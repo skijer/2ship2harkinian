@@ -763,4 +763,22 @@ void Player_UnsetMask(struct PlayState* play);
 #define NA_SE_EN_FANTOM_LAUGH NA_SE_NONE
 #endif
 
+/* Link-time stubs defined in mods/nei_link_stubs.cpp: OoT internals with no MM equivalent, all
+ * called in statement context. Empty parameter lists on purpose — the linker matches by name, and
+ * so did the C99 implicit declaration these calls relied on until clang started rejecting it. */
+int func_8002829C();
+int func_8002F6D4();
+int func_80033480();
+int func_8005B1A4();
+int func_80077D10();
+int func_8009728C();
+int func_80097534();
+int Sfx_PlaySfxCentered();
+int SkelAnime_DrawSkeleton2();
+int Entrance_OverrideNextIndex();
+int Scene_SetTransitionForNextEntrance();
+
+/* MM rumble. Stubbed in nei_link_stubs.cpp, so the effect is inert until it is wired up. */
+void func_800AA000(f32 distSq, u8 sourceIntensity, u8 decayTimer, u8 decayStep);
+
 #endif /* NEI_OOT_COMPAT_H */

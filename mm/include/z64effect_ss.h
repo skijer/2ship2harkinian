@@ -153,6 +153,7 @@ void EffectSsIcePiece_SpawnBurst(struct PlayState* play, Vec3f* refPos, f32 scal
 void func_800B2B44(struct PlayState* play, struct Actor* actor, Vec3f* pos, f32 scale);
 void func_800B2B7C(struct PlayState* play, struct Actor* actor, Vec3s* arg2, f32 scale);
 void EffectSsEnIce_Spawn(struct PlayState* play, Vec3f* pos, f32 scale, Vec3f* velocity, Vec3f* accel, Color_RGBA8* primColor, Color_RGBA8* envColor, s32 life);
+void EffectSsEnIce_SpawnFlying(struct PlayState* play, struct Actor* actor, Vec3f* pos, Color_RGBA8* primColor, Color_RGBA8* envColor, f32 scale);
 void EffectSsFireTail_Spawn(struct PlayState* play, struct Actor* actor, Vec3f* pos, f32 scale, Vec3f* arg4, s16 arg5, Color_RGBA8* primColor, Color_RGBA8* envColor, s16 type, s16 bodyPart, s32 life);
 void EffectSsFireTail_SpawnFlame(struct PlayState* play, struct Actor* actor, Vec3f* pos, f32 arg3, s16 bodyPart, f32 colorIntensity);
 void EffectSsFireTail_SpawnFlameOnPlayer(struct PlayState* play, f32 scale, s16 bodyPart, f32 colorIntensity);

@@ -14,6 +14,8 @@
 #include "functions.h"
 #include "variables.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
+// Before the helpers: they call OoT names too, and individual item headers pull this in too late.
+#include "../../nei_oot_compat.h"
 
 // Helper modules
 // REAL MM player shims (poses/anims/state) — FIRST so all later files see true prototypes.
