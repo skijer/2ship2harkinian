@@ -1193,8 +1193,6 @@ static Actor* sUhHighlightTarget = NULL;
 // ACTION changes and cached in nextModelGroup, so changing what
 // ExtPlayer_GetActionModelGroup returns mid-hold has no effect on its own: nothing
 // asks again. Grabbing and releasing have to ask for it explicitly.
-s32 Player_ActionToModelGroup(Player* this, s32 actionParam);
-void Player_SetModels(Player* this, s32 modelGroup);
 
 // -- the tint ------------------------------------------------------------------
 // Zonai green, on the actor's own model. NOT Actor_SetColorFilter - that offers white, red

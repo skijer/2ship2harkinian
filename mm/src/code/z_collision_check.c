@@ -1,5 +1,6 @@
 #include "z64collision_check.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 
 // Skijer's NEI shared time control (mods/items/helpers/timestop_helper.c): caches which AC
 // colliders each actor registers so frozen actors can stay hittable during a time stop.

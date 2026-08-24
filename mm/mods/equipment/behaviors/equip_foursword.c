@@ -409,8 +409,6 @@ static void FourSword_Cleanup(void) {
 // upperLimbRot matrix corrections at PLAYER_LIMB_UPPER (via Common), plus
 // equipment DL selection for L_HAND / R_HAND / SHEATH / WAIST. Passing player
 // as arg makes the clone show the same sword+shield+sheath as Link himself.
-extern s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
-                                                  void* arg);
 
 // ─── Clone tunic colors (Four Swords Adventures style) ───────────────────────
 // Red, Blue, Purple — one per clone. Applied via gDPSetEnvColor before drawing

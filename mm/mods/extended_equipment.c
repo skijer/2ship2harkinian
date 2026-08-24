@@ -16,7 +16,6 @@
 #include "pak_loader/pak_loader.h"
 #include "oot_asset_loader/oot_asset_loader.h" // Trident: Phantom Ganon's lance lives in oot.o2r
 
-extern MmPlayerTransformation MmForm_GetCurrentForm(void);
 // trade_items.c ships no header; declared locally, as the save editor does. The Pendant of
 // Memories lives on the adult trade wheel — that bit is its ONLY ownership flag since the ext
 // BOOTS-2 grid slot became the Climb Boots (Skijer 2026-07-29).
