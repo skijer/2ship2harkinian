@@ -21,6 +21,11 @@
 #include "../helpers/camera_helper.h"
 // (OoT Bg_Ice_Shelter red-ice puzzle blocks have no MM analog — removed)
 
+// The shard colors MM bakes into func_800B2B44; kept explicit so the call reads like
+// the OoT original it was ported from.
+static Color_RGBA8 sIceShardPrim = { 150, 150, 150, 250 };
+static Color_RGBA8 sIceShardEnv = { 235, 245, 255, 255 };
+
 static ItemEquipState sIceEquipState = { 0 };
 static s8 sIcePrevInvinc = 0;
 static u8 sIceLastSwingType = 0xFF; // "no swing" sentinel — must NOT be 0 (== PLAYER_MWA_FORWARD_SLASH_1H,
@@ -221,8 +226,7 @@ static u8 IceRod_CheckHit(ColliderCylinder* col, Vec3f* pos, PlayState* play, Pl
                 // Apply blue color filter for frozen appearance (0x4000 = blue tint)
                 Actor_SetColorFilter(hitActor, 0x4000, 255, 0x2000, ICE_ROD_FREEZE_DURATION);
                 // Spawn ice visual effect on the frozen enemy
-                EffectSsEnIce_SpawnFlyingVec3f(play, hitActor, &hitActor->world.pos, 150, 150, 150, 250, 235, 245, 255,
-                                               1.0f);
+                EffectSsEnIce_SpawnFlying(play, hitActor, &hitActor->world.pos, &sIceShardPrim, &sIceShardEnv, 1.0f);
                 Audio_PlayActorSound2(hitActor, NA_SE_PL_FREEZE_S);
             }
         }
@@ -415,8 +419,8 @@ static void IceRod_UpdateIceWave(Player* p, PlayState* play) {
                     if (hitActor->category == ACTORCAT_ENEMY || hitActor->category == ACTORCAT_BOSS) {
                         hitActor->freezeTimer = ICE_ROD_FREEZE_DURATION;
                         Actor_SetColorFilter(hitActor, 0x4000, 255, 0x2000, ICE_ROD_FREEZE_DURATION);
-                        EffectSsEnIce_SpawnFlyingVec3f(play, hitActor, &hitActor->world.pos, 150, 150, 150, 250, 235,
-                                                       245, 255, 1.0f);
+                        EffectSsEnIce_SpawnFlying(play, hitActor, &hitActor->world.pos, &sIceShardPrim, &sIceShardEnv,
+                                                  1.0f);
                         Audio_PlayActorSound2(hitActor, NA_SE_PL_FREEZE_S);
                     }
                 }
@@ -578,8 +582,7 @@ static void IceRod_UpdateSpinIce(Player* p, PlayState* play) {
             if (hitActor->category == ACTORCAT_ENEMY || hitActor->category == ACTORCAT_BOSS) {
                 hitActor->freezeTimer = ICE_ROD_FREEZE_DURATION;
                 Actor_SetColorFilter(hitActor, 0x4000, 255, 0x2000, ICE_ROD_FREEZE_DURATION);
-                EffectSsEnIce_SpawnFlyingVec3f(play, hitActor, &hitActor->world.pos, 150, 150, 150, 250, 235, 245, 255,
-                                               1.0f);
+                EffectSsEnIce_SpawnFlying(play, hitActor, &hitActor->world.pos, &sIceShardPrim, &sIceShardEnv, 1.0f);
                 EffectSsIcePiece_SpawnBurst(play, &hitActor->world.pos, 1.0f);
                 Audio_PlayActorSound2(hitActor, NA_SE_PL_FREEZE_S);
             }

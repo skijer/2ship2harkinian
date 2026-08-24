@@ -649,10 +649,6 @@
 #ifndef Matrix_RotateZ
 #define Matrix_RotateZ Matrix_RotateZF
 #endif
-/* OoT EnIce flying-shard spawn (Vec3f pos) → MM EffectSsEnIce_SpawnFlying (same args). */
-#ifndef EffectSsEnIce_SpawnFlyingVec3f
-#define EffectSsEnIce_SpawnFlyingVec3f EffectSsEnIce_SpawnFlying
-#endif
 /* NEI player shims (real MM impls in mods/items/helpers/nei_player_shims.c, same TU).
  * Prototyped here because extended_inventory.c (z_player.c line ~75) calls them BEFORE the
  * shim definitions are included via custom_items.c (line ~76). */
