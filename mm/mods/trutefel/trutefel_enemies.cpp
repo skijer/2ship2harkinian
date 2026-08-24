@@ -22,6 +22,11 @@
 // takes C++ linkage unless a C declaration exists at file scope. Force the C symbols (same trick
 // as boss_remains.cpp / spiritual_stones.cpp / PropHunt.cpp) so the macro's redeclaration matches
 // and links.
+// At GLOBAL scope, before the extern "C" block below: z64.h pulls in <memory> under C++, and a
+// template cannot have C linkage. Getting it in first makes the include inside that block a no-op.
+#include "z64.h"
+#include <math.h> // sqrtf / fabsf, used by the ported actor .c files
+
 extern "C" {
 void FrameInterpolation_RecordOpenChild(const void* a, int b);
 void FrameInterpolation_RecordCloseChild(void);

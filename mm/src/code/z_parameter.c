@@ -49,6 +49,7 @@ uint8_t Sw97_EffectiveElement(uint8_t isSling);
 uint8_t Sw97_IsBowItem(uint16_t item);
 uint8_t Sw97_IsSlingItem(uint16_t item);
 uint16_t Sw97_ElementIcon(uint8_t elem);
+uint8_t Sw97_ItemHasBombs(uint16_t item);
 
 // 2S2H [Port] This was originally static but needs to be global so it can be accessed in z_kaleido_collect,
 // z_kaleido_debug, and z_kaleido_draw.
