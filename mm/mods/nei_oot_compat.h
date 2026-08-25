@@ -778,8 +778,6 @@ int Flags_GetItemGetInf();
 int Flags_SetItemGetInf();
 int Magic_RequestChange();
 int SwitchAge();
-int func_80837C0C();
-int func_8083821C();
 int func_80839FFC();
 
 /* MM rumble. Stubbed in nei_link_stubs.cpp, so the effect is inert until it is wired up. */
