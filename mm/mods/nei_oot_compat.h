@@ -773,6 +773,14 @@ int Sfx_PlaySfxCentered();
 int SkelAnime_DrawSkeleton2();
 int Entrance_OverrideNextIndex();
 int Scene_SetTransitionForNextEntrance();
+int Player_UpperAction_Sword();
+int Flags_GetItemGetInf();
+int Flags_SetItemGetInf();
+int Magic_RequestChange();
+int SwitchAge();
+int func_80837C0C();
+int func_8083821C();
+int func_80839FFC();
 
 /* MM rumble. Stubbed in nei_link_stubs.cpp, so the effect is inert until it is wired up. */
 void func_800AA000(f32 distSq, u8 sourceIntensity, u8 decayTimer, u8 decayStep);

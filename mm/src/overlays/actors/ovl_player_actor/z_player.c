@@ -68,6 +68,7 @@
 // the sibling .cpp files compile standalone via the CMake mods/expansions glob.
 // (sm64 is intentionally NOT re-listed — it's the 2ship-native block above.)
 #include "mods/nei_oot_compat.h" // OoT->MM compat (PLAYER_STATE/PLAYER_IA/ITEM/M_PI) for the item files
+s32 Player_PutAwayHeldItem(PlayState* play, Player* this); // defined below, called from power_keg.c
 #include "mods/items/custom_items.h"
 #include "mods/items/custom_bottles.h"
 #include "mods/extended_player.h"
