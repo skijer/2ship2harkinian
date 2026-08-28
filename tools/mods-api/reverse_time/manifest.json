@@ -1,0 +1,11 @@
+{
+    "name": "reverse_time",
+    "author": "claude",
+    "version": "1.0",
+    "description": "The clock runs backwards.",
+    "binaries": {
+        "windows_x64": "bin/reverse_time.dll",
+        "linux_x64": "bin/reverse_time.so",
+        "darwin": "bin/reverse_time.dylib"
+    }
+}

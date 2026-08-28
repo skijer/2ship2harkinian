@@ -1,0 +1,11 @@
+{
+    "name": "hello_mod",
+    "author": "claude",
+    "version": "1.0",
+    "description": "Says hello when you pick up a recovery heart. The smallest example.",
+    "binaries": {
+        "windows_x64": "bin/hello_mod.dll",
+        "linux_x64": "bin/hello_mod.so",
+        "darwin": "bin/hello_mod.dylib"
+    }
+}

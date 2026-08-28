@@ -1,0 +1,96 @@
+name: mods-api
+
+on:
+  push:
+    paths:
+      - 'tools/mods-api/**'
+      - 'mm/2s2h/ModApi/**'
+      - '.github/workflows/mods-api.yml'
+  pull_request:
+    paths:
+      - 'tools/mods-api/**'
+      - 'mm/2s2h/ModApi/**'
+      - '.github/workflows/mods-api.yml'
+  workflow_dispatch:
+
+env:
+  MODS: hello_mod floor_is_lava faster_on_damage reverse_time enemy_rain
+  INCLUDES: >-
+    -I mm/2s2h/ModApi -I mm/include -I mm/include/PR -I mm/assets
+    -I mm/src -I mm -I mm/2s2h -I libultraship/include
+
+jobs:
+  build:
+    name: build-${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows_x64
+            extension: dll
+            flags: ''
+          - os: ubuntu-22.04
+            platform: linux_x64
+            extension: so
+            flags: '-fPIC'
+          - os: macos-14
+            platform: darwin
+            extension: dylib
+            flags: '-fPIC'
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Configure Developer Command Prompt
+        if: matrix.platform == 'windows_x64'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build mods
+        shell: bash
+        run: |
+          mkdir -p out
+          for mod in $MODS; do
+            echo "::group::$mod"
+            clang -shared ${{ matrix.flags }} -O2 -o "out/$mod.${{ matrix.extension }}" \
+              "tools/mods-api/$mod/$mod.c" $INCLUDES -w
+            echo "::endgroup::"
+          done
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: mods-${{ matrix.platform }}
+          path: out/*.${{ matrix.extension }}
+
+  pack:
+    name: pack
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v6
+
+      - name: Download binaries
+        uses: actions/download-artifact@v8
+        with:
+          path: binaries
+
+      - name: Pack mods
+        run: |
+          for mod in $MODS; do
+            python3 tools/mods-api/pack_mod.py "$mod" \
+              --binary "windows_x64=binaries/mods-windows_x64/$mod.dll" \
+              --binary "linux_x64=binaries/mods-linux_x64/$mod.so" \
+              --binary "darwin=binaries/mods-darwin/$mod.dylib" \
+              --out out/mods
+          done
+
+      - name: Upload mods
+        uses: actions/upload-artifact@v7
+        with:
+          name: mods
+          path: out/mods/*.o2r

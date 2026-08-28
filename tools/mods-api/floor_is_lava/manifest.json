@@ -1,0 +1,11 @@
+{
+    "name": "floor_is_lava",
+    "author": "claude",
+    "version": "1.0",
+    "description": "Standing on the ground burns you, unless you wear the Circus Leader's Mask.",
+    "binaries": {
+        "windows_x64": "bin/floor_is_lava.dll",
+        "linux_x64": "bin/floor_is_lava.so",
+        "darwin": "bin/floor_is_lava.dylib"
+    }
+}
