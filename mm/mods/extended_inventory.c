@@ -729,6 +729,9 @@ void* ExtInv_GetCustomItemNameTex(uint16_t itemId, uint8_t language) {
             case ITEM_HAMMER:
                 ootPath = "__OTR__textures/item_name_static/gMegatonHammerItemNameENGTex";
                 break;
+            case ITEM_BOTTLE_LETTER_RUTO:
+                ootPath = "__OTR__textures/item_name_static/gRutosLetterItemNameENGTex";
+                break;
             default:
                 break;
         }
@@ -856,6 +859,9 @@ void* ExtInv_GetItemIcon(uint16_t itemId) {
             case ITEM_ROCS_FEATHER:
                 ootPath = "__OTR__textures/icon_item_static/gRocsFeatherTex";
                 break; // ship-vanilla art (baked)
+            case ITEM_BOTTLE_LETTER_RUTO:
+                ootPath = "__OTR__textures/icon_item_static/gItemIconBottleRutosLetterTex";
+                break;
             default:
                 break;
         }
@@ -1060,6 +1066,18 @@ void* ExtInv_GetItemIcon(uint16_t itemId) {
             t = MmAssets_LoadResource("__OTR__icon_item_static_yar/gItemIconLetterToMamaTex");
         if (t)
             return t;
+    }
+
+    // Adult-Link swords are NEI sentinel ids (Master 0xDE / Biggoron 0xDF / Giant's Knife 0xEC) with no
+    // gItemIcons[] entry, so a B/C-button sword fell through to the default gItemIcons[0] = the OCARINA
+    // icon. Return the real OoT icon path (interpreter resolves it), FileExists-gated so a missing OoT
+    // icon yields empty rather than the wrong ocarina.
+    if (itemId == ITEM_SWORD_MASTER || itemId == ITEM_SWORD_BGS || itemId == ITEM_SWORD_KNIFE) {
+        const char* p = (itemId == ITEM_SWORD_BGS) ? "__OTR__textures/icon_item_static/gItemIconSwordBiggoronTex"
+                        : (itemId == ITEM_SWORD_KNIFE)
+                            ? "__OTR__textures/icon_item_static/gItemIconSwordKnifeTex"
+                            : "__OTR__textures/icon_item_static/gItemIconSwordMasterTex";
+        return ResourceMgr_FileExists(p) ? (void*)p : NULL;
     }
 
     if (itemId < 156) {

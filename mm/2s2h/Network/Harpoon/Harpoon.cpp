@@ -14,7 +14,8 @@
 //   gNetwork.Harpoon.Host                : string  (default "54.209.53.9")
 //   gNetwork.Harpoon.Port                : int     (default 8765)
 //   gNetwork.Harpoon.Name                : string  (default "Player")
-//   gNetwork.Harpoon.Color.Value         : color   (default white)
+//   gNetwork.Harpoon.Color.Value         : color   (default green, fixed at connect time)
+//   gNetwork.Harpoon.ShowNametags        : int     (default 1 — each player's own call)
 //   gNetwork.Harpoon.ShowOtherPlayersOnMinimap : int (default 0 — OFF)
 // =============================================================================
 
@@ -25,6 +26,7 @@ constexpr const char* CVAR_HOST = "gNetwork.Harpoon.Host";
 constexpr const char* CVAR_PORT = "gNetwork.Harpoon.Port";
 constexpr const char* CVAR_NAME = "gNetwork.Harpoon.Name";
 constexpr const char* CVAR_COLOR = "gNetwork.Harpoon.Color.Value";
+constexpr const char* CVAR_SHOW_NAMETAGS = "gNetwork.Harpoon.ShowNametags";
 
 constexpr const char* CLIENT_VERSION = "2S2H-Harpoon/0.1";
 } // namespace
@@ -189,6 +191,9 @@ void Harpoon::OnWsConnected() {
     // "no me deja conectarme"). color is an {r,g,b} object; installedGamemodes
     // is the list of folders under harpoon/gamemodes/ that have a gamemode.yaml.
     Color_RGBA8 color = CVarGetColor(CVAR_COLOR, Color_RGBA8{ 100, 255, 100, 255 });
+    // Snapshot it: this is the value the room roster will hand to everyone else, so our own tunic
+    // has to keep drawing with it even if the CVar moves later.
+    ownColorRgba_.store(((uint32_t)color.r << 24) | ((uint32_t)color.g << 16) | ((uint32_t)color.b << 8) | 0xFF);
     json payload = {
         { "protocol", "harpoon" },
         { "name", CVarGetString(CVAR_NAME, "Player") },
@@ -633,6 +638,14 @@ std::vector<HarpoonRoomInfo> Harpoon::GetRoomListSnapshot() const {
     return roomList_;
 }
 
+uint32_t Harpoon::OwnColorRgba() const {
+    if (state_.load() != HarpoonConnState::InRoom) {
+        return 0;
+    }
+
+    return ownColorRgba_.load();
+}
+
 // -----------------------------------------------------------------------------
 // Gamemode-driven behavior. These replace the old manual CVar checkboxes — the
 // active room's gamemode decides what's on, exactly like the gamemode.yaml says.
@@ -650,10 +663,9 @@ bool Harpoon::IsPvpActive() const {
 }
 
 bool Harpoon::NametagsVisible() const {
-    std::lock_guard<std::mutex> lk(stateMutex_);
-    if (state_.load() != HarpoonConnState::InRoom)
-        return false;
-    return gameMode_ != "geoguessr"; // hidden in geoguessr by design
+    // Purely the local player's call, in every gamemode: geoguessr hides them by design, but who
+    // gets to see whom is not something one client can enforce on another.
+    return state_.load() == HarpoonConnState::InRoom && CVarGetInteger(CVAR_SHOW_NAMETAGS, 1);
 }
 
 bool Harpoon::MinimapVisible() const {

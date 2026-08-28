@@ -34,6 +34,14 @@ extern void FleetPicto_OnPhotoDiscarded(void);
 #include <libultraship/bridge/gfxbridge.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 
+// mods/actors/master_cycle.c — the Master Cycle rides on Epona's actor, so every "is he on a horse"
+// test in the HUD answers yes for it too. None of what those tests do is right for a bike: they
+// swap B for the bow, draw the carrot boosts and cut the HUD down to A+B+minimap. This asks the
+// narrower question the interface actually means. Skijer's NEI
+u8 MasterCycle_IsRiding(void);
+#define PLAYER_ON_REAL_HORSE(player) \
+    (((player)->stateFlags1 & PLAYER_STATE1_800000) && !MasterCycle_IsRiding())
+
 // Skijer's NEI: OoT Fairy Slingshot item id (canonical def in mods/extended_inventory.h, same
 // guarded value) — mirrored here so the HUD ammo code doesn't pull the whole NEI header in.
 #ifndef ITEM_FAIRY_SLINGSHOT
@@ -3714,11 +3722,11 @@ void Interface_UpdateButtonsPart1(PlayState* play) {
 
     if (gSaveContext.save.cutsceneIndex < 0xFFF0) {
         gSaveContext.hudVisibilityForceButtonAlphasByStatus = false;
-        if ((player->stateFlags1 & PLAYER_STATE1_800000) || CHECK_WEEKEVENTREG(WEEKEVENTREG_08_01) ||
+        if (PLAYER_ON_REAL_HORSE(player) || CHECK_WEEKEVENTREG(WEEKEVENTREG_08_01) ||
             (!CHECK_EVENTINF(EVENTINF_41) && (play->bButtonAmmoPlusOne >= 2))) {
             // Riding Epona OR Honey & Darling minigame OR Horseback balloon minigame OR related to swamp boat
             // (non-minigame?)
-            if ((player->stateFlags1 & PLAYER_STATE1_800000) && (player->currentMask == PLAYER_MASK_BLAST) &&
+            if (PLAYER_ON_REAL_HORSE(player) && (player->currentMask == PLAYER_MASK_BLAST) &&
                 (gSaveContext.bButtonStatus == BTN_DISABLED)) {
                 // Riding Epona with blast mask?
                 restoreHudVisibility = true;
@@ -3838,12 +3846,12 @@ void Interface_UpdateButtonsPart1(PlayState* play) {
                         gSaveContext.shipSaveContext.dpad.status[EQUIP_SLOT_D_UP] = BTN_DISABLED;
                         // #endregion
                         Interface_SetHudVisibility(HUD_VISIBILITY_A_B_MINIMAP);
-                    } else if (player->stateFlags1 & PLAYER_STATE1_800000) {
+                    } else if (PLAYER_ON_REAL_HORSE(player)) {
                         Interface_SetHudVisibility(HUD_VISIBILITY_A_B_MINIMAP);
                     }
                 }
             } else {
-                if (player->stateFlags1 & PLAYER_STATE1_800000) {
+                if (PLAYER_ON_REAL_HORSE(player)) {
                     Interface_SetHudVisibility(HUD_VISIBILITY_A_B_MINIMAP);
                 }
 
@@ -3914,7 +3922,7 @@ void Interface_UpdateButtonsPart1(PlayState* play) {
                     gSaveContext.shipSaveContext.dpad.status[EQUIP_SLOT_D_UP] = BTN_DISABLED;
                     // #endregion
                     Interface_SetHudVisibility(HUD_VISIBILITY_A_B_MINIMAP);
-                } else if (player->stateFlags1 & PLAYER_STATE1_800000) {
+                } else if (PLAYER_ON_REAL_HORSE(player)) {
                     Interface_SetHudVisibility(HUD_VISIBILITY_A_B_MINIMAP);
                 }
             }
@@ -4244,6 +4252,8 @@ s16 sAmmoRefillCounts[] = { 5, 10, 20, 30 }; // Sticks, nuts, bombs
 s16 sArrowRefillCounts[] = { 10, 30, 40, 50 };
 s16 sBombchuRefillCounts[] = { 20, 10, 1, 5 };
 s16 sRupeeRefillCounts[] = { 1, 5, 10, 20, 50, 100, 200 };
+
+extern uint8_t Bottle_GiveBottle(uint16_t contentItem); // Skijer's NEI — 8-slot bottle wheel
 
 // 2S2H [Enhancements] This was originally Item_Give, we wrapped it for hooking purposes
 u8 Item_GiveImpl(PlayState* play, u8 item) {
@@ -4597,6 +4607,14 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
     } else if (item == ITEM_BOTTLE) {
         slot = SLOT(item);
 
+        // Skijer's NEI — a give that grants a NEW bottle (this branch and the ITEM_MILK_BOTTLE one
+        // below look for a FREE slot, unlike content refills which look for an empty bottle) belongs
+        // in the 8-slot wheel. Vanilla would drop it into MM's spare slot 5/6 and leave the residue
+        // killer to migrate it a frame later.
+        if (Bottle_GiveBottle(item)) {
+            return ITEM_NONE;
+        }
+
         for (i = BOTTLE_FIRST; i < BOTTLE_MAX; i++) {
             if (gSaveContext.save.saveInfo.inventory.items[slot + i] == ITEM_NONE) {
                 gSaveContext.save.saveInfo.inventory.items[slot + i] = item;
@@ -4672,6 +4690,9 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
                 }
             }
         } else {
+            if (Bottle_GiveBottle(item)) {
+                return ITEM_NONE;
+            }
             for (i = BOTTLE_FIRST; i < BOTTLE_MAX; i++) {
                 if (gSaveContext.save.saveInfo.inventory.items[slot + i] == ITEM_NONE) {
                     gSaveContext.save.saveInfo.inventory.items[slot + i] = item;
@@ -6843,7 +6864,7 @@ void Interface_DrawBButtonIcons(PlayState* play) {
         if ((player->transformation == PLAYER_FORM_FIERCE_DEITY) || (player->transformation == PLAYER_FORM_HUMAN)) {
             if (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) != ITEM_NONE) {
                 Interface_DrawItemIconTexture(play, interfaceCtx->iconItemSegment[EQUIP_SLOT_B], EQUIP_SLOT_B);
-                if ((player->stateFlags1 & PLAYER_STATE1_800000) || CHECK_WEEKEVENTREG(WEEKEVENTREG_08_01) ||
+                if (PLAYER_ON_REAL_HORSE(player) || CHECK_WEEKEVENTREG(WEEKEVENTREG_08_01) ||
                     (play->bButtonAmmoPlusOne >= 2)) {
                     gDPPipeSync(OVERLAY_DISP++);
                     gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE,

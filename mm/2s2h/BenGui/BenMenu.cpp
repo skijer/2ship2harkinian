@@ -2312,6 +2312,10 @@ static void HarpoonMainMenu() {
     }
     ImGui::EndDisabled();
 
+    // Your tunic color, and the color your name and nametag are drawn in for everyone else. The
+    // server hands it to the room from the handshake, so it is locked for the session once you
+    // connect — same as the host and the name.
+    ImGui::BeginDisabled(inputLocked);
     Color_RGBA8 color = CVarGetColor("gNetwork.Harpoon.Color.Value", { 100, 255, 100, 255 });
     float colorF[3] = { color.r / 255.0f, color.g / 255.0f, color.b / 255.0f };
     if (ImGui::ColorEdit3("Color", colorF)) {
@@ -2319,6 +2323,10 @@ static void HarpoonMainMenu() {
         color.g = (u8)(colorF[1] * 255);
         color.b = (u8)(colorF[2] * 255);
         CVarSetColor("gNetwork.Harpoon.Color.Value", color);
+    }
+    ImGui::EndDisabled();
+    if (inputLocked) {
+        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Color is set when you connect.");
     }
 
     ImGui::Separator();
@@ -2469,17 +2477,20 @@ static void HarpoonMainMenu() {
         }
     }
 
-    // Active gamemode effects — read-only. The room's gamemode.yaml decides
-    // these (no manual toggles): geoguessr => PvP on, nametags + minimap hidden.
+    // What the room's gamemode.yaml turns on (PvP is not a manual toggle), plus the one display
+    // choice that is each player's own: whether they see the other players' nametags.
     if (inRoom) {
         ImGui::Separator();
         ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "Active mode: %s", harpoon->GameMode().c_str());
+        ImGui::Text("PvP %s", harpoon->IsPvpActive() ? "ON" : "OFF");
+
+        bool showNametags = CVarGetInteger("gNetwork.Harpoon.ShowNametags", 1) != 0;
+        if (ImGui::Checkbox("Show player nametags", &showNametags)) {
+            CVarSetInteger("gNetwork.Harpoon.ShowNametags", showNametags);
+        }
         if (harpoon->IsGeoguessr()) {
-            ImGui::TextColored(ImVec4(0.6f, 0.9f, 0.6f, 1.0f),
-                               "PvP ON  -  nametags & minimap HIDDEN (find each other by sight)");
-        } else {
-            ImGui::Text("PvP %s  -  nametags/minimap %s", harpoon->IsPvpActive() ? "ON" : "OFF",
-                        harpoon->NametagsVisible() ? "shown" : "hidden");
+            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f),
+                               "Geoguessr is meant to be played with these off - find each other by sight.");
         }
     }
 }

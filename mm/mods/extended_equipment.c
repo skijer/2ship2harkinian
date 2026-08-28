@@ -15,6 +15,7 @@
 #include "transformation_masks/assets/mm_asset_loader.h"
 #include "pak_loader/pak_loader.h"
 #include "oot_asset_loader/oot_asset_loader.h" // Trident: Phantom Ganon's lance lives in oot.o2r
+#include "2s2h/FleetShipCombo/FleetComboIds.h"  // FC_SHIELD_IKANA (Trident's Mirror fallback)
 
 // trade_items.c ships no header; declared locally, as the save editor does. The Pendant of
 // Memories lives on the adult trade wheel — that bit is its ONLY ownership flag since the ext
@@ -97,7 +98,7 @@ static const u8 sExtEquipAgeReqs[4][3] = {
     { AGE_REQ_NONE, AGE_REQ_CHILD, AGE_REQ_NONE },
     { AGE_REQ_NONE, AGE_REQ_NONE, AGE_REQ_CHILD },
     { AGE_REQ_NONE, AGE_REQ_NONE, AGE_REQ_NONE },
-    { AGE_REQ_NONE, AGE_REQ_NONE, AGE_REQ_ADULT },
+    { AGE_REQ_NONE, AGE_REQ_NONE, AGE_REQ_NONE }, // Roc's Boots: any age (the ADULT was the old Dragon Scale's)
 };
 
 u8 ExtEquip_GetAgeReq(s16 equipType, u8 index) {
@@ -144,7 +145,11 @@ void ExtEquip_OnPlayerSceneInit(void) {
     TridentChargeBall_Forget();
 }
 
+// While ExtEquip_Init migrates a save, slot changes must not poke the half-built player.
+static u8 sExtEquipInitInProgress = 0;
+
 void ExtEquip_Init(void) {
+    sExtEquipInitInProgress = 1;
     ExtEquip_OnPlayerSceneInit();
     memset(&gExtEquipState, 0, sizeof(gExtEquipState));
     memset(&gExtEquipBehavior, 0, sizeof(gExtEquipBehavior));
@@ -218,6 +223,7 @@ void ExtEquip_Init(void) {
 
     // Generate placeholder icons
     ExtEquip_GenerateIcons();
+    sExtEquipInitInProgress = 0;
 }
 
 void ExtEquip_Update(void) {
@@ -225,11 +231,17 @@ void ExtEquip_Update(void) {
         gExtEquipState.pageSwitchTimer--;
     }
 
-    // If cheat was disabled, reset page and clear equipped state
+    // Cheat switched off mid-game: take every ext piece off cleanly (cleanup + vanilla base) instead
+    // of freezing its behavior mid-effect.
     if (!ExtEquip_IsEnabled()) {
+        s16 t;
+
         gExtEquipState.equipPage = 0;
-        // Don't clear equipped state here — it persists in CVars
-        // and will be re-applied when cheat is re-enabled
+        for (t = EQUIP_TYPE_SWORD; t <= EQUIP_TYPE_BOOTS; t++) {
+            if (ExtEquip_GetCurrent(t) != 0) {
+                ExtEquip_SetSlot(t, 0);
+            }
+        }
     }
 }
 
@@ -397,6 +409,11 @@ void ExtEquip_SagesFlashTick(void) {
     }
 }
 
+void ExtEquip_SagesFlashReset(void) {
+    sSagesFlashTimer = 0;
+    sSagesFlashResist = 0;
+}
+
 void ExtEquip_GetSagesTunicColor(u8* r, u8* g, u8* b) {
     *r = 235;
     *g = 240;
@@ -449,34 +466,120 @@ void ExtEquip_GiveItem(s16 equipType, u8 index) {
     Nei_Save()->extEquipOwnedBits |= ExtEquip_GetBit(equipType, index); // Skijer's NEI
 }
 
-// Clear vanilla equipment base that was set for ext equipment.
-// Called only from explicit toggle-off paths (not from vanilla equip path,
-// which sets its own vanilla equipment before calling ExtEquip_Unequip).
-static void ExtEquip_ClearVanillaEquip(s16 equipType) {
-    switch (equipType) {
-        case EQUIP_TYPE_SWORD:
-            // 2ship: MM's Inventory_ChangeEquipment(s16) only touches the shield, so set
-            // the sword nibble directly via SET_EQUIP_VALUE (faithful to OoT's 2-arg call).
-            SET_EQUIP_VALUE(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_NONE);
-            gSaveContext.save.saveInfo.equips.buttonItems[0][0] = ITEM_NONE; // 2ship: nested equips, B button
-            break;
-        case EQUIP_TYPE_SHIELD:
-            Inventory_ChangeEquipment(EQUIP_VALUE_SHIELD_NONE); // 2ship: 1-arg (shield-only) in MM
-            break;
-        default:
-            break;
-    }
-}
-
 void ExtEquip_RemoveItem(s16 equipType, u8 index) {
     if (index == 0 || index > 3 || equipType < 0 || equipType > 3)
         return;
     Nei_Save()->extEquipOwnedBits &= ~ExtEquip_GetBit(equipType, index); // Skijer's NEI
-    // If currently equipped, unequip and clear vanilla base
     if (ExtEquip_GetCurrent(equipType) == index) {
-        ExtEquip_Unequip(equipType);
-        ExtEquip_ClearVanillaEquip(equipType);
+        ExtEquip_SetSlot(equipType, 0);
     }
+}
+
+// ---------------------------------------------------------------------------
+// The single writer of an equipped ext slot. Every path that changes a slot — kaleido, C button,
+// give/remove, transforms, FleetSync, cheat toggle — goes through ExtEquip_SetSlot, so the outgoing
+// piece is always cleaned up synchronously and the player/vanilla state never lags a frame behind.
+// ---------------------------------------------------------------------------
+void ExtEquip_RefreshPlayer(void) {
+    // player->currentShield/currentBoots + model group only follow the equipment nibbles through
+    // Player_SetEquipmentData; nothing else refreshes them until the next scene load.
+    if (gPlayState != NULL && !sExtEquipInitInProgress) {
+        Player* player = GET_PLAYER(gPlayState);
+        if (player != NULL) {
+            Player_SetEquipmentData(gPlayState, player);
+        }
+    }
+}
+
+static void ExtEquip_ReloadBIcon(void) {
+    if (gPlayState != NULL) {
+        Interface_LoadItemIconImpl(gPlayState, EQUIP_SLOT_B);
+    }
+}
+
+// Vanilla state each slot value implies. index 0 = the slot was just vacated: a sword/shield ext
+// piece leaves Link BARE (user decision — nothing he wore before is restored), ext tunics/boots
+// fall back to Kokiri.
+static void ExtEquip_ApplyVanillaBase(s16 equipType, u8 oldIndex, u8 index) {
+    switch (equipType) {
+        case EQUIP_TYPE_SWORD:
+            // Four Sword / Trident ride the B button as THEMSELVES (ExtPlayer_GetItemAction aliases
+            // their ids to the one-hand sword action): the equipment nibble and the save never see a
+            // Kokiri Sword the player may not own. Byrna is an add-on to whatever sword is held.
+            if (index == 2 || index == 3) {
+                gSaveContext.save.saveInfo.equips.buttonItems[0][0] = ExtEquip_GetItemId(EQUIP_TYPE_SWORD, index);
+                ExtEquip_ReloadBIcon();
+            } else if (index == 0 && (oldIndex == 2 || oldIndex == 3)) {
+                SET_EQUIP_VALUE(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_NONE);
+                gSaveContext.save.saveInfo.equips.buttonItems[0][0] = ITEM_NONE;
+                ExtEquip_ReloadBIcon();
+            }
+            break;
+        case EQUIP_TYPE_SHIELD:
+            // Ikana IS MM's Mirror Shield; the other two ride the Hero Shield (OoT Hylian == MM Hero).
+            if (index == 0) {
+                Inventory_ChangeEquipment(EQUIP_VALUE_SHIELD_NONE);
+            } else if (index == 3) {
+                Inventory_ChangeEquipment(EQUIP_VALUE_SHIELD_MIRROR);
+            } else {
+                Inventory_ChangeEquipment(EQUIP_VALUE_SHIELD_HERO);
+            }
+            break;
+        case EQUIP_TYPE_TUNIC:
+            // Exclusive with the Goron/Zora tunic in both directions; both land on Kokiri.
+            SET_EQUIP_VALUE(EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_KOKIRI);
+            Nei_Save()->vanillaTunic = 0;
+            break;
+        case EQUIP_TYPE_BOOTS:
+            // Exclusive with the Iron/Hover boots in both directions.
+            Nei_Save()->vanillaBoots = 0;
+            break;
+    }
+}
+
+// Trident: only the Divine Shield (ext 1) or a Mirror (Ikana ext 3 = MM Mirror, or the native
+// Mirror value) may be held with it.
+u8 ExtEquip_TridentAllowsShield(u8 extIndex, u16 vanillaValue) {
+    if (extIndex == 1 || extIndex == 3) {
+        return 1;
+    }
+    return (extIndex == 0) && (vanillaValue == EQUIP_VALUE_SHIELD_MIRROR);
+}
+
+static void ExtEquip_ApplyTridentShieldPolicy(void) {
+    if (ExtEquip_TridentAllowsShield(ExtEquip_GetCurrent(EQUIP_TYPE_SHIELD), GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD))) {
+        return;
+    }
+    if (ExtEquip_HasItem(EQUIP_TYPE_SHIELD, 1)) {
+        ExtEquip_SetSlot(EQUIP_TYPE_SHIELD, 1);
+        return;
+    }
+    ExtEquip_SetSlot(EQUIP_TYPE_SHIELD, 0);
+    if (Nei_Save()->shieldOwned & FC_SHIELD_IKANA) {
+        Inventory_ChangeEquipment(EQUIP_VALUE_SHIELD_MIRROR);
+        ExtEquip_RefreshPlayer();
+    }
+}
+
+void ExtEquip_SetSlot(s16 equipType, u8 index) {
+    u8 old;
+
+    if (equipType < 0 || equipType > 3 || index > 3) {
+        return;
+    }
+    old = ExtEquip_GetCurrent(equipType);
+    if (old == index) {
+        return;
+    }
+    if (old != 0) {
+        ExtEquip_CleanupSlot(equipType, old);
+    }
+    ExtEquip_SetCurrentByType(equipType, index);
+    ExtEquip_ApplyVanillaBase(equipType, old, index);
+    if (equipType == EQUIP_TYPE_SWORD && index == 3) {
+        ExtEquip_ApplyTridentShieldPolicy();
+    }
+    ExtEquip_RefreshPlayer();
 }
 
 void ExtEquip_Equip(s16 equipType, u8 index) {
@@ -499,6 +602,11 @@ void ExtEquip_Equip(s16 equipType, u8 index) {
     if (!ExtEquip_CheckAgeReq(equipType, index))
         return;
 
+    // The Trident only tolerates the Divine Shield or a Mirror.
+    if (equipType == EQUIP_TYPE_SHIELD && ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 3 &&
+        !ExtEquip_TridentAllowsShield(index, 0))
+        return;
+
     // The MM equipment sub-page is a core inventory page and remains reachable even
     // when the legacy cheat toggle is off. Equipping an owned piece is therefore the
     // authoritative opt-in: enable its behavior/draw path as part of the equip action.
@@ -506,62 +614,61 @@ void ExtEquip_Equip(s16 equipType, u8 index) {
         CVarSetInteger(CVAR_EXT_EQUIP_ENABLED, 1);
     }
 
-    // If already equipped, toggle off (unequip)
-    u8 current = ExtEquip_GetCurrent(equipType);
-    if (current == index) {
-        ExtEquip_Unequip(equipType);
-        ExtEquip_ClearVanillaEquip(equipType);
-        return;
-    }
-
-    // Set extended equipment (also syncs to gSaveContext.ship)
-    ExtEquip_SetCurrentByType(equipType, index);
-
-    // Set vanilla equipment base for ext equipment
-    // Ext swords use Kokiri Sword as base (model + IA), ext shields use Mirror Shield
-    switch (equipType) {
-        case EQUIP_TYPE_SWORD:
-            // Ext swords don't change vanilla sword equipment or B button item.
-            // The sword model/IA override is handled by the behavior/draw system.
-            // This prevents giving BGS/Kokiri Sword if the player doesn't own them.
-            break;
-        case EQUIP_TYPE_SHIELD:
-            // Shield of Ikana (slot 3) uses Mirror Shield model
-            // 2ship: 1-arg Inventory_ChangeEquipment (shield-only) in MM.
-            // OoT's Hylian shield == MM's Hero shield.
-            if (index == 3) {
-                Inventory_ChangeEquipment(EQUIP_VALUE_SHIELD_MIRROR);
-            } else {
-                Inventory_ChangeEquipment(EQUIP_VALUE_SHIELD_HERO);
-            }
-            break;
-        case EQUIP_TYPE_TUNIC:
-            // 2ship: MM's Inventory_ChangeEquipment(s16) only touches the shield; write the
-            // tunic nibble directly (EQUIP_TYPE_TUNIC is an OoT remnant in MM, harmless bit).
-            SET_EQUIP_VALUE(EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_KOKIRI);
-            break;
-        case EQUIP_TYPE_BOOTS:
-            // Ext boots are accessories — don't change vanilla boots
-            break;
-    }
+    // Equipping the piece already worn toggles it off.
+    ExtEquip_SetSlot(equipType, (ExtEquip_GetCurrent(equipType) == index) ? 0 : index);
 }
 
 void ExtEquip_Unequip(s16 equipType) {
-    // Restore sword state if Byrna was active
-    if (equipType == EQUIP_TYPE_SWORD && gExtEquipBehavior.byrnaActive) {
-        Byrna_Cleanup();
-    }
+    ExtEquip_SetSlot(equipType, 0);
+}
 
-    ExtEquip_SetCurrentByType(equipType, 0);
-    // NOTE: vanilla equipment is NOT cleared here — callers that need it
-    // (toggle-off, remove) call ExtEquip_ClearVanillaEquip separately.
-    // The vanilla equip path (z_kaleido_equipment.c) calls ExtEquip_Unequip
-    // after already setting vanilla equipment, so clearing here would undo it.
+// FleetSync writes Nei_Save()->extEquip* directly; pull that back into the RAM copy every
+// predicate/draw reads, without re-applying bases (the peer already did).
+void ExtEquip_ResyncFromSave(void) {
+    gExtEquipState.currentExtSword = Nei_Save()->extEquipSword;
+    gExtEquipState.currentExtShield = Nei_Save()->extEquipShield;
+    gExtEquipState.currentExtTunic = Nei_Save()->extEquipTunic;
+    gExtEquipState.currentExtBoots = Nei_Save()->extEquipBoots;
+    ExtEquip_RefreshPlayer();
+}
+
+// Sram_OpenSave raises this so Player_Init re-runs ExtEquip_Init on ANY file load — keying it on a
+// fileNum change missed "erase slot, start a new game in the same slot".
+static u8 sExtEquipSaveOpened = 0;
+
+void ExtEquip_OnSaveOpened(void) {
+    sExtEquipSaveOpened = 1;
+}
+
+u8 ExtEquip_ConsumeSaveOpened(void) {
+    u8 opened = sExtEquipSaveOpened;
+
+    sExtEquipSaveOpened = 0;
+    return opened;
 }
 
 // ---------------------------------------------------------------------------
 // Transform integration
 // ---------------------------------------------------------------------------
+
+// A transform parks the ext pieces in RAM ONLY: Nei_Save keeps the loadout, so saving while
+// transformed doesn't zero the four slots, and no vanilla base is touched (the form owns the body).
+static void ExtEquip_SetCurrentRamOnly(s16 equipType, u8 index) {
+    switch (equipType) {
+        case EQUIP_TYPE_SWORD:
+            gExtEquipState.currentExtSword = index;
+            break;
+        case EQUIP_TYPE_SHIELD:
+            gExtEquipState.currentExtShield = index;
+            break;
+        case EQUIP_TYPE_TUNIC:
+            gExtEquipState.currentExtTunic = index;
+            break;
+        case EQUIP_TYPE_BOOTS:
+            gExtEquipState.currentExtBoots = index;
+            break;
+    }
+}
 
 void ExtEquip_UnequipForTransform(void) {
     if (!ExtEquip_IsEnabled())
@@ -577,7 +684,8 @@ void ExtEquip_UnequipForTransform(void) {
 
     for (s16 t = EQUIP_TYPE_SWORD; t <= EQUIP_TYPE_BOOTS; t++) {
         if (ExtEquip_GetCurrent(t) != 0) {
-            ExtEquip_Unequip(t);
+            ExtEquip_CleanupSlot(t, ExtEquip_GetCurrent(t));
+            ExtEquip_SetCurrentRamOnly(t, 0);
         }
     }
 }
@@ -592,10 +700,11 @@ void ExtEquip_RestoreFromTransform(void) {
 
     for (s16 t = EQUIP_TYPE_SWORD; t <= EQUIP_TYPE_BOOTS; t++) {
         if (sTransformBackup[t] != 0 && ExtEquip_HasItem(t, sTransformBackup[t])) {
-            ExtEquip_Equip(t, sTransformBackup[t]);
+            ExtEquip_SetCurrentRamOnly(t, sTransformBackup[t]);
         }
     }
     sTransformBackupValid = 0;
+    ExtEquip_RefreshPlayer();
 }
 
 void ExtEquip_ClearTransformBackup(void) {
@@ -605,6 +714,8 @@ void ExtEquip_ClearTransformBackup(void) {
 
 void ExtEquip_ToggleFromCButton(u16 itemId) {
     if (itemId < ITEM_EXT_SWORD_1 || itemId > ITEM_EXT_BOOTS_3)
+        return;
+    if (!ExtEquip_IsEnabled())
         return;
 
     // Pikachu cannot use extended equipment
@@ -630,8 +741,7 @@ void ExtEquip_ToggleFromCButton(u16 itemId) {
 
     // Toggle: if already equipped with this index, unequip; otherwise equip
     if (current == index) {
-        ExtEquip_Unequip(equipType);
-        ExtEquip_ClearVanillaEquip(equipType);
+        ExtEquip_SetSlot(equipType, 0);
         Audio_PlaySoundGeneral(NA_SE_IT_SHIELD_REMOVE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                                &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
     } else {

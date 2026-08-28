@@ -497,10 +497,23 @@ void Rando::GiveItem(RandoItemId randoItemId) {
             gSaveContext.healthAccumulator = gSaveContext.save.saveInfo.playerData.healthCapacity + 0x10;
             Item_Give(gPlayState, Rando::StaticData::Items[randoItemId].itemId);
             break;
+        // MM's own filled-bottle checks: like the OoT ones below, these GRANT a bottle, so they go to
+        // the wheel. The vanilla paths they used (ITEM_LONGSHOT for red potion, a plain content give
+        // for the rest) only FILL an empty bottle and were lost when the player had none.
         case RI_BOTTLE_RED_POTION:
-            // ITEM_LONGSHOT will give a Red Potion bottle on the first available bottle slot
-            // ITEM_POTION_RED will put a Red Potion bottle on the first bottle slot
-            Item_Give(gPlayState, ITEM_LONGSHOT);
+            if (!Bottle_GiveBottle(ITEM_POTION_RED)) {
+                Item_Give(gPlayState, ITEM_LONGSHOT);
+            }
+            break;
+        case RI_BOTTLE_CHATEAU_ROMANI:
+            if (!Bottle_GiveBottle(ITEM_CHATEAU)) {
+                Item_Give(gPlayState, ITEM_CHATEAU_2);
+            }
+            break;
+        case RI_BOTTLE_GOLD_DUST:
+            if (!Bottle_GiveBottle(ITEM_GOLD_DUST)) {
+                Item_Give(gPlayState, ITEM_GOLD_DUST_2);
+            }
             break;
         // OoT bottled contents: add a NEW filled bottle to the NEI wheel (Bottle_GiveBottle -> first
         // free bottleSlots entry). The vanilla Item_Give(content) path only FILLS an empty bottle the
@@ -1334,9 +1347,8 @@ void Rando::GiveItem(RandoItemId randoItemId) {
         case RI_OOT_GREG:
         case RI_OOT_SKELETON_KEY:
         // Third wave storeless items (verified): Climb/Crawl have no MM movement-gate system, the
-        // jabber nuts have no MM speak system, Ruto's Letter has no MM letter content (the custom
-        // bottle system carries no letter), and the OoT GS Token has no MM store — its count crosses
-        // via comboObtainedFc and OoT grants the real tokens on arrival.
+        // jabber nuts have no MM speak system, and the OoT GS Token has no MM store — its count
+        // crosses via comboObtainedFc and OoT grants the real tokens on arrival.
         case RI_OOT_ABILITY_CHESTS:
         case RI_OOT_ABILITY_CLIMB:
         case RI_OOT_ABILITY_CRAWL:
@@ -1347,9 +1359,13 @@ void Rando::GiveItem(RandoItemId randoItemId) {
         case RI_OOT_SPEAK_KOKIRI:
         case RI_OOT_SPEAK_ZORA:
         case RI_OOT_GS_TOKEN:
-        case RI_OOT_RUTOS_LETTER:
         case RI_JUNK:
         case RI_NONE:
+            break;
+        // Ruto's Letter has no MM item, so it rides as a wheel-only content (ITEM_BOTTLE_LETTER_RUTO):
+        // icon + name come from oot.o2r, and it is inert on C — MM has nobody to deliver it to.
+        case RI_OOT_RUTOS_LETTER:
+            Bottle_GiveBottle(ITEM_BOTTLE_LETTER_RUTO);
             break;
         default: {
             // CheckQueue marks the check obtained right after this returns, so a missing arm eats

@@ -397,7 +397,16 @@ void HarpoonWebSocket::ProcessInboundFrames() {
                 break;
             }
             case FrameOp::CLOSE: {
-                SPDLOG_INFO("[HarpoonWS] server closed");
+                // Close payload is a 2-byte BE status code plus a UTF-8 reason: the
+                // server's only channel for *why* it refused us (e.g. 1013 too_many_per_peer).
+                uint16_t closeCode = 0;
+                std::string closeReason;
+                if (f.payload.size() >= 2) {
+                    closeCode = (uint16_t)(((uint8_t)f.payload[0] << 8) | (uint8_t)f.payload[1]);
+                    closeReason.assign(f.payload, 2, std::string::npos);
+                }
+                SPDLOG_WARN("[HarpoonWS] server closed: code={} reason={}", closeCode,
+                            closeReason.empty() ? "(none)" : closeReason);
                 std::string close;
                 EncodeCloseFrame(close);
                 if (socket_) {

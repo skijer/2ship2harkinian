@@ -37,6 +37,13 @@
 #ifndef PLAYER_STATE1_IN_WATER
 #define PLAYER_STATE1_IN_WATER PLAYER_STATE1_8000000
 #endif
+/* Same bit in both games; MM simply never named these two. */
+#ifndef PLAYER_STATE1_ON_HORSE
+#define PLAYER_STATE1_ON_HORSE PLAYER_STATE1_800000
+#endif
+#ifndef PLAYER_STATE1_IN_CUTSCENE
+#define PLAYER_STATE1_IN_CUTSCENE PLAYER_STATE1_20000000
+#endif
 /* OoT-only states with no MM analog → 0 (`& flag` reads false, `|= flag` is a no-op). */
 #ifndef PLAYER_STATE1_READY_TO_FIRE
 #define PLAYER_STATE1_READY_TO_FIRE 0

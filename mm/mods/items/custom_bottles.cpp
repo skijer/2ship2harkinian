@@ -34,8 +34,8 @@
 #define BC_ITEM_CHATEAU 0x25          // ITEM_CHATEAU
 #define BC_ITEM_HYLIAN_LOACH 0x26     // ITEM_HYLIAN_LOACH
 #define BC_ITEM_OBABA_DRINK 0x27      // ITEM_OBABA_DRINK
-// OoT-only content (no MM item): custom sentinel right after ITEM_BOTTOMLESS_BOTTLE (0xF8).
-#define BC_ITEM_LETTER_RUTO 0xF9
+// OoT-only content (no MM item): ITEM_BOTTLE_LETTER_RUTO, the last free u8 id (see z64item.h).
+#define BC_ITEM_LETTER_RUTO 0xFC
 
 // Order MUST match the BottleContent enum.
 static const uint16_t sContentItem[BOTTLE_C_COUNT] = {
@@ -417,6 +417,16 @@ extern "C" uint16_t Bottle_WheelPrevItem(uint8_t wheel, uint16_t curItem) {
     return list[0];
 }
 
+extern "C" uint8_t Bottle_HasFreeSlot(void) {
+    const uint8_t* slots = Nei_Save()->bottleSlots;
+    for (int i = 0; i < 8; i++) {
+        if (slots[i] == BOTTLE_SLOT_EMPTY) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 // Give a NEW rando bottle: drop `contentItem` (an MM ITEM_ bottle content id, or BC_ITEM_BOTTLE for an
 // empty bottle) into the first free wheel slot — Wheel A (0-3) first, then Wheel B (4-7). Returns 1 if
 // placed, 0 when all 8 slots are already occupied. Rando bottle GIVES MUST use this, NOT the vanilla
@@ -427,6 +437,10 @@ extern "C" uint8_t Bottle_GiveBottle(uint16_t contentItem) {
     for (int i = 0; i < 8; i++) {
         if (slots[i] == BOTTLE_SLOT_EMPTY) {
             slots[i] = (uint8_t)contentItem;
+            // Owning a bottle converts the row to the NEI layout, exactly as the residue killer did
+            // when bottles still landed in a vanilla slot on their way here.
+            Bottle_SetNetOwned(1);
+            Bottle_SetBottomlessOwned(1);
             return 1;
         }
     }

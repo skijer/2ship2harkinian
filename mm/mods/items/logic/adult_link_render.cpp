@@ -53,10 +53,22 @@ char** ResourceMgr_ListFiles(const char* searchMask, int* resultSize); // enumer
 extern TexturePtr sPlayerEyesTextures[PLAYER_FORM_MAX][PLAYER_EYES_MAX];
 extern TexturePtr sPlayerMouthTextures[PLAYER_FORM_MAX][PLAYER_MOUTH_MAX];
 
+// Per-form GAMEPLAY attributes (z_player.c:787). player->ageProperties points at [transformation], so
+// overriding the Human slot in place makes the running Human Link play tall — ledge-grab reach
+// (unk_14/18/1C vs yDistToLedge), ceiling clearance, wall radius, body height. This is the GAMEPLAY half
+// of a custom form (the visual half is the skeleton/eye swap); the collider HEIGHT auto-recomputes from
+// the taller adult body-part positions, so only these scalars need scaling.
+extern PlayerAgeProperties sPlayerAgeProperties[PLAYER_FORM_MAX];
+
 // NEI custom-item in-hand draw dispatcher (beetle, cane of somaria, ball&chain, ...). In the vanilla
 // path it runs AFTER the skeleton draw (which we skip via the early return), reading the world-space
 // hand positions the skeleton draw wrote. custom_items.h:611, extern "C".
 s32 CustomItems_OverrideDraw(Player* player, PlayState* play);
+
+// NEI extended-equipment shield override: the OTR path of a custom shield's back DL (Divine/Kite/Ikana),
+// or NULL for a vanilla shield. extended_equipment.h:392. Used so PostLimb keeps drawing ext shields on
+// the back while we suppress the duplicate MM-CHILD shield the adult sheath DL already bakes in.
+const char* ExtEquip_GetShieldDLOverride(void);
 }
 
 #define ADULT_LINK_SCALE_DEFAULT 0.01f
@@ -109,10 +121,13 @@ static Gfx* sDL_RHBow;
 static Gfx* sDL_RHOcarina;
 static Gfx* sDL_RHHookshot;
 static Gfx* sDL_Waist;
-static Gfx* sDL_SheathEmpty;  // both sword & shield off the back
-static Gfx* sDL_SheathSword;  // sword on back only (shield raised)
-static Gfx* sDL_SheathShield; // shield on back only (sword drawn)
-static Gfx* sDL_SheathBoth;   // sword + shield on back (idle)
+static Gfx* sDL_SheathEmpty;       // empty scabbard, no shield on back
+static Gfx* sDL_SheathSword;       // sword in scabbard, no shield on back
+static Gfx* sDL_SheathShield;      // empty scabbard + Hylian shield on back
+static Gfx* sDL_SheathBoth;        // sword in scabbard + Hylian shield on back
+static Gfx* sDL_RHMirrorShield;    // Mirror shield raised in hand
+static Gfx* sDL_SheathMirror;      // empty scabbard + Mirror shield on back
+static Gfx* sDL_SheathMirrorSword; // sword in scabbard + Mirror shield on back
 
 // A MOD head mesh binds its own eye/mouth via segments 0x08/0x09 (recomp/Fast64 preserves the vanilla
 // structure). We DISCOVER the mod's eye/mouth textures generically by matching each blink state as a
@@ -349,6 +364,9 @@ static s32 AdultLink_Setup(void) {
     sDL_SheathSword = AdultLink_LoadDL(ALB("gLinkAdultMasterSwordAndSheathNearDL"));
     sDL_SheathShield = AdultLink_LoadDL(ALB("gLinkAdultHylianShieldAndSheathNearDL"));
     sDL_SheathBoth = AdultLink_LoadDL(ALB("gLinkAdultHylianShieldSwordAndSheathNearDL"));
+    sDL_RHMirrorShield = AdultLink_LoadDL(ALB("gLinkAdultRightHandHoldingMirrorShieldNearDL"));
+    sDL_SheathMirror = AdultLink_LoadDL(ALB("gLinkAdultMirrorShieldAndSheathNearDL"));
+    sDL_SheathMirrorSword = AdultLink_LoadDL(ALB("gLinkAdultMirrorShieldSwordAndSheathNearDL"));
 
     sSkel = skel;
     sReady = 1;
@@ -388,8 +406,15 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             break;
 
         case PLAYER_LIMB_RIGHT_HAND:
-            if (p->rightHandType == PLAYER_MODELTYPE_RH_SHIELD && sDL_RHShield != NULL) {
-                *dList = sDL_RHShield;
+            if (p->rightHandType == PLAYER_MODELTYPE_RH_SHIELD) {
+                // Draw whichever shield is EQUIPPED in hand, not always Hylian.
+                if (p->currentShield == PLAYER_SHIELD_MIRROR_SHIELD && sDL_RHMirrorShield != NULL) {
+                    *dList = sDL_RHMirrorShield;
+                } else if (sDL_RHShield != NULL) {
+                    *dList = sDL_RHShield;
+                } else {
+                    *dList = skelDL;
+                }
             } else if (p->rightHandType == PLAYER_MODELTYPE_RH_BOW && sDL_RHBow != NULL) {
                 *dList = sDL_RHBow;
             } else if (p->rightHandType == PLAYER_MODELTYPE_RH_INSTRUMENT && sDL_RHOcarina != NULL) {
@@ -407,14 +432,28 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             if (sIsMod) {
                 *dList = skelDL; // the mod's own sword+sheath mesh on the back
             } else {
-                // Base skeleton has no sheath mesh (limb 19 = NULL) — pick the back setup by state.
-                u8 swordDrawn = (p->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD ||
-                                 p->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD);
-                u8 shieldRaised = (p->rightHandType == PLAYER_MODELTYPE_RH_SHIELD);
-                Gfx* d = (swordDrawn && shieldRaised) ? sDL_SheathEmpty
-                         : shieldRaised               ? sDL_SheathSword
-                         : swordDrawn                 ? sDL_SheathShield
-                                                      : sDL_SheathBoth;
+                // Base skeleton has no sheath mesh (limb 19 = NULL) — pick the back setup from the EQUIPPED
+                // sword/shield, mirroring MM's real sheath logic (z_player_lib.c:3233), NOT the hand-type
+                // enum. Sword-on-back only if a sword is equipped AND sheathed (not in hand); shield-on-back
+                // only if a shield is equipped AND not raised. This kills the old "always Master Sword +
+                // Hylian at rest" default.
+                u8 swordSheathed = ((u8)GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) != EQUIP_VALUE_SWORD_NONE) &&
+                                   (p->sheathType == PLAYER_MODELTYPE_SHEATH_14 ||
+                                    p->sheathType == PLAYER_MODELTYPE_SHEATH_12);
+                u8 shieldOnBack =
+                    (p->currentShield != PLAYER_SHIELD_NONE) && (p->rightHandType != PLAYER_MODELTYPE_RH_SHIELD);
+                // A NEI ext shield (Divine/Kite/Ikana) has no adult geometry — keep it OFF the sheath DL and
+                // let PostLimb's ext-shield draw handle the back.
+                u8 extShield = (ExtEquip_GetShieldDLOverride() != NULL);
+
+                Gfx* d;
+                if (!shieldOnBack || extShield) {
+                    d = swordSheathed ? sDL_SheathSword : sDL_SheathEmpty;
+                } else if (p->currentShield == PLAYER_SHIELD_MIRROR_SHIELD && sDL_SheathMirror != NULL) {
+                    d = swordSheathed ? sDL_SheathMirrorSword : sDL_SheathMirror;
+                } else { // Hero's/Hylian (also the mirror-DL-missing fallback)
+                    d = swordSheathed ? sDL_SheathBoth : sDL_SheathShield;
+                }
                 if (d != NULL) {
                     *dList = d;
                 }
@@ -422,6 +461,26 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             break;
     }
     return ret;
+}
+
+// PostLimb wrapper: the adult sheath DLs already bake the shield-on-back at ADULT scale, but MM's
+// Player_PostLimbDrawGameplay independently draws a SECOND shield at CHILD scale at the SHEATH limb
+// (z_player_lib.c:4388). Suppress that duplicate for a VANILLA shield by hiding currentShield across the
+// post-limb call; keep it for a NEI ext shield (Divine/Kite/Ikana) — our sheath geometry doesn't bake
+// those, so PostLimb's ext-shield back draw is the only one. currentShield isn't read elsewhere in that
+// post-limb block, so this only removes the duplicate.
+static void AdultLink_PostLimb(PlayState* play, s32 limbIndex, Gfx** dList1, Gfx** dList2, Vec3s* rot,
+                               Actor* actor) {
+    Player* p = (Player*)actor;
+    if (limbIndex == PLAYER_LIMB_SHEATH && p->currentShield != PLAYER_SHIELD_NONE &&
+        ExtEquip_GetShieldDLOverride() == NULL) {
+        s8 saved = p->currentShield;
+        p->currentShield = PLAYER_SHIELD_NONE;
+        Player_PostLimbDrawGameplay(play, limbIndex, dList1, dList2, rot, actor);
+        p->currentShield = saved;
+    } else {
+        Player_PostLimbDrawGameplay(play, limbIndex, dList1, dList2, rot, actor);
+    }
 }
 
 extern "C" s32 AdultLink_IsActive(void) {
@@ -553,7 +612,7 @@ extern "C" void AdultLink_Draw(PlayState* play, Player* player) {
     // Draw through the real engine path so held items / trails / colliders all work; our override
     // supplies adult equipment DLs. Feed MM's OWN jointTable (identical 21-limb hierarchy) 1:1.
     Player_DrawImpl(play, sSkel->sh.segment, player->skelAnime.jointTable, sSkel->dListCount, 0, PLAYER_FORM_HUMAN,
-                    player->currentBoots, player->actor.shape.face, AdultLink_OverrideLimb, Player_PostLimbDrawGameplay,
+                    player->currentBoots, player->actor.shape.face, AdultLink_OverrideLimb, AdultLink_PostLimb,
                     &player->actor);
 
     for (int i = 0; i < PLAYER_EYES_MAX; i++) {
@@ -579,9 +638,50 @@ extern "C" void AdultLink_Draw(PlayState* play, Player* player) {
     CustomItems_OverrideDraw(player, play);
 }
 
-extern "C" void AdultLink_UpdateCollider(Player* player) {
-    if (!AdultLink_IsActive() || !sReady) {
+// ---- GAMEPLAY layer: adult-scale the Human form's height-dependent attributes -------------------
+// Backed up once, applied on activate, restored on deactivate (in place on the shared table, mirroring
+// PlayAsKafei's skeleton-slot swap). Scales ledge-grab / ceiling / wall / height by the same factor the
+// adult skeleton is taller than child Link, so adult Link grabs higher ledges, clears ceilings at adult
+// head height, and checks walls at adult reach — the part that makes the form PLAY tall, not just look it.
+static PlayerAgeProperties sHumanAgePropsBackup;
+static u8 sAgePropsSaved = 0;
+static u8 sAgePropsActive = 0;
+
+static void AdultLink_ApplyAgeProps(void) {
+    PlayerAgeProperties* h = &sPlayerAgeProperties[PLAYER_FORM_HUMAN];
+    if (!sAgePropsSaved) {
+        sHumanAgePropsBackup = *h;
+        sAgePropsSaved = 1;
+    }
+    if (sAgePropsActive) {
         return;
     }
+    const PlayerAgeProperties* b = &sHumanAgePropsBackup;
+    f32 s = CVarGetFloat("gAdultLink.HeightScale", 1.30f); // adult ~30% taller than MM child Link
+    h->ceilingCheckHeight = b->ceilingCheckHeight * s;
+    h->unk_0C = b->unk_0C * s;
+    h->unk_10 = b->unk_10 * s;
+    h->unk_14 = b->unk_14 * s; // ledge grab: max yDistToLedge to grab
+    h->unk_18 = b->unk_18 * s; // ledge grab: hang
+    h->unk_1C = b->unk_1C * s; // ledge grab: climb
+    h->unk_34 = b->unk_34 * s; // body height
+    h->unk_40 = b->unk_40 * s;
+    h->wallCheckRadius = b->wallCheckRadius * CVarGetFloat("gAdultLink.WallScale", 1.0f);
+    sAgePropsActive = 1;
+}
+
+static void AdultLink_RestoreAgeProps(void) {
+    if (sAgePropsSaved && sAgePropsActive) {
+        sPlayerAgeProperties[PLAYER_FORM_HUMAN] = sHumanAgePropsBackup;
+        sAgePropsActive = 0;
+    }
+}
+
+extern "C" void AdultLink_UpdateCollider(Player* player) {
+    if (!AdultLink_IsActive() || !sReady) {
+        AdultLink_RestoreAgeProps(); // form off -> child Link's ledge grab / ceiling / walls
+        return;
+    }
+    AdultLink_ApplyAgeProps();
     player->cylinder.dim.height = (s16)CVarGetInteger("gAdultLink.ColliderHeight", ADULT_LINK_COLLIDER_HEIGHT_DEFAULT);
 }

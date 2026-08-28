@@ -39,6 +39,10 @@ u8 Breastplate_IsActive(void);
 // ---------------------------------------------------------------------------
 static s16 sBreastplateRupeeTick = 0;
 
+static void Breastplate_Cleanup(void) {
+    sBreastplateRupeeTick = 0;
+}
+
 // ---------------------------------------------------------------------------
 // Main Behavior — runs every frame from ExtEquip_UpdateBehavior
 // Handles passive rupee drain and the broke-mode movement penalty.

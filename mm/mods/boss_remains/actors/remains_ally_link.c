@@ -40,6 +40,10 @@
 // Compiled as part of the C++ TU boss_remains.cpp, so the OTR-path asset symbols are `const char[]` and
 // need explicit casts to the pointer types the engine wants (implicit in C, not in C++).
 
+// 2s2h/BenGui/CosmeticEditor.h. Declared by hand because this file is unity-included inside an
+// extern "C" block, where that header (a C++ one) cannot go.
+void PlayerTunic_BindLocalColor(PlayState* play);
+
 // ============================================================================
 // TUNING
 // ============================================================================
@@ -583,6 +587,8 @@ static void RemainsAllyLink_Draw(Actor* thisx, PlayState* play) {
     }
     gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)gCullBackDList);
     gSPSegment(POLY_XLU_DISP++, 0x0C, (uintptr_t)gCullBackDList);
+    // Segment 0x07 likewise, while the per-player tunic tint owns the tunic display lists.
+    PlayerTunic_BindLocalColor(play);
 
     // DARK LINK: render the whole puppet in grayscale, crushed toward black.
     gSPGrayscale(POLY_OPA_DISP++, true);

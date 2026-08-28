@@ -77,6 +77,10 @@ SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path, SkelAnime* skel
 extern EffectBlureInit2 D_8085D30C;
 }
 
+// Down here because both declare engine types in their signatures.
+#include "2s2h/BenGui/CosmeticEditor.h" // PlayerTunic_* (per-player tunic tint)
+#include "2s2h/NameTag/NameTag.h"
+
 // Effect_GetByIndex returns NULL for this index (z_effect.c:90), and Effect_Add
 // writes exactly this value when it fails. Used as "this peer has no trail".
 // = SPARK_COUNT(3) + BLURE_COUNT(25) + SHIELD_PARTICLE_COUNT(3) + TIRE_MARK_COUNT(15).
@@ -144,6 +148,64 @@ static bool ResolveFormSkeleton(s32 form, void*** outSkel, s32* outDList) {
 }
 
 // =============================================================================
+// Per-player tunic color. In a room the tunic display lists jump through segment
+// 0x07 instead of carrying a prim color (PlayerTunic_SetPerPlayerTint, in
+// CosmeticEditor.cpp), so every Player_DrawImpl call site MUST bind it first or
+// that jump lands on whatever the segment happened to hold.
+// =============================================================================
+
+static void UnpackColorRgba(uint32_t rgba, u8* r, u8* g, u8* b) {
+    *r = (rgba >> 24) & 0xFF;
+    *g = (rgba >> 16) & 0xFF;
+    *b = (rgba >> 8) & 0xFF;
+}
+
+static void BindTunicColorSegment(PlayState* play, u8 r, u8 g, u8 b) {
+    Gfx* colorDl = (Gfx*)GRAPH_ALLOC(play->state.gfxCtx, 3 * sizeof(Gfx));
+
+    gDPSetPrimColor(&colorDl[0], 0, 0, r, g, b, 255);
+    gDPPipeSync(&colorDl[1]);
+    gSPEndDisplayList(&colorDl[2]);
+
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPSegment(POLY_OPA_DISP++, 0x07, (uintptr_t)colorDl);
+    gSPSegment(POLY_XLU_DISP++, 0x07, (uintptr_t)colorDl);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// Both bind unconditionally, tint on or off: the tint is installed from OnGameStateUpdate, which
+// runs AFTER GameState_Draw (game.c:168), so the frame it turns on already has its display list
+// built — the patched jump would then execute at the end of that frame with segment 0x07 empty.
+extern "C" void PlayerTunic_BindColor(PlayState* play, u8 r, u8 g, u8 b) {
+    if (play == NULL) {
+        return;
+    }
+
+    BindTunicColorSegment(play, r, g, b);
+}
+
+extern "C" void PlayerTunic_BindLocalColor(PlayState* play) {
+    if (play == NULL) {
+        return;
+    }
+
+    u8 r;
+    u8 g;
+    u8 b;
+    uint32_t own = Harpoon::Instance()->OwnColorRgba();
+    if (own != 0) {
+        UnpackColorRgba(own, &r, &g, &b);
+    } else {
+        // Not in a room: nothing reads the segment then, but it stays valid either way.
+        Color_RGBA8 cosmetic = PlayerTunic_ResolveLocalColor();
+        r = cosmetic.r;
+        g = cosmetic.g;
+        b = cosmetic.b;
+    }
+    BindTunicColorSegment(play, r, g, b);
+}
+
+// =============================================================================
 // ACTOR_HARPOON_PEER — the collider carrier.
 // =============================================================================
 
@@ -175,6 +237,7 @@ typedef struct HarpoonPeerActor {
 void HarpoonPeer_Init(Actor* thisx, PlayState* play);
 void HarpoonPeer_Destroy(Actor* thisx, PlayState* play);
 void HarpoonPeer_Update(Actor* thisx, PlayState* play);
+void HarpoonPeer_Draw(Actor* thisx, PlayState* play);
 
 // How much a hit on a remote player hurts, and which reaction it triggers.
 // Row order is MM's (z_collision_btltbls.c); the effect nibble carries a
@@ -258,9 +321,15 @@ ActorProfile HarpoonPeer_Profile = {
     HarpoonPeer_Init,
     HarpoonPeer_Destroy,
     HarpoonPeer_Update,
-    NULL, // no draw — HarpoonDummyPlayer_DrawAll renders the body
+    HarpoonPeer_Draw,
     NULL,
 };
+
+// The body is rendered by HarpoonDummyPlayer_DrawAll, not here. This exists because Actor_DrawAll
+// skips actors with a NULL draw, and only Actor_Draw sets `isDrawn` — which is what NameTag checks
+// before rendering a tag (NameTag.cpp:50).
+void HarpoonPeer_Draw(Actor* thisx, PlayState* play) {
+}
 
 void HarpoonPeer_Init(Actor* thisx, PlayState* play) {
     HarpoonPeerActor* self = (HarpoonPeerActor*)thisx;
@@ -348,6 +417,11 @@ void HarpoonPeer_Update(Actor* thisx, PlayState* play) {
     self->actor.shape.rot.y = rotY;
     self->actor.world.rot.y = rotY;
     self->actor.room = -1;
+    // Nothing else fills focus in, and both Z-targeting and the nametag anchor read it — left at the
+    // origin the tag would hang in the air at y=0.
+    self->actor.focus.pos = self->actor.world.pos;
+    self->actor.focus.pos.y += 50.0f;
+    self->actor.focus.rot = self->actor.world.rot;
 
     // Tatl perches on anything attention-enabled that isn't hostile; in coop
     // that's just noise, and in geoguessr it would give peers away.
@@ -571,6 +645,15 @@ static void DrawPeerCustomItems(PlayState* play, Player& dp, const HarpoonClient
     gCustomItemState = saved;
 }
 
+static void BindPeerTunicColor(PlayState* play, const HarpoonClient& c) {
+    u8 r;
+    u8 g;
+    u8 b;
+
+    UnpackColorRgba(c.colorRgba, &r, &g, &b);
+    PlayerTunic_BindColor(play, r, g, b);
+}
+
 void HarpoonDummyPlayer_DrawAll(PlayState* play) {
     if (!play)
         return;
@@ -682,6 +765,7 @@ void HarpoonDummyPlayer_DrawAll(PlayState* play) {
             }
             gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)gCullBackDList);
             gSPSegment(POLY_XLU_DISP++, 0x0C, (uintptr_t)gCullBackDList);
+            BindPeerTunicColor(play, c);
             Matrix_SetTranslateRotateYXZ(c.posX, c.posY + yOff, c.posZ, &dp.actor.shape.rot);
             Matrix_Scale(dp.actor.scale.x, dp.actor.scale.y, dp.actor.scale.z, MTXMODE_APPLY);
             Player_DrawImpl(play, dp.skelAnime.skeleton, dp.skelAnime.jointTable, dp.skelAnime.dListCount, 0,
@@ -718,6 +802,7 @@ void HarpoonDummyPlayer_DrawAll(PlayState* play) {
         OPEN_DISPS(play->state.gfxCtx);
         gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)gCullBackDList);
         gSPSegment(POLY_XLU_DISP++, 0x0C, (uintptr_t)gCullBackDList);
+        BindPeerTunicColor(play, c);
         if (seg06 != NULL) {
             gSPSegment(POLY_OPA_DISP++, 0x06, (uintptr_t)seg06);
             gSPSegment(POLY_XLU_DISP++, 0x06, (uintptr_t)seg06);
@@ -736,6 +821,54 @@ void HarpoonDummyPlayer_DrawAll(PlayState* play) {
     }
 }
 
-// Nametags previously anchored to a spawned actor; coop nametags are a TODO.
-void HarpoonDummyPlayer_SyncNametags() {
+// What a peer's nametag is showing right now.
+struct HarpoonPeerTag {
+    Actor* actor;
+    std::string name;
+    uint32_t colorRgba;
+};
+
+// Nametags hang off each peer's collider actor. Registering one allocates its Vtx/Mtx, so a peer is
+// only (re)registered when something the tag shows actually changed: the name, the color, or the
+// actor it belongs to (peers get a fresh one after every scene change).
+void HarpoonDummyPlayer_SyncNametags(PlayState* play) {
+    static constexpr const char* kPeerNameTag = "harpoon_peer";
+    static std::map<uint32_t, HarpoonPeerTag> sTags;
+
+    if (play == NULL) {
+        return;
+    }
+
+    auto* h = Harpoon::Instance();
+    std::map<uint32_t, HarpoonPeerTag> wanted;
+    if (h->NametagsVisible()) {
+        std::lock_guard<std::mutex> lk(h->StateMutex());
+        for (auto& [cid, c] : h->ClientsRaw()) {
+            if (c.peerActor == nullptr || c.name.empty() || c.sceneId != play->sceneId) {
+                continue;
+            }
+            wanted[cid] = { (Actor*)c.peerActor, c.name, c.colorRgba };
+        }
+    }
+
+    for (auto it = sTags.begin(); it != sTags.end();) {
+        auto w = wanted.find(it->first);
+        if (w != wanted.end() && w->second.actor == it->second.actor && w->second.name == it->second.name &&
+            w->second.colorRgba == it->second.colorRgba) {
+            wanted.erase(w); // already showing exactly this
+            ++it;
+            continue;
+        }
+        NameTag_RemoveAllForActor(it->second.actor);
+        it = sTags.erase(it);
+    }
+
+    for (auto& [cid, tag] : wanted) {
+        NameTagOptions options = {};
+        options.tag = kPeerNameTag;
+        UnpackColorRgba(tag.colorRgba, &options.textColor.r, &options.textColor.g, &options.textColor.b);
+        options.textColor.a = 255;
+        NameTag_RegisterForActorWithOptions(tag.actor, tag.name.c_str(), options);
+        sTags[cid] = tag;
+    }
 }

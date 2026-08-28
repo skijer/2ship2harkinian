@@ -49,6 +49,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
+#include "2s2h/BenGui/CosmeticEditor.h" // PlayerTunic_BindLocalColor (per-player tunic tint)
 #include <libultraship/bridge/consolevariablebridge.h>
 
 // Mario Mode (libsm64) — these .c files are #include'd directly so the
@@ -6219,6 +6220,13 @@ void func_8083375C(Player* this, PlayerMeleeWeaponAnimation meleeWeaponAnim) {
 }
 
 void func_80833864(PlayState* play, Player* this, PlayerMeleeWeaponAnimation meleeWeaponAnim) {
+    // Riding the Master Cycle: no melee, whatever is in his hands. This is the single door every
+    // sword/stick/hammer swing goes through, so closing it here covers the B press, the combo
+    // continuations and the jump slash in one place. Skijer's NEI
+    if (MasterCycle_IsRiding()) {
+        return;
+    }
+
     meleeWeaponAnim = Trident_NextComboMwa(this, meleeWeaponAnim);
     func_8083375C(this, meleeWeaponAnim);
     Player_SetAction(play, this, Player_Action_84, 0);
@@ -10181,7 +10189,7 @@ s32 Player_ActionHandler_3(Player* this, PlayState* play) {
                     rideActor->actor.world.pos.z + rideActor->riderPos.z + ((temp_fv1 * sp28) - (temp_fv0 * sp24));
                 this->unk_B48 = rideActor->actor.world.pos.y - this->actor.world.pos.y;
 
-                this->yaw = this->actor.shape.rot.y = rideActor->actor.shape.rot.y;
+                this->yaw = this->actor.shape.rot.y = MasterCycle_RideYaw(&rideActor->actor);
 
                 Player_MountHorse(play, this, &rideActor->actor);
                 Player_Anim_PlayOnce(play, this, entry->anim);
@@ -12225,7 +12233,9 @@ void Player_Init(Actor* thisx, PlayState* play) {
     {
         static s32 sExtEquipLoadedFile = -1;
         if (this == GET_PLAYER(play)) {
-            if (sExtEquipLoadedFile != gSaveContext.fileNum) {
+            // Any file load re-inits (Sram_OpenSave raises the flag): a fileNum compare alone missed
+            // "erase the slot, start a new game in the same slot" and carried the old loadout over.
+            if (ExtEquip_ConsumeSaveOpened() || (sExtEquipLoadedFile != gSaveContext.fileNum)) {
                 ExtEquip_Init();
                 sExtEquipLoadedFile = gSaveContext.fileNum;
             } else {
@@ -12419,6 +12429,11 @@ void Player_UpdateInterface(PlayState* play, Player* this) {
                 } else {
                     doActionA = DO_ACTION_CHECK;
                 }
+            } else if (MasterCycle_IsRiding()) {
+                // The bike has no carrot boosts, and DO_ACTION_FASTER is the ONE thing the carrot
+                // row keys off (z_parameter.c) — so not asking for it is how they stay off screen.
+                // A is the throttle here and holds no prompt. Skijer's NEI
+                doActionA = DO_ACTION_NONE;
             } else if (!func_8082DA90(play) && !func_800B7128(this) && !(this->stateFlags1 & PLAYER_STATE1_100000)) {
                 doActionA = DO_ACTION_FASTER;
             } else {
@@ -12782,6 +12797,13 @@ void Player_ProcessSceneCollision(PlayState* play, Player* this) {
 
     sPlayerFloorType = SurfaceType_GetFloorType(&play->colCtx, floorPoly, this->actor.floorBgId);
 
+    // Roc's Boots: WALK ON LAVA — the sink/burn/void-out floors (4/7/12) and the timed hot floors
+    // (2/3) read as plain floor, the same family the Hover Boots float over. Snow sink (13-15) stays.
+    if (RocBoots_IsWorn() && (this->transformation == PLAYER_FORM_HUMAN) &&
+        (func_808340D4(sPlayerFloorType) || (func_808340AC(sPlayerFloorType) >= 0))) {
+        sPlayerFloorType = FLOOR_TYPE_0;
+    }
+
     if (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) {
         f32 floorPolyNormalX;
         f32 floorPolyNormalY;
@@ -12814,6 +12836,10 @@ void Player_ProcessSceneCollision(PlayState* play, Player* this) {
         // never forces Player_Action_SlideOnSlope (Player_HandleSlopes) nor the uphill slowdown.
         if ((sPlayerFloorEffect == FLOOR_EFFECT_1) && ClimbBoots_HasGrip() &&
             (this->transformation == PLAYER_FORM_HUMAN)) {
+            sPlayerFloorEffect = FLOOR_EFFECT_0;
+        }
+        // Roc's Boots on the water surface: the lake bottom's slope is not the floor Link stands on.
+        if (RocBoots_OnWater()) {
             sPlayerFloorEffect = FLOOR_EFFECT_0;
         }
 
@@ -12853,6 +12879,31 @@ void Player_ProcessSceneCollision(PlayState* play, Player* this) {
     } else {
         func_808430E0(this);
         sPlayerFloorEffect = FLOOR_EFFECT_0;
+    }
+
+    // Roc's Boots: WALK ON WATER — feet at/below the surface while not swimming → pin Link to the
+    // surface and call it flat floor (the same snap Deku Link's water hops use).
+    {
+        u8 onWater = RocBoots_WalksOnWater(this);
+
+        if (onWater != 0) {
+            if (!(this->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
+                this->actor.bgCheckFlags |= BGCHECKFLAG_GROUND;
+                if (onWater == 2) {
+                    this->actor.bgCheckFlags |= BGCHECKFLAG_GROUND_TOUCH;
+                }
+            }
+            this->actor.world.pos.y += this->actor.depthInWater;
+            this->actor.depthInWater = 0.0f;
+            this->actor.floorHeight = this->actor.world.pos.y;
+            sPlayerYDistToFloor = 0.0f;
+            if (this->actor.velocity.y < 0.0f) {
+                this->actor.velocity.y = 0.0f;
+            }
+            sPlayerFloorType = FLOOR_TYPE_0;
+            sPlayerFloorEffect = FLOOR_EFFECT_0;
+            this->floorPitch = this->floorPitchAlt = sFloorPitchShape = 0;
+        }
     }
 
     if (floorPoly != NULL) {
@@ -13234,7 +13285,7 @@ void func_80844784(PlayState* play, Player* this) {
         this->actor.world.rot.y = this->yaw;
     }
 
-    Actor_UpdateVelocityWithGravity(&this->actor);
+    RocBoots_MoveWithGravity(this, Actor_UpdateVelocityWithGravity); // half gravity while worn
     D_80862B3C = 0.0f;
 
     // Wind is blowing but the Forest Medallion is holding it off — show it on the tunic.
@@ -13456,7 +13507,7 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
     if (this->stateFlags2 & PLAYER_STATE2_8000) {
         if (!(this->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
             Player_StopHorizontalMovement(this);
-            Actor_MoveWithGravity(&this->actor);
+            RocBoots_MoveWithGravity(this, Actor_MoveWithGravity); // half gravity while worn
         }
         Player_ProcessSceneCollision(play, this);
     } else {
@@ -14151,6 +14202,7 @@ void Player_DrawGameplay(PlayState* play, Player* this, s32 lod, Gfx* cullDList,
 
     gSPSegment(POLY_OPA_DISP++, 0x0C, cullDList);
     gSPSegment(POLY_XLU_DISP++, 0x0C, cullDList);
+    PlayerTunic_BindLocalColor(play);
 
     Player_DrawImpl(play, this->skelAnime.skeleton, this->skelAnime.jointTable, this->skelAnime.dListCount, lod,
                     this->transformation, 0, this->actor.shape.face, overrideLimbDraw, Player_PostLimbDrawGameplay,
@@ -18212,7 +18264,7 @@ void Player_Action_52(Player* this, PlayState* play) {
         this->actor.world.pos.y = rideActor->actor.world.pos.y + rideActor->riderPos.y - 27.0f;
         this->actor.world.pos.z = rideActor->actor.world.pos.z + rideActor->riderPos.z;
 
-        this->yaw = this->actor.shape.rot.y = rideActor->actor.shape.rot.y;
+        this->yaw = this->actor.shape.rot.y = MasterCycle_RideYaw(&rideActor->actor);
 
         if (!sUpperBodyIsBusy) {
             if (this->av1.actionVar1 != 0) {

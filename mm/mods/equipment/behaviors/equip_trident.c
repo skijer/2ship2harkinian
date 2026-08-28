@@ -619,10 +619,6 @@ static struct {
     LinkAnimationHeader* savedWalk[PLAYER_ANIMTYPE_MAX];
     LinkAnimationHeader* savedRun[PLAYER_ANIMTYPE_MAX];
     u8 heavyBoots; // iron-boots REGs currently applied
-    u8 baseForced;
-    u8 savedSwordEquip;
-    u8 savedButtonItem;
-    s32 savedFileNum;
 } sTri = { 0 };
 
 extern LinkAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeader(const char* path);
@@ -1434,8 +1430,8 @@ static u8 Trident_IsSwordIA(s8 ia) {
 // ---------------------------------------------------------------------------
 // The guard — vanilla's shield action, and now vanilla's POSES too.
 //
-// R is OOT's own shield, unchanged and un-reskinned: Mirror forced by
-// Trident_EnforceShield, block handled by the vanilla shield quad, and the
+// R is OOT's own shield, unchanged and un-reskinned: Divine/Mirror enforced once by
+// ExtEquip_SetSlot, block handled by the vanilla shield quad, and the
 // raise/hold/lower clips are Link's own ("haz que las poses de shield use las
 // vanilla"). The gunlance guard idle that used to be served through
 // VB_PLAYER_ANIM_SITE_SHIELD_RAISE / _LOOP is gone from those sites.
@@ -1929,39 +1925,9 @@ static void Trident_Draw(Player* player, PlayState* play) {
                          (play->gameplayFrames * 10.0f) / 1000.0f);
 }
 
-// ---------------------------------------------------------------------------
-// El escudo del gunlance en MM
-//
-// Link humano corresponde a la rama infantil de OoT, así que el arma siempre usa
-// Divine Shield (ext, ranura 1). No existe aquí la rama adulto → Mirror Shield.
-//
-// ⚠️ NO se guarda el escudo anterior ni se restaura al desequipar el trident.
-// Es deliberado ("no lo pierdes del inventario pero no te restaura el escudo, lo
-// que hace más riesgoso"): el escudo sigue en el inventario, pero sacar el
-// trident con otro escudo puesto hace que el Divine lo sustituya hasta que vuelvas
-// a equipar el anterior tú.
-// Por eso esto NO tiene pareja en Trident_Cleanup, y no es un olvido.
-// ---------------------------------------------------------------------------
-// ⚠️ SIEMPRE SE DESEQUIPA LO QUE HUBIERA ANTES, y ahí estaba el bug del "luego sigue
-// el kite shield a veces". MM conserva por separado el escudo vanilla que sirve de
-// base y el escudo EXT (Kite, Ikana…); hay que limpiar el EXT anterior antes de poner
-// Divine para que no quede su modelo dibujándose por encima.
-#define TRI_EXT_SHIELD_DIVINE 1
-
-static void Trident_EnforceShield(void) {
-    u8 curExt = ExtEquip_GetCurrent(EQUIP_TYPE_SHIELD);
-
-    // MM only has the child/human Link for this equipment. The adult/Mirror
-    // branch from OoT is therefore not merely unreachable at runtime: its
-    // two-argument inventory API and OoT ownership index do not exist in MM.
-    if (curExt == TRI_EXT_SHIELD_DIVINE) {
-        return; // ya está
-    }
-    // Las dos ranuras a cero antes de poner nada. ExtEquip_Equip pone por su
-    // cuenta el escudo vanilla que le sirve de base.
-    ExtEquip_Unequip(EQUIP_TYPE_SHIELD);
-    ExtEquip_Equip(EQUIP_TYPE_SHIELD, TRI_EXT_SHIELD_DIVINE);
-}
+// The Trident's shield rule (Divine or a Mirror, else bare) is applied ONCE by ExtEquip_SetSlot
+// when the Trident goes on, and the kaleido refuses other shields while it is worn — nothing here
+// touches the shield slot per frame anymore.
 
 // ---------------------------------------------------------------------------
 // Phantom Ganon flight — the one custom state.
@@ -2623,23 +2589,15 @@ static void Trident_Behavior(Player* player, PlayState* play) {
         sTri.chargePrev = -1.0f;
     }
 
-    // MM refuses sword actions when no native sword is equipped. The Trident uses
-    // Kokiri Sword only as an internal host and restores the exact prior loadout.
-    if (!sTri.baseForced) {
-        sTri.savedSwordEquip = GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD);
-        sTri.savedButtonItem = gSaveContext.save.saveInfo.equips.buttonItems[0][0];
-        sTri.savedFileNum = gSaveContext.fileNum;
-        sTri.baseForced = 1;
-    }
-    SET_EQUIP_VALUE(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_KOKIRI);
-    gSaveContext.save.saveInfo.equips.buttonItems[0][0] = ITEM_SWORD_KOKIRI;
+    // The sword action comes from B holding ITEM_EXT_SWORD_3 itself (ExtEquip_SetSlot puts it there;
+    // ExtPlayer_GetItemAction aliases it to the one-hand sword action) — the save never sees a
+    // Kokiri Sword the player may not own.
 
     // Swap OOT's melee clips for the gunlance ones. Idempotent, so re-running it
     // every frame costs a flag test; that also means it self-heals if anything
     // else stomped the tables. B is NEVER intercepted — OOT's pipeline drives the
     // whole combo, it just plays our animations.
     Trident_InstallAnims();
-    Trident_EnforceShield();
 
     drawn = Trident_CanAct(player);
     Trident_TickLoco(play, player, drawn);
@@ -2724,13 +2682,6 @@ static void Trident_Cleanup(void) {
             }
         }
     }
-    if (sTri.baseForced) {
-        if (sTri.savedFileNum == gSaveContext.fileNum) {
-            SET_EQUIP_VALUE(EQUIP_TYPE_SWORD, sTri.savedSwordEquip);
-            gSaveContext.save.saveInfo.equips.buttonItems[0][0] = sTri.savedButtonItem;
-        }
-        sTri.baseForced = 0;
-    }
     sTri.state = TRI_IDLE;
     sTri.timer = 0;
     sTri.windowOpen = 0;
@@ -2758,15 +2709,9 @@ static void Trident_Cleanup(void) {
     sTri.heavyBoots = 0;
 }
 
-// Player actors and their collider context are rebuilt on every scene. Preserve
-// only the reversible native-sword host for the same save file; all action,
+// Player actors and their collider context are rebuilt on every scene: all action,
 // collider and animation-table state must start fresh.
 static void Trident_OnPlayerInit(void) {
-    u8 keepBase = sTri.baseForced && (sTri.savedFileNum == gSaveContext.fileNum);
-    u8 savedSwordEquip = sTri.savedSwordEquip;
-    u8 savedButtonItem = sTri.savedButtonItem;
-    s32 savedFileNum = sTri.savedFileNum;
-
     Trident_RestoreAnims();
     Trident_RestoreLoco();
     memset(&sTri, 0, sizeof(sTri));
@@ -2776,13 +2721,6 @@ static void Trident_OnPlayerInit(void) {
     sTriQuadsInited = 0;
     sTridentComboStep = 0;
     sTridentComboIdle = 0;
-
-    if (keepBase) {
-        sTri.baseForced = 1;
-        sTri.savedSwordEquip = savedSwordEquip;
-        sTri.savedButtonItem = savedButtonItem;
-        sTri.savedFileNum = savedFileNum;
-    }
 }
 
 // Called from the melee-hit dispatch while the Trident is equipped.

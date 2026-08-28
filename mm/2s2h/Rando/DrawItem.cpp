@@ -2697,40 +2697,130 @@ void DrawOotExtTrident() {
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 
-void DrawOotExtClimbBoots() { // Iron Boots GI, pacci-style bright grayscale = all-steel look
-    // Vanilla composition (GetItem_DrawOpa0Xlu1): main DL Opa + rivets Xlu. The near-white
-    // grayscale multiplier keeps the mesh's own shading and turns the brown leather sections
-    // steel gray (a dark tint would just blacken them — grayscale × color only darkens).
-    static Gfx* sMainCache = NULL;
-    static Gfx* sRivetsCache = NULL;
-    if (sMainCache == NULL) {
-        sMainCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_gi_boots_2/gGiIronBootsDL");
+// Generic version of the Pegasus copy-and-remap: one-time local copy of an OoT GI DL with every
+// G_SETPRIMCOLOR/G_SETENVCOLOR pushed through `remap`. Per-SECTION recolors (Climb: yellow leather
+// vs silver iron) are only possible this way — a grayscale tint is one color for the whole mesh.
+static Gfx* BuildRecoloredOotGiDL(const char* otrPath, u32 (*remap)(u32), Gfx* dst, bool* built) {
+    if (*built) {
+        return dst;
     }
-    if (sRivetsCache == NULL) {
-        sRivetsCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_gi_boots_2/gGiIronBootsRivetsDL");
+    // Two-word (expanded) commands: the second word is payload, never an opcode.
+    auto isTwoWord = [](u8 op) {
+        return op == 0x20 || op == 0x24 || op == 0x25 || op == 0x27 || op == 0x31 || op == 0x32 ||
+               op == 0x33 || op == 0x35 || op == 0x36 || op == 0x42;
+    };
+    Gfx* src = (Gfx*)OotAssets_LoadGfx(otrPath);
+    if (src == NULL) {
+        return NULL; // oot.o2r not mounted yet — try again next frame
     }
-    if (sMainCache == NULL || sRivetsCache == NULL) {
+    size_t count = 0;
+    bool sawEnd = false;
+    while (count < 512) {
+        u8 op = (u8)((src[count].words.w0 >> 24) & 0xFF);
+        dst[count] = src[count];
+        count++;
+        if (op == 0xDF) { // G_ENDDL
+            sawEnd = true;
+            break;
+        }
+        if (isTwoWord(op) && count < 512) {
+            dst[count] = src[count];
+            count++;
+        }
+    }
+    if (!sawEnd) {
+        return NULL; // DL longer than the buffer
+    }
+    for (size_t i = 0; i < count; i++) {
+        u8 op = (u8)((dst[i].words.w0 >> 24) & 0xFF);
+        if (op == 0xDF) {
+            break;
+        }
+        if (op == G_SETPRIMCOLOR || op == G_SETENVCOLOR) {
+            dst[i].words.w1 = (uintptr_t)remap((u32)dst[i].words.w1);
+        } else if (isTwoWord(op)) {
+            i++; // payload word, never an opcode
+        }
+    }
+    *built = true;
+    return dst;
+}
+
+// Climb Boots: YELLOW leather + SILVER iron. The GI mesh tells the sections apart by color
+// temperature — every leather prim/env is warm brown (r >> b), every iron one is cool gray —
+// so classify per color and ramp by luminance.
+static u32 ClimbBoots_YellowIronRamp(u32 rgba) {
+    u8 r = (rgba >> 24) & 0xFF, g = (rgba >> 16) & 0xFF, b = (rgba >> 8) & 0xFF, a = rgba & 0xFF;
+    f32 lum = 0.299f * r + 0.587f * g + 0.114f * b;
+    f32 nrF, ngF, nbF;
+
+    if (r > b + 30) { // warm brown = leather → yellow
+        nrF = lum * 2.2f;
+        ngF = lum * 1.75f;
+        nbF = lum * 0.35f;
+    } else { // cool gray = iron → bright silver
+        nrF = lum * 1.2f + 25.0f;
+        ngF = lum * 1.25f + 25.0f;
+        nbF = lum * 1.35f + 28.0f;
+    }
+    u8 nr = (u8)(nrF > 255.0f ? 255.0f : nrF);
+    u8 ng = (u8)(ngF > 255.0f ? 255.0f : ngF);
+    u8 nb = (u8)(nbF > 255.0f ? 255.0f : nbF);
+    return ((u32)nr << 24) | ((u32)ng << 16) | ((u32)nb << 8) | a;
+}
+
+// Roc's Boots: the whole hover-boots mesh in ONE metallic gold (mids rich gold, highlights
+// toward white-gold).
+static u32 RocBoots_GoldRamp(u32 rgba) {
+    u8 r = (rgba >> 24) & 0xFF, g = (rgba >> 16) & 0xFF, b = (rgba >> 8) & 0xFF, a = rgba & 0xFF;
+    f32 lum = 0.299f * r + 0.587f * g + 0.114f * b;
+    f32 nrF = lum * 1.6f;
+    f32 ngF = lum * 1.22f;
+    f32 nbF = lum * 0.5f;
+    u8 nr = (u8)(nrF > 255.0f ? 255.0f : nrF);
+    u8 ng = (u8)(ngF > 255.0f ? 255.0f : ngF);
+    u8 nb = (u8)(nbF > 255.0f ? 255.0f : nbF);
+    return ((u32)nr << 24) | ((u32)ng << 16) | ((u32)nb << 8) | a;
+}
+
+void DrawOotExtClimbBoots() { // Iron Boots GI: yellow leather + silver iron (per-section remap)
+    // Vanilla composition (GetItem_DrawOpa0Xlu1): main DL Opa + rivets Xlu.
+    static Gfx sMain[512];
+    static Gfx sRivets[512];
+    static bool sMainBuilt = false;
+    static bool sRivetsBuilt = false;
+    Gfx* mainDL = BuildRecoloredOotGiDL("__OTR__objects/object_gi_boots_2/gGiIronBootsDL", ClimbBoots_YellowIronRamp,
+                                        sMain, &sMainBuilt);
+    Gfx* rivetsDL = BuildRecoloredOotGiDL("__OTR__objects/object_gi_boots_2/gGiIronBootsRivetsDL",
+                                          ClimbBoots_YellowIronRamp, sRivets, &sRivetsBuilt);
+
+    if (mainDL == NULL || rivetsDL == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
     }
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
-    gDPSetGrayscaleColor(POLY_OPA_DISP++, 245, 248, 255, 255);
-    gSPGrayscale(POLY_OPA_DISP++, true);
-    gSPDisplayList(POLY_OPA_DISP++, sMainCache);
-    gSPGrayscale(POLY_OPA_DISP++, false);
+    gSPDisplayList(POLY_OPA_DISP++, mainDL);
     Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
-    gDPSetGrayscaleColor(POLY_XLU_DISP++, 245, 248, 255, 255);
-    gSPGrayscale(POLY_XLU_DISP++, true);
-    gSPDisplayList(POLY_XLU_DISP++, sRivetsCache);
-    gSPGrayscale(POLY_XLU_DISP++, false);
+    gSPDisplayList(POLY_XLU_DISP++, rivetsDL);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 
-void DrawOotExtRocBoots() { // Hover Boots mesh tinted feather white-blue (Pegasus already takes red)
-    static Gfx* c = NULL;
-    DrawOotGetItemOpaTint("__OTR__objects/object_gi_hoverboots/gGiHoverBootsDL", &c, 225, 235, 255);
+void DrawOotExtRocBoots() { // Hover Boots GI, whole palette in one metallic gold (Pegasus keeps red)
+    static Gfx sDL[512];
+    static bool sBuilt = false;
+    Gfx* dl = BuildRecoloredOotGiDL("__OTR__objects/object_gi_hoverboots/gGiHoverBootsDL", RocBoots_GoldRamp, sDL,
+                                    &sBuilt);
+
+    if (dl == NULL) {
+        return; // oot.o2r not mounted yet — try again next frame
+    }
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, dl);
+    CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 
 // ── The four 2026-08-06 page-2 additions ─────────────────────────────────────────────────────────

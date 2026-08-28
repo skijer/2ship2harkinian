@@ -603,7 +603,10 @@ void Sram_SaveEndOfCycle(PlayState* play) {
         gSaveContext.save.saveInfo.playerData.health = 0x30;
     }
 
-    if (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) <= EQUIP_VALUE_SWORD_RAZOR) {
+    // NEI: a bare sword slot (ext sword taken off) must stay bare — the vanilla reset assumes Link
+    // always owns the Kokiri Sword and would hand one out here.
+    if ((GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) != EQUIP_VALUE_SWORD_NONE) &&
+        (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) <= EQUIP_VALUE_SWORD_RAZOR)) {
         SET_EQUIP_VALUE(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_KOKIRI);
 
         if (CUR_FORM == 0) {
@@ -1334,6 +1337,11 @@ void Sram_OpenSave(FileSelectState* fileSelect, SramContext* sramCtx) {
     s32 phi_t1;
     s32 pad1;
     s32 fileNum;
+
+    {
+        extern void ExtEquip_OnSaveOpened(void);
+        ExtEquip_OnSaveOpened(); // NEI: Player_Init re-reads the page-2 loadout for this file
+    }
 
     if (gSaveContext.flashSaveAvailable) {
         memset(sramCtx->saveBuf, 0, SAVE_BUFFER_SIZE);

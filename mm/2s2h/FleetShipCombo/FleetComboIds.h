@@ -261,7 +261,7 @@ static const FcBottleContentPair kFcBottleContentMap[] = {
     { 0xF2, 0x26 }, // ITEM_HYLIAN_LOACH             <-> ITEM_HYLIAN_LOACH
     { 0xF3, 0x27 }, // ITEM_OBABA_DRINK              <-> ITEM_OBABA_DRINK
     { 0xDD, 0x23 }, // ITEM_MAGIC_MUSHROOM           <-> ITEM_MUSHROOM
-    { 0x1B, 0xFE }, // ITEM_LETTER_RUTO              <-> (no MM relative: sentinel 0xFE, kept OoT-side)
+    { 0x1B, 0xFC }, // ITEM_LETTER_RUTO              <-> ITEM_BOTTLE_LETTER_RUTO (MM wheel-only content)
 };
 #define FC_BOTTLE_CONTENT_MAP_COUNT (sizeof(kFcBottleContentMap) / sizeof(kFcBottleContentMap[0]))
 #define FC_BOTTLE_SLOT_EMPTY 0xFF // NeiSaveData.bottleSlots "no bottle in this slot"

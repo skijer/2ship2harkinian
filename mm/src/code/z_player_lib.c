@@ -843,8 +843,16 @@ s32 func_801235DC(PlayState* play, f32 arg1, s16 arg2) {
 }
 
 // #region 2S2H [Dpad]
+u8 MasterCycle_IsRiding(void); // mods/actors/master_cycle.c
+
 ItemId Player_Dpad_GetItemOnButton(PlayState* play, Player* player, DpadEquipSlot slot) {
     if (slot >= EQUIP_SLOT_D_MAX) {
+        return ITEM_NONE;
+    }
+
+    // On the Master Cycle the D-pad is the wheelie (up) and its cancel (down), so it must not also
+    // fire whatever is equipped there. Skijer's NEI
+    if (MasterCycle_IsRiding()) {
         return ITEM_NONE;
     }
 
@@ -859,7 +867,22 @@ u8 Pacci_UltrahandModeActive(void); // mods/actors/cane_pacci.c
 ItemId Player_GetItemOnButton(PlayState* play, Player* player, EquipSlot slot) {
     // mods/actors/cane_pacci.c — while Ultrahand mode is up the D-pad rotates and
     // moves the held object, so it must not also fire whatever is equipped there.
+    //
+    // NOTE: this range does not do what it reads like, and the Master Cycle deliberately does NOT
+    // join it. EQUIP_SLOT_D_* is a SEPARATE enum that starts at 0 (z64interface.h:62), so
+    // `slot >= EQUIP_SLOT_D_RIGHT && slot <= EQUIP_SLOT_D_UP` is `slot >= 0 && slot <= 3` — B and
+    // the three C buttons, not the D-pad at all. The real D-pad lookup is a different function,
+    // Player_Dpad_GetItemOnButton, and that is where the bike blocks it. Left alone here because
+    // it is Ultrahand's to fix.
     if ((slot >= EQUIP_SLOT_D_RIGHT) && (slot <= EQUIP_SLOT_D_UP) && Pacci_UltrahandModeActive()) {
+        return ITEM_NONE;
+    }
+
+    // On the bike B is the reverse/dismount control and both hands are on the bars: nothing comes
+    // out of it. An empty B slot is how you tell the item pipeline to leave the button alone, and it
+    // is what stops the sword leaving its scabbard. (The swing itself, if the blade was already out
+    // when he got on, is stopped in func_80833864.) Skijer's NEI
+    if ((slot == EQUIP_SLOT_B) && MasterCycle_IsRiding()) {
         return ITEM_NONE;
     }
 

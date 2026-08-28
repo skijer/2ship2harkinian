@@ -424,6 +424,11 @@ typedef enum ItemId {
 // Only genuinely-custom bottle items (no MM-native equivalent) get an ID here:
 #define ITEM_NET                 0xF7
 #define ITEM_BOTTOMLESS_BOTTLE   0xF8
+// Ruto's Letter: an OoT bottle content with no MM equivalent, so it lives as a wheel-only content
+// (BC_ITEM_LETTER_RUTO in custom_bottles.cpp). Inert on C — MM has nobody to deliver it to.
+// 0xFC is the last free u8: 0xF9/0xFA are medallion sentinels, 0xFB the ext-button marker, 0xFD the
+// B-button placeholder, and 0xFE is FC_BOTTLE_UNMAPPED ("never store" — it crashes icon lookups).
+#define ITEM_BOTTLE_LETTER_RUTO  0xFC
 
 // ─── Skijer's NEI — OoT-only item-name compat (centralized here from
 // extended_inventory.h so EVERY mod TU sees them; extended_player.c / equip_helper.c /

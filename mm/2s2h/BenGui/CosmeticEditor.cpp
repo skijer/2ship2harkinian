@@ -1029,46 +1029,64 @@ Gfx humanTunic[] = {
     gsSPEndDisplayList(),
 };
 
-static RegisterShipInitFunc humanTunicPatch(
-    []() {
-        if (!IsCustomHumanModelActive() && CVarGetInteger(kHumanTunicOption.colorChangedCvar, 0)) {
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanWaistDL", "setPrim", 5,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanRightThighDL", "setPrim", 10,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanLeftThighDL", "setPrim", 10,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanHeadDL", "setPrim", 92,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanHatDL", "setPrim", 10,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanCollarDL", "setPrim", 5,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim1", 10,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim2", 65,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim1", 10,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim2", 65,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanTorsoDL", "setPrim", 5,
-                                       gsSPDisplayList(humanTunic));
-        } else {
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanWaistDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanRightThighDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanLeftThighDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanHeadDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanHatDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanCollarDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim1");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim2");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim1");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim2");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanTorsoDL", "setPrim");
-        }
-    },
-    { kHumanTunicOption.colorChangedCvar });
+// One tunic display list whose prim color IS the tunic color. `white` entries carry no color: they
+// reset prim to white for the geometry that follows the tunic in the same list.
+struct TunicPatchSite {
+    const char* path;
+    const char* name;
+    int index;
+    bool white;
+};
+
+// The display list every site jumps to while the per-player tint owns the tunic: segment 0x07,
+// bound per draw with the color of whoever is about to be rendered. The low bit is what tells
+// Fast3D the word is a segmented address and not a host pointer (Interpreter::SegAddr), and it is
+// what OTRExporter sets on every segmented display list it writes.
+static Gfx* const kTunicColorSegment = (Gfx*)0x07000001;
+
+static void PatchTunicSites(const TunicPatchSite* sites, size_t count, Gfx* colorDl) {
+    for (size_t i = 0; i < count; i++) {
+        ResourceMgr_PatchGfxByName(sites[i].path, sites[i].name, sites[i].index,
+                                   gsSPDisplayList(sites[i].white ? backToWhite : colorDl));
+    }
+}
+
+static void UnpatchTunicSites(const TunicPatchSite* sites, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        ResourceMgr_UnpatchGfxByName(sites[i].path, sites[i].name);
+    }
+}
+
+static bool sPerPlayerTint = false;
+
+static const TunicPatchSite kHumanTunicSites[] = {
+    { "objects/object_link_child/gLinkHumanWaistDL", "setPrim", 5, false },
+    { "objects/object_link_child/gLinkHumanRightThighDL", "setPrim", 10, false },
+    { "objects/object_link_child/gLinkHumanLeftThighDL", "setPrim", 10, false },
+    { "objects/object_link_child/gLinkHumanHeadDL", "setPrim", 92, false },
+    { "objects/object_link_child/gLinkHumanHatDL", "setPrim", 10, false },
+    { "objects/object_link_child/gLinkHumanCollarDL", "setPrim", 5, false },
+    { "objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim1", 10, false },
+    { "objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim2", 65, false },
+    { "objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim1", 10, false },
+    { "objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim2", 65, false },
+    { "objects/object_link_child/gLinkHumanTorsoDL", "setPrim", 5, false },
+};
+
+static void ApplyHumanTunicPatch() {
+    if (sPerPlayerTint) {
+        return;
+    }
+
+    if (!IsCustomHumanModelActive() && CVarGetInteger(kHumanTunicOption.colorChangedCvar, 0)) {
+        PatchTunicSites(kHumanTunicSites, ARRAY_COUNT(kHumanTunicSites), humanTunic);
+    } else {
+        UnpatchTunicSites(kHumanTunicSites, ARRAY_COUNT(kHumanTunicSites));
+    }
+}
+
+static RegisterShipInitFunc humanTunicPatch([]() { ApplyHumanTunicPatch(); },
+                                            { kHumanTunicOption.colorChangedCvar });
 
 static RegisterShipInitFunc humanTunicColor(
     []() {
@@ -1091,24 +1109,11 @@ Gfx neiEquipTunic[] = {
 static int8_t sNeiLastTunic = -1;
 
 static void NeiTunic_UpdateEquipmentColor() {
-    struct NeiTunicPatch {
-        const char* path;
-        const char* name;
-        int index;
-    };
-    static const NeiTunicPatch kPatches[] = {
-        { "objects/object_link_child/gLinkHumanWaistDL", "setPrim", 5 },
-        { "objects/object_link_child/gLinkHumanRightThighDL", "setPrim", 10 },
-        { "objects/object_link_child/gLinkHumanLeftThighDL", "setPrim", 10 },
-        { "objects/object_link_child/gLinkHumanHeadDL", "setPrim", 92 },
-        { "objects/object_link_child/gLinkHumanHatDL", "setPrim", 10 },
-        { "objects/object_link_child/gLinkHumanCollarDL", "setPrim", 5 },
-        { "objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim1", 10 },
-        { "objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim2", 65 },
-        { "objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim1", 10 },
-        { "objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim2", 65 },
-        { "objects/object_link_child/gLinkHumanTorsoDL", "setPrim", 5 },
-    };
+    // In a Harpoon room the tunic belongs to the per-player tint; re-patching here every frame
+    // would overwrite it the frame after it is installed.
+    if (sPerPlayerTint) {
+        return;
+    }
 
     uint8_t tunic = Nei_Save()->vanillaTunic;
     u8 extTunic = ExtEquip_GetCurrent(EQUIP_TYPE_TUNIC);
@@ -1138,22 +1143,13 @@ static void NeiTunic_UpdateEquipmentColor() {
                 break;
         }
         neiEquipTunic[0] = gsDPSetPrimColor(0, 0, c.r, c.g, c.b, 255);
-        for (const auto& p : kPatches) {
-            ResourceMgr_PatchGfxByName(p.path, p.name, p.index, gsSPDisplayList(neiEquipTunic));
-        }
+        PatchTunicSites(kHumanTunicSites, ARRAY_COUNT(kHumanTunicSites), neiEquipTunic);
         sNeiLastTunic = colorMode;
     } else if (sNeiLastTunic != 0) {
         // Transitioned to Kokiri: restore ONCE — re-apply the HumanTunic cosmetic if it's active,
         // otherwise remove the patch so the baked-green tunic shows.
         sNeiLastTunic = 0;
-        bool cosmeticActive = !IsCustomHumanModelActive() && CVarGetInteger(kHumanTunicOption.colorChangedCvar, 0);
-        for (const auto& p : kPatches) {
-            if (cosmeticActive) {
-                ResourceMgr_PatchGfxByName(p.path, p.name, p.index, gsSPDisplayList(humanTunic));
-            } else {
-                ResourceMgr_UnpatchGfxByName(p.path, p.name);
-            }
-        }
+        ApplyHumanTunicPatch();
     }
 }
 
@@ -1204,30 +1200,31 @@ Gfx dekuTunic[] = {
     gsSPEndDisplayList(),
 };
 
-static RegisterShipInitFunc dekuTunicPatch(
-    []() {
-        if (!IsCustomDekuModelActive() && CVarGetInteger(kDekuTunicOption.colorChangedCvar, 0)) {
-            ResourceMgr_PatchGfxByName("objects/object_link_nuts/gLinkDekuWaistDL", "setPrim", 22,
-                                       gsSPDisplayList(dekuTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_nuts/gLinkDekuHeadDL", "setPrim1", 55,
-                                       gsSPDisplayList(dekuTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_nuts/gLinkDekuHeadDL", "setPrim2", 76,
-                                       gsSPDisplayList(backToWhite));
-            ResourceMgr_PatchGfxByName("objects/object_link_nuts/gLinkDekuHatDL", "setPrim", 29,
-                                       gsSPDisplayList(dekuTunic));
+static const TunicPatchSite kDekuTunicSites[] = {
+    { "objects/object_link_nuts/gLinkDekuWaistDL", "setPrim", 22, false },
+    { "objects/object_link_nuts/gLinkDekuHeadDL", "setPrim1", 55, false },
+    { "objects/object_link_nuts/gLinkDekuHeadDL", "setPrim2", 76, true },
+    { "objects/object_link_nuts/gLinkDekuHatDL", "setPrim", 29, false },
+};
 
-            ShadePaletteWhite("objects/object_link_nuts/object_link_nuts_TLUT_003EB0", 243, 254, MODE_MAX);
-        } else {
-            ResourceMgr_UnpatchGfxByName("objects/object_link_nuts/gLinkDekuWaistDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_nuts/gLinkDekuHeadDL", "setPrim1");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_nuts/gLinkDekuHeadDL", "setPrim2");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_nuts/gLinkDekuHatDL", "setPrim");
+static const char* const kDekuTunicPalette = "objects/object_link_nuts/object_link_nuts_TLUT_003EB0";
 
-            ShadePaletteRevert("objects/object_link_nuts/object_link_nuts_TLUT_003EB0", 243, 254);
-        }
-        gfx_texture_cache_clear();
-    },
-    { kDekuTunicOption.colorChangedCvar });
+static void ApplyDekuTunicPatch() {
+    if (sPerPlayerTint) {
+        return;
+    }
+
+    if (!IsCustomDekuModelActive() && CVarGetInteger(kDekuTunicOption.colorChangedCvar, 0)) {
+        PatchTunicSites(kDekuTunicSites, ARRAY_COUNT(kDekuTunicSites), dekuTunic);
+        ShadePaletteWhite(kDekuTunicPalette, 243, 254, MODE_MAX);
+    } else {
+        UnpatchTunicSites(kDekuTunicSites, ARRAY_COUNT(kDekuTunicSites));
+        ShadePaletteRevert(kDekuTunicPalette, 243, 254);
+    }
+    gfx_texture_cache_clear();
+}
+
+static RegisterShipInitFunc dekuTunicPatch([]() { ApplyDekuTunicPatch(); }, { kDekuTunicOption.colorChangedCvar });
 
 static RegisterShipInitFunc dekuTunicColor(
     []() {
@@ -1325,39 +1322,100 @@ Gfx goronTunic[] = {
     gsSPEndDisplayList(),
 };
 
-static RegisterShipInitFunc goronTunicPatch(
-    []() {
-        if (!IsCustomGoronModelActive() && CVarGetInteger(kGoronTunicOption.colorChangedCvar, 0)) {
-            ResourceMgr_PatchGfxByName("objects/object_link_goron/gLinkGoronWaistDL", "setPrim", 16,
-                                       gsSPDisplayList(goronTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_goron/gLinkGoronHatDL", "setPrim", 17,
-                                       gsSPDisplayList(goronTunic));
+static const TunicPatchSite kGoronTunicSites[] = {
+    { "objects/object_link_goron/gLinkGoronWaistDL", "setPrim", 16, false },
+    { "objects/object_link_goron/gLinkGoronHatDL", "setPrim", 17, false },
+};
 
-            ShadePaletteWhite("objects/object_link_goron/object_link_goron_Tex_002780", 0, 127, MODE_MAX);
-        } else {
-            ResourceMgr_UnpatchGfxByName("objects/object_link_goron/gLinkGoronWaistDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_goron/gLinkGoronHatDL", "setPrim");
+static const char* const kGoronTunicPalette = "objects/object_link_goron/object_link_goron_Tex_002780";
+// Second Goron texture: its color lives in the palette itself, so it can only ever hold ONE color.
+static const char* const kGoronTunicBasePalette = "objects/object_link_goron/object_link_goron_Tex_00CEB8";
 
-            ShadePaletteRevert("objects/object_link_goron/object_link_goron_Tex_002780", 0, 127);
-            ShadePaletteRevert("objects/object_link_goron/object_link_goron_Tex_00CEB8", 0, 127);
-        }
-        gfx_texture_cache_clear();
-    },
-    { kGoronTunicOption.colorChangedCvar });
+static void ApplyGoronTunicPatch() {
+    if (sPerPlayerTint) {
+        return;
+    }
+
+    if (!IsCustomGoronModelActive() && CVarGetInteger(kGoronTunicOption.colorChangedCvar, 0)) {
+        PatchTunicSites(kGoronTunicSites, ARRAY_COUNT(kGoronTunicSites), goronTunic);
+        ShadePaletteWhite(kGoronTunicPalette, 0, 127, MODE_MAX);
+    } else {
+        UnpatchTunicSites(kGoronTunicSites, ARRAY_COUNT(kGoronTunicSites));
+        ShadePaletteRevert(kGoronTunicPalette, 0, 127);
+        ShadePaletteRevert(kGoronTunicBasePalette, 0, 127);
+    }
+    gfx_texture_cache_clear();
+}
+
+static RegisterShipInitFunc goronTunicPatch([]() { ApplyGoronTunicPatch(); }, { kGoronTunicOption.colorChangedCvar });
 
 static RegisterShipInitFunc goronTunicColor(
     []() {
         Color_RGBA8 changedColor = CVarGetColor(kGoronTunicOption.colorCvar, {});
         goronTunic[0] = gsDPSetPrimColor(0, 0, changedColor.r, changedColor.g, changedColor.b, 255);
 
-        if (IsCustomGoronModelActive() || !CVarGetInteger(kGoronTunicOption.colorChangedCvar, 0)) {
+        if (sPerPlayerTint || IsCustomGoronModelActive() || !CVarGetInteger(kGoronTunicOption.colorChangedCvar, 0)) {
             return;
         }
 
-        ShadePaletteNewBase("objects/object_link_goron/object_link_goron_Tex_00CEB8", 0, 127, changedColor, MODE_MAX);
+        ShadePaletteNewBase(kGoronTunicBasePalette, 0, 127, changedColor, MODE_MAX);
         gfx_texture_cache_clear();
     },
     { kGoronTunicOption.colorCvar });
+
+// Per-player tunic tint. The patch above recolors the tunic through ONE global Gfx — one color per
+// frame, useless once several players share the screen — so this re-points those jumps at segment
+// 0x07, which each draw then binds to its own color. Zora is absent on purpose: its color lives in
+// a TLUT gradient, not in a prim color, so it physically cannot differ between players.
+void PlayerTunic_SetPerPlayerTint(bool enabled) {
+    // Called every frame: patching is idempotent and a scene reload can drop it (the same reason the
+    // equipment tunic re-applies its own). The palette work runs only on the transition.
+    bool changed = sPerPlayerTint != enabled;
+    sPerPlayerTint = enabled;
+
+    if (!enabled) {
+        if (changed) {
+            // Each Apply* drops our patch and puts back whatever the cosmetic editor wants; -1 makes
+            // the equipment tunic re-decide instead of assuming it still owns what it patched last.
+            ApplyHumanTunicPatch();
+            ApplyDekuTunicPatch();
+            ApplyGoronTunicPatch();
+            sNeiLastTunic = -1;
+        }
+        return;
+    }
+
+    if (!IsCustomHumanModelActive()) {
+        PatchTunicSites(kHumanTunicSites, ARRAY_COUNT(kHumanTunicSites), kTunicColorSegment);
+    }
+    if (!IsCustomDekuModelActive()) {
+        PatchTunicSites(kDekuTunicSites, ARRAY_COUNT(kDekuTunicSites), kTunicColorSegment);
+    }
+    if (!IsCustomGoronModelActive()) {
+        PatchTunicSites(kGoronTunicSites, ARRAY_COUNT(kGoronTunicSites), kTunicColorSegment);
+    }
+
+    if (!changed) {
+        return;
+    }
+
+    // Deku and Goron need their tunic texture greyscaled, or the prim color multiplies against the
+    // baked green. Human's is already neutral.
+    if (!IsCustomDekuModelActive()) {
+        ShadePaletteWhite(kDekuTunicPalette, 243, 254, MODE_MAX);
+    }
+    if (!IsCustomGoronModelActive()) {
+        ShadePaletteWhite(kGoronTunicPalette, 0, 127, MODE_MAX);
+    }
+    gfx_texture_cache_clear();
+}
+
+Color_RGBA8 PlayerTunic_ResolveLocalColor() {
+    if (!IsCustomHumanModelActive() && CVarGetInteger(kHumanTunicOption.colorChangedCvar, 0)) {
+        return CVarGetColor(kHumanTunicOption.colorCvar, kHumanTunicOption.defaultColor);
+    }
+    return kHumanTunicOption.defaultColor;
+}
 
 // Player.ZoraTunic
 static const Color_RGBA8 zoraSkinColor = { 197, 247, 247, 255 };

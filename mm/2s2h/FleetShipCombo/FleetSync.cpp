@@ -71,6 +71,9 @@ unsigned char ExtEquip_PendantOwned(void);
 void ExtEquip_GivePendant(void);
 // Ownership of a page-2 equipment cell (extEquipOwnedBits). Needed by the fold below.
 unsigned char ExtEquip_HasItem(short equipType, unsigned char index);
+// The single writer of an equipped ext slot + the RAM re-read after an apply (extended_equipment.h).
+void ExtEquip_SetSlot(short equipType, unsigned char index);
+void ExtEquip_ResyncFromSave(void);
 // Bottle wheel fold (custom_bottles.cpp) — declared HERE, in the extern "C" block: a declaration
 // inside an anonymous namespace mangles as a local C++ symbol and fails to link (bit soh first).
 void Bottle_WheelPersist(unsigned char wheel, unsigned short slotItem);
@@ -214,21 +217,22 @@ int GetEquippedShieldCanonical() {
     return 0;
 }
 
+// Routed through ExtEquip_SetSlot so the outgoing ext shield is cleaned up and the RAM copy every
+// predicate/draw reads changes with the save (a raw nei->extEquipShield write left them apart
+// until the next scene load).
 void SetEquippedShieldCanonical(int canon) {
-    NeiSaveData* nei = Nei_Save();
     switch (canon) {
         case 2: // Hylian -> Hero
-            nei->extEquipShield = 0;
+            ExtEquip_SetSlot(EQUIP_TYPE_SHIELD, 0);
             MM_EQ.equipment = (uint16_t)((MM_EQ.equipment & ~0xF0) | (1 << 4));
             break;
         case 6: // Ikana -> native MM Mirror
-            nei->extEquipShield = 0;
+            ExtEquip_SetSlot(EQUIP_TYPE_SHIELD, 0);
             MM_EQ.equipment = (uint16_t)((MM_EQ.equipment & ~0xF0) | (2 << 4));
             break;
         case 4: // Divine (NEI ext 1 over Hero base)
         case 5: // Kite (NEI ext 2)
-            nei->extEquipShield = (uint8_t)(canon - 3);
-            MM_EQ.equipment = (uint16_t)((MM_EQ.equipment & ~0xF0) | (1 << 4));
+            ExtEquip_SetSlot(EQUIP_TYPE_SHIELD, (unsigned char)(canon - 3));
             break;
         default:
             break; // deku / mirror-OoT / none: no MM relative -> keep current
@@ -824,10 +828,16 @@ void ApplyShared(const nlohmann::json& sh) {
     }
     if (sh.contains("equippedSword")) {
         int sw = sh["equippedSword"].get<int>();
-        if (sw == 1) {
+        // A vanilla sword on the peer means no ext sword here; only the Kokiri line the peer actually
+        // OWNS may land in the nibble (never a Kokiri Sword out of thin air).
+        bool kokiriOwned = sh.contains("swordFlags") && sh["swordFlags"].value("kokiri", false);
+        if (sw == 1 && kokiriOwned) {
             int target = 1 + KokiriChainLevel();
+            ExtEquip_SetSlot(EQUIP_TYPE_SWORD, 0);
             MM_EQ.equipment = (uint16_t)((MM_EQ.equipment & ~0xF) | target);
+            MM_EQ.buttonItems[0][0] = (uint8_t)(ITEM_SWORD_KOKIRI + KokiriChainLevel());
         } else if (sw == 4) {
+            ExtEquip_SetSlot(EQUIP_TYPE_SWORD, 0);
             MM_EQ.equipment = (uint16_t)((MM_EQ.equipment & ~0xF) | 4);
         }
         // 2 (master) / 3 (bgs): no MM equip nibble -> keep current
@@ -1133,6 +1143,10 @@ void ApplyShared(const nlohmann::json& sh) {
                     (int)nei->bottleSlots[3], (int)nei->bottleSlots[4], (int)nei->bottleSlots[5],
                     (int)nei->bottleSlots[6], (int)nei->bottleSlots[7]);
     }
+
+    // Everything above wrote Nei_Save()->extEquip* / equipment nibbles directly — the RAM copy the
+    // behaviors and draws read must follow now, not at the next scene load.
+    ExtEquip_ResyncFromSave();
 }
 
 // =================================================================================================

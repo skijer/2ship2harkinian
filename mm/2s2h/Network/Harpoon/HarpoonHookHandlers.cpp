@@ -16,6 +16,7 @@
 #include "Harpoon.h"
 #include "Combat/CombatSync.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/BenGui/CosmeticEditor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <spdlog/spdlog.h>
 #include <imgui.h>
@@ -52,7 +53,7 @@ s32 func_808344C0(PlayState* play, Player* player);
 
 // Forward decls implemented in HarpoonDummyPlayer.cpp.
 void HarpoonDummyPlayer_DrawAll(PlayState* play); // render remote players (draw hook)
-void HarpoonDummyPlayer_SyncNametags();           // no-op for now
+void HarpoonDummyPlayer_SyncNametags(PlayState* play); // name above each peer, gated by the CVar
 void HarpoonPeer_RefreshActors(PlayState* play);  // spawn/kill one collider actor per peer
 void HarpoonPeer_OnActorDestroyed(Actor* actor);
 void HarpoonPeer_OnPlayDestroy();
@@ -249,6 +250,9 @@ int Harpoon_RegisterFrameHook() {
     return GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>([]() {
         Harpoon::Instance()->DrainIncomingQueue();
         Harpoon_TickLocalStatus();
+        // Owning the tunic means patching engine resources, so it is driven from here (game thread)
+        // instead of from the room packets, which land on the WebSocket worker.
+        PlayerTunic_SetPerPlayerTint(Harpoon::Instance()->State() == HarpoonConnState::InRoom);
     });
 }
 
@@ -325,6 +329,7 @@ int Harpoon_RegisterActorUpdateHook() {
         // cylinder, so our sword / form attacks / bombs / custom items land on
         // it and HarpoonPeer_Update forwards the result.
         HarpoonPeer_RefreshActors(play);
+        HarpoonDummyPlayer_SyncNametags(play);
     });
 }
 

@@ -26,6 +26,7 @@
 #include "interface/parameter_static/parameter_static.h"
 #include "archives/icon_item_static/icon_item_static_yar.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/BenGui/CosmeticEditor.h"         // PlayerTunic_BindLocalColor (per-player tunic tint)
 #include "2s2h/FleetShipCombo/FleetComboIds.h"  // FC_SHIELD_* / FC_OOT_TUNIC/BOOTS ownership bits
 #include "2s2h/FleetShipCombo/FleetShipCombo.h" // FleetShipCombo_GetActiveGame (combo ownership gate)
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -463,13 +464,18 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
         return;
     }
 
+    // Vanilla cells: the ext piece of that type comes off FIRST (ExtEquip_SetSlot cleans it up and
+    // leaves the slot bare/Kokiri), then the vanilla value goes on top. The old order — vanilla
+    // write, then a deferred cleanup restoring the ext piece's snapshot — is what overwrote a freshly
+    // equipped Master Sword with the Kokiri Sword.
     if (cell.equipType == CELL_SWORD) {
         // Kokiri line: equip the highest owned progressive tier (Kokiri/Razor/Gilded).
         u8 level = WeaponUpgrade_KokiriLevel(); // 0/1/2
+        ExtEquip_Unequip(EQUIP_TYPE_SWORD);
         SET_EQUIP_VALUE(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_KOKIRI + level);
         BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_B) = ITEM_SWORD_KOKIRI + level;
         Interface_LoadItemIconImpl(play, EQUIP_SLOT_B);
-        ExtEquip_Unequip(EQUIP_TYPE_SWORD);
+        ExtEquip_RefreshPlayer();
         Audio_PlaySfx(NA_SE_SY_DECIDE);
         return;
     }
@@ -478,10 +484,11 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
         // Master line: reuse the Gilded equip value (one-handed mechanics) but put ITEM_SWORD_MASTER
         // on B so heldItemAction resolves to PLAYER_IA_SWORD_MASTER (own IA -> OoT blade + full-HP
         // beam once True Master is owned). z_player_lib.c overrides the blade DL by heldItemId.
+        ExtEquip_Unequip(EQUIP_TYPE_SWORD);
         SET_EQUIP_VALUE(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_GILDED);
         BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_B) = ITEM_SWORD_MASTER;
         Interface_LoadItemIconImpl(play, EQUIP_SLOT_B);
-        ExtEquip_Unequip(EQUIP_TYPE_SWORD);
+        ExtEquip_RefreshPlayer();
         Audio_PlaySfx(NA_SE_SY_DECIDE);
         return;
     }
@@ -491,11 +498,24 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
         // model group draws gPlayerLeftHandTwoHandSwordDLs (Great Fairy's Sword); a distinct
         // Biggoron blade DL (pre-Great-Fairy) is a follow-up. GFS HP/MP recover is already wired
         // (GreatFairySword_* via ExtEquip_OnMeleeHit) once WeaponUpgrade_HasGreatFairy().
+        ExtEquip_Unequip(EQUIP_TYPE_SWORD);
         BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_B) = ITEM_SWORD_BGS;
         Interface_LoadItemIconImpl(play, EQUIP_SLOT_B);
-        ExtEquip_Unequip(EQUIP_TYPE_SWORD);
+        ExtEquip_RefreshPlayer();
         Audio_PlaySfx(NA_SE_SY_DECIDE);
         return;
+    }
+
+    // The Trident tolerates only the Divine Shield or a Mirror.
+    if (cell.equipType == CELL_SHIELD || cell.equipType == CELL_SHIELD_DEKU ||
+        cell.equipType == CELL_SHIELD_OOT_MIRROR) {
+        u16 wantValue = (cell.equipType == CELL_SHIELD)      ? (u16)cell.index
+                        : (cell.equipType == CELL_SHIELD_DEKU) ? EQUIP_VALUE_SHIELD_HERO
+                                                               : EQUIP_VALUE_SHIELD_MIRROR;
+        if ((ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 3) && !ExtEquip_TridentAllowsShield(0, wantValue)) {
+            Audio_PlaySfx(NA_SE_SY_ERROR);
+            return;
+        }
     }
 
     if (cell.equipType == CELL_SHIELD) {
@@ -508,9 +528,10 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
             Nei_Save()->shieldOwned |= FC_SHIELD_IKANA;
         }
         Nei_Save()->shieldOwned |= (cell.index == 1) ? FC_SHIELD_HYLIAN : FC_SHIELD_IKANA;
+        ExtEquip_Unequip(EQUIP_TYPE_SHIELD);
         SET_EQUIP_VALUE(EQUIP_TYPE_SHIELD, cell.index);
         Nei_Save()->vanillaShieldSkin = 0; // native Hero/Mirror model, not the Deku skin
-        ExtEquip_Unequip(EQUIP_TYPE_SHIELD);
+        ExtEquip_RefreshPlayer();
         Audio_PlaySfx(NA_SE_SY_DECIDE);
         return;
     }
@@ -519,9 +540,10 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
         // Deku shield: equip AS Hero (same IA / raise gate / collider), then flag the Deku skin so
         // the draw shows OoT's smaller Deku model instead of the Hylian/Hero one.
         Nei_Save()->shieldOwned |= FC_SHIELD_DEKU | FC_SHIELD_HYLIAN;
+        ExtEquip_Unequip(EQUIP_TYPE_SHIELD);
         SET_EQUIP_VALUE(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_HERO);
         Nei_Save()->vanillaShieldSkin = 1;
-        ExtEquip_Unequip(EQUIP_TYPE_SHIELD);
+        ExtEquip_RefreshPlayer();
         Audio_PlaySfx(NA_SE_SY_DECIDE);
         return;
     }
@@ -531,28 +553,37 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
         // skin 2 so the draw shows OoT's mirror model (child-hand-patched). Distinct from the MM
         // Mirror (= Shield of Ikana on the ext page).
         Nei_Save()->shieldOwned |= FC_SHIELD_MIRROR_OOT;
+        ExtEquip_Unequip(EQUIP_TYPE_SHIELD);
         SET_EQUIP_VALUE(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_MIRROR);
         Nei_Save()->vanillaShieldSkin = 2;
-        ExtEquip_Unequip(EQUIP_TYPE_SHIELD);
+        ExtEquip_RefreshPlayer();
         Audio_PlaySfx(NA_SE_SY_DECIDE);
         return;
     }
 
     if (cell.equipType == CELL_TUNIC) {
+        ExtEquip_Unequip(EQUIP_TYPE_TUNIC); // Goron/Zora tunic and an ext tunic are exclusive
         Nei_Save()->vanillaTunic = (u8)cell.index; // 0=Kokiri, 1=Goron (fireproof), 2=Zora (gas-immune)
         Audio_PlaySfx(NA_SE_SY_DECIDE);
         return;
     }
 
     if (cell.equipType == CELL_BOOTS) {
+        ExtEquip_Unequip(EQUIP_TYPE_BOOTS); // Iron/Hover boots and ext boots are exclusive
         Nei_Save()->vanillaBoots = (u8)cell.index; // 0=Kokiri, 1=Iron (anti-KB/wind), 2=Hover (float)
         Audio_PlaySfx(NA_SE_SY_DECIDE);
         return;
     }
 
-    // Extended equipment (toggle: equipping the current one unequips it — SoH behavior)
+    // Extended equipment (toggle: equipping the current one unequips it — SoH behavior). Refusals
+    // that ExtEquip_Equip would make silently get their error beep here.
     if (ExtEquip_GetCurrent(cell.equipType) == cell.index) {
         ExtEquip_Unequip(cell.equipType);
+    } else if (!ExtEquip_CheckAgeReq(cell.equipType, (u8)cell.index) ||
+               ((cell.equipType == EQUIP_TYPE_SHIELD) && (ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 3) &&
+                !ExtEquip_TridentAllowsShield((u8)cell.index, 0))) {
+        Audio_PlaySfx(NA_SE_SY_ERROR);
+        return;
     } else {
         ExtEquip_Equip(cell.equipType, (u8)cell.index);
     }
@@ -913,6 +944,8 @@ static void KaleidoEquip_RenderDollFB(PlayState* play) {
     // Zora/FD), whose skeletons lean on it. Set it on both streams like the real player draw.
     gSPSegment(POLY_OPA_DISP++, 0x0C, gCullBackDList);
     gSPSegment(POLY_XLU_DISP++, 0x0C, gCullBackDList);
+    // Same deal for segment 0x07 while the per-player tunic tint owns the tunic display lists.
+    PlayerTunic_BindLocalColor(play);
 
     Matrix_Push();
     // Camera sits at z=-100 looking at the origin (guLookAt above) — Link must be IN FRONT of

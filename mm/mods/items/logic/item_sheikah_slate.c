@@ -38,9 +38,10 @@
 // box_menu.c is unity-included just before this file in custom_items.c, so its BoxMenu_*
 // declarations are already in scope — it has no header (see the note at its top).
 
-// Stasis: the first rune with real behaviour. Included here (not globbed) so it shares this
-// translation unit — and so it needs no header, which would drag 2ship into a CMake regeneration.
+// The runes with real behaviour. Included here (not globbed) so they share this translation unit —
+// and so they need no header, which would drag 2ship into a CMake regeneration.
 #include "../../actors/stasis_rune.c"
+#include "../../actors/master_cycle.c"
 
 extern s32 func_8083485C(Player* this, PlayState* play); // generic "held item" upper action
 // Ext-button store: which u16 item a button really holds when it shows ITEM_EXT_BUTTON.
@@ -61,8 +62,7 @@ s32 Slate_CastRune(Player* player, PlayState* play, u8 rune) {
             // TODO(rune): Cryonis — raise a standable ice pillar from water surfaces.
             break;
         case SLATE_RUNE_MASTER_CYCLE:
-            // TODO(rune): Master Cycle Zero — summon the rideable Sheikah bike.
-            break;
+            return MasterCycle_Cast(play, player);
         default:
             break;
     }
@@ -193,6 +193,10 @@ void Slate_TickInput(PlayState* play, Player* player) {
     // Stasis drives whatever it has frozen every frame, and must keep doing so even with the slate
     // stowed or the menu open — it owns another actor's update until it lets go.
     Stasis_Update(play, player);
+
+    // The bike outlives the tablet being out, too: it has to notice scene changes and loading zones
+    // whether or not the slate is in Link's hand.
+    MasterCycle_Tick(play, player);
 
     // Paint what a cast would grab, but only while the tablet is actually out on the Stasis rune —
     // otherwise every actor Link walks past would shimmer. Called every frame either way so the

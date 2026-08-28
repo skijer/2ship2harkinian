@@ -212,6 +212,10 @@ class Harpoon {
     }
     std::string LastError() const;
     std::string CurrentRoomId() const;
+    // Our own color, packed like HarpoonClient::colorRgba (0 when we are not in a room). Peers learn
+    // it from the room roster, which the server fills in from the handshake — so it is fixed for the
+    // whole session and the menu locks the picker once connected.
+    uint32_t OwnColorRgba() const;
     std::vector<HarpoonClient> GetClientsSnapshot() const;
     std::vector<HarpoonRoomInfo> GetRoomListSnapshot() const;
 
@@ -238,12 +242,15 @@ class Harpoon {
     }
 
     // Behavior driven by the active room's gamemode (NOT manual toggles). The
-    // gamemode id maps to its gamemode.yaml: "geoguessr" => PvP on, nametags
-    // and minimap markers hidden. Coop modes => nametags/minimap shown, PvP off.
-    bool IsPvpActive() const;     // gamemode permits PvP (e.g. geoguessr)
-    bool NametagsVisible() const; // false in geoguessr (hidden by design)
-    bool MinimapVisible() const;  // false in geoguessr
-    bool IsGeoguessr() const;     // current room's gamemode == "geoguessr"
+    // gamemode id maps to its gamemode.yaml: "geoguessr" => PvP on, minimap
+    // markers hidden. Coop modes => minimap shown, PvP off.
+    bool IsPvpActive() const;    // gamemode permits PvP (e.g. geoguessr)
+    bool MinimapVisible() const; // false in geoguessr
+    bool IsGeoguessr() const;    // current room's gamemode == "geoguessr"
+
+    // Whether WE want to see the other players' names above their heads. Not a gamemode call: it is
+    // a local display preference, so each player answers it for themselves.
+    bool NametagsVisible() const;
 
   private:
     Harpoon() = default;
@@ -286,6 +293,7 @@ class Harpoon {
     std::atomic<bool> enabled_{ false };
     std::atomic<HarpoonConnState> state_{ HarpoonConnState::Disconnected };
     std::atomic<uint32_t> ownClientId_{ 0 };
+    std::atomic<uint32_t> ownColorRgba_{ 0 }; // snapshot of the color CVar, taken at handshake
     std::atomic<uint64_t> seqCounter_{ 1 };
 
     mutable std::mutex stateMutex_;
