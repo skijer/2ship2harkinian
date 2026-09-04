@@ -12,6 +12,12 @@ extern "C" {
  */
 const char* PauseItemDesc_Get(u16 itemId, s32 pageIndex);
 
+// C-Up on the page-2 equipment grid: description for an ITEM_EXT_* cell, or NULL.
+const char* PauseItemDesc_GetEquip(u16 extItemId);
+
+// C-Up on the equipment page's upgrade column: row 0 = Magic Cape, row 1 = Pendant of Memories.
+const char* PauseItemDesc_GetEquipUpgrade(s16 row);
+
 /**
  * True when `textId` actually exists in the NES message table.
  *

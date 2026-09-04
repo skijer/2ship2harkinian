@@ -30,6 +30,7 @@ typedef struct {
 
 // 10 bean spots in OOT (all overworld, 9 confirmed + Zora's River always-unlocked)
 #define POD_SOIL_COUNT 10
+#define MINISH_POD_SOIL_RANGE 50.0f
 
 extern const PodSoilWarpPoint sPodSoilTable[POD_SOIL_COUNT];
 

@@ -32,6 +32,10 @@ void FleetHoleSpawnTick() {
     static s16 sSceneWithHole = -1;
     static u32 sLastFrameCount = 0;
 
+#ifdef COMBO_BUILD
+    // ComboShip has no fade/flip pipeline behind this hole: Link would sink into it and void out.
+    return;
+#endif
     if (FleetShipCombo_GetActiveGame() < 0 || gPlayState == NULL) {
         sHole = nullptr;
         sSceneWithHole = -1;
@@ -68,6 +72,9 @@ void FleetHoleSpawnTick() {
 }
 
 void RegisterFleetWarpDoor() {
+#ifdef COMBO_BUILD
+    return; // no fade/flip pipeline behind the hole under ComboShip (see FleetHoleSpawnTick)
+#endif
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldEnd>(FleetHoleSpawnTick);
 }
 

@@ -1851,8 +1851,7 @@ static void MasterCycle_Update(Actor* thisx, PlayState* play) {
     // `child` is the player while he is genuinely in the saddle: Player_MountHorse sets it, and the
     // player clears it the frame he STARTS a dismount — so the controls let go the moment the
     // dismount animation begins rather than when it ends.
-    riding = (player->stateFlags1 & MC_RIDING_FLAG) && (player->rideActor == thisx) &&
-             (thisx->child == &player->actor);
+    riding = (player->stateFlags1 & MC_RIDING_FLAG) && (player->rideActor == thisx) && (thisx->child == &player->actor);
 
     // Arm the climb-on grace the frame he takes the saddle; spent once on the way in, and cleared
     // when he is off so the next mount gets its own.

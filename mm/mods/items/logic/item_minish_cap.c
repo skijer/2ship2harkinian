@@ -179,16 +179,26 @@ s32 MinishCap_GetUnlockedCount(void) {
 // Check if player is within range of any unlocked pod soil in the current scene
 static s32 MinishCap_IsNearPodSoil(Player* p, PlayState* play) {
     for (s32 i = 0; i < POD_SOIL_COUNT; i++) {
-        if (sPodSoilTable[i].sceneId != play->sceneNum)
+        // Every entry is an OoT overworld scene, and nei_oot_compat.h stubs those ids to 0.
+        // Without this the whole table matches MM's scene 0 and opens a warp map that has
+        // no update hook to close it, wedging the item for the rest of the session.
+        if (sPodSoilTable[i].sceneId == 0) {
             continue;
-        if (!MinishCap_IsPodSoilUnlocked(i))
+        }
+        if (sPodSoilTable[i].sceneId != play->sceneNum) {
             continue;
+        }
+        if (!MinishCap_IsPodSoilUnlocked(i)) {
+            continue;
+        }
+
         f32 dx = p->actor.world.pos.x - sPodSoilTable[i].pos.x;
         f32 dy = p->actor.world.pos.y - sPodSoilTable[i].pos.y;
         f32 dz = p->actor.world.pos.z - sPodSoilTable[i].pos.z;
         f32 distSq = (dx * dx) + (dy * dy) + (dz * dz);
-        if (distSq <= (50.0f * 50.0f))
+        if (distSq <= (MINISH_POD_SOIL_RANGE * MINISH_POD_SOIL_RANGE)) {
             return 1;
+        }
     }
     return 0;
 }

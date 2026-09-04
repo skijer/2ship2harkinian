@@ -256,10 +256,7 @@ static void ExtEquip_DrawDispatch(Player* player, PlayState* play) {
     }
     // Water Dragon Scale draw removed — item deleted (Zora swim = Zora Tunic effect).
     // Magic Cape cloth draw moved to ExtEquip_Draw (cheat-independent, ownership-based).
-    // Four Sword: ghost clone Links
-    if (gExtEquipState.currentExtSword == 2) {
-        FourSword_Draw(player, play);
-    }
+    // The Four Sword clones are real actors now — they draw themselves.
     if (gExtEquipState.currentExtSword == 3) {
         Trident_Draw(player, play);
     }

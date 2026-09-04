@@ -15,7 +15,17 @@
 #include "HudEditor.h"
 #include "Notification.h"
 #include "2s2h/Enhancements/Trackers/DisplayOverlay.h"
+#include <algorithm>
+#include <string>
 #include <variant>
+#include <vector>
+#ifdef __APPLE__
+#include <SDL_scancode.h>
+#include <SDL_gamecontroller.h>
+#else
+#include <SDL2/SDL_scancode.h>
+#include <SDL2/SDL_gamecontroller.h>
+#endif
 #include <ship/utils/StringHelper.h>
 #include <spdlog/fmt/fmt.h>
 #include "variables.h"
@@ -43,6 +53,10 @@ static std::unordered_map<int32_t, const char*> imguiScaleOptions = {
     { 1, "Normal" },
     { 2, "Large" },
     { 3, "X-Large" },
+};
+
+static const std::unordered_map<int32_t, const char*> customFormOptions = {
+    { 0, "None" }, { 1, "Kafei" }, { 2, "Keaton" }, { 3, "Gerudo" }, { 4, "Garo" },
 };
 
 static const std::unordered_map<int32_t, const char*> menuThemeOptions = {
@@ -1452,6 +1466,32 @@ void BenMenu::AddEnhancements() {
 
     path = { "Enhancements", "Items/Songs", SECTION_COLUMN_1 };
     AddSidebarEntry("Enhancements", "Items/Songs", 3);
+    AddWidget(path, "Custom Forms (NEI)", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Kafei Mask Transforms", WIDGET_CVAR_CHECKBOX)
+        .CVar("gForms.Kafei")
+        .Options(CheckboxOptions()
+                     .Tooltip("Wearing Kafei's Mask transforms you into Kafei (child or adult with the Time Gate).")
+                     .DefaultValue(true));
+    AddWidget(path, "Keaton Mask Transforms", WIDGET_CVAR_CHECKBOX)
+        .CVar("gForms.Keaton")
+        .Options(CheckboxOptions().Tooltip("Wearing the Keaton Mask transforms you into a Keaton.").DefaultValue(true));
+    AddWidget(path, "Garo Mask Transforms", WIDGET_CVAR_CHECKBOX)
+        .CVar("gForms.Garo")
+        .Options(CheckboxOptions().Tooltip("Wearing the Garo Mask transforms you into a Garo.").DefaultValue(true));
+    AddWidget(path, "Gerudo Form (MHR dual blades)", WIDGET_CVAR_CHECKBOX)
+        .CVar("gForms.Gerudo")
+        .Options(CheckboxOptions()
+                     .Tooltip("Enables the Gerudo form: dual scimitars, sprint on A, forward slash, aerial slash "
+                              "and Urbosa's Fury on R+B once the rage bar has charge.")
+                     .DefaultValue(true));
+    AddWidget(path, "Force Form", WIDGET_CVAR_COMBOBOX)
+        .CVar("gForms.ForceForm")
+        .Options(ComboboxOptions()
+                     .Tooltip("Force a custom form regardless of the worn mask. Gerudo has no MM mask, so this "
+                              "is also its switch.")
+                     .ComboMap(&customFormOptions)
+                     .DefaultIndex(0));
+
     // Mask Enhancements
     AddWidget(path, "Masks", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Equippable While Swimming", WIDGET_CVAR_CHECKBOX)
@@ -2695,7 +2735,68 @@ void ItemEditorResetCape() {
     Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
 }
 
+// ---------------------------------------------------------------------------
+// Sheikah Sensor rune — the five wished-for items (Skijer's NEI)
+// ---------------------------------------------------------------------------
+// Mirror of Ship's picker in SohMenuNEI.cpp, over MM's own item table.
+
+const std::vector<std::pair<int32_t, std::string>>& SensorItemChoices() {
+    static std::vector<std::pair<int32_t, std::string>> choices;
+
+    if (choices.empty()) {
+        for (auto& [randoItemId, item] : Rando::StaticData::Items) {
+            if (randoItemId <= RI_NONE || randoItemId >= RI_MAX || item.name == nullptr || item.name[0] == '\0') {
+                continue;
+            }
+            choices.emplace_back((int32_t)randoItemId, item.name);
+        }
+        std::sort(choices.begin(), choices.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+    }
+    return choices;
+}
+
+std::string SensorDesireName(int32_t randoItemId) {
+    auto item = Rando::StaticData::Items.find((RandoItemId)randoItemId);
+
+    if (item == Rando::StaticData::Items.end() || item->second.name == nullptr || item->second.name[0] == '\0') {
+        return "(empty)";
+    }
+    return item->second.name;
+}
+
 } // namespace
+
+void DrawSensorDesirePicker() {
+    static char search[SENSOR_DESIRE_SLOTS][64] = {};
+
+    ImGui::TextWrapped("Casting the Sheikah Slate's Sensor rune answers for the FIRST of these still "
+                       "out there, so the order is the priority. Each answer costs a Heart Container.");
+
+    for (int32_t slot = 0; slot < SENSOR_DESIRE_SLOTS; slot++) {
+        std::string cvar = std::string(CVAR_SENSOR_DESIRE_PREFIX) + std::to_string(slot);
+        int32_t current = CVarGetInteger(cvar.c_str(), RI_NONE);
+        std::string label = "Desire " + std::to_string(slot + 1) + "##sensorDesire" + std::to_string(slot);
+
+        if (ImGui::BeginCombo(label.c_str(), SensorDesireName(current).c_str())) {
+            ImGui::InputTextWithHint("##sensorSearch", "Search", search[slot], sizeof(search[slot]));
+
+            if (ImGui::Selectable("(empty)", current <= RI_NONE)) {
+                CVarSetInteger(cvar.c_str(), RI_NONE);
+                Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+            }
+            for (const auto& [randoItemId, name] : SensorItemChoices()) {
+                if (search[slot][0] != '\0' && name.find(search[slot]) == std::string::npos) {
+                    continue;
+                }
+                if (ImGui::Selectable(name.c_str(), randoItemId == current)) {
+                    CVarSetInteger(cvar.c_str(), randoItemId);
+                    Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+                }
+            }
+            ImGui::EndCombo();
+        }
+    }
+}
 
 void BenMenu::AddNEI() {
     AddMenuEntry("Skijer's NEI", "gSettings.Menu.SkijerNEISidebarSection");
@@ -2797,6 +2898,11 @@ void BenMenu::AddNEI() {
                      .Tooltip("Which canes ride the shared wheel. A base cane is only hidden once\n"
                               "its own end-item (Trirod / Ultrahand) is owned, so the cell can\n"
                               "never lose the only cane you have."));
+
+    AddWidget(editorPath, "Sheikah Sensor: Desired Items", WIDGET_SEPARATOR_TEXT);
+    AddWidget(editorPath, "Desired Items", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
+        DrawSensorDesirePicker();
+    });
 
     // ── Sheikah Slate: in-hand placement. The tablet is drawn off the forearm→hand vector every
     // frame (object_sheikah_slate.c), so these land live while it is out — draw it with C and drag.
@@ -2959,11 +3065,44 @@ void BenMenu::AddNEI() {
 
     // ===================== Tab: Modes =====================
     WidgetPath modesPath = { "Skijer's NEI", "Modes", SECTION_COLUMN_1 };
-    AddWidget(modesPath, "Broken Modes", WIDGET_SEPARATOR_TEXT);
-    AddWidget(modesPath, "Enable Broken Modes", WIDGET_CVAR_CHECKBOX)
+    AddWidget(modesPath, "Crossover Items", WIDGET_SEPARATOR_TEXT);
+    AddWidget(modesPath, "Enable Crossover Items", WIDGET_CVAR_CHECKBOX)
         .CVar("gBrokenItems.Enabled")
         .Options(CheckboxOptions().Tooltip(
-            "Form selector (Link / Mario / Pikachu) on the equipment page's transform sub-page (L cycles)."));
+            "Form selector (Link / Mario / Pikachu) on the equipment page's transform sub-page (L cycles).\n"
+            "Mario needs the Mario Mask and Pikachu needs the Pokeball; both are randomizer items\n"
+            "(see 'Include Mario Mask' / 'Include Pikachu Pokeball' in the rando item pool).\n"
+            "Pikachu has no transformation in 2Ship yet — the form selects but Link does not change."));
+
+    // Quick transform. The pad button is read straight from SDL (CrossoverHotkey_Tick in
+    // BenPort.cpp) because Back/Select has no N64 button to map it onto.
+    static std::unordered_map<int32_t, const char*> quickTransformKeyOptions = {
+        { SDL_SCANCODE_0, "0 (default)" }, { SDL_SCANCODE_1, "1" }, { SDL_SCANCODE_2, "2" }, { SDL_SCANCODE_3, "3" },
+        { SDL_SCANCODE_4, "4" },           { SDL_SCANCODE_5, "5" }, { SDL_SCANCODE_6, "6" }, { SDL_SCANCODE_7, "7" },
+        { SDL_SCANCODE_8, "8" },           { SDL_SCANCODE_9, "9" }, { SDL_SCANCODE_T, "T" }, { SDL_SCANCODE_G, "G" },
+        { SDL_SCANCODE_V, "V" },
+    };
+    static std::unordered_map<int32_t, const char*> quickTransformPadOptions = {
+        { SDL_CONTROLLER_BUTTON_BACK, "Back / Select (default)" },
+        { SDL_CONTROLLER_BUTTON_GUIDE, "Guide / Home" },
+        { SDL_CONTROLLER_BUTTON_LEFTSTICK, "Left stick click" },
+        { SDL_CONTROLLER_BUTTON_RIGHTSTICK, "Right stick click" },
+    };
+
+    AddWidget(modesPath, "Quick Transform", WIDGET_CVAR_CHECKBOX)
+        .CVar("gCrossover.Hotkey.Enabled")
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "One key/button turns you into the form equipped on the Crossover Items sub-page and\n"
+            "back into Link, without opening the pause menu.\n"
+            "Ignored while the pause menu or this menu is open."));
+    AddWidget(modesPath, "Quick Transform Key", WIDGET_CVAR_COMBOBOX)
+        .CVar("gCrossover.Hotkey.Key")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gCrossover.Hotkey.Enabled", 1); })
+        .Options(ComboboxOptions().ComboMap(&quickTransformKeyOptions).DefaultIndex(SDL_SCANCODE_0));
+    AddWidget(modesPath, "Quick Transform Button", WIDGET_CVAR_COMBOBOX)
+        .CVar("gCrossover.Hotkey.Pad")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gCrossover.Hotkey.Enabled", 1); })
+        .Options(ComboboxOptions().ComboMap(&quickTransformPadOptions).DefaultIndex(SDL_CONTROLLER_BUTTON_BACK));
 
     // ===================== Tab: Randomizer =====================
     // The Fleet Ship Combo block is this tab's only content, so the sidebar entry follows it.

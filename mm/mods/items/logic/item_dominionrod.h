@@ -48,6 +48,7 @@
 // =============================================================================
 
 #define DOMROD_ORB_SCALE 5.5f
+#define DOMROD_ORB_FALLBACK_SCALE 0.01f
 #define DOMROD_ORB_LIGHT_RADIUS 200
 #define DOMROD_ORB_COLLIDER_RADIUS 35
 #define DOMROD_ORB_COLLIDER_HEIGHT 50

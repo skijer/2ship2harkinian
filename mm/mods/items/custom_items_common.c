@@ -291,6 +291,9 @@ static s16 sSendAlpha = 0;    // 0..255 ramp for the sending fade overlay (drawn
 static s16 sWarpCooldown = 0; // suppress the trigger right after any warp (bridges the scene reload)
 
 static void FleetWarp_Tick(Player* p, PlayState* play) {
+#ifdef COMBO_BUILD
+    return; // ComboShip switches games at its scene seams; the manual fade/flip pipeline must stay off
+#endif
     if (FleetShipCombo_GetActiveGame() < 0) {
         return; // combo not running -> no-op (standalone OoT unaffected)
     }
@@ -865,6 +868,15 @@ void CustomItems_Update(Player* p, PlayState* play) {
         Pacci_UltrahandDropTick(play);
         Pacci_FuseFollow(play);
     }
+
+    // A floor switch that the switch magnet left something standing on has to be re-asserted every
+    // frame, the engine wiping interactFlags -- and outside the cane's block on purpose: it stays
+    // down while you walk off and use the door, whatever item is in hand. Skijer's NEI
+    {
+        extern void SwitchMagnet_PressTick(PlayState * play);
+
+        SwitchMagnet_PressTick(play);
+    }
 }
 
 // Late per-frame pass — runs AFTER Player_UpdateCommon (which re-samples the animation into
@@ -912,9 +924,17 @@ s32 CustomItems_OverrideDraw(Player* p, PlayState* play) {
     {
         extern void CustomItems_DrawSheikahSlate(Player * player, PlayState * play);
         extern void Stasis_Draw(PlayState * play);
+        extern void Hourglass_Draw(PlayState * play);
+        extern void Wand_Draw(Player * player, PlayState * play);
+        extern void Cryonis_DrawGhost(PlayState * play);
 
         CustomItems_DrawSheikahSlate(p, play);
-        Stasis_Draw(play); // chains + launch arrow on whatever the Stasis rune is holding
+        Stasis_Draw(play);       // chains + launch arrow on whatever the Stasis rune is holding
+        Hourglass_Draw(play);    // the path the recall target is about to retrace
+        Cryonis_DrawGhost(play); // where the ice would land while the aiming mode is up
+        // The wand's world half: the bolt is already in flight and the wind burns whether or not
+        // the staff is in Link's hand, so this is not gated on the wand being drawn.
+        Wand_Draw(p, play);
     }
     if (gCustomItemState.mogmaMittsActive) {
         CustomItems_DrawMogmaMitts(p, play);

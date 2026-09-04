@@ -320,6 +320,7 @@ void Sw97_MigrateLayout(struct PlayState* play); // one-shot, gated by NeiSaveDa
 uint8_t Wand_RandoMode(void);
 uint8_t Wand_ModeOwned(uint8_t mode);
 void Wand_GrantMode(uint8_t mode);
+void Wand_SetModeOwned(uint8_t mode, uint8_t owned);
 uint8_t Wand_ModeCount(void);
 uint8_t Wand_ModeAt(uint8_t index);
 uint8_t Wand_GetMode(void);
@@ -339,7 +340,15 @@ void Slate_SetRune(uint8_t rune);
 uint8_t Slate_RuneNeighbor(uint8_t rune, int32_t dir);
 void* Slate_RuneMiniIcon(uint8_t rune); // 24x24 rune glyph (wheel previews / textbox)
 void* Slate_RuneIcon(uint8_t rune);     // 32x32 slate-with-rune-badge (cell / HUD)
-void ExtInv_DebugGiveAll(void);         // NEI debug: grant all custom items to their slots
+
+// ── Rod of Seasons (Skijer's NEI) — slate idiom over SLOT_ROD_OF_SEASONS ──
+uint8_t Seasons_SeasonOwned(uint8_t season);
+void Seasons_GrantSeason(uint8_t season); // also hands over the rod on the first season
+uint8_t Seasons_SeasonCount(void);        // owned seasons
+uint8_t Seasons_SeasonAt(uint8_t index);
+uint8_t Seasons_GetSeason(void); // active season (self-healing to an owned one)
+void Seasons_SetSeason(uint8_t season);
+void ExtInv_DebugGiveAll(void); // NEI debug: grant all custom items to their slots
 
 typedef struct {
     int currentPage;         // 0 = vanilla, 1 = custom items, 2 = MM masks
@@ -518,7 +527,7 @@ extern const uint8_t gPage2ItemAgeReqs[24];
 #define SLOT_HYLIAS_GRACE 41 // RETIRED item (2026-08-06); 41 is the Phantom Hourglass now
 #define SLOT_LANTERN 42
 #define SLOT_MINISH_CAP 43
-#define SLOT_POKEBALL 44 // moved to the Broken Items equipment page (Pikachu form); 44 is the Shadow Crystal now
+#define SLOT_POKEBALL 44 // moved to the Crossover Items equipment page (Pikachu form); 44 is the Shadow Crystal now
 #define SLOT_CANE_OF_SOMARIA 45
 #define SLOT_SHOVEL 46       // shared cell: Shovel <-> Dominion Rod wheel (ownership = shovelOwned/dominionOwned flags)
 #define SLOT_DOMINION_ROD 47 // RETIRED cell (rod moved onto the shovel wheel); 47 is the Rod of Seasons now

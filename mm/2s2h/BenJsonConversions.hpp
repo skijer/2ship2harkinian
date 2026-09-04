@@ -138,6 +138,8 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "slateMode", n.slateMode },
         { "slateRunesOwned", n.slateRunesOwned },
         { "ootCanGrab", n.ootCanGrab },
+        { "activeCustomForm", n.activeCustomForm },
+        { "marioMaskOwned", n.marioMaskOwned },
     };
 }
 
@@ -263,13 +265,19 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.slateMode = j.value("slateMode", (uint8_t)0);
     n.slateRunesOwned = j.value("slateRunesOwned", (uint8_t)0);
     n.ootCanGrab = j.value("ootCanGrab", (uint8_t)0);
+    n.activeCustomForm = j.value("activeCustomForm", (uint8_t)0);
+    n.marioMaskOwned = j.value("marioMaskOwned", (uint8_t)0);
 }
 
 // Spiritual Stones — per-save state (gSaveContext.save.shipSaveInfo.spiritualStones).
 inline void to_json(json& j, const SpiritualStoneWarpSave& w) {
     j = json{
-        { "entranceId", w.entranceId }, { "sceneId", w.sceneId }, { "roomNum", w.roomNum },
-        { "rotY", w.rotY },             { "posX", w.posX },       { "posY", w.posY },
+        { "entranceId", w.entranceId },
+        { "sceneId", w.sceneId },
+        { "roomNum", w.roomNum },
+        { "rotY", w.rotY },
+        { "posX", w.posX },
+        { "posY", w.posY },
         { "posZ", w.posZ },
     };
 }

@@ -1821,7 +1821,7 @@ u8 Sm64Remote_DrawPuppet(PlayState* play, f32 x, f32 y, f32 z, s16 faceYaw, s32 
 }
 
 // =============================================================================
-// Kaleido pause-doll Mario (Broken Modes equipment page)
+// Kaleido pause-doll Mario (Crossover Items equipment page)
 //
 // When the local player is in Mario mode, the equipment subscreen's 3D "doll"
 // (normally Link, drawn by KaleidoScope_DrawPlayerWork → Player_DrawPause) is
@@ -2114,7 +2114,7 @@ void Sm64MarioMask_ForceAndToggle(PlayState* play, Player* player) {
     (void)play;
     (void)player;
     // C-Down NO LONGER toggles Mario Mode — it's freed for the Cappy / cap-throw.
-    // Mario Mode is toggled via the menu CVar gSm64Mario (or the Broken Items
+    // Mario Mode is toggled via the menu CVar gSm64Mario (or the Crossover Items
     // pause page). This handler is kept as a no-op so the z_player hook call
     // site stays valid; no mask is stamped onto C-Down anymore.
 }

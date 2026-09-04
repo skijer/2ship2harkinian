@@ -39,8 +39,7 @@ extern void FleetPicto_OnPhotoDiscarded(void);
 // swap B for the bow, draw the carrot boosts and cut the HUD down to A+B+minimap. This asks the
 // narrower question the interface actually means. Skijer's NEI
 u8 MasterCycle_IsRiding(void);
-#define PLAYER_ON_REAL_HORSE(player) \
-    (((player)->stateFlags1 & PLAYER_STATE1_800000) && !MasterCycle_IsRiding())
+#define PLAYER_ON_REAL_HORSE(player) (((player)->stateFlags1 & PLAYER_STATE1_800000) && !MasterCycle_IsRiding())
 
 // Skijer's NEI: OoT Fairy Slingshot item id (canonical def in mods/extended_inventory.h, same
 // guarded value) — mirrored here so the HUD ammo code doesn't pull the whole NEI header in.

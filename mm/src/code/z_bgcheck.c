@@ -4222,10 +4222,10 @@ extern u8 gMogmaMittsClimbActive;
 // reverts by itself the moment the stasis ends. This is deliberately done here rather than by
 // editing surfaceTypeList — collision headers are shared, cached resources, so writing to one would
 // make every instance of that collision climbable for the rest of the session.
-extern u8 Stasis_IsClimbableBgId(s32 bgId);
+extern u8 Slate_IsClimbableBgId(s32 bgId); // Stasis and Cryonis, aggregated in item_sheikah_slate.c
 
 s32 SurfaceType_GetWallFlags(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId) {
-    if (gMogmaMittsClimbActive || Stasis_IsClimbableBgId(bgId) ||
+    if (gMogmaMittsClimbActive || Slate_IsClimbableBgId(bgId) ||
         GameInteractor_Should(VB_BE_CLIMBABLE_SURFACE, false)) {
         return sWallFlags[SurfaceType_GetWallType(colCtx, poly, bgId)] | WALL_FLAG_3;
     }

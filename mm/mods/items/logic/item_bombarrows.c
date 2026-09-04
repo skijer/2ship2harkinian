@@ -189,8 +189,9 @@ static void BombArrows_SpawnInstantBomb(PlayState* play, Vec3f* pos) {
         // Scale must be set (init chain sets to 0, normally set at timer=67)
         Actor_SetScale(&bomb->actor, 0.01f);
 
-        // (MM EnBom has no `explosionCollider` field — manual collider-position +
-        //  arrow-damage-type init dropped; the bomb still spawns and explodes. TODO adapt.)
+        // Lets the blast reach enemies that only bleed to arrows. MM's EnBom_Init already
+        // places the explosion collider, so only the damage type has to be widened here.
+        bomb->collider2Elements[0].base.atDmgInfo.dmgFlags |= DMG_FIRE_ARROW;
     }
 }
 
@@ -389,7 +390,9 @@ static void BombArrows_FireArrow(Player* p, PlayState* play) {
 
         // Detach from player so it flies on its own (vanilla bow detach pattern).
         p->heldActor = arrow;
-        // (MM Player has no unk_A73 "item-thrown" flag — dropped. TODO adapt bomb-arrow fire.)
+        // EnArrow's init action kills any arrow whose parent is gone unless this is set,
+        // which would drop the bomb on the player's own head. OoT this->unk_A73 = 4.
+        p->unk_D57 = 4;
         arrow->parent = NULL;
         p->actor.child = NULL;
         p->heldActor = NULL;

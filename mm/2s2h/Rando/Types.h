@@ -3212,7 +3212,14 @@ typedef enum {
     RI_OOT_GOLDEN_GAUNTLETS,  // Progressive Strength L3
     RI_OOT_NEI_ROCS_FEATHER,  // Progressive Roc's L1 (Skijer's feather, SLOT_ROCS)
     RI_OOT_NEI_ROCS_CAPE,     // Progressive Roc's L2
-    RI_MAX_TRAP,              // Just used for ice trap ice cube model
+    RI_OOT_NEI_SEASON_SPRING,
+    RI_OOT_NEI_SEASON_SUMMER,
+    RI_OOT_NEI_SEASON_AUTUMN,
+    RI_OOT_NEI_SEASON_WINTER,
+    // Crossover Items: the Mario Mask twin of RI_OOT_NEI_POKE_BALL. No inventory cell — it lights
+    // NeiSaveData.marioMaskOwned, which is what unlocks MARIO MODE on the equipment page.
+    RI_OOT_NEI_MARIO_MASK,
+    RI_MAX_TRAP, // Just used for ice trap ice cube model
     RI_MAX,
 } RandoItemId;
 
@@ -3614,6 +3621,10 @@ typedef enum {
     RO_SHUFFLE_OOT_EQUIPMENT, // the 12 ext-equipment grid pieces + the progressive Skijer Roc
     RO_SHUFFLE_OOT_QUEST,     // OoT songs + medallions + spiritual stones + Stone of Agony
     RO_SHUFFLE_OOT_MASKS,     // Skull / Spooky / Gerudo
+    // Crossover Items. Both are pure ownership flags with no inventory cell, so each gets its own
+    // gate instead of riding RO_SHUFFLE_NEI_ITEMS.
+    RO_CROSSOVER_POKEBALL,
+    RO_CROSSOVER_MARIO_MASK,
     RO_MAX,
 } RandoOptionId;
 

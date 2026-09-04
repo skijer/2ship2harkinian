@@ -117,8 +117,9 @@ static void DekuLeaf_StartGlide(Player* p, PlayState* play) {
 }
 
 static void DekuLeaf_StartBlow(Player* p, PlayState* play) {
-    if (gSaveContext.save.saveInfo.playerData.magic < MAGIC_REQ(DEKULEAF_BLOW_MAGIC_COST))
+    if (!ItemMagic_HasEnough(play, DEKULEAF_BLOW_MAGIC_COST)) {
         return;
+    }
 
     DekuLeaf_InitCollider(play, p);
 
@@ -381,7 +382,7 @@ void Handle_DekuLeaf(Player* p, PlayState* play) {
             return;
         }
 
-        if (!in.isHeld || gSaveContext.save.saveInfo.playerData.magic <= 0 || in.otherButtonPressed) {
+        if (!in.isHeld || !ItemMagic_HasEnough(play, DEKULEAF_GLIDE_MAGIC_COST) || in.otherButtonPressed) {
             DekuLeaf_Stop(p, play);
             return;
         }
@@ -392,7 +393,7 @@ void Handle_DekuLeaf(Player* p, PlayState* play) {
 
     if (!dlActive && in.isPressed) {
         if (!Movement_IsOnGround(p)) {
-            if (gSaveContext.save.saveInfo.playerData.magic > 0) {
+            if (ItemMagic_HasEnough(play, DEKULEAF_GLIDE_MAGIC_COST)) {
                 DekuLeaf_StartGlide(p, play);
             }
         } else {

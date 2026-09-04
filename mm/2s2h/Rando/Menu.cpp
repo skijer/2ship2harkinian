@@ -942,12 +942,25 @@ static const NeiRandoOption kNeiRandoOptions[] = {
     { RO_SHUFFLE_OOT_MASKS, 1 },
     { RO_SHUFFLE_BOMB_ARROWS, RO_BOMB_ARROWS_SHUFFLED },
     { RO_ELEMENTAL_WAND_SHUFFLE, RO_WAND_ELEMENTAL_SHUFFLE },
+    { RO_CROSSOVER_POKEBALL, 1 },
+    { RO_CROSSOVER_MARIO_MASK, 1 },
 };
+
+// Both Crossover items share ONE feature toggle, so this only ever turns it on: mirroring either
+// checkbox's value would let unchecking one switch the selector off while the other is shuffled.
+static void NeiRando_EnableCrossover() {
+    if (CVarGetInteger(Rando::StaticData::Options[RO_CROSSOVER_POKEBALL].cvar, RO_GENERIC_OFF) ||
+        CVarGetInteger(Rando::StaticData::Options[RO_CROSSOVER_MARIO_MASK].cvar, RO_GENERIC_OFF)) {
+        CVarSetInteger("gBrokenItems.Enabled", 1);
+    }
+    Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+}
 
 static void NeiRando_SetAll(bool on) {
     for (const auto& o : kNeiRandoOptions) {
         CVarSetInteger(Rando::StaticData::Options[o.id].cvar, on ? o.on : 0);
     }
+    NeiRando_EnableCrossover();
     CVarSetInteger("gMods.BombArrows.Mode",
                    CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_BOMB_ARROWS].cvar, RO_BOMB_ARROWS_OFF));
     Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
@@ -1273,6 +1286,23 @@ static void DrawItemPoolTab() {
     CVarCheckbox("Add OoT Masks", Rando::StaticData::Options[RO_SHUFFLE_OOT_MASKS].cvar,
                  CheckboxOptions({ { .tooltip = "Adds the Skull, Spooky and Gerudo masks to a solo-MM pool.\n\n"
                                                 "Not considered by logic." } }));
+    // Crossover Items: no inventory cell, so they get their own gates rather than riding
+    // RO_SHUFFLE_NEI_ITEMS. Each one unlocks its form on the equipment page's Crossover sub-page.
+    if (CVarCheckbox(
+            "Include Pikachu Pokeball", Rando::StaticData::Options[RO_CROSSOVER_POKEBALL].cvar,
+            CheckboxOptions({ { .tooltip = "Adds the Pikachu Pokeball to the pool. Finding it unlocks PIKACHU\n"
+                                           "MODE on the equipment page's Crossover Items sub-page.\n"
+                                           "2Ship has no Pikachu transformation yet — the form selects but Link\n"
+                                           "does not change.\n\nNot considered by logic." } }))) {
+        NeiRando_EnableCrossover();
+    }
+    if (CVarCheckbox(
+            "Include Mario Mask", Rando::StaticData::Options[RO_CROSSOVER_MARIO_MASK].cvar,
+            CheckboxOptions({ { .tooltip = "Adds the Mario Mask to the pool. Finding it unlocks MARIO MODE on\n"
+                                           "the equipment page's Crossover Items sub-page.\n\n"
+                                           "Not considered by logic." } }))) {
+        NeiRando_EnableCrossover();
+    }
     if (CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_NEI_ITEMS].cvar, RO_GENERIC_OFF)) {
         // Bomb Arrows have no inventory slot any more — they are the last entry of the bow's
         // element wheel, so this is purely about how you come by them. The seed-locked value mirrors
@@ -1803,6 +1833,12 @@ void Rando::RegisterMenu() {
     mBenMenu->AddSidebarEntry("Rando", "Hints", 1);
     path.sidebarName = "Hints";
     mBenMenu->AddWidget(path, "Hints", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) { DrawHintsTab(); });
+
+    mBenMenu->AddSidebarEntry("Rando", "Desired Items", 1);
+    path.sidebarName = "Desired Items";
+    mBenMenu->AddWidget(path, "Sheikah Sensor", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
+        BenGui::DrawSensorDesirePicker();
+    });
 
     mBenMenu->AddSidebarEntry("Rando", "Item Tracker", 1);
     path.sidebarName = "Item Tracker";

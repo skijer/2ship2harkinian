@@ -21,6 +21,7 @@ extern "C" {
 #include "variables.h"
 #include "message_data_static.h"
 #include "mods/extended_inventory.h" // Sw97_* / Wand_* (Skijer's NEI)
+#include "mods/extended_equipment.h" // ITEM_EXT_* ids for the equipment-page table
 }
 
 // ---------------------------------------------------------------------------
@@ -40,11 +41,12 @@ static const ItemDescEntry sCustomItemDescs[] = {
     { ITEM_DESIRE_SENSOR, "Sense major items in this area.\nCosts 3 hearts. Randomizer only." },
     { ITEM_HYLIAS_GRACE,
       "Fairy flight for 10s. Ignores walls.\nA=up, B=down, L=sprint. 24 MP." }, // RETIRED item; row kept for old saves
-    // 2026-08-06 page-2 additions (behaviour pending — the description says so honestly).
-    { EXT_ITEM_SHEIKAH_SLATE, "Ancient Sheikah tablet. A cycles\nits runes. Their powers are dormant." },
-    { EXT_ITEM_PHANTOM_HOURGLASS, "Sand of hours from another sea.\nIts powers are still dormant." },
-    { EXT_ITEM_SHADOW_CRYSTAL, "Cursed twilight crystal.\nIts powers are still dormant." },
-    { EXT_ITEM_ROD_OF_SEASONS, "Rod bearing the four seasons.\nIts powers are still dormant." },
+    // 2026-08-06 page-2 additions. Shadow Crystal and Rod of Seasons are model-only on this side.
+    { EXT_ITEM_SHEIKAH_SLATE,
+      "Draw the slate to cast a rune.\nA cycles Remote Bomb, Stasis,\nCryonis and Master Cycle." },
+    { EXT_ITEM_PHANTOM_HOURGLASS, "Recall an object along its own path.\nC aims, C rewinds, C lets go. 4 MP+" },
+    { EXT_ITEM_SHADOW_CRYSTAL, "Cursed twilight crystal. Turns Link\ninto Wolf Link. OoT only for now." },
+    { EXT_ITEM_ROD_OF_SEASONS, "Rod bearing the four seasons.\nOoT only for now." },
     { ITEM_ZONAI_PERMAFROST, "Stop time for 10s. Enemies, NPCs\nand bosses freeze. Costs 12 magic." },
     { ITEM_DEMISE_DESTRUCTION, "Massive AoE explosion. Damages all\nenemies in range. Ground only. 12 MP." },
     { ITEM_DEKU_LEAF, "Ground: blow wind gust. Air: hold\nto glide. Drains magic while gliding." },
@@ -55,7 +57,8 @@ static const ItemDescEntry sCustomItemDescs[] = {
       "Heavy thrown weapon. Breaks ice walls\nand heavy objects. Hold C to charge.\nC-Up to aim." },
     { ITEM_WHIP, "Grapple from any bar surface. Swing\nwith joystick. Release for momentum\nlaunch." },
     { ITEM_SPINNER, "Toggle to ride. A for homing dash\nattack. Breaks rocks." },
-    { ITEM_CANE_OF_SOMARIA, "Create statues (max 3) that press\nany switch. Hookable and throwable." },
+    { ITEM_CANE_OF_SOMARIA,
+      "Four canes on one cell. Summon\nblocks, flip enemies, build with\nUltrahand. A cycles the cane." },
     { ITEM_DOMINION_ROD, "Fire orb to possess Beamos, Armos\nor Anubis. Control them with analog+C." },
     { ITEM_TIME_GATE, "Travel through time. Swap between\nyoung and adult Link. Costs 48 magic." },
     { ITEM_BOMB_ARROWS, "Explosive arrows. Hold C to aim.\nConsumes 1 arrow and 1 bomb per shot." },
@@ -110,8 +113,93 @@ static const ItemDescEntry sWandModeDescs[] = {
     { WAND_MODE_SCEPTER, "Shadow Scepter. Unlocked by the\nShadow Medallion." },
 };
 
+// The eight OoT page-0 items, which live on MM sentinel ids. Without these the fallback would hand
+// `0x1700 + id` to the message table, where those ids belong to MM items entirely — Milk, Gold Dust,
+// the Hylian Loach, the map points — so the cursor showed somebody else's description.
+static const ItemDescEntry sOotPageZeroDescs[] = {
+    { ITEM_DINS_FIRE, "Ring of flame around you. Burns\nfoes and lights torches. 6 MP." },
+    { ITEM_FARORES_WIND, "Set a warp point, then teleport\nback to it later. 6 MP." },
+    { ITEM_NAYRUS_LOVE, "Protective barrier that blocks\nall damage for a time. 12 MP." },
+    { ITEM_FAIRY_SLINGSHOT, "Child ranged weapon. Fires Deku\nSeeds. Hold C to aim." },
+    { ITEM_HOOKSHOT_OOT, "Fire to grab targets and pull\nyourself in, or items to you." },
+    { ITEM_LONGSHOT_OOT, "Like the Hookshot but with\ntwice the reach." },
+    { ITEM_BOOMERANG, "Throw to stun foes and grab\ndistant items. Returns to you." },
+    { ITEM_HAMMER, "Megaton Hammer. Smash rusty\nswitches, posts and armor." },
+};
+
+// Page-2 equipment, read on the EQUIP page. Slot contents differ from SoH's: sword 3 is the Trident,
+// shield 2 the Kite Shield, boots 2 the Climb Boots and boots 3 the Roc Boots.
+static const ItemDescEntry sExtEquipDescs[] = {
+    { ITEM_EXT_SWORD_1, "Cane of Byrna. Two-handed glaive with\na Kinsect orb. OoT only for now." },
+    { ITEM_EXT_SWORD_2, "Four Sword. R+B to charge. Spawns 3\nclones (36 MP) that mirror your attacks." },
+    { ITEM_EXT_SWORD_3, "Trident. Gunlance moveset: guard dash,\ncharged blast and flight." },
+    { ITEM_EXT_SHIELD_1, "Goddess Shield. Fireproof; an early\nblock stuns every enemy nearby.\nOoT only for now." },
+    { ITEM_EXT_SHIELD_2, "Kite Shield. R in mid-air to surf.\nDownhill builds speed. A hops, B spins." },
+    { ITEM_EXT_SHIELD_3,
+      "Shield of Ikana. Perfect guards drain\nlife; revives you once per scene.\nOoT only for now." },
+    { ITEM_EXT_TUNIC_1, "Champion's Tunic. Perfect dodges open\na Flurry Rush; aiming in mid-air slows\nthe world." },
+    { ITEM_EXT_TUNIC_2, "Magic Tunic. Rupees absorb every hit.\nAt zero you are slow and unprotected." },
+    { ITEM_EXT_TUNIC_3, "Sage's Tunic. Each medallion you own\nadds a passive resistance while worn." },
+    { ITEM_EXT_BOOTS_1, "Pegasus Boots. Keep holding B after a\nswing to charge forward, sword first." },
+    { ITEM_EXT_BOOTS_2, "Climb Boots. Full traction: ice stops\nbeing slippery and steep slopes stop\nsliding you." },
+    { ITEM_EXT_BOOTS_3, "Roc Boots. Water and lava become solid\nground. You fall at half speed." },
+};
+
+static const char* kMagicCapeDesc =
+    "Magic Cape. Halves every magic cost\nwhile owned; 1 MP items become free.\nA toggles "
+    "whether it is drawn.";
+static const char* kPendantDesc =
+    "Pendant of Memories. Three extra B\nmoves: Mortal Draw, Ground Pound and\nParry Leap. "
+    "A toggles the moveset.";
+
+extern "C" const char* PauseItemDesc_GetEquip(u16 extItemId) {
+    for (size_t i = 0; i < ARRAY_COUNT(sExtEquipDescs); i++) {
+        if (sExtEquipDescs[i].itemId == extItemId) {
+            return sExtEquipDescs[i].desc;
+        }
+    }
+    return NULL;
+}
+
+extern "C" const char* PauseItemDesc_GetEquipUpgrade(s16 row) {
+    switch (row) {
+        case 0:
+            return kMagicCapeDesc;
+        case 1:
+            return kPendantDesc;
+        default:
+            return NULL;
+    }
+}
+
+// SW97 medallions, read on the OoT quest page. Each one arms a spell on a C button.
+static const ItemDescEntry sMedallionDescs[] = {
+    { ITEM_MEDALLION_FOREST, "Wind spell. 12 MP.\nC to equip the spell." },
+    { ITEM_MEDALLION_FIRE, "Fire spell. 12 MP.\nC to equip the spell." },
+    { ITEM_MEDALLION_WATER, "Ice spell. 24 MP.\nC to equip the spell." },
+    { ITEM_MEDALLION_SPIRIT, "Soul spell. 24 MP.\nC to equip the spell." },
+    { ITEM_MEDALLION_SHADOW, "Dark spell. 12 MP.\nC to equip the spell." },
+    { ITEM_MEDALLION_LIGHT, "Light spell. 24 MP.\nC to equip the spell." },
+};
+
+static const char* PauseItemDesc_Find(const ItemDescEntry* table, size_t count, u16 itemId) {
+    for (size_t i = 0; i < count; i++) {
+        if (table[i].itemId == itemId) {
+            return table[i].desc;
+        }
+    }
+    return NULL;
+}
+
 extern "C" const char* PauseItemDesc_Get(u16 itemId, s32 pageIndex) {
-    // Custom items only live on the item page (all extended-inventory sub-pages route through it).
+    // The equipment and quest pages carry their own tables and share nothing with the item page.
+    // NEI's equipment page rides PAUSE_MASK — MM has no PAUSE_EQUIP of its own.
+    if (pageIndex == PAUSE_MASK) {
+        return PauseItemDesc_Find(sExtEquipDescs, ARRAY_COUNT(sExtEquipDescs), itemId);
+    }
+    if (pageIndex == PAUSE_QUEST) {
+        return PauseItemDesc_Find(sMedallionDescs, ARRAY_COUNT(sMedallionDescs), itemId);
+    }
     if (pageIndex != PAUSE_ITEM) {
         return NULL;
     }
@@ -143,13 +231,12 @@ extern "C" const char* PauseItemDesc_Get(u16 itemId, s32 pageIndex) {
         }
     }
 
-    for (size_t i = 0; i < ARRAY_COUNT(sCustomItemDescs); i++) {
-        if (sCustomItemDescs[i].itemId == itemId) {
-            return sCustomItemDescs[i].desc;
-        }
+    const char* custom = PauseItemDesc_Find(sCustomItemDescs, ARRAY_COUNT(sCustomItemDescs), itemId);
+    if (custom != NULL) {
+        return custom;
     }
 
-    return NULL;
+    return PauseItemDesc_Find(sOotPageZeroDescs, ARRAY_COUNT(sOotPageZeroDescs), itemId);
 }
 
 extern "C" u8 PauseItemDesc_VanillaTextExists(u16 textId) {

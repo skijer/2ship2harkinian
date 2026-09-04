@@ -186,6 +186,10 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_OOT_NEI_PHANTOM_HOURGLASS,  "the",  "Phantom Hourglass",          RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SHADOW_CRYSTAL,     "the",  "Shadow Crystal",             RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_ROD_OF_SEASONS,     "the",  "Rod of Seasons",             RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
+    RI(RI_OOT_NEI_SEASON_SPRING,      "the",  "Season: Spring",             RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
+    RI(RI_OOT_NEI_SEASON_SUMMER,      "the",  "Season: Summer",             RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
+    RI(RI_OOT_NEI_SEASON_AUTUMN,      "the",  "Season: Autumn",             RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
+    RI(RI_OOT_NEI_SEASON_WINTER,      "the",  "Season: Winter",             RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     // Sheikah Slate runes — sibling items over the slate cell (wand idiom: any order, no levels).
     RI(RI_OOT_NEI_SLATE_RUNE_BOMB,     "the", "Rune: Remote Bomb",          RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE, "the", "Rune: Master Cycle",             RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
@@ -245,7 +249,7 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_OOT_NEI_CANE_PACCI_ULTRAHAND,  "the", "Cane of Pacci (Ultrahand)",RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_DEKU_LEAF,          "the",  "Deku Leaf",                  RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_DEMISE_DESTRUCTION, "",     "Demise Destruction",         RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
-    RI(RI_OOT_NEI_DESIRE_SENSOR,      "the",  "Desire Sensor",             RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
+    RI(RI_OOT_NEI_DESIRE_SENSOR,      "the",  "Rune: Sheikah Sensor",      RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_DOMINION_ROD,       "the",  "Dominion Rod",               RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_ELEMENTAL_WAND,     "the",  "Elemental Wand",             RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_WAND_SAND_ROD,      "the",  "Sand Rod",                   RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
@@ -263,6 +267,7 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_OOT_NEI_MINISH_CAP,         "",     "The Minish Cap",             RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_MOGMA_MITTS,        "the",  "Mogma Mitts",                RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_POKE_BALL,          "a",    "Poke Ball",                  RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE), // soh English is "Poké Ball"; é dropped (MM charmap-safe)
+    RI(RI_OOT_NEI_MARIO_MASK,         "the",  "Mario Mask",                 RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SHOVEL,             "the",  "Shovel",                     RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SPINNER,            "the",  "Spinner",                    RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SWITCH_HOOK,        "the",  "Switch Hook",                RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
@@ -1070,24 +1075,19 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
         case RI_OOT_NEI_DEMISE_DESTRUCTION:
             return "__OTR__textures/icon_item_custom/gItemIconDemiseDestructionTex";
         case RI_OOT_NEI_DESIRE_SENSOR:
-            return "__OTR__textures/icon_item_custom/gItemIconDesireSensorTex";
+            return "__OTR__textures/icon_item_custom/gItemIconSheikahSlateSensorTex";
         case RI_OOT_NEI_DOMINION_ROD:
             return "__OTR__textures/icon_item_custom/gItemIconDominionRodTex";
-        // Elemental Wand: per-ROD icons, so the check tracker and the get-item textbox say which of
-        // the six you found even though they all land on one inventory cell.
+        // Elemental Wand: the six rods ARE one wand, so they share its icon. The check name and the
+        // textbox already say which rod it is.
         case RI_OOT_NEI_ELEMENTAL_WAND:
         case RI_OOT_NEI_WAND_SAND_ROD:
-            return "__OTR__textures/icon_item_custom/gItemIconSandRodTex";
         case RI_OOT_NEI_WAND_TORNADO_ROD:
-            return "__OTR__textures/icon_item_custom/gItemIconTornadoRodTex";
         case RI_OOT_NEI_WAND_WATER_ROD:
-            return "__OTR__textures/icon_item_custom/gItemIconWaterRodTex";
         case RI_OOT_NEI_WAND_METEOR_ROD:
-            return "__OTR__textures/icon_item_custom/gItemIconMeteorRodTex";
         case RI_OOT_NEI_WAND_STORM_ROD:
-            return "__OTR__textures/icon_item_custom/gItemIconStormRodTex";
         case RI_OOT_NEI_WAND_SHADOW_SCEPTER:
-            return "__OTR__textures/icon_item_custom/gItemIconShadowScepterTex";
+            return "__OTR__textures/icon_item_custom/gItemIconElementalWandTex";
         case RI_OOT_NEI_FIRE_ROD:
             return "__OTR__textures/icon_item_custom/gItemIconFireRodTex";
         case RI_OOT_NEI_GUST_JAR:
@@ -1104,6 +1104,8 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
             return "__OTR__textures/icon_item_custom/gItemIconMinishCapTex";
         case RI_OOT_NEI_MOGMA_MITTS:
             return "__OTR__textures/icon_item_custom/gItemIconMogmaMittsTex";
+        case RI_OOT_NEI_MARIO_MASK:
+            return "__OTR__textures/icon_item_custom/gItemIconMarioMaskTex";
         case RI_OOT_NEI_POKE_BALL:
             return "__OTR__textures/icon_item_custom/gItemIconPokeballTex";
         case RI_OOT_NEI_SHOVEL:
@@ -1150,6 +1152,10 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
         case RI_OOT_NEI_SHADOW_CRYSTAL:
             return "__OTR__textures/icon_item_custom/gItemIconShadowCrystalTex";
         case RI_OOT_NEI_ROD_OF_SEASONS:
+        case RI_OOT_NEI_SEASON_SPRING:
+        case RI_OOT_NEI_SEASON_SUMMER:
+        case RI_OOT_NEI_SEASON_AUTUMN:
+        case RI_OOT_NEI_SEASON_WINTER:
             return "__OTR__textures/icon_item_custom/gItemIconRodOfSeasonsTex";
         // Slate runes: the slate composite with the rune's badge (textbox/tracker icon).
         case RI_OOT_NEI_SLATE_RUNE_BOMB:

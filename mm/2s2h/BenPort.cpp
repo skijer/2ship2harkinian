@@ -35,10 +35,15 @@
 
 #ifdef __APPLE__
 #include <SDL_scancode.h>
+#include <SDL_keyboard.h>
+#include <SDL_gamecontroller.h>
 #else
 #include <SDL2/SDL_scancode.h>
+#include <SDL2/SDL_keyboard.h>
+#include <SDL2/SDL_gamecontroller.h>
 #endif
 #include "Extractor/Extract.h"
+#include "mods/broken_items/broken_items.h"
 // OTRTODO
 // #include <functions.h>
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
@@ -778,8 +783,9 @@ void OTRGlobals::Initialize() {
     // Skijer's NEI: mount the optional OoT companion archive (the player's extracted OoT ROM
     // data) now that the MM version check passed — it carries an OoT ROM hash the MM-only
     // validHashes check would reject, so it must NEVER be part of InitResourceManager.
-    // Search order: nei/oot.o2r, mods/oot.o2r (2ship layouts), then ../oot.o2r (Fleet Ship
-    // Combo layout: Ship/2ship/2ship.exe with oot.o2r in the Ship root). With it mounted, the
+    // Search order: oot.o2r next to the executable first (the extractor's own output, and where
+    // ComboShip keeps both ROM archives), then the legacy nei/ and mods/ folders, then ../oot.o2r
+    // (Fleet Ship Combo layout: Ship/2ship/2ship.exe with oot.o2r in the Ship root). With it mounted, the
     // OoT vanilla texture paths (__OTR__textures/icon_item_static/... — equipment-page icons,
     // page backgrounds, titles) resolve directly; every use is FileExists-gated, so its
     // absence just falls back to the MM art.
@@ -791,7 +797,7 @@ void OTRGlobals::Initialize() {
     // icons, icon_item_24_static medallions) resolve to the companion. This is the EXACT pattern
     // SoH uses to mount MM's mm.o2r alongside OoT (mm_asset_loader.cpp LoadMmO2r).
     {
-        const char* companionCandidates[] = { "nei/oot.o2r", "mods/oot.o2r", "../oot.o2r" };
+        const char* companionCandidates[] = { "oot.o2r", "nei/oot.o2r", "mods/oot.o2r", "../oot.o2r" };
         std::string ootPath;
         for (const char* candidate : companionCandidates) {
             std::string p = Ship::Context::LocateFileAcrossAppDirs(candidate, appShortName);
@@ -1075,6 +1081,10 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     // Files - Generate one now?" (or "outdated -> re-extract"), and hiding first parks that popup at
     // -32000,-32000 where nobody can see or click it: MM never comes up, the combo looks dead. So the
     // extractor stays visible and we hide right after it (below).
+#ifdef COMBO_BUILD
+    // ComboShip owns extraction (combo/ComboExtract.h) and there is no guest window to hide.
+    OTRGlobals::Instance->RunExtract(argc, argv);
+#else
     const bool hostedChild = FleetShipCombo_GetActiveGame() >= 0;
     bool hidden = false;
     if (hostedChild && FleetShipCombo_HaveValidMmArchive()) {
@@ -1086,6 +1096,7 @@ extern "C" void InitOTR(int argc, char* argv[]) {
         FleetShipCombo_HideGuestWindow(); // extractor done (visible); now behave as the hidden child
     }
     FleetShipCombo_ProvisionO2rBothDirs(); // push our freshly-extracted o2r out to the sibling dir
+#endif
 
     // `2ship.exe --fleet-extract` (Ship's MM archive gate): our only job was the extractor above.
     // Ship is waiting on this process; the mirror just pushed mm.o2r next to soh.exe. Done.
@@ -1209,9 +1220,47 @@ extern "C" uint64_t GetUnixTimestamp() {
     return now;
 }
 
+// Crossover Items quick transform. The Back/Select button is not an N64 button, so the pad is
+// read straight from SDL — through the handle LUS already opened for that joystick, never a
+// second one of our own. Skijer's NEI
+static void CrossoverHotkey_Tick() {
+    static bool sHeld = false;
+
+    if (!CVarGetInteger("gCrossover.Hotkey.Enabled", 1) || !BrokenItems_Enabled()) {
+        sHeld = false;
+        return;
+    }
+
+    const Uint8* keys = SDL_GetKeyboardState(NULL);
+    int32_t key = CVarGetInteger("gCrossover.Hotkey.Key", SDL_SCANCODE_0);
+    bool pressed = (keys != NULL) && (key > SDL_SCANCODE_UNKNOWN) && (key < SDL_NUM_SCANCODES) && keys[key];
+
+    int32_t padBtn = CVarGetInteger("gCrossover.Hotkey.Pad", SDL_CONTROLLER_BUTTON_BACK);
+    for (int i = 0; !pressed && (i < SDL_NumJoysticks()); i++) {
+        SDL_GameController* pad = SDL_GameControllerFromInstanceID(SDL_JoystickGetDeviceInstanceID(i));
+        if (pad != NULL) {
+            pressed = SDL_GameControllerGetButton(pad, (SDL_GameControllerButton)padBtn) != 0;
+        }
+    }
+
+    if (pressed && !sHeld) {
+        auto gui = Ship::Context::GetRawInstance()->GetWindow()->GetGui();
+        auto menu = gui ? gui->GetMenu() : nullptr;
+        bool menuOpen = (menu != nullptr) && menu->IsVisible();
+        // Pausing already has its own selector, and a transform mid-menu would fight the CVar edit.
+        if (!menuOpen && (gPlayState != NULL) && (gPlayState->pauseCtx.state == 0)) {
+            BrokenItems_ToggleEquippedForm();
+        }
+    }
+    sHeld = pressed;
+}
+
 extern "C" void Graph_StartFrame() {
 #ifndef __WIIU__
     using Ship::KbScancode;
+
+    CrossoverHotkey_Tick();
+
     int32_t dwScancode = OTRGlobals::Instance->context->GetWindow()->GetLastScancode();
     OTRGlobals::Instance->context->GetWindow()->SetLastScancode(-1);
 
@@ -1452,6 +1501,7 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
     } catch (...) { SPDLOG_ERROR("[FrameGuard] render/frame threw a non-std exception — frame skipped"); }
     FleetSync_PostFlipTrace("7. render: RunCommands done");
 
+#ifndef COMBO_BUILD
     // Host-death watchdog must run EVERY frame, independent of the render gating below: an
     // inactive 2ship skips ProducerPublishFrame (which also carries this check), so without an
     // unconditional poll here an idle 2ship would never notice Ship closed and would orphan.
@@ -1478,6 +1528,7 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         FleetShipCombo_UpdateGuestWindow();
         std::this_thread::sleep_for(std::chrono::milliseconds(33));
     }
+#endif // COMBO_BUILD owns frame presentation: no shared-texture producer, no guest window to park.
 
     last_fps = fps;
     last_update_rate = R_UPDATE_RATE;

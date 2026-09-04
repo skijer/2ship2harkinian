@@ -756,3 +756,6 @@
 // OnPlayDrawWorldEnd, so this profile has no draw. objectId is GAMEPLAY_KEEP — always loaded, so
 // Actor_Spawn never fails on Object_GetSlot in any scene.
 /* 0x2C5 */ DEFINE_ACTOR(         HarpoonPeer,         ACTOR_HARPOON_PEER,        ALLOCTYPE_NORMAL,    "HarpoonPeer",         "Harpoon remote player (collider carrier)")
+// Skijer's NEI Four Sword: one clone per formation slot. Authored in
+// mm/mods/equipment/actors/four_sword_clone.c, unity-#included by extended_equipment.c (a C TU).
+/* 0x2C6 */ DEFINE_ACTOR(         FourSwordClone,      ACTOR_NEI_FOUR_SWORD_CLONE, ALLOCTYPE_NORMAL,   "FourSwordClone",      "Four Sword formation clone")

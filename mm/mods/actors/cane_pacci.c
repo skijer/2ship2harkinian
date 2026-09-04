@@ -19,6 +19,7 @@
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/object_dy_obj/object_dy_obj.h"
 #include "../items/helpers/target_select_helper.h"
+#include "../items/helpers/rewind_helper.h" // the Phantom Hourglass drives an actor the same way we do
 #include <math.h>
 
 extern PlayState* gPlayState;
@@ -196,6 +197,7 @@ void Pacci_CleanupPool(void) {
     // Forget, do not release: by the time this runs the actors are gone, so writing
     // their update/flags back would be a use-after-free.
     Pacci_FuseForget();
+    Pacci_AnchorClear();
     for (u8 i = 0; i < PACCI_MAX_AFFECTED; i++) {
         if (sPacciPool[i].actor != NULL && sPacciPool[i].actor->update == NULL) {
             sPacciPool[i].actor = NULL;
@@ -662,6 +664,11 @@ u8 Pacci_IsLiftableEx(Actor* actor, u8 isDyna) {
         return 0;
     }
     if ((actor->id == ACTOR_PLAYER) || (actor->category == ACTORCAT_BOSS)) {
+        return 0;
+    }
+    // Two hands on one body: the Hourglass writes its transform every frame from the recorded
+    // path while we would write ours from the carry, and whichever ran second would win.
+    if (Rewind_IsScrubbing(actor)) {
         return 0;
     }
     // Modelled on SwitchHook_CanSwap (item_switchhook.h): an ALLOW-list of categories plus an
@@ -1157,6 +1164,549 @@ static PacciUhMode sUhMode = { 0, 0.0f, 0 };
 // ULTRAHAND
 // ============================================================================
 
+// -- per-actor traits ----------------------------------------------------------
+// Some actors are not generic objects, and pretending otherwise is what makes a physics toy feel
+// broken in a dungeon. A lift dragged out of its shaft, a room quadrant carried in front of you,
+// an ice block lifted over the wall it was supposed to slide against — each one is a puzzle solved
+// by ignoring it rather than by using the tool.
+//
+// So: a table, and a deny/constrain list rather than anything derived. "Too big to pick up",
+// "belongs on a rail", "is on fire" are not properties the actor struct exposes and never will be.
+// Adding a case is adding a row.
+typedef enum {
+    PACCI_UH_TRAIT_EXCLUDE = 1 << 0,  // not liftable at all
+    PACCI_UH_TRAIT_AXIS_Y = 1 << 1,   // up and down only; XZ pinned to the grab
+    PACCI_UH_TRAIT_PLANE_XZ = 1 << 2, // along the ground only; Y pinned to the grab
+    PACCI_UH_TRAIT_PATH = 1 << 3,     // confined to the scene path its params name
+    PACCI_UH_TRAIT_NO_TURN = 1 << 4,  // orientation frozen at the grab pose
+    PACCI_UH_TRAIT_BURNS = 1 << 5,    // sets fire to what it touches while carried
+    // Grabbable even though neither normal route can see it. The raycast only finds dynapoly and
+    // the actor scan only walks the categories the target helper covers, so anything outside both
+    // is unreachable no matter what the filter says. This opts a row in explicitly.
+    PACCI_UH_TRAIT_REACHABLE = 1 << 6,
+    // Does not turn to follow Link, but DOES still answer L + D-pad. Distinct from NO_TURN, which
+    // freezes the pose outright: a lift is a floor and has no business being rotated at all, while
+    // a block is something you line up deliberately and nothing else should be nudging.
+    PACCI_UH_TRAIT_NO_FACE = 1 << 7,
+    // Moving it far enough by hand sets the switch flag its params name.
+    PACCI_UH_TRAIT_SETS_FLAG = 1 << 8,
+    // ...and moving it back the other way clears it again. Only for the ones where both states are
+    // things the room can be in: a staircase can be up or down, a mouth open or shut.
+    PACCI_UH_TRAIT_CLEARS_FLAG = 1 << 9,
+    // Held, but never moved. The body stays exactly where it is and the D-pad drives its FLAG
+    // instead of its position — for machinery whose two states are the only thing about it that
+    // was ever meant to change.
+    PACCI_UH_TRAIT_LOCKED = 1 << 10,
+    // SETS_FLAG only: the flag index is only real when params fit entirely inside the field.
+    PACCI_UH_TRAIT_FLAG_STRICT = 1 << 11,
+    // Grabbing it does not take IT — it spawns something and you carry that instead. For the
+    // things whose whole job is to stay where they are: a bomb flower keeps its flower, a flame
+    // keeps burning in its bowl, and what comes with you is a copy that dies when you let go.
+    PACCI_UH_TRAIT_PROXY = 1 << 12,
+    // The proxy is a live bomb: its fuse is held off while carried, and the attach button
+    // detonates it instead of welding it.
+    PACCI_UH_TRAIT_EXPLODES = 1 << 13,
+    // The constraint writes home.pos instead of world.pos, for actors that rebuild their position
+    // from home every frame — writing world.pos there is writing a value about to be recomputed.
+    PACCI_UH_TRAIT_DRIVE_HOME = 1 << 14,
+    // Aiming at it HITS it, with whatever kind of blow that particular actor is waiting for. No
+    // carry: the cane lands the hit its damage table already accepts and gets out of the way, so
+    // the actor plays its own reaction, sets its own flag and dies its own death.
+    PACCI_UH_TRAIT_STRIKES = 1 << 15,
+    // Held in place, D-pad drives its HEIGHT rather than its position.
+    PACCI_UH_TRAIT_HEIGHT = 1 << 16,
+    // Aiming at it THROWS it, by handing it to its own throw. Nothing is carried and nothing is
+    // written except the one field its state machine is already watching.
+    PACCI_UH_TRAIT_THROWS = 1 << 17,
+    // Not carried — HAULED. Link braces and pulls it along the ground with the vanilla pulling
+    // animation, for the things that are too big to float in front of you.
+    PACCI_UH_TRAIT_PULLABLE = 1 << 18,
+    // The D-pad swings ONE hinge of this body open and shut.
+    PACCI_UH_TRAIT_JAW = 1 << 19,
+    // Same gesture, but handed to an animation the actor already owns instead of posed by hand.
+    PACCI_UH_TRAIT_HINGE = 1 << 20,
+} PacciUhTrait;
+
+typedef struct {
+    s16 actorId;
+    u32 traits;
+    // A bit field inside params, spelled out per row because every actor packs it somewhere
+    // different. PATH reads a scene path index out of it; SETS_FLAG reads a switch flag index.
+    u8 pathShift;
+    u8 pathMask;
+    // Optional. Some rows are about a STATE, not an actor: a torch only burns while it is lit.
+    // NULL means the row applies unconditionally.
+    u8 (*cond)(Actor* actor);
+    // SETS_FLAG only: which way the body has to travel before the flag is set. +1 up, -1 down,
+    // 0 either. It matters because these mean opposite things.
+    s8 flagDir;
+    // PROXY only: what to spawn in the body's place, and with what params.
+    s16 proxyId;
+    s16 proxyParams;
+    // STRIKES only: the blow to land, and how hard. dmgFlags has to be something the target's own
+    // bumper accepts or nothing happens at all — which is the point, since it means the actor's
+    // rules decide, not ours.
+    u32 hitFlags;
+    s16 hitDamage;
+} PacciUhTraitRow;
+
+// A torch is only worth taking while it is actually burning.
+static u8 Pacci_UhCondTorchLit(Actor* actor) {
+    return (actor->params & 0x8000) ? 1 : 0;
+}
+
+// The rows. Deliberately short: Pacci_UhTooBig below answers "is this a piece of the room" for
+// everything by measuring it, so this table is only for what measurement cannot see. SoH's copy is
+// long because it enumerates OoT dungeon machinery — Fire/Forest/Spirit/Shadow bodies that have no
+// counterpart here — and none of that transfers. Adding a case is adding a row.
+static const PacciUhTraitRow sPacciUhTraits[] = {
+    // Lined up deliberately, so nothing else should be nudging their facing.
+    { ACTOR_OBJ_OSHIHIKI, PACCI_UH_TRAIT_NO_FACE, 0, 0, NULL },
+    { ACTOR_OBJ_LIFT, PACCI_UH_TRAIT_NO_FACE, 0, 0, NULL },
+    // A bomb flower keeps its flower: what comes along is a live bomb that dies when you let go.
+    { ACTOR_EN_BOMBF, PACCI_UH_TRAIT_PROXY | PACCI_UH_TRAIT_EXPLODES, 0, 0, NULL, 0, ACTOR_EN_BOM, 0 },
+    // The flame stays in its bowl and a copy travels with you, setting light to what it touches.
+    { ACTOR_OBJ_SYOKUDAI, PACCI_UH_TRAIT_PROXY | PACCI_UH_TRAIT_BURNS | PACCI_UH_TRAIT_REACHABLE, 0, 0,
+      Pacci_UhCondTorchLit },
+};
+
+static const PacciUhTraitRow* Pacci_UhTraitRow(Actor* actor) {
+    if (actor != NULL) {
+        for (u32 i = 0; i < ARRAY_COUNT(sPacciUhTraits); i++) {
+            if (sPacciUhTraits[i].actorId != actor->id) {
+                continue;
+            }
+            // A row whose condition is false does not apply AT ALL — it is not a row with its
+            // traits stripped. An unlit torch is an ordinary torch, and that is the whole answer.
+            // But it does not end the search either: one actor id can carry several rows, one per
+            // variant, and the condition is what tells them apart.
+            if ((sPacciUhTraits[i].cond != NULL) && !sPacciUhTraits[i].cond(actor)) {
+                continue;
+            }
+            return &sPacciUhTraits[i];
+        }
+    }
+    return NULL;
+}
+
+static u32 Pacci_UhTraits(Actor* actor) {
+    const PacciUhTraitRow* row = Pacci_UhTraitRow(actor);
+
+    return (row != NULL) ? row->traits : 0;
+}
+
+/**
+ * Too big to be an object. THIS is the general answer, and the table above is only for the
+ * exceptions it cannot see.
+ *
+ * A dynapoly actor's CollisionHeader carries its own model-space bounds, so the size of the thing
+ * is right there. Only the horizontal extents are tested: height alone does not make something a
+ * room, and refusing every tall pillar would cost more than it saves.
+ */
+static u8 Pacci_UhTooBig(Actor* actor) {
+    PlayState* play = gPlayState;
+
+    if ((play == NULL) || (actor == NULL)) {
+        return 0;
+    }
+
+    for (s32 i = 0; i < BG_ACTOR_MAX; i++) {
+        BgActor* bg = &play->colCtx.dyna.bgActors[i];
+
+        if ((bg->actor != actor) || (bg->colHeader == NULL)) {
+            continue;
+        }
+
+        CollisionHeader* hdr = bg->colHeader;
+        f32 halfX = ((f32)hdr->maxBounds.x - (f32)hdr->minBounds.x) * 0.5f * actor->scale.x;
+        f32 halfZ = ((f32)hdr->maxBounds.z - (f32)hdr->minBounds.z) * 0.5f * actor->scale.z;
+
+        return ((halfX > PACCI_UH_MAX_HALF) || (halfZ > PACCI_UH_MAX_HALF)) ? 1 : 0;
+    }
+    return 0; // no dynapoly: whatever it is, it is not a room
+}
+
+// -- dragging a body's colliders along with it ---------------------------------
+// Moving an actor moves its MODEL. Its colliders were placed by its own update and stay where they
+// were, so a body carried across the room keeps hurting people at its old address.
+//
+// Each collider's reference point is captured as an OFFSET from its owner's resting position, and
+// then forced onto `owner world.pos + offset` every frame. Absolute, therefore idempotent,
+// therefore self-healing — an incremental delta that misses one frame would be wrong forever.
+//
+// The offset is measured from the pose at the GRAB, not from where the actor is when the collider
+// is first seen: collection can take a frame or two to succeed, and by then the carry has already
+// moved the actor. The collider has not, so measuring against where the actor WAS is what makes a
+// late capture come out right. That is the one thing this does not share with the switch hook's
+// slots, whose owner never travels.
+//
+// SwitchHook_GetColliderRefPos and SwitchHook_ShiftCollider come from item_switchhook.c, earlier in
+// this same translation unit.
+#define PACCI_ANCHOR_OWNERS 8
+#define PACCI_ANCHOR_COLS 10 // colliders tracked per actor; extras are simply left alone
+
+typedef struct {
+    Collider* col;
+    Vec3f offset;  // reference point, relative to the owner's RESTING position
+    Vec3f lastSet; // where we last left that reference point
+    u8 hasLastSet;
+} PacciAnchor;
+
+typedef struct {
+    Actor* owner;
+    Vec3f basePos; // the pose the offsets describe, recorded at the grab
+    u8 active;
+    u8 count;
+    PacciAnchor cols[PACCI_ANCHOR_COLS];
+} PacciAnchorSlot;
+
+static PacciAnchorSlot sUhAnchor[PACCI_ANCHOR_OWNERS];
+
+static PacciAnchorSlot* Pacci_AnchorFind(Actor* actor) {
+    for (u8 i = 0; i < PACCI_ANCHOR_OWNERS; i++) {
+        if (sUhAnchor[i].active && (sUhAnchor[i].owner == actor)) {
+            return &sUhAnchor[i];
+        }
+    }
+    return NULL;
+}
+
+// Start tracking. Call at the moment the actor is taken, while it is still at rest.
+static void Pacci_AnchorTake(Actor* actor) {
+    if (actor == NULL) {
+        return;
+    }
+
+    PacciAnchorSlot* slot = Pacci_AnchorFind(actor);
+    if (slot == NULL) {
+        for (u8 i = 0; i < PACCI_ANCHOR_OWNERS; i++) {
+            if (!sUhAnchor[i].active) {
+                slot = &sUhAnchor[i];
+                break;
+            }
+        }
+    }
+    if (slot == NULL) {
+        return;
+    }
+
+    slot->owner = actor;
+    slot->active = 1;
+    slot->count = 0;
+    slot->basePos = actor->world.pos;
+}
+
+static void Pacci_AnchorRelease(Actor* actor) {
+    PacciAnchorSlot* slot = Pacci_AnchorFind(actor);
+
+    if (slot != NULL) {
+        slot->active = 0;
+        slot->owner = NULL;
+        slot->count = 0;
+    }
+}
+
+void Pacci_AnchorClear(void) {
+    for (u8 i = 0; i < PACCI_ANCHOR_OWNERS; i++) {
+        sUhAnchor[i].active = 0;
+        sUhAnchor[i].owner = NULL;
+        sUhAnchor[i].count = 0;
+    }
+}
+
+static void Pacci_AnchorCollect(PacciAnchorSlot* slot, Collider** list, s32 count) {
+    for (s32 i = 0; (i < count) && (slot->count < PACCI_ANCHOR_COLS); i++) {
+        Collider* col = list[i];
+        Vec3f refPos;
+        u8 seen = 0;
+
+        if ((col == NULL) || (col->actor != slot->owner)) {
+            continue;
+        }
+        // One collider can be registered as AT and AC and OC in the same frame — track it once.
+        for (u8 j = 0; j < slot->count; j++) {
+            if (slot->cols[j].col == col) {
+                seen = 1;
+                break;
+            }
+        }
+        if (seen || !SwitchHook_GetColliderRefPos(col, &refPos)) {
+            continue;
+        }
+
+        slot->cols[slot->count].col = col;
+        slot->cols[slot->count].offset.x = refPos.x - slot->basePos.x;
+        slot->cols[slot->count].offset.y = refPos.y - slot->basePos.y;
+        slot->cols[slot->count].offset.z = refPos.z - slot->basePos.z;
+        slot->cols[slot->count].hasLastSet = 0;
+        slot->count++;
+    }
+}
+
+/**
+ * Collect anything newly submitted, then force every tracked collider onto the owner.
+ *
+ * Call from inside the owner's OWN update, right after that update has run: the collision context
+ * is cleared at the end of Actor_UpdateAll, so a collider is only in the frame's lists from the
+ * moment its actor submits it — and props update after the player, so collecting from the cane's
+ * own code could never see one at all.
+ */
+static void Pacci_AnchorSync(PlayState* play, Actor* actor) {
+    if ((play == NULL) || (actor == NULL) || (actor->update == NULL)) {
+        return;
+    }
+
+    PacciAnchorSlot* slot = Pacci_AnchorFind(actor);
+    if (slot == NULL) {
+        return;
+    }
+
+    Pacci_AnchorCollect(slot, play->colChkCtx.colAT, play->colChkCtx.colATCount);
+    Pacci_AnchorCollect(slot, play->colChkCtx.colAC, play->colChkCtx.colACCount);
+    Pacci_AnchorCollect(slot, play->colChkCtx.colOC, play->colChkCtx.colOCCount);
+
+    for (u8 i = 0; i < slot->count; i++) {
+        PacciAnchor* anchor = &slot->cols[i];
+        Vec3f refPos;
+        Vec3f delta;
+
+        if (!SwitchHook_GetColliderRefPos(anchor->col, &refPos)) {
+            continue;
+        }
+        // The owner rebuilt this collider itself since our last pass — its answer wins. Re-derive
+        // the offset from it so we stay in step instead of fighting an actor that is already doing
+        // the right thing. This is also what heals a first capture taken from a stale pose.
+        if (anchor->hasLastSet &&
+            ((refPos.x != anchor->lastSet.x) || (refPos.y != anchor->lastSet.y) || (refPos.z != anchor->lastSet.z))) {
+            anchor->offset.x = refPos.x - actor->world.pos.x;
+            anchor->offset.y = refPos.y - actor->world.pos.y;
+            anchor->offset.z = refPos.z - actor->world.pos.z;
+            anchor->lastSet = refPos;
+            continue;
+        }
+
+        delta.x = (actor->world.pos.x + anchor->offset.x) - refPos.x;
+        delta.y = (actor->world.pos.y + anchor->offset.y) - refPos.y;
+        delta.z = (actor->world.pos.z + anchor->offset.z) - refPos.z;
+        SwitchHook_ShiftCollider(anchor->col, &delta);
+        // Record where it ACTUALLY ended up, not where we aimed: the s16 shapes round, and
+        // comparing against the un-rounded ideal would read as "the owner moved it" every frame.
+        if (SwitchHook_GetColliderRefPos(anchor->col, &anchor->lastSet)) {
+            anchor->hasLastSet = 1;
+        }
+    }
+}
+
+// -- hauling --------------------------------------------------------------------
+// Some things are too big to hold out in front of you. Link braces against them and drags them
+// along the floor instead, with the animation the game already has for exactly this.
+//
+// The whole body is animated, not just the upper half the cane normally claims — a pull is a
+// stance, and half a stance is a man doing a mime.
+//
+// Link is pinned while he hauls. Letting him walk would fight the animation and stretch the rope
+// nobody drew, so speed is zeroed every frame and the D-pad does the moving.
+static Actor* sPullActor = NULL;
+static u8 sPullStarted = 0;
+
+u8 Pacci_PullActive(void) {
+    return (sPullActor != NULL) ? 1 : 0;
+}
+
+void Pacci_PullStop(PlayState* play) {
+    Player* player = (play != NULL) ? GET_PLAYER(play) : NULL;
+
+    if ((sPullActor != NULL) && (player != NULL) && sPullStarted) {
+        PlayerAnimation_Change(play, &player->skelAnime, (PlayerAnimationHeader*)gPlayerAnim_link_normal_pull_end, 1.0f,
+                               0.0f, Animation_GetLastFrame((void*)gPlayerAnim_link_normal_pull_end), ANIMMODE_ONCE,
+                               -6.0f);
+    }
+    Pacci_AnchorRelease(sPullActor);
+    sPullActor = NULL;
+    sPullStarted = 0;
+}
+
+static void Pacci_PullStart(PlayState* play, Player* player, Actor* target) {
+    sPullActor = target;
+    sPullStarted = 0;
+    // A hauled body keeps running its own update, so its colliders are live and have to travel
+    // with it. Taken here, while it is still at rest.
+    Pacci_AnchorTake(target);
+    PlayerAnimation_Change(play, &player->skelAnime, (PlayerAnimationHeader*)gPlayerAnim_link_normal_pull_start, 1.0f,
+                           0.0f, Animation_GetLastFrame((void*)gPlayerAnim_link_normal_pull_start), ANIMMODE_ONCE,
+                           -6.0f);
+    // The grunt Link makes taking hold of something heavy. A positional sound, from the body — a
+    // menu blip out of nowhere would give away that nothing is really being lifted.
+    Actor_PlaySfx(target, NA_SE_PL_PULL_UP_BIGROCK);
+}
+
+/**
+ * One frame of hauling. This takes the pad's STATE rather than the edges every other Ultrahand
+ * control uses, because a pull is a sustained effort and not a press. Holding D-down drags it
+ * toward you and D-up pushes it away, along the line between you and it — the only direction a
+ * braced pull can go.
+ */
+static void Pacci_PullTick(PlayState* play, Player* player, u8 dpad) {
+    f32 step = 0.0f;
+
+    if ((sPullActor == NULL) || (player == NULL)) {
+        return;
+    }
+    if (sPullActor->update == NULL) {
+        Pacci_PullStop(play);
+        return;
+    }
+
+    // The start animation runs once and then the loop takes over. Checked by asking the animation
+    // rather than by counting frames, so a different playback speed cannot desynchronise it.
+    if (!sPullStarted) {
+        if (PlayerAnimation_Update(play, &player->skelAnime)) {
+            sPullStarted = 1;
+            PlayerAnimation_Change(play, &player->skelAnime, (PlayerAnimationHeader*)gPlayerAnim_link_normal_pulling,
+                                   1.0f, 0.0f, Animation_GetLastFrame((void*)gPlayerAnim_link_normal_pulling),
+                                   ANIMMODE_LOOP, -4.0f);
+        }
+    } else {
+        PlayerAnimation_Update(play, &player->skelAnime);
+    }
+    player->actor.speed = 0.0f;
+    player->speedXZ = 0.0f;
+
+    if (dpad & 2) {
+        step = -PACCI_UH_PULL_RATE; // toward Link
+    } else if (dpad & 1) {
+        step = PACCI_UH_PULL_RATE; // away
+    } else {
+        return;
+    }
+
+    f32 dx = sPullActor->world.pos.x - player->actor.world.pos.x;
+    f32 dz = sPullActor->world.pos.z - player->actor.world.pos.z;
+    f32 len = sqrtf((dx * dx) + (dz * dz));
+    if (len < 1.0f) {
+        return;
+    }
+
+    sPullActor->world.pos.x += (dx / len) * step;
+    sPullActor->world.pos.z += (dz / len) * step;
+    // Bodies that rebuild their position from home need home to come along.
+    sPullActor->home.pos.x = sPullActor->world.pos.x;
+    sPullActor->home.pos.z = sPullActor->world.pos.z;
+    sPullActor->prevPos = sPullActor->world.pos;
+    Pacci_AnchorSync(play, sPullActor);
+}
+
+// -- handing something to its own throw -----------------------------------------
+// A body whose state machine already knows how to be thrown is gated on ONE field: actor->parent.
+// So the cane sets parent for a frame and clears it. Two writes, and the actor does the rest — no
+// actionFunc poked, no velocity guessed, no cutscene reimplemented. It is the same sequence Link's
+// own hands produce, which is why it looks right.
+static Actor* sUhThrowActor = NULL;
+static s16 sUhThrowTimer = 0;
+
+void Pacci_ThrowTick(PlayState* play) {
+    if ((play == NULL) || (sUhThrowActor == NULL)) {
+        return;
+    }
+    if (sUhThrowActor->update == NULL) {
+        sUhThrowActor = NULL;
+        sUhThrowTimer = 0;
+        return;
+    }
+    if (sUhThrowTimer > 0) {
+        sUhThrowTimer--;
+        return; // still "lifted"; its own wait state is running the pickup
+    }
+
+    // The throw itself, and this part is NOT the actor's: a thrown body integrates its speed along
+    // world.rot.y and never sets either — in vanilla they arrive from Link, on one frame of his
+    // throw animation. Without them it just drops where it stood.
+    {
+        Player* player = GET_PLAYER(play);
+
+        sUhThrowActor->world.rot.y = player->actor.shape.rot.y;
+        sUhThrowActor->speed = PACCI_UH_THROW_SPEED;
+        sUhThrowActor->velocity.y = 20.0f;
+    }
+    // Actor_HasNoParent goes true and the body flies.
+    sUhThrowActor->parent = NULL;
+    sUhThrowActor = NULL;
+}
+
+// Is a THROWS body mid-hand-off? Asked so Link is not frozen into the carry pose for a lift he
+// never actually performed.
+u8 Pacci_IsThrowing(void) {
+    return (sUhThrowActor != NULL) ? 1 : 0;
+}
+
+static void Pacci_ThrowArm(Player* player, Actor* target) {
+    // Held long enough for the target's own update to see the parent and move on to its carried
+    // state. One frame would be a coin flip on update order; a handful is not.
+    target->parent = &player->actor;
+    sUhThrowActor = target;
+    sUhThrowTimer = PACCI_UH_THROW_HOLD;
+}
+
+// -- cutting --------------------------------------------------------------------
+// One frame of damage, delivered where the actor is standing.
+//
+// Dealt as a real hit rather than by writing colChkInfo.health or calling Actor_Kill, because the
+// actor's own damage path is where everything worth having lives: the recoil, the sound, the flag
+// it sets on the killing blow, and the fact that four hits are four hits.
+//
+// It stays armed for a few frames because an AT only meets an AC when both are in the same frame's
+// lists, and the target submits its own on its own schedule.
+static ColliderCylinder sUhCutCol;
+static Actor* sUhCutTarget = NULL;
+static s16 sUhCutTimer = 0;
+static u32 sUhCutFlags = 0;
+static s16 sUhCutDamage = 0;
+
+void Pacci_CutTick(PlayState* play) {
+    CombatColliderConfig cfg;
+
+    if ((play == NULL) || (sUhCutTarget == NULL) || (sUhCutTimer <= 0)) {
+        return;
+    }
+    if (sUhCutTarget->update == NULL) {
+        sUhCutTarget = NULL; // it died — which is the point
+        sUhCutTimer = 0;
+        return;
+    }
+
+    sUhCutTimer--;
+    cfg.dmgFlags = sUhCutFlags;
+    cfg.damage = sUhCutDamage;
+    cfg.effect = 0;
+    cfg.radius = PACCI_UH_CUT_RADIUS;
+    cfg.height = PACCI_UH_CUT_HEIGHT;
+
+    Vec3f pos = sUhCutTarget->world.pos;
+    Combat_UpdateCylinder(&sUhCutCol, &pos, &cfg);
+    Combat_RegisterCollider(play, &sUhCutCol);
+    if (Combat_CheckHit(&sUhCutCol)) {
+        sUhCutCol.base.atFlags &= ~AT_HIT;
+    }
+}
+
+static void Pacci_CutArm(PlayState* play, Player* player, Actor* target, const PacciUhTraitRow* row) {
+    CombatColliderConfig cfg;
+
+    sUhCutFlags = row->hitFlags;
+    sUhCutDamage = (row->hitDamage != 0) ? row->hitDamage : PACCI_UH_CUT_DAMAGE;
+    cfg.dmgFlags = sUhCutFlags;
+    cfg.damage = sUhCutDamage;
+    cfg.effect = 0;
+    cfg.radius = PACCI_UH_CUT_RADIUS;
+    cfg.height = PACCI_UH_CUT_HEIGHT;
+    // Owned by LINK, not by the target: an actor's own collider never damages itself, and the game
+    // has to attribute the cut to the player for the target to react to it.
+    Combat_InitCylinder(play, &sUhCutCol, &player->actor, &cfg);
+    sUhCutTarget = target;
+    sUhCutTimer = PACCI_UH_CUT_FRAMES;
+    Actor_PlaySfx(target, NA_SE_IT_BOOMERANG_THROW);
+}
+
 typedef struct {
     Actor* held;
     u8 dropping;
@@ -1184,6 +1734,9 @@ typedef struct {
     // Held objects are frozen: their own update is what submits their OC collider,
     // and with it live the object shoves Link around while he is carrying it.
     ActorFunc origUpdate;
+    // Latched at the grab from the trait table, so the constraint and the release paths do not
+    // have to re-derive it every frame from an actor that may already be gone.
+    u32 traits;
 } PacciUltrahand;
 
 static PacciUltrahand sUltrahand = { 0 };
@@ -1298,6 +1851,10 @@ static void Pacci_UhTintAdd(Actor* actor) {
     actor->draw = Pacci_UhTintedDraw;
 }
 
+// Ultrahand borrows PLAYER_MODELGROUP_HOOKSHOT for its extended-arm pose, and that group also
+// carries the hookshot itself, drawn in a hand that is supposed to be empty. Hiding it is NOT done
+// from here: the right hand's DL table and its type are chosen together in the draw, and writing
+// the type alone leaves them out of step — see ItemEquip_HoldsEmptyHand.
 static void Pacci_RefreshPlayerPose(Player* player) {
     if (player != NULL) {
         Player_SetModels(player, Player_ActionToModelGroup(player, player->itemAction));
@@ -1317,6 +1874,11 @@ u8 Pacci_IsHoldingUltrahand(void) {
     return (sUltrahand.held != NULL) && !sUltrahand.dropping;
 }
 
+/** What Ultrahand has in hand, for the items that must not touch the same body. */
+Actor* Pacci_GetUltrahandHeld(void) {
+    return sUltrahand.held;
+}
+
 static void Pacci_UltrahandLetGo(void) {
     Actor* actor = sUltrahand.held;
 
@@ -1330,11 +1892,13 @@ static void Pacci_UltrahandLetGo(void) {
         actor->room = (s8)sUltrahand.origRoom;
         actor->colorFilterParams = 0;
     }
+    Pacci_AnchorRelease(actor);
     sUltrahand.held = NULL;
     sUltrahand.dropping = 0;
     sUltrahand.dropTimer = 0;
     sUltrahand.origUpdate = NULL;
     sUltrahand.vfxAge = 0;
+    sUltrahand.traits = 0;
     sUhHighlightTarget = NULL;
     Pacci_UhLightOff(gPlayState); // the draw hook stops running the moment nothing is held
     Pacci_UhTintClear();
@@ -1535,13 +2099,20 @@ static void Pacci_UltrahandTake(Player* player, Actor* target) {
     sUltrahand.carryVel.z = 0.0f;
     sUltrahand.faceOffsetYaw = target->shape.rot.y - Math_Vec3f_Yaw(&target->world.pos, &player->actor.world.pos);
     sUltrahand.vfxAge = 0;
+    sUltrahand.traits = Pacci_UhTraits(target);
     sUhHighlightTarget = NULL;
+    // While it is still at rest, before the carry moves it: the offsets are measured from this pose.
+    Pacci_AnchorTake(target);
     sUltrahand.origUpdate = target->update;
     target->update = Pacci_UltrahandHeldUpdate;
     sUltrahand.distance = sqrtf((dx * dx) + (dy * dy) + (dz * dz));
     sUltrahand.distance = CLAMP(sUltrahand.distance, PACCI_UH_DIST_MIN, PACCI_UH_DIST_MAX);
     target->room = -1; // held objects should survive a room change
 
+    // The carry runs from LINK's update, and the engine syncs an actor's prevPos to world.pos right
+    // before that actor's own update — so a carried body always reads as still to the recorder's
+    // automatic admission test. Without this, nothing moved by Ultrahand could ever be recalled.
+    Rewind_Track(target);
     Actor_PlaySfx(target, NA_SE_SY_GET_ITEM);
     Pacci_RefreshPlayerPose(player); // empty-handed -> hookshot hold
 }
@@ -1581,6 +2152,34 @@ u8 Pacci_CastUltrahand(PlayState* play, Player* player) {
         target = Pacci_FuseRootOf(target);
     }
 
+    // Three traits answer the grab with something OTHER than a carry, so they are resolved before
+    // anything is taken. Each one hands the body to a mechanism it already owns and steps back.
+    {
+        const PacciUhTraitRow* row = Pacci_UhTraitRow(target);
+        u32 traits = (row != NULL) ? row->traits : 0;
+
+        if (traits & PACCI_UH_TRAIT_STRIKES) {
+            Pacci_CutArm(play, player, target, row);
+            return 1;
+        }
+        if (traits & PACCI_UH_TRAIT_THROWS) {
+            Pacci_ThrowArm(player, target);
+            return 1;
+        }
+        if (traits & PACCI_UH_TRAIT_PULLABLE) {
+            Pacci_PullStart(play, player, target);
+            return 1;
+        }
+        if (traits & PACCI_UH_TRAIT_EXCLUDE) {
+            return 0; // a piece of the room, not an object
+        }
+    }
+    // Everything the table says nothing about still has to pass the size test: a room quadrant is
+    // not an object no matter how reachable it is.
+    if (Pacci_UhTooBig(target)) {
+        return 0;
+    }
+
     Pacci_UltrahandTake(player, target);
     return 1;
 }
@@ -1598,6 +2197,28 @@ void Pacci_UpdateUltrahand(PlayState* play, Player* player) {
     Actor* actor = sUltrahand.held;
     Input* input = &play->state.input[0];
 
+    // Above the early return: all three own a body that is NOT the carried one. A thrown block is
+    // already in the air, a cut stays armed for a few frames after the swing, and a haul is a
+    // stance Link is locked into — none of them stop mattering because nothing is held.
+    Pacci_ThrowTick(play);
+    Pacci_CutTick(play);
+    if (Pacci_PullActive()) {
+        u8 dpad = 0;
+
+        if (input->cur.button & BTN_DUP) {
+            dpad |= 1; // away
+        }
+        if (input->cur.button & BTN_DDOWN) {
+            dpad |= 2; // toward Link
+        }
+        Pacci_PullTick(play, player, dpad);
+        // Any other button lets go, the way every other cane hold ends.
+        if (CHECK_BTN_ANY(input->press.button, BTN_A | BTN_B | BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT)) {
+            Pacci_PullStop(play);
+        }
+        return; // Link is braced; nothing else about the cane runs while he hauls
+    }
+
     if (actor == NULL) {
         return;
     }
@@ -1610,6 +2231,10 @@ void Pacci_UpdateUltrahand(PlayState* play, Player* player) {
         sUltrahand.dropping = 0;
         return;
     }
+
+    // Re-claimed every frame the body is ours. Held perfectly still it would otherwise age out of
+    // the recorder as "nothing ever happened here" and lose the carry that came before.
+    Rewind_Track(actor);
 
     if (!sUltrahand.dropping) {
         s16 playerFacingYaw;

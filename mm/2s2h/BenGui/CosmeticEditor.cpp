@@ -1085,8 +1085,7 @@ static void ApplyHumanTunicPatch() {
     }
 }
 
-static RegisterShipInitFunc humanTunicPatch([]() { ApplyHumanTunicPatch(); },
-                                            { kHumanTunicOption.colorChangedCvar });
+static RegisterShipInitFunc humanTunicPatch([]() { ApplyHumanTunicPatch(); }, { kHumanTunicOption.colorChangedCvar });
 
 static RegisterShipInitFunc humanTunicColor(
     []() {

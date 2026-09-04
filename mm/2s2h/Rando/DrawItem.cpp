@@ -2156,6 +2156,30 @@ void DrawOotNeiPokeBall() { // REAL mesh (object_nei_pokeball, SoH scale 0.18) �
     static Gfx* c = NULL;
     DrawOotGetItemOpaTint("__OTR__objects/object_gi_bomb_1/gGiBombDL", &c, 255, 70, 70);
 }
+// Mario Mask — the same custom object SoH uses. Two things the generic helper cannot do: the
+// plate is modelled lying flat (it hangs face-up off the Salesman's backpack) so it needs the
+// upright tilt, and it is single-sided so culling has to go or it vanishes for half the spin.
+// Verts span 1564 units, hence 60/1564 ≈ 0.038. Fallback: the Skull Mask get-item.
+void DrawOotNeiMarioMask() {
+    static Gfx* real = NULL;
+    static u8 tried = 0;
+    Gfx* dl = LoadNeiRealGfx("__OTR__objects/object_nei_mario_mask/g_mario_mask_dl", &real, &tried);
+    if (dl == NULL) {
+        DrawOotSkullMask();
+        return;
+    }
+
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    Matrix_Scale(0.038f, 0.038f, 0.038f, MTXMODE_APPLY);
+    Matrix_RotateXF(-M_PIf / 2.0f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+    gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BOTH);
+    gSPDisplayList(POLY_OPA_DISP++, dl);
+    gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
+    CLOSE_DISPS(gPlayState->state.gfxCtx);
+}
+
 void DrawOotNeiBallAndChain() { // REAL mesh (object_nei_ball_and_chain, SoH scale 0.25) — fallback: steel bomb
     static Gfx* real = NULL;
     static u8 tried = 0;
@@ -2207,15 +2231,6 @@ void DrawOotNeiDekuLeaf() { // REAL mesh (object_nei_deku_leaf, SoH scale 0.5) �
     }
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_grass/gGiGrassDL", &sCache);
-}
-void DrawOotNeiDesireSensor() { // REAL mesh (object_nei_desire_sensor, SoH scale 0.5) — fallback: purple agony
-    static Gfx* real = NULL;
-    static u8 tried = 0;
-    if (DrawNeiRealOpa("__OTR__objects/object_nei_desire_sensor/g_desire_sensor_dl", &real, &tried, 0.5f, false)) {
-        return;
-    }
-    static Gfx* c = NULL;
-    DrawOotGetItemOpaTint("__OTR__objects/object_gi_map/gGiStoneOfAgonyDL", &c, 200, 110, 255);
 }
 void DrawOotNeiMinishCap() { // REAL mesh (object_nei_minish_cap, SoH scale 0.5) — fallback: green tunic
     static Gfx* real = NULL;
@@ -2706,8 +2721,8 @@ static Gfx* BuildRecoloredOotGiDL(const char* otrPath, u32 (*remap)(u32), Gfx* d
     }
     // Two-word (expanded) commands: the second word is payload, never an opcode.
     auto isTwoWord = [](u8 op) {
-        return op == 0x20 || op == 0x24 || op == 0x25 || op == 0x27 || op == 0x31 || op == 0x32 ||
-               op == 0x33 || op == 0x35 || op == 0x36 || op == 0x42;
+        return op == 0x20 || op == 0x24 || op == 0x25 || op == 0x27 || op == 0x31 || op == 0x32 || op == 0x33 ||
+               op == 0x35 || op == 0x36 || op == 0x42;
     };
     Gfx* src = (Gfx*)OotAssets_LoadGfx(otrPath);
     if (src == NULL) {
@@ -2810,8 +2825,8 @@ void DrawOotExtClimbBoots() { // Iron Boots GI: yellow leather + silver iron (pe
 void DrawOotExtRocBoots() { // Hover Boots GI, whole palette in one metallic gold (Pegasus keeps red)
     static Gfx sDL[512];
     static bool sBuilt = false;
-    Gfx* dl = BuildRecoloredOotGiDL("__OTR__objects/object_gi_hoverboots/gGiHoverBootsDL", RocBoots_GoldRamp, sDL,
-                                    &sBuilt);
+    Gfx* dl =
+        BuildRecoloredOotGiDL("__OTR__objects/object_gi_hoverboots/gGiHoverBootsDL", RocBoots_GoldRamp, sDL, &sBuilt);
 
     if (dl == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
@@ -2885,6 +2900,11 @@ void DrawOotSlateRune(RandoItemId randoItemId) {
             g = 215;
             b = 255;
             break; // ice blue
+        case RI_OOT_NEI_DESIRE_SENSOR:
+            r = 200;
+            g = 130;
+            b = 255;
+            break; // violet (the old Desire Sensor's colour)
         default:
             break;
     }
@@ -3510,9 +3530,6 @@ void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* 
             DrawOotNeiSpellReal("__OTR__objects/object_nei_magic_spell/gDemiseDestructionGiveDL", &c, &tr, 150, 30, 30);
             break;
         }
-        case RI_OOT_NEI_DESIRE_SENSOR:
-            DrawOotNeiDesireSensor();
-            break;
         case RI_OOT_NEI_DOMINION_ROD:
             DrawOotNeiDominionRod();
             break;
@@ -3542,6 +3559,9 @@ void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* 
             break;
         case RI_OOT_NEI_MOGMA_MITTS:
             DrawOotNeiMogmaMitts();
+            break;
+        case RI_OOT_NEI_MARIO_MASK:
+            DrawOotNeiMarioMask();
             break;
         case RI_OOT_NEI_POKE_BALL:
             DrawOotNeiPokeBall();
@@ -3636,6 +3656,7 @@ void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* 
         case RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE:
         case RI_OOT_NEI_SLATE_RUNE_STASIS:
         case RI_OOT_NEI_SLATE_RUNE_CRYONIS:
+        case RI_OOT_NEI_DESIRE_SENSOR:
             DrawOotSlateRune(randoItemId);
             break;
         case RI_OOT_NEI_PHANTOM_HOURGLASS:
@@ -3645,6 +3666,10 @@ void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* 
             DrawOotNeiShadowCrystal();
             break;
         case RI_OOT_NEI_ROD_OF_SEASONS:
+        case RI_OOT_NEI_SEASON_SPRING:
+        case RI_OOT_NEI_SEASON_SUMMER:
+        case RI_OOT_NEI_SEASON_AUTUMN:
+        case RI_OOT_NEI_SEASON_WINTER:
             DrawOotNeiRodOfSeasons();
             break;
         case RI_OOT_EXT_SHEIKAH_SHIELD:

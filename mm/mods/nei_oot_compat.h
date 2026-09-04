@@ -400,15 +400,6 @@
 #ifndef QUEST_MEDALLION_LIGHT
 #define QUEST_MEDALLION_LIGHT 0
 #endif
-#ifndef ROCK_LARGE
-#define ROCK_LARGE 0
-#endif
-#ifndef ROCK_SMALL
-#define ROCK_SMALL 1
-#endif
-#ifndef VB_ROCK_DROP_ITEM
-#define VB_ROCK_DROP_ITEM 0
-#endif
 #ifndef SLOT_LENS
 #define SLOT_LENS 0
 #endif

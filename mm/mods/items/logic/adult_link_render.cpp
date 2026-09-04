@@ -69,6 +69,18 @@ s32 CustomItems_OverrideDraw(Player* player, PlayState* play);
 // or NULL for a vanilla shield. extended_equipment.h:392. Used so PostLimb keeps drawing ext shields on
 // the back while we suppress the duplicate MM-CHILD shield the adult sheath DL already bakes in.
 const char* ExtEquip_GetShieldDLOverride(void);
+
+// Custom forms (Kafei/Keaton/Gerudo/Garo): each is an adult-rigged mirror of object_link_boy under
+// objects/forms/<name>/, so this renderer draws them by swapping its model source to the form's base path.
+#include "mods/forms/custom_forms.h"
+// Garo has NO Link-rig mirror: it draws MM's native ghost-ninja skeleton (En_Jso's rig) over a
+// null-DL walk of the Link skeleton that keeps positions/shadow/colliders alive.
+#include "objects/object_jso/object_jso.h"
+
+// OPEN_DISPS re-declares these at block scope with C++ linkage in a .cpp; the FIRST declaration wins,
+// so pin them to C linkage here or the link fails with LNK2001 (see reference_open_disps_cpp_linkage).
+void FrameInterpolation_RecordOpenChild(const void* a, int b);
+void FrameInterpolation_RecordCloseChild(void);
 }
 
 #define ADULT_LINK_SCALE_DEFAULT 0.01f
@@ -107,7 +119,13 @@ static const char* sLimbNearDL[ADULT_LINK_LIMB_COUNT] = {
 static FlexSkeletonHeader* sSkel = NULL;
 static u8 sReady = 0;
 static u8 sSetupFailedPermanently = 0;
-static u8 sIsMod = 0; // 1 = a user alt-assets mod supplied the skeleton (full model replacement)
+static u8 sIsMod = 0;      // 1 = a user alt-assets mod supplied the skeleton (full model replacement)
+static u8 sIsForm = 0;     // 1 = a custom form (objects/forms/<name>/) supplied the skeleton
+static u8 sIsChildRig = 0; // 1 = the form's object_link_child mirror is loaded (Time Gate off = child age)
+static SkelAnime sGaroSkelAnime;
+static Vec3s sGaroJointTable[GARO_LIMB_MAX];
+static Vec3s sGaroMorphTable[GARO_LIMB_MAX];
+static u8 sGaroReady = 0;
 
 // Equipment DLs chosen at draw time by the override (deep-patched adult DLs).
 static Gfx* sDL_LHOpen;
@@ -147,6 +165,17 @@ static const char* sOotMouthName[PLAYER_MOUTH_MAX] = {
     "gLinkAdultMouth3Tex",
     "gLinkAdultMouth4Tex",
 };
+// CHILD-rig twins (forms ship both ages; the Time Gate picks which, mirroring OoT's linkAge).
+static const char* sOotChildEyeName[PLAYER_EYES_MAX] = {
+    "gLinkChildEyesOpenTex",      "gLinkChildEyesHalfTex",  "gLinkChildEyesClosedfTex", "gLinkChildEyesRollLeftTex",
+    "gLinkChildEyesRollRightTex", "gLinkChildEyesShockTex", "gLinkChildEyesUnk1Tex",    "gLinkChildEyesUnk2Tex",
+};
+static const char* sOotChildMouthName[PLAYER_MOUTH_MAX] = {
+    "gLinkChildMouth1Tex",
+    "gLinkChildMouth2Tex",
+    "gLinkChildMouth3Tex",
+    "gLinkChildMouth4Tex",
+};
 // sPlayerEyesTextures holds OTR PATH STRINGS (e.g. "__OTR__objects/.../gLinkHumanEyesOpenTex"), which
 // the gfx interpreter resolves at draw time — NOT raw pixel pointers. So we store the mod eye/mouth
 // PATHS (with the __OTR__ prefix) and hand those to Player_DrawImpl, letting it resolve the mod texture.
@@ -164,10 +193,25 @@ static void* sModMouth[PLAYER_MOUTH_MAX];
 // is present (indexed), use it so appearance mods apply; otherwise deep-patch the oot.o2r base (which
 // the alt-assets index can't reach). Only mod DLs that ship the FULL display list get overridden here;
 // texture-only packs don't apply because the deep-patch inlines oot.o2r's base textures.
+// Mirror base of the rig the current setup is loading ("objects/forms/<name>/object_link_<age>/"),
+// empty when no form is active. Set by AdultLink_Setup before the equipment loads run.
+static std::string sRigBase;
+
 static Gfx* AdultLink_LoadDL(const char* otrPath) {
     const char* p = otrPath;
     if (std::strncmp(p, "__OTR__", 7) == 0) {
         p += 7;
+    }
+    const char* sym = std::strrchr(p, '/');
+    sym = (sym != NULL) ? sym + 1 : p;
+    if (!sRigBase.empty()) {
+        std::string formPath = sRigBase + sym;
+        if (ResourceMgr_FileExists(formPath.c_str())) {
+            Gfx* dl = ResourceMgr_LoadGfxByName(formPath.c_str());
+            if (dl != NULL) {
+                return dl;
+            }
+        }
     }
     if (ResourceMgr_IsAltAssetsEnabled()) {
         std::string altPath = std::string("alt/") + p; // gAltAssetPrefix == "alt/"
@@ -185,6 +229,27 @@ static Gfx* AdultLink_LoadDL(const char* otrPath) {
     return dl;
 }
 
+// A form/mode change invalidates every cached model resource; the next draw re-runs the setup with the
+// new model source.
+extern "C" void AdultLink_OnFormChanged(void) {
+    sReady = 0;
+    sSetupFailedPermanently = 0;
+    sSkel = NULL;
+    sIsMod = 0;
+    sIsForm = 0;
+    sIsChildRig = 0;
+    sRigBase.clear();
+    sGaroReady = 0;
+    for (int i = 0; i < PLAYER_EYES_MAX; i++) {
+        sModEyePath[i].clear();
+        sModEye[i] = NULL;
+    }
+    for (int i = 0; i < PLAYER_MOUTH_MAX; i++) {
+        sModMouthPath[i].clear();
+        sModMouth[i] = NULL;
+    }
+}
+
 static s32 AdultLink_Setup(void) {
     if (sReady) {
         return 1;
@@ -199,12 +264,41 @@ static s32 AdultLink_Setup(void) {
     // index; its limbs already reference the mod's indexed meshes, so nothing needs deep-patching. When
     // no mod is present it returns NULL (the oot.o2r base isn't indexed) and we deep-patch the base.
     FlexSkeletonHeader* skel = NULL;
-    if (ResourceMgr_IsAltAssetsEnabled()) {
+    // Active custom form first: its self-contained 21-limb mirror skeleton (mods/nei_forms.o2r) already
+    // references its own indexed limb meshes — same contract as a mod skeleton, nothing to deep-patch.
+    const char* formBase = CustomForms_BasePath();
+    std::string formRigBase = (formBase != NULL) ? formBase : "";
+    if (formBase != NULL) {
+        // The Time Gate is MM's linkAge: gate off = the form's object_link_child mirror (when shipped).
+        if (!AdultLink_IsActive()) {
+            std::string childBase = formRigBase;
+            size_t boy = childBase.find("object_link_boy");
+            if (boy != std::string::npos) {
+                childBase.replace(boy, strlen("object_link_boy"), "object_link_child");
+                if (ResourceMgr_FileExists((childBase + "gLinkChildSkel").c_str())) {
+                    formRigBase = childBase;
+                    sIsChildRig = 1;
+                }
+            }
+        }
+        std::string formSkel = formRigBase + (sIsChildRig ? "gLinkChildSkel" : "gLinkAdultSkel");
+        skel = (FlexSkeletonHeader*)ResourceMgr_LoadSkeletonByName(formSkel.c_str(), NULL);
+        sIsForm = (skel != NULL) ? 1 : 0;
+        if (!sIsForm) {
+            sIsChildRig = 0;
+            static u8 loggedFormMiss = 0;
+            if (!loggedFormMiss) {
+                loggedFormMiss = 1;
+                SPDLOG_WARN("[AdultLink] form skeleton {} not found — falling back to adult Link", formSkel);
+            }
+        }
+    }
+    if (skel == NULL && ResourceMgr_IsAltAssetsEnabled()) {
         skel = (FlexSkeletonHeader*)ResourceMgr_LoadSkeletonByName("objects/object_link_boy/gLinkAdultSkel", NULL);
     }
-    sIsMod = (skel != NULL) ? 1 : 0;
+    sIsMod = (!sIsForm && skel != NULL) ? 1 : 0;
 
-    if (!sIsMod) {
+    if (!sIsMod && !sIsForm) {
         // Base skeleton from the un-indexed oot.o2r (self-recovering archive-scoped load).
         skel = (FlexSkeletonHeader*)MmAssets_LoadFromOotArchive("objects/object_link_boy/gLinkAdultSkel", NULL);
         if (skel == NULL) {
@@ -227,9 +321,9 @@ static s32 AdultLink_Setup(void) {
         return 0;
     }
 
-    if (!sIsMod) {
+    if (!sIsMod && !sIsForm) {
         // Base skeleton: its limb DLs point at un-indexed oot.o2r assets — swap each for a self-contained
-        // deep-patched Gfx*. (A mod skeleton's limbs already point at indexed mod meshes — leave them.)
+        // deep-patched Gfx*. (A mod/form skeleton's limbs already point at indexed meshes — leave them.)
         int loaded = 0, failed = 0;
         for (int i = 0; i < ADULT_LINK_LIMB_COUNT; i++) {
             LodLimb* limb = (LodLimb*)skel->sh.segment[i];
@@ -276,32 +370,37 @@ static s32 AdultLink_Setup(void) {
         // which left every slot on the MM-child eye). Any slot the mod lacks falls back to the oot.o2r
         // base adult eye (raw pixels) — a real adult eye, never the child garbage.
         int nEye = 0, nMouth = 0, firstEye = -1, firstMouth = -1;
+        // A FORM ships its eyes at its own indexed mirror path (bound directly); a MOD ships them at
+        // alt/ (probed there, bound as the base path so the interpreter's alt-redirect resolves them).
+        const char* const* eyeNames = sIsChildRig ? sOotChildEyeName : sOotEyeName;
+        const char* const* mouthNames = sIsChildRig ? sOotChildMouthName : sOotMouthName;
+        std::string ootBase = sIsChildRig ? "objects/object_link_child/" : "objects/object_link_boy/";
+        std::string probeBase = sIsForm ? formRigBase : std::string("alt/objects/object_link_boy/");
+        std::string bindBase =
+            sIsForm ? (std::string("__OTR__") + formRigBase) : std::string("__OTR__objects/object_link_boy/");
         for (int i = 0; i < PLAYER_EYES_MAX; i++) {
-            std::string altc = std::string("alt/objects/object_link_boy/") + sOotEyeName[i];
-            if (ResourceMgr_FileExists(altc.c_str())) {
-                // Bind the base path; LoadResourceProcess auto-redirects base -> alt (the mod texture).
-                sModEyePath[i] = std::string("__OTR__objects/object_link_boy/") + sOotEyeName[i];
+            std::string probe = probeBase + eyeNames[i];
+            if (ResourceMgr_FileExists(probe.c_str())) {
+                sModEyePath[i] = bindBase + eyeNames[i];
                 if (firstEye < 0) {
                     firstEye = i;
                 }
                 nEye++;
             } else {
-                // oot.o2r base adult eye as raw texels (un-indexed archive; bound directly on the segment).
-                std::string base = std::string("objects/object_link_boy/") + sOotEyeName[i];
-                sModEye[i] = MmAssets_LoadFromOotArchive(base.c_str(), NULL);
+                // oot.o2r twin as raw texels (un-indexed archive; bound directly on the segment).
+                sModEye[i] = MmAssets_LoadFromOotArchive((ootBase + eyeNames[i]).c_str(), NULL);
             }
         }
         for (int i = 0; i < PLAYER_MOUTH_MAX; i++) {
-            std::string altc = std::string("alt/objects/object_link_boy/") + sOotMouthName[i];
-            if (ResourceMgr_FileExists(altc.c_str())) {
-                sModMouthPath[i] = std::string("__OTR__objects/object_link_boy/") + sOotMouthName[i];
+            std::string probe = probeBase + mouthNames[i];
+            if (ResourceMgr_FileExists(probe.c_str())) {
+                sModMouthPath[i] = bindBase + mouthNames[i];
                 if (firstMouth < 0) {
                     firstMouth = i;
                 }
                 nMouth++;
             } else {
-                std::string base = std::string("objects/object_link_boy/") + sOotMouthName[i];
-                sModMouth[i] = MmAssets_LoadFromOotArchive(base.c_str(), NULL);
+                sModMouth[i] = MmAssets_LoadFromOotArchive((ootBase + mouthNames[i]).c_str(), NULL);
             }
         }
         // Any still-empty slot (no mod texture, no oot.o2r base) -> reuse the first slot the mod DID ship,
@@ -347,6 +446,37 @@ static s32 AdultLink_Setup(void) {
         }
     }
 
+    sRigBase = sIsForm ? formRigBase : "";
+
+    if (sIsChildRig) {
+        // Child rig: MM's own child equipment already fits, so the hand overrides stay off (NULL lets the
+        // vanilla override result stand while holding); only the back setup uses the form's child combos.
+        sDL_LHOpen = NULL;
+        sDL_LHClosed = NULL;
+        sDL_LHSword = NULL;
+        sDL_LHBgs = NULL;
+        sDL_RHOpen = NULL;
+        sDL_RHClosed = NULL;
+        sDL_RHShield = NULL;
+        sDL_RHBow = NULL;
+        sDL_RHOcarina = NULL;
+        sDL_RHHookshot = NULL;
+        sDL_Waist = NULL;
+        sDL_RHMirrorShield = NULL;
+        sDL_SheathMirror = NULL;
+        sDL_SheathMirrorSword = NULL;
+        sDL_SheathEmpty = AdultLink_LoadDL("__OTR__objects/object_link_child/gLinkChildSheathNearDL");
+        sDL_SheathSword = AdultLink_LoadDL("__OTR__objects/object_link_child/gLinkChildSwordAndSheathNearDL");
+        sDL_SheathShield = AdultLink_LoadDL("__OTR__objects/object_link_child/gLinkChildHylianShieldAndSheathNearDL");
+        sDL_SheathBoth =
+            AdultLink_LoadDL("__OTR__objects/object_link_child/gLinkChildHylianShieldSwordAndSheathNearDL");
+
+        sSkel = skel;
+        sReady = 1;
+        SPDLOG_INFO("[AdultLink] setup OK (form child rig, base={})", formRigBase);
+        return 1;
+    }
+
     // Equipment DLs the override swaps in for held weapons (both paths). A mod usually lacks holding
     // variants, so these fall to the oot.o2r base; AdultLink_LoadDL prefers a mod alt/ when present.
     sDL_LHOpen = AdultLink_LoadDL(ALB("gLinkAdultLeftHandNearDL"));
@@ -384,6 +514,34 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
     s32 ret = Player_OverrideLimbDrawGameplayDefault(play, limbIndex, dList, pos, rot, actor);
     Player* p = (Player*)actor;
 
+    // A short-legged form (Keaton 0.335) scales the ROOT joint translation so Link's animations sit at
+    // the form's hip height — the mesh itself is authored at the right size (soh custom_forms rule).
+    if (limbIndex == PLAYER_LIMB_ROOT) {
+        f32 rootScale = CustomForms_RootScale();
+        // Order matters: Gerudo drops BEFORE the multiply, Keaton AFTER (soh MmForm_OverrideLimbDraw).
+        pos->y -= CustomForms_RootDropBefore();
+        if (rootScale != 1.0f) {
+            pos->x *= rootScale;
+            pos->y *= rootScale;
+            pos->z *= rootScale;
+        }
+        pos->y -= CustomForms_RootDropAfter();
+    }
+
+    // A form may claim a hand outright (Gerudo's scimitar in BOTH hands) or blank the sheath.
+    if (limbIndex == PLAYER_LIMB_LEFT_HAND || limbIndex == PLAYER_LIMB_RIGHT_HAND) {
+        u8 claimed = 0;
+        Gfx* formDL = CustomForms_HandDL(p, limbIndex, &claimed);
+        if (claimed) {
+            *dList = formDL;
+            return ret;
+        }
+    }
+    if (limbIndex == PLAYER_LIMB_SHEATH && CustomForms_HidesSheath(p)) {
+        *dList = NULL;
+        return ret;
+    }
+
     // The vanilla override CLOBBERS *dList for the waist/hands/sheath with MM-CHILD DLs (read from
     // player->waistDLists / leftHandDLists / ... — that's why child parts leaked through, gerudo has the
     // same issue). We RESTORE the skeleton's own mesh for those limbs, substituting an oot.o2r base DL
@@ -394,6 +552,13 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             break;
 
         case PLAYER_LIMB_LEFT_HAND:
+            if (sIsChildRig) {
+                // Held items keep the vanilla MM-child DL (right scale); empty hands are the form's own.
+                if (p->leftHandType == PLAYER_MODELTYPE_LH_OPEN || p->leftHandType == PLAYER_MODELTYPE_LH_CLOSED) {
+                    *dList = skelDL;
+                }
+                break;
+            }
             if (p->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD && sDL_LHSword != NULL) {
                 *dList = sDL_LHSword;
             } else if (p->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD && sDL_LHBgs != NULL) {
@@ -406,6 +571,12 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             break;
 
         case PLAYER_LIMB_RIGHT_HAND:
+            if (sIsChildRig) {
+                if (p->rightHandType == PLAYER_MODELTYPE_RH_OPEN || p->rightHandType == PLAYER_MODELTYPE_RH_CLOSED) {
+                    *dList = skelDL;
+                }
+                break;
+            }
             if (p->rightHandType == PLAYER_MODELTYPE_RH_SHIELD) {
                 // Draw whichever shield is EQUIPPED in hand, not always Hylian.
                 if (p->currentShield == PLAYER_SHIELD_MIRROR_SHIELD && sDL_RHMirrorShield != NULL) {
@@ -437,9 +608,9 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
                 // enum. Sword-on-back only if a sword is equipped AND sheathed (not in hand); shield-on-back
                 // only if a shield is equipped AND not raised. This kills the old "always Master Sword +
                 // Hylian at rest" default.
-                u8 swordSheathed = ((u8)GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) != EQUIP_VALUE_SWORD_NONE) &&
-                                   (p->sheathType == PLAYER_MODELTYPE_SHEATH_14 ||
-                                    p->sheathType == PLAYER_MODELTYPE_SHEATH_12);
+                u8 swordSheathed =
+                    ((u8)GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) != EQUIP_VALUE_SWORD_NONE) &&
+                    (p->sheathType == PLAYER_MODELTYPE_SHEATH_14 || p->sheathType == PLAYER_MODELTYPE_SHEATH_12);
                 u8 shieldOnBack =
                     (p->currentShield != PLAYER_SHIELD_NONE) && (p->rightHandType != PLAYER_MODELTYPE_RH_SHIELD);
                 // A NEI ext shield (Divine/Kite/Ikana) has no adult geometry — keep it OFF the sheath DL and
@@ -469,8 +640,7 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
 // post-limb call; keep it for a NEI ext shield (Divine/Kite/Ikana) — our sheath geometry doesn't bake
 // those, so PostLimb's ext-shield back draw is the only one. currentShield isn't read elsewhere in that
 // post-limb block, so this only removes the duplicate.
-static void AdultLink_PostLimb(PlayState* play, s32 limbIndex, Gfx** dList1, Gfx** dList2, Vec3s* rot,
-                               Actor* actor) {
+static void AdultLink_PostLimb(PlayState* play, s32 limbIndex, Gfx** dList1, Gfx** dList2, Vec3s* rot, Actor* actor) {
     Player* p = (Player*)actor;
     if (limbIndex == PLAYER_LIMB_SHEATH && p->currentShield != PLAYER_SHIELD_NONE &&
         ExtEquip_GetShieldDLOverride() == NULL) {
@@ -481,6 +651,54 @@ static void AdultLink_PostLimb(PlayState* play, s32 limbIndex, Gfx** dList1, Gfx
     } else {
         Player_PostLimbDrawGameplay(play, limbIndex, dList1, dList2, rot, actor);
     }
+    // Form extras that need THIS limb's matrix: Keaton's tails/reflector (waist), flute + fist quads (hands).
+    CustomForms_PostLimb(play, p, limbIndex);
+}
+
+// ---- Garo form: native object_jso skeleton over a null-DL Link walk --------------------------
+static s32 AdultLink_NullLimb(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, Actor* actor) {
+    s32 ret = Player_OverrideLimbDrawGameplayDefault(play, limbIndex, dList, pos, rot, actor);
+    *dList = NULL;
+    return ret;
+}
+
+static void AdultLink_DrawGaro(PlayState* play, Player* player) {
+    if (!sGaroReady) {
+        SkelAnime_InitFlex(play, &sGaroSkelAnime, (FlexSkeletonHeader*)gGaroSkel, (AnimationHeader*)gGaroIdleAnim,
+                           sGaroJointTable, sGaroMorphTable, GARO_LIMB_MAX);
+        Animation_PlayLoop(&sGaroSkelAnime, (AnimationHeader*)gGaroIdleAnim);
+        sGaroReady = 1;
+        SPDLOG_INFO("[AdultLink] Garo skeleton ready (native object_jso)");
+    }
+
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)gCullBackDList);
+    CLOSE_DISPS(play->state.gfxCtx);
+
+    f32 scale = CVarGetFloat("gAdultLink.Scale", ADULT_LINK_SCALE_DEFAULT);
+    Matrix_Translate(player->actor.world.pos.x, player->actor.world.pos.y, player->actor.world.pos.z, MTXMODE_NEW);
+    Matrix_RotateYS(player->actor.shape.rot.y, MTXMODE_APPLY);
+    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+
+    // Null-DL walk of the Link rig: fills bodyPartsPos / hand + focus positions for items and lock-on.
+    Player_DrawImpl(play, sSkel->sh.segment, player->skelAnime.jointTable, sSkel->dListCount, 0, PLAYER_FORM_HUMAN,
+                    player->currentBoots, player->actor.shape.face, AdultLink_NullLimb, AdultLink_PostLimb,
+                    &player->actor);
+
+    // Hybrid body: Link's animation retargeted bone-by-bone onto the ghost rig (sword + robe bones keep
+    // Garo's own idle), drawn at Link's 0.01 with the x3.5 subtree scale applied at the ROOT entry.
+    CustomForms_GaroPose(player, sGaroSkelAnime.jointTable, GARO_LIMB_MAX);
+    Matrix_Translate(player->actor.world.pos.x, player->actor.world.pos.y, player->actor.world.pos.z, MTXMODE_NEW);
+    Matrix_RotateYS(player->actor.shape.rot.y, MTXMODE_APPLY);
+    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+    SkelAnime_DrawFlexOpa(play, sGaroSkelAnime.skeleton, sGaroSkelAnime.jointTable, sGaroSkelAnime.dListCount,
+                          CustomForms_GaroOverrideLimb, CustomForms_GaroPostLimb, &player->actor);
+
+    Math_Vec3f_Copy(&player->actor.shape.feetPos[0], &player->actor.world.pos);
+    Math_Vec3f_Copy(&player->actor.shape.feetPos[1], &player->actor.world.pos);
+    CustomItems_OverrideDraw(player, play);
+    CustomForms_DrawWorld(play, player);
 }
 
 extern "C" s32 AdultLink_IsActive(void) {
@@ -492,18 +710,27 @@ extern "C" void AdultLink_Toggle(void) {
     NeiSaveData* n = Nei_Save();
     n->timeGateAdultMode = n->timeGateAdultMode ? 0 : 1;
     SPDLOG_INFO("[AdultLink] toggle -> adult mode = {}", (int)n->timeGateAdultMode);
-    if (n->timeGateAdultMode) {
+    // The age flip also switches an active form between its child and adult mirrors.
+    AdultLink_OnFormChanged();
+    if (n->timeGateAdultMode || CustomForms_ActiveForm() != CUSTOM_FORM_NONE) {
         AdultLink_Setup();
     }
 }
 
 extern "C" s32 AdultLink_ShouldHide(void) {
-    if (!AdultLink_IsActive()) {
+    // The menu's Force Form combobox changes the active form without going through CustomForms_Toggle.
+    static s32 sLastForm = CUSTOM_FORM_NONE;
+    s32 form = CustomForms_ActiveForm();
+    if (form != sLastForm) {
+        sLastForm = form;
+        AdultLink_OnFormChanged();
+    }
+    if (!AdultLink_IsActive() && form == CUSTOM_FORM_NONE) {
         return 0;
     }
-    // Adult Link only REPLACES the Human form. When the player is transformed (Deku / Goron / Zora /
-    // Fierce Deity via a mask), draw that form normally — otherwise the adult overlay is drawn over every
-    // transformation and it looks like the mask "no me convierte" while adult mode is on.
+    // Adult Link / a custom form only REPLACES the Human form. When the player is transformed (Deku /
+    // Goron / Zora / Fierce Deity via a mask), draw that native form normally — otherwise the overlay is
+    // drawn over every transformation and it looks like the mask "no me convierte".
     if (gSaveContext.save.playerForm != PLAYER_FORM_HUMAN) {
         return 0;
     }
@@ -512,6 +739,11 @@ extern "C" s32 AdultLink_ShouldHide(void) {
 
 extern "C" void AdultLink_Draw(PlayState* play, Player* player) {
     if (!sReady || sSkel == NULL) {
+        return;
+    }
+
+    if (CustomForms_ActiveForm() == CUSTOM_FORM_GARO) {
+        AdultLink_DrawGaro(play, player);
         return;
     }
 
@@ -555,10 +787,14 @@ extern "C" void AdultLink_Draw(PlayState* play, Player* player) {
 
     // Neutralize the Human age scale so the adult root sits at its animation-native height (the shared
     // ageProperties table is restored right after — same save/mutate/restore pattern as item_minish_cap.c).
+    // A child rig with no explicit form scale keeps MM's own child root scale (11/17, OoT's 0.64):
+    // the child mirror is authored child-sized, so an adult root height leaves it hanging in the air.
     f32 savedAgeScale = 0.0f;
     if (player->ageProperties != NULL) {
         savedAgeScale = player->ageProperties->unk_08;
-        player->ageProperties->unk_08 = 1.0f;
+        if (!sIsChildRig || CustomForms_RootScale() != 1.0f) {
+            player->ageProperties->unk_08 = 1.0f;
+        }
     }
 
     // Point the Human eye/mouth arrays at the adult textures for this draw (Player_DrawImpl binds them
@@ -670,18 +906,55 @@ static void AdultLink_ApplyAgeProps(void) {
     sAgePropsActive = 1;
 }
 
+static u8 sFormPropsApplied = 0;
+
 static void AdultLink_RestoreAgeProps(void) {
-    if (sAgePropsSaved && sAgePropsActive) {
+    if (sAgePropsSaved && (sAgePropsActive || sFormPropsApplied)) {
         sPlayerAgeProperties[PLAYER_FORM_HUMAN] = sHumanAgePropsBackup;
         sAgePropsActive = 0;
+        sFormPropsApplied = 0;
     }
 }
 
+// Per-form placement on top of the age layer (soh sFormProps): ceiling / wall reach / shadow and the
+// collider cylinder. Kafei keeps the adult numbers so his running ledge vault survives.
+static void AdultLink_ApplyFormProps(Player* player, const CustomFormProps* props) {
+    PlayerAgeProperties* h = &sPlayerAgeProperties[PLAYER_FORM_HUMAN];
+    if (!sAgePropsSaved) {
+        sHumanAgePropsBackup = *h;
+        sAgePropsSaved = 1;
+    }
+    if (props->overridesAgeProps) {
+        h->ceilingCheckHeight = props->ceilingCheckHeight;
+        h->wallCheckRadius = props->wallCheckRadius;
+        h->shadowScale = props->shadowScale;
+        sFormPropsApplied = 1;
+    }
+    player->cylinder.dim.radius = (s16)props->cylinderRadius;
+    player->cylinder.dim.height = (s16)props->cylinderHeight;
+}
+
 extern "C" void AdultLink_UpdateCollider(Player* player) {
-    if (!AdultLink_IsActive() || !sReady) {
-        AdultLink_RestoreAgeProps(); // form off -> child Link's ledge grab / ceiling / walls
+    if (sGaroReady && CustomForms_ActiveForm() == CUSTOM_FORM_GARO) {
+        SkelAnime_Update(&sGaroSkelAnime);
+    }
+    const CustomFormProps* props = (sReady && player->transformation == PLAYER_FORM_HUMAN) ? CustomForms_Props() : NULL;
+    // Adult gameplay attributes apply to adult mode AND to any ADULT-SIZED custom form (rootScale 1.0 —
+    // Kafei/Gerudo). A short form (Keaton) keeps child Link's ledge grab / ceiling / collider.
+    u8 adultSized = (AdultLink_IsActive() || CustomForms_ActiveForm() != CUSTOM_FORM_NONE) && sReady && !sIsChildRig &&
+                    CustomForms_RootScale() == 1.0f;
+    if (!adultSized && props == NULL) {
+        AdultLink_RestoreAgeProps();
         return;
     }
-    AdultLink_ApplyAgeProps();
-    player->cylinder.dim.height = (s16)CVarGetInteger("gAdultLink.ColliderHeight", ADULT_LINK_COLLIDER_HEIGHT_DEFAULT);
+    if (adultSized) {
+        AdultLink_ApplyAgeProps();
+        player->cylinder.dim.height =
+            (s16)CVarGetInteger("gAdultLink.ColliderHeight", ADULT_LINK_COLLIDER_HEIGHT_DEFAULT);
+    } else {
+        AdultLink_RestoreAgeProps();
+    }
+    if (props != NULL) {
+        AdultLink_ApplyFormProps(player, props);
+    }
 }

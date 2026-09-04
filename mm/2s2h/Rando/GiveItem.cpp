@@ -23,6 +23,7 @@ extern "C" {
 // Set by FleetSync's ApplyFcRegistryToNatives while it grants an FC deficit — suppress re-recording
 // those native grants (they were already counted when obtained), else the registry feeds itself.
 extern int gFcCombo_SuppressRecord;
+extern "C" void FleetShared_OnNativeObtained(int nativeId); // FleetShipCombo/FleetSharedItems.h
 // item_cane_of_somaria.c — Dual Cane. Six separate obtainable skills share ONE inventory
 // slot; this lights the skill's bit and, on the FIRST one obtained (any of the six, in any
 // order), also puts the cane into SLOT_CANE_OF_SOMARIA. CANE_SKILL_* live in
@@ -111,6 +112,7 @@ void Rando::GiveItem(RandoItemId randoItemId) {
                 nei->comboAppliedFc[fc]++;
             }
         }
+        FleetShared_OnNativeObtained((int)recordId); // ComboShip: hand OoT its half of a shared item
         // "You found X" corner toast — parity with SoH's EnItem00 pickup notification
         // (soh hook_handlers.cpp ~1330). Outermost call only = one toast per pickup (recursion for
         // progressives/ConvertItem stays silent), and cross-sync deficit grants (SuppressRecord) stay
@@ -1111,10 +1113,9 @@ void Rando::GiveItem(RandoItemId randoItemId) {
             ExtInv_GiveItem(SLOT_BALL_AND_CHAIN, ITEM_BALL_AND_CHAIN);
             break;
         case RI_OOT_NEI_DESIRE_SENSOR:
-            // The standalone Desire Sensor is retired — SLOT_DESIRE_SENSOR is no
-            // longer equippable. Any seed that still places it grants the Quartz
-            // of Motion instead, so it never becomes a dead item in the pool.
-            Nei_Save()->quartzOwned = 1;
+            // The standalone Desire Sensor is retired: its pool item is the Sheikah Slate's Sensor
+            // rune now, which is where its "where is my item" behaviour went.
+            Slate_GrantRune(SLATE_RUNE_SENSOR);
             break;
         case RI_OOT_NEI_LIGHT_ROD:
             ExtInv_GiveItem(SLOT_LIGHT_ROD, ITEM_ROD_LIGHT);
@@ -1131,12 +1132,14 @@ void Rando::GiveItem(RandoItemId randoItemId) {
         case RI_OOT_NEI_MINISH_CAP:
             ExtInv_GiveItem(SLOT_MINISH_CAP, ITEM_MINISH_CAP);
             break;
+        // Crossover Items: neither has an inventory cell (the Pokeball left page 2 in the
+        // 2026-08-06 re-layout, cell 44 is the Shadow Crystal now). Ownership is a flag, read by
+        // BrokenItems_FormUnlocked to gate the form on the equipment page. Skijer's NEI
         case RI_OOT_NEI_POKE_BALL:
-            // 2026-08-06 re-layout: the Pokeball left page 2 (cell 44 is the Shadow Crystal now) and
-            // lives on the Broken Items equipment page, where it is the PIKACHU MODE form — that page
-            // already uses the Pokeball as that form's icon. Ownership is a flag; the form selector
-            // will gate on it (TODO: BrokenItems_FormCount/EquipForm gating). Skijer's NEI
             Nei_Save()->pokeballOwned = 1;
+            break;
+        case RI_OOT_NEI_MARIO_MASK:
+            Nei_Save()->marioMaskOwned = 1;
             break;
         // Dual Cane: six separate skills on ONE slot. Cane_GiveSkill lights that
         // skill's bit and, if this is the first one found, drops the cane itself
@@ -1218,6 +1221,20 @@ void Rando::GiveItem(RandoItemId randoItemId) {
             break;
         case RI_OOT_NEI_ROD_OF_SEASONS:
             ExtInv_GiveItem(SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS);
+            break;
+        // Rod of Seasons — sibling items over the rod's cell (slate idiom). Each lights its own
+        // season, and the first one obtained hands over the rod itself.
+        case RI_OOT_NEI_SEASON_SPRING:
+            Seasons_GrantSeason(SEASON_SPRING);
+            break;
+        case RI_OOT_NEI_SEASON_SUMMER:
+            Seasons_GrantSeason(SEASON_SUMMER);
+            break;
+        case RI_OOT_NEI_SEASON_AUTUMN:
+            Seasons_GrantSeason(SEASON_AUTUMN);
+            break;
+        case RI_OOT_NEI_SEASON_WINTER:
+            Seasons_GrantSeason(SEASON_WINTER);
             break;
         // Elemental Wand: whichever rod lands grants that mode AND the slot. In "Single item" mode
         // one pickup lights all six; in "Elemental shuffle" each rod is its own check. Wand_GrantMode

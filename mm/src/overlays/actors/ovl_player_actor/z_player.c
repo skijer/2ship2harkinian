@@ -88,6 +88,7 @@ s32 Player_PutAwayHeldItem(PlayState* play, Player* this); // defined below, cal
 #include "mods/oot_asset_loader/oot_asset_loader.h"
 #include "mods/spiritual_stones/spiritual_stones.h"
 #include "mods/boss_remains/boss_remains.h"
+#include "mods/forms/custom_forms.h"
 #include "expansions/ssbb/ssbb_anim.h"
 #include "expansions/ssbb/ssbb_character.h"
 #include "expansions/ssbb/ssbb_global.c"
@@ -4972,6 +4973,11 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
         }
     }
 
+    // Custom forms without an MM item id (the Gerudo Mask of the OoT mask wheel) toggle here.
+    if (CustomForms_UseItem(this, item)) {
+        return;
+    }
+
     PlayerItemAction itemAction = Player_ItemToItemAction(this, item);
 
     // NEI-DBG: mask-wear tracing (remove after diagnosis)
@@ -5679,6 +5685,7 @@ s32 Player_GetMovementSpeedAndYaw(Player* this, f32* outSpeedTarget, s16* outYaw
     // Boss Remains (Odolwa): the 2x run boost (hold A) applies to EVERY stick-driven direction —
     // forward, backward, sideways, targeting — because all locomotion actions pull speed from here.
     *outSpeedTarget *= BossRemains_RunSpeedMul();
+    *outSpeedTarget *= CustomForms_RunSpeedMul();
 
     return true;
 }
@@ -6227,7 +6234,7 @@ void func_80833864(PlayState* play, Player* this, PlayerMeleeWeaponAnimation mel
         return;
     }
 
-    meleeWeaponAnim = Trident_NextComboMwa(this, meleeWeaponAnim);
+    meleeWeaponAnim = CustomForms_NextComboMwa(this, Trident_NextComboMwa(this, meleeWeaponAnim));
     func_8083375C(this, meleeWeaponAnim);
     Player_SetAction(play, this, Player_Action_84, 0);
     this->av2.actionVar2 = 0;
@@ -6242,7 +6249,7 @@ void func_80833864(PlayState* play, Player* this, PlayerMeleeWeaponAnimation mel
     }
 
     this->unk_ADD++;
-    if ((this->unk_ADD >= 3) && !Trident_OwnsComboRow(this)) {
+    if ((this->unk_ADD >= 3) && !Trident_OwnsComboRow(this) && !CustomForms_OwnsComboRow(this)) {
         meleeWeaponAnim += 2;
     }
 
@@ -6355,6 +6362,7 @@ void func_80833B18(PlayState* play, Player* this, s32 arg2, f32 speed, f32 veloc
 
     Player_PlaySfx(this, NA_SE_PL_DAMAGE);
 
+    CustomForms_ScaleIncomingDamage(this);
     if (func_808339D4(play, this, -this->actor.colChkInfo.damage) == 0) {
         this->stateFlags2 &= ~PLAYER_STATE2_80;
         if ((this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) || (this->stateFlags1 & PLAYER_STATE1_8000000)) {
@@ -6689,6 +6697,11 @@ s32 func_80834600(Player* this, PlayState* play) {
         PlayerAnimationHeader* var_a2;
         s32 sp64;
 
+        // Ext-shield parries read the AC flags, so they have to run before Collider_ResetQuadAC
+        // clears them later this frame. SoH fires these off VB_PLAYER_SHIELD_BLOCKED. Skijer's NEI
+        DivineShield_OnShieldBlock(this, play);
+        Ikana_OnShieldBlock(this, play);
+
         Player_RequestRumble(play, this, 180, 20, 100, SQ(0));
         if ((this->invincibilityTimer >= 0) && !Player_IsGoronOrDeku(this)) {
             sp64 = (Player_Action_18 == this->actionFunc);
@@ -6800,6 +6813,9 @@ s32 func_80834600(Player* this, PlayState* play) {
 
 void func_80834CD0(Player* this, f32 arg1, u16 sfxId) {
     this->actor.velocity.y = arg1 * sWaterSpeedFactor;
+    // Tornado Rod: every launch off the ground goes through here — plain jump, side hops, backflip —
+    // so the wind boost is applied once, where the velocity is written. Skijer's NEI
+    WandWind_Boost(this);
     this->actor.bgCheckFlags &= ~BGCHECKFLAG_GROUND;
     gNeiHoverTimer = 0; // Skijer's NEI: a real jump launch cancels the hover grace (OoT func_80838940)
 
@@ -7576,7 +7592,7 @@ void func_80836B3C(PlayState* play, Player* this, f32 arg2) {
     // Boss Remains: while wearing Odolwa's (A = run) or Goht's (A = bull charge) remains, A never
     // rolls. This is the single choke point every human/Goron roll passes through, so suppressing it
     // here kills ALL roll entry points at once. Human form only (Goron ball unaffected).
-    if (BossRemains_SuppressRoll() && (this->transformation == PLAYER_FORM_HUMAN)) {
+    if ((BossRemains_SuppressRoll() || CustomForms_SuppressRoll(this)) && (this->transformation == PLAYER_FORM_HUMAN)) {
         return;
     }
 
@@ -8067,7 +8083,7 @@ s32 func_80837DEC(Player* this, PlayState* play) {
 
             if (BgCheck_EntityLineTest2(&play->colCtx, &this->actor.world.pos, &sp7C, &sp70, &entityPoly, true, false,
                                         false, true, &entityBgId, &this->actor)) {
-                if (ABS_ALT(entityPoly->normal.y) < 0x258) {
+                if ((ABS_ALT(entityPoly->normal.y) < 0x258) || gMogmaMittsClimbActive) {
                     s32 var_v1_2; // sp54
 
                     entityNormalX = COLPOLY_GET_NORMAL(entityPoly->normal.x);
@@ -8855,7 +8871,9 @@ void func_808395F0(PlayState* play, Player* this, PlayerMeleeWeaponAnimation mel
     this->speedXZ = linearVelocity;
     this->yaw = this->actor.shape.rot.y;
     this->actor.velocity.y = yVelocity;
+    WandWind_Boost(this); // the jump slash is the one launch that does not go through func_80834CD0
     Trident_AdjustJumpSlash(this, meleeWeaponAnim);
+    CustomForms_AdjustJumpSlash(this);
     this->actor.bgCheckFlags &= ~BGCHECKFLAG_GROUND;
     gNeiHoverTimer = 0; // Skijer's NEI: sword-jump launch cancels the hover grace (OoT func_8083BA90)
     Player_AnimSfx_PlayFloorJump(this);
@@ -8987,6 +9005,9 @@ s32 Player_ActionHandler_10(Player* this, PlayState* play) {
                     } else {
                         func_80836B3C(play, this, 0.0f);
                     }
+                } else if (CustomForms_ReplacesJumpslash(this)) {
+                    // Kafei (SW97): A under Z is a plain jump, never a jump slash. Skijer's NEI
+                    func_80834DB8(this, &gPlayerAnim_link_normal_jump, REG(69) / 100.0f, play);
                 } else if (GameInteractor_Should(VB_START_JUMPSLASH,
                                                  !(this->stateFlags1 & PLAYER_STATE1_8000000) &&
                                                      (Player_GetMeleeWeaponHeld(this) != PLAYER_MELEEWEAPON_NONE) &&
@@ -10849,6 +10870,7 @@ void func_8083EA44(Player* this, f32 arg1) {
     f32 updateScale = R_UPDATE_RATE / 2.0f;
 
     arg1 *= updateScale;
+    arg1 *= CustomForms_RunAnimRateMul();
     if (arg1 < -7.25f) {
         arg1 = -7.25f;
     } else if (arg1 > 7.25f) {
@@ -12720,7 +12742,10 @@ void Player_ProcessSceneCollision(PlayState* play, Player* this) {
         if ((this->actor.bgCheckFlags & BGCHECKFLAG_PLAYER_WALL_INTERACT) && (sShapeYawToTouchedWall < 0x3000)) {
             CollisionPoly* wallPoly = this->actor.wallPoly;
 
-            if (ABS_ALT(wallPoly->normal.y) < 600) {
+            // The Mitts already force WALL_FLAG_3 in SurfaceType_GetWallFlags, but yDistToLedge is
+            // only computed inside this angle gate, so without the bypass no slanted wall can be
+            // grabbed at all. Skijer's NEI
+            if ((ABS_ALT(wallPoly->normal.y) < 600) || gMogmaMittsClimbActive) {
                 f32 wallPolyNormalX = COLPOLY_GET_NORMAL(wallPoly->normal.x);
                 f32 wallPolyNormalY = COLPOLY_GET_NORMAL(wallPoly->normal.y);
                 f32 wallPolyNormalZ = COLPOLY_GET_NORMAL(wallPoly->normal.z);
@@ -13426,6 +13451,21 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
         Slate_TickInput(play, this);
     }
 
+    // Phantom Hourglass: C raises it, C recalls the painted target, C lets go. Skijer's NEI
+    {
+        extern void Hourglass_TickInput(PlayState * play, Player * player);
+
+        Hourglass_TickInput(play, this);
+    }
+
+    // Elemental Wand: C casts the active rod, hold L opens the rod wheel. The rods that own
+    // something in the world tick from in here too, so they keep running with the wand stowed.
+    {
+        extern void Wand_TickInput(PlayState * play, Player * player);
+
+        Wand_TickInput(play, this);
+    }
+
     if (this->unk_D6A < 0) {
         this->unk_D6A++;
         if (this->unk_D6A == 0) {
@@ -13907,6 +13947,7 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
     Collider_ResetCylinderAC(play, &this->cylinder.base);
     Collider_ResetCylinderAC(play, &this->shieldCylinder.base);
     Collider_ResetCylinderAT(play, &this->shieldCylinder.base);
+    CustomForms_ScanMeleeHits(this);
     Collider_ResetQuadAT(play, &this->meleeWeaponQuads[0].base);
     Collider_ResetQuadAT(play, &this->meleeWeaponQuads[1].base);
     Collider_ResetQuadAC(play, &this->shieldQuad.base);
@@ -14124,7 +14165,7 @@ void Player_Update(Actor* thisx, PlayState* play) {
         } else {
             this->stateFlags3 |= PLAYER_STATE3_PAUSE_ACTION_FUNC;
         }
-    } else if (!KiteSurf_IsActive() && !Trident_OwnsPlayerAction()) {
+    } else if (!KiteSurf_IsActive() && !Trident_OwnsPlayerAction() && !CustomForms_OwnsPlayerAction()) {
         // Do not clear a flag another module owns. This else exists for SM64 Mario's exit path, but
         // it runs unconditionally whenever Mario mode is OFF — i.e. always — and it sits between the
         // ext-equipment hook and Player_UpdateCommon, so it was wiping the Kite Shield surf's pause
@@ -14140,11 +14181,16 @@ void Player_Update(Actor* thisx, PlayState* play) {
     // hit to Link's HP/state directly and Mario never plays his knockback.
     Sm64Mario_InterceptDamage(play, this);
 
+    // Custom forms strip the buttons they own before vanilla reads them, and keep the raw pad for
+    // their own tick after Player_UpdateCommon (same late-call reason as the Kite Shield below).
+    CustomForms_FilterInput(this, &input);
+
     Player_UpdateCommon(this, play, &input);
 
     // The Trident needs current input/stick state and stamps its PAUSE ownership
     // after Player_UpdateCommon's clears, matching SoH's hook order.
     ExtEquip_TridentPostUpdate(this, play);
+    CustomForms_Update(this, play);
 
     // KITE SHIELD shield surfing runs HERE, not from ExtEquip_UpdateBehavior above, because it takes
     // the player over and that requires everything Player_UpdateCommon sets up:
@@ -15237,6 +15283,9 @@ s32 Player_ActionHandler_7(Player* this, PlayState* play) {
         if (func_808396B8(play, this)) {
             PlayerMeleeWeaponAnimation meleeWeaponAnim = func_808335F4(this);
 
+            if (CustomForms_StartMeleeSwing(this, play)) {
+                return true;
+            }
             func_80833864(play, this, meleeWeaponAnim);
             // Skijer's NEI: the OoT Master Sword fires a sword beam on a NORMAL slash at full health
             // (the "True Master" upgrade) — reuse the Fierce Deity beam path. func_808332A0 makes it

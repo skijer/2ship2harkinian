@@ -269,3 +269,14 @@ u8 ItemHeld_IsButtonPressed(u8 itemId, Player* player, PlayState* play) {
         return 0;
     return (play->state.input[0].press.button & button) != 0;
 }
+
+u8 Hourglass_WantsEmptyHand(void);
+u8 Pacci_IsHoldingUltrahand(void);
+
+// The two items that borrow the HOOKSHOT model group for its extended-arm pose and must not get the
+// hookshot that comes with it. Read at DRAW time, where the hand's DL table and its type are chosen
+// together; writing the type from item code leaves them out of step, and a table indexed with a
+// type it does not match resolves a NULL display list.
+u8 ItemEquip_HoldsEmptyHand(void) {
+    return Hourglass_WantsEmptyHand() || Pacci_IsHoldingUltrahand();
+}

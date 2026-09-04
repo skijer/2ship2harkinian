@@ -52,9 +52,9 @@ s32 func_808344C0(PlayState* play, Player* player);
 }
 
 // Forward decls implemented in HarpoonDummyPlayer.cpp.
-void HarpoonDummyPlayer_DrawAll(PlayState* play); // render remote players (draw hook)
+void HarpoonDummyPlayer_DrawAll(PlayState* play);      // render remote players (draw hook)
 void HarpoonDummyPlayer_SyncNametags(PlayState* play); // name above each peer, gated by the CVar
-void HarpoonPeer_RefreshActors(PlayState* play);  // spawn/kill one collider actor per peer
+void HarpoonPeer_RefreshActors(PlayState* play);       // spawn/kill one collider actor per peer
 void HarpoonPeer_OnActorDestroyed(Actor* actor);
 void HarpoonPeer_OnPlayDestroy();
 Actor* HarpoonPeer_FindByClientId(uint32_t clientId);

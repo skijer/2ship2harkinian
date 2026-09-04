@@ -22,6 +22,7 @@ s32 KaleidoScope_UpdateQuestStatusPoint(PauseContext* pauseCtx, s16 point);
 // page (KaleidoScope_HandlePageToggles), persisted in a CVar. Self-contained: its own local
 // Vtx grid (MM's pauseCtx->questVtx is sized for MM's 39-quad layout, too small for OoT's).
 // ============================================================================
+#include "2s2h/CustomMessage/PauseItemDescriptions.h" // NEI: C-Up descriptions for the SW97 medallions
 #include "mods/nei_save.h"
 #include "mods/extended_inventory.h"
 #include "mods/spiritual_stones/spiritual_stones.h" // SpiritualStone_IsPassiveActive (stone dimming)
@@ -865,6 +866,20 @@ static void OotQuest_HandleSelect(PlayState* play, Input* input) {
     // DpadEquips enhancement is on. Item id comes from the table (medallions are NOT contiguous).
     if (point <= 5 && OotQuest_Has(point)) {
         u8 item = sOotMedallionItemIds[point];
+
+        // C-Up reads the medallion out, the way it does on the item page. This page is the only
+        // place the SW97 spells are described. Skijer's NEI
+        if (CHECK_BTN_ALL(input->press.button, BTN_CUP)) {
+            const char* desc = PauseItemDesc_Get(item, PAUSE_QUEST);
+
+            if (desc != NULL) {
+                play->pauseCtx.itemDescriptionOn = true;
+                PauseItemDesc_Show(play, desc, 1);
+            } else {
+                Audio_PlaySfx(NA_SE_SY_ERROR);
+            }
+            return;
+        }
 
         // C-button items live at form index 0 (shared across forms; only B differs per form) — same
         // idiom as the item page's BUTTON_ITEM_EQUIP(0, i) + Interface_LoadItemIconImpl.

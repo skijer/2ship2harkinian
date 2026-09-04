@@ -1147,6 +1147,9 @@ void ProcessOracle() {
 }
 
 void RegisterFleetOracle() {
+#ifdef COMBO_BUILD
+    return; // ComboShip queries MM's logic by direct call (MM_*_Rando_*); the JSON request pump is idle
+#endif
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>(ProcessOracle);
 }
 

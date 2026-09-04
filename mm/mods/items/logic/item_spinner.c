@@ -54,18 +54,7 @@ static void Spinner_CheckHit(Player* p) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Breakable rock destruction: per-type helpers
-// ---------------------------------------------------------------------------
-// Each helper spawns its own VFX/SFX and fires the matching VB hook so the
-// randomizer can hand out the shuffled item for that check.
-//
-//   EN_ISHI ROCK_SMALL  → VB_ROCK_DROP_ITEM (drop collectible)
-//   EN_ISHI ROCK_LARGE  → Actor_OfferGetItem so rando intercepts the lift-check
-//   OBJ_HAMISHI         → VB_ROCK_DROP_ITEM (1-hit, vanilla needs 2 hammer hits)
-//   OBJ_BOMBIWA         → VB_ROCK_DROP_ITEM
-//   EN_GOROIWA          → no rando hook (not a check, just hazard removal)
-
+// Obj_Hamishi normally takes two hammer hits; the spinner breaks it in one.
 static void Spinner_SpawnBreakVFX(PlayState* play, Vec3f* pos, u8 big) {
     if (big) {
         func_80033480(play, pos, 140.0f, 6, 180, 90, 1);
@@ -79,27 +68,24 @@ static void Spinner_SpawnBreakVFX(PlayState* play, Vec3f* pos, u8 big) {
 static void Spinner_DropAtActor(PlayState* play, Actor* actor) {
     Vec3f dropPos = actor->world.pos;
     dropPos.y += 30.0f;
-    // Mirrors EnIshi_DropCollectible: dropParams in upper nibble of params >> 8,
-    // capped at 0xC. Falls back to 0 (random fixed drop) for non-ishi rocks.
-    s16 dropParams = (actor->params >> 8) & 0xF;
-    if (dropParams >= 0xD)
+    // Mirrors EnIshi_DropCollectible; index 0xD and up is not a table, so it falls
+    // back to 0 (random fixed drop) for non-ishi rocks.
+    s16 dropParams = ENISHI_GET_DROP_TABLE(actor);
+    if (dropParams >= 0xD) {
         dropParams = 0;
+    }
     Item_DropCollectibleRandom(play, NULL, &dropPos, dropParams << 4);
 }
 
 static void Spinner_DestroyIshi(PlayState* play, Actor* actor) {
-    s16 type = actor->params & 1;
+    s16 size = ENISHI_GET_SIZE_FLAG(actor);
     Vec3f pos = actor->world.pos;
 
-    Spinner_SpawnBreakVFX(play, &pos, type == ROCK_LARGE);
+    Spinner_SpawnBreakVFX(play, &pos, size == ISHI_SIZE_SILVER_BOULDER);
 
-    // Fire VB_ROCK_DROP_ITEM with the vanilla-default condition:
-    //   ROCK_SMALL → vanilla drops a collectible (true)
-    //   ROCK_LARGE → vanilla doesn't drop (false), but the rando overrides
-    //                this hook (ShuffleRocks.cpp) to deliver the shuffled
-    //                silver-boulder check item directly.
-    u8 vanillaDrop = (type == ROCK_SMALL);
-    if (GameInteractor_Should(VB_ROCK_DROP_ITEM, vanillaDrop, actor)) {
+    // Matches vanilla EnIshi: only the small rock carries a collectible. MM has no
+    // rock shuffle, so there is no hook to override the drop.
+    if (size == ISHI_SIZE_SMALL_ROCK) {
         Spinner_DropAtActor(play, actor);
     }
     Actor_Kill(actor);
@@ -107,19 +93,15 @@ static void Spinner_DestroyIshi(PlayState* play, Actor* actor) {
 
 static void Spinner_DestroyHamishi(PlayState* play, Actor* actor) {
     Vec3f pos = actor->world.pos;
-    Spinner_SpawnBreakVFX(play, &pos, 1);
-    if (GameInteractor_Should(VB_ROCK_DROP_ITEM, true, actor)) {
-        Spinner_DropAtActor(play, actor);
-    }
+    Spinner_SpawnBreakVFX(play, &pos, true);
+    Spinner_DropAtActor(play, actor);
     Actor_Kill(actor);
 }
 
 static void Spinner_DestroyBombiwa(PlayState* play, Actor* actor) {
     Vec3f pos = actor->world.pos;
-    Spinner_SpawnBreakVFX(play, &pos, 1);
-    if (GameInteractor_Should(VB_ROCK_DROP_ITEM, true, actor)) {
-        Spinner_DropAtActor(play, actor);
-    }
+    Spinner_SpawnBreakVFX(play, &pos, true);
+    Spinner_DropAtActor(play, actor);
     Actor_Kill(actor);
 }
 

@@ -169,7 +169,10 @@ static const NeiItem sNeiItems[] = {
       "effectuer&un %gdouble saut%w en l'air.&Appuyez sur %y\xA1%w en sautant&pour aller plus haut!",
       "Du hast %rRocs Umhang%w erhalten!&Dieser magische Umhang&verbessert deine Sprungkraft.^Du kannst nun "
       "einen&%gDoppelsprung%w in der Luft&ausführen. Drücke %y\xA1%w&erneut während du springst!" },
-    { ITEM_DESIRE_SENSOR, PLAYER_IA_DESIRE_SENSOR, PLAYER_MODELGROUP_DEFAULT, SLOT_DESIRE_SENSOR, AGE_REQ_NONE,
+    // RETIRED 2026-08-06: replaced by the Quartz of Motion on the collect page. Row kept so old
+    // saves/icon lookups by ITEM id still resolve; NEI_NO_SLOT keeps it out of cell 39, which
+    // belongs to the Sheikah Slate — ExtInv_DebugGiveAll used to drop this inert item in there.
+    { ITEM_DESIRE_SENSOR, PLAYER_IA_DESIRE_SENSOR, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE,
       (void*)gItemIconDesireSensorTex, func_8083485C, Player_InitDefaultIA, Randomizer_DrawDesireSensor,
       RG_DESIRE_SENSOR,
       "You got the %pDesire Sensor%w!&A cursed artifact that reveals&hidden treasures... at a cost.^Press %y\xA1%w to "
@@ -370,7 +373,7 @@ static const NeiItem sNeiItems[] = {
     // IA: the active rod is NeiSaveData.wandMode. Per-rod behavior is a separate task, so the update
     // func is the generic aim handler and the init is a stub. Skijer's NEI
     { ITEM_ELEMENTAL_WAND, PLAYER_IA_ELEMENTAL_WAND, PLAYER_MODELGROUP_DEFAULT, SLOT_ELEMENTAL_WAND, AGE_REQ_NONE,
-      (void*)gItemIconSandRodTex, Player_UpperAction_ElementalWand, Player_InitElementalWandIA,
+      (void*)gItemIconElementalWandTex, Player_UpperAction_ElementalWand, Player_InitElementalWandIA,
       Randomizer_DrawElementalWand, RG_ELEMENTAL_WAND,
       "You got the %cElemental Wand%w!&Six rods in one.^Press %y¡%w on it in the pause&menu to switch between the "
       "rods&you have unlocked.",
@@ -455,7 +458,7 @@ static const NeiItem sNeiItems[] = {
       "You got the %yLantern%w!&Catch fire from torches and&use it to light your way!",
       "Vous obtenez la %yLanterne%w!&Capturez le feu des torches et&utilisez-le pour éclairer votre chemin!",
       "Du hast die %yLaterne%w erhalten!&Fang Feuer von Fackeln und&nutze es um deinen Weg zu erleuchten!" },
-    // 2026-08-06: the Pokeball left page 2 (cell 44 = Shadow Crystal) for the Broken Items page,
+    // 2026-08-06: the Pokeball left page 2 (cell 44 = Shadow Crystal) for the Crossover Items page,
     // where it is the Pikachu form. NEI_NO_SLOT keeps the row for icon/textbox lookups only.
     { ITEM_POKEBALL, PLAYER_IA_POKEBALL, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE,
       (void*)gItemIconPokeballTex, func_8083485C, Player_InitPokeballIA, Randomizer_DrawPokeball, RG_POKEBALL,

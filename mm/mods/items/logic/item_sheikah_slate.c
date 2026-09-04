@@ -1,7 +1,7 @@
 /**
  * item_sheikah_slate.c — Sheikah Slate (Skijer's NEI)
  *
- * Four runes share ONE page-2 cell (SLOT_SHEIKAH_SLATE) behind ONE ext item id
+ * Five runes share ONE page-2 cell (SLOT_SHEIKAH_SLATE) behind ONE ext item id
  * (EXT_ITEM_SHEIKAH_SLATE). Which rune is live is NeiSaveData.slateMode, cycled by the kaleido
  * wheel; ownership is the NeiSaveData.slateRunesOwned bitmask, one sibling pickup per rune
  * (RG_SLATE_RUNE_* — the wand idiom: gettable in any order, no levels). This file is where the
@@ -40,8 +40,11 @@
 
 // The runes with real behaviour. Included here (not globbed) so they share this translation unit —
 // and so they need no header, which would drag 2ship into a CMake regeneration.
+#include "../../actors/remote_bomb.c"
 #include "../../actors/stasis_rune.c"
 #include "../../actors/master_cycle.c"
+#include "../../actors/cryonis_rune.c"
+#include "../../actors/sensor_rune.c"
 
 extern s32 func_8083485C(Player* this, PlayState* play); // generic "held item" upper action
 // Ext-button store: which u16 item a button really holds when it shows ITEM_EXT_BUTTON.
@@ -49,26 +52,35 @@ extern u16 ExtButton_GetItem(s32 form, s32 btn);
 
 /**
  * Per-rune cast. `rune` is a SLATE_RUNE_*; returns 1 if the rune actually fired (so the caller can
- * play cast/error feedback). All four are stubs awaiting their specs.
+ * play cast/error feedback).
  */
 s32 Slate_CastRune(Player* player, PlayState* play, u8 rune) {
     switch (rune) {
         case SLATE_RUNE_BOMB:
-            // TODO(rune): Remote Bomb — place a round rune bomb, second press detonates.
-            break;
+            return RemoteBomb_Cast(play, player);
         case SLATE_RUNE_STASIS:
             return Stasis_Cast(play, player);
         case SLATE_RUNE_CRYONIS:
-            // TODO(rune): Cryonis — raise a standable ice pillar from water surfaces.
-            break;
+            return Cryonis_Cast(play, player);
         case SLATE_RUNE_MASTER_CYCLE:
             return MasterCycle_Cast(play, player);
+        case SLATE_RUNE_SENSOR:
+            return Sensor_Cast(play, player);
         default:
             break;
     }
     (void)player;
     (void)play;
     return 0;
+}
+
+/**
+ * The one climbable-surface question the engine asks (SurfaceType_GetWallFlags in z_bgcheck.c). Two
+ * runes make a body climbable and neither may touch the collision headers they borrow, which are
+ * shared and cached — both answer by bgId instead, and this is where the two answers meet.
+ */
+u8 Slate_IsClimbableBgId(s32 bgId) {
+    return Stasis_IsClimbableBgId(bgId) || Cryonis_IsClimbableBgId(bgId);
 }
 
 /**
@@ -81,6 +93,7 @@ s32 Player_UpperAction_SheikahSlate(Player* player, PlayState* play) {
         case SLATE_RUNE_STASIS:
         case SLATE_RUNE_CRYONIS:
         case SLATE_RUNE_MASTER_CYCLE:
+        case SLATE_RUNE_SENSOR:
             // Per-rune held/aim behavior goes here once the casts above exist.
             break;
         default:
@@ -197,6 +210,22 @@ void Slate_TickInput(PlayState* play, Player* player) {
     // The bike outlives the tablet being out, too: it has to notice scene changes and loading zones
     // whether or not the slate is in Link's hand.
     MasterCycle_Tick(play, player);
+
+    // A live bomb has to stay inert whatever the player is doing, and the ice platform's pointer
+    // goes stale on a scene change with no word to us. Both run before every early return below.
+    RemoteBomb_Tick(play);
+    Cryonis_Tick(play);
+
+    // ABOVE the blocking checks and the stow paths on purpose: with the aiming mode below them, the
+    // A that commits a placement had already gone through the unequip, and the tablet was gone by
+    // the time the press arrived.
+    if (Cryonis_ModeUpdate(play, player)) {
+        return;
+    }
+    // Same reason: the Sensor's prompt and hint own the frame until the player closes them.
+    if (Sensor_Tick(play, player)) {
+        return;
+    }
 
     // Paint what a cast would grab, but only while the tablet is actually out on the Stasis rune —
     // otherwise every actor Link walks past would shimmer. Called every frame either way so the

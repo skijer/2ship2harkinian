@@ -127,6 +127,10 @@ void ItemInput_RequestItemChange(Player* player, PlayState* play);
  */
 u8 ItemInput_CanInterrupt(Player* player);
 
+// Is something reaching out empty-handed (Recall aim, Ultrahand carry), so the hookshot model that
+// rides along with that arm pose must not be drawn?
+u8 ItemEquip_HoldsEmptyHand(void);
+
 /**
  * Update equip state and call callbacks.
  * @param state Equip state

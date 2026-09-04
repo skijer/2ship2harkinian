@@ -22,7 +22,8 @@
 #include "macros.h"
 #include "functions.h"
 #include "variables.h"
-#include "objects/gameplay_keep/gameplay_keep.h" // gEffFire1DL placeholder (OoT object_fhg has no MM equivalent)
+#include "objects/gameplay_keep/gameplay_keep.h" // gEffFire1DL fallback when oot.o2r is not mounted
+#include "mods/oot_asset_loader/oot_asset_loader.h"
 #include "overlays/effects/ovl_Effect_Ss_Fhg_Flash/z_eff_ss_fhg_flash.h" // MM-native (Boss Hakugin uses it)
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h"
 #include "../../actors/somaria_cubes.h"
@@ -35,9 +36,21 @@ static u8 sControlFirstFrame = 0;
 static Vec3f sLastLinkPos = { 0, 0, 0 };
 static u8 sLinkWasJumping = 0;
 
+// Cached OoT Phantom Ganon energy ball (the real control orb). NULL until resolved / if unavailable.
+static Gfx* sDomRodOrbDL = NULL;
+static u8 sDomRodOrbTried = 0;
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
+
+static Gfx* DomRod_GetOrbDL(void) {
+    if (!sDomRodOrbTried) {
+        sDomRodOrbTried = 1;
+        sDomRodOrbDL = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_fhg/gPhantomEnergyBallDL");
+    }
+    return sDomRodOrbDL;
+}
 
 static void DomRod_InitCollider(PlayState* play, Player* p) {
     if (sDomRodColInitialized)
@@ -786,23 +799,37 @@ void CustomItems_DrawDominionRod(Player* p, PlayState* play) {
         domRodState != DOMROD_STATE_CONTROLLING)
         return;
 
+    // The DOMROD_ORB_SCALE of 5.5 belongs to the real energy ball; the flame fallback is
+    // authored at a wholly different size and fills the screen if drawn at that scale.
+    Gfx* orbDL = DomRod_GetOrbDL();
+    u8 useReal = (orbDL != NULL);
+    Gfx* ballDL = useReal ? orbDL : (Gfx*)gEffFire1DL;
+    f32 ballScale = useReal ? DOMROD_ORB_SCALE : DOMROD_ORB_FALLBACK_SCALE;
+
     OPEN_DISPS(play->state.gfxCtx);
 
     Matrix_Translate(domRodOrbPos.x, domRodOrbPos.y, domRodOrbPos.z, MTXMODE_NEW);
     Matrix_ReplaceRotation(&play->billboardMtxF);
-    Matrix_Scale(DOMROD_ORB_SCALE, DOMROD_ORB_SCALE, DOMROD_ORB_SCALE, MTXMODE_APPLY);
+    Matrix_Scale(ballScale, ballScale, ballScale, MTXMODE_APPLY);
 
     s16 rotZ = (play->gameplayFrames * 0x1000) + (s16)(Rand_ZeroOne() * 0x4000);
     Matrix_RotateZ((rotZ / (f32)0x8000) * M_PI, MTXMODE_APPLY);
 
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
 
+    // The flame fallback reads its texture from segment 0x08; the energy ball is self-textured.
+    if (!useReal) {
+        gSPSegment(POLY_XLU_DISP++, 0x08,
+                   Gfx_TwoTexScroll(play->state.gfxCtx, 0, 0, 0, 0x20, 0x40, 1, 0, (play->gameplayFrames * -20) & 0x1FF,
+                                    0x20, 0x80));
+    }
+
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, DOMROD_ORB_PRIM_R, DOMROD_ORB_PRIM_G, DOMROD_ORB_PRIM_B, DOMROD_ORB_PRIM_A);
     gDPSetEnvColor(POLY_XLU_DISP++, DOMROD_ORB_ENV_R, DOMROD_ORB_ENV_G, DOMROD_ORB_ENV_B, DOMROD_ORB_ENV_A);
     gDPPipeSync(POLY_XLU_DISP++);
 
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gSPDisplayList(POLY_XLU_DISP++, gEffFire1DL);
+    gSPDisplayList(POLY_XLU_DISP++, ballDL);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

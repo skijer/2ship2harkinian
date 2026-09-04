@@ -17,10 +17,9 @@
 static std::unordered_map<std::string, void (*)(void*)> BuildHookEntries() {
     std::unordered_map<std::string, void (*)(void*)> entries;
 
-#define DEFINE_HOOK(name, args)                                           \
-    entries[#name] = [](void* callback) {                                 \
-        GameInteractor::Instance->RegisterGameHook<GameInteractor::name>( \
-            (S2HCb_##name)callback);                                      \
+#define DEFINE_HOOK(name, args)                                                                   \
+    entries[#name] = [](void* callback) {                                                         \
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::name>((S2HCb_##name)callback); \
     };
 #include "2s2h/GameInteractor/GameInteractor_HookTable.h"
 #undef DEFINE_HOOK

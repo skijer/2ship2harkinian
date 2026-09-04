@@ -33,6 +33,7 @@
 #include "../helpers/timestop_helper.c"
 #include "../helpers/rewind_helper.c"
 #include "../helpers/target_select_helper.c"
+#include "../helpers/switch_magnet.c"
 #include "../custom_items_common.c"
 #include "../objects/object_custom_items.c"
 
@@ -88,13 +89,14 @@
 #include "item_rocs_feather_vanilla.c"
 #include "item_dominionrod.c"
 #include "item_cane_of_somaria.c"
-#include "item_elemental_wand.c" // Skijer's NEI: six rods behind one item action (wandMode dispatch)
-#include "../helpers/box_menu.c" // Skijer's NEI: generic hold-button box selector (slate runes, ...)
-#include "item_sheikah_slate.c"  // Skijer's NEI: four runes behind one page-2 cell (slateMode dispatch)
+#include "../helpers/box_menu.c"    // Skijer's NEI: generic hold-button box selector (slate runes, ...)
+#include "item_elemental_wand.c"    // Skijer's NEI: six rods behind one item action (wandMode dispatch)
+#include "item_sheikah_slate.c"     // Skijer's NEI: four runes behind one page-2 cell (slateMode dispatch)
+#include "item_phantom_hourglass.c" // Skijer's NEI: ToTK Recall on one actor, over rewind_helper
 #include "item_time_gate.c"
 #include "item_minish_cap.c"
 #include "../helpers/minish_kaleido.c"
-// Broken-Modes form data (Link/Mario/Pikachu) — consumed by the equipment kaleido's form
+// Crossover-Items form data (Link/Mario/Pikachu) — consumed by the equipment kaleido's form
 // selector (z_kaleido_equipment.c). Not globbed (.c), so compile it in this TU.
 #include "../../broken_items/broken_items.c"
 // #include "item_postman_hat.c" // DELETED: MM has Postman's Hat native (kaleido_mask); the

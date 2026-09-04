@@ -332,9 +332,10 @@ void Menu::MenuDrawItem(WidgetInfo& widget, uint32_t width, UIWidgets::Colors me
                     Ship::Context::GetRawInstance()->GetConfig()->Save();
                     UpdateWindowBackendObjects();
 
+#ifndef COMBO_BUILD
                     // Warn at the moment of choosing, not after the fact: the combo shares its
                     // frame as a D3D11 shared texture, so any other renderer silently leaves the
-                    // combo with no image at all.
+                    // combo with no image at all. (ComboShip draws both games itself: any backend works.)
                     if (FleetShipCombo_GetActiveGame() >= 0 &&
                         configWindowBackend != Fast::WindowBackend::FAST3D_DXGI_DX11) {
                         Notification::Emit({
@@ -345,6 +346,7 @@ void Menu::MenuDrawItem(WidgetInfo& widget, uint32_t width, UIWidgets::Colors me
                             .remainingTime = 15.0f,
                         });
                     }
+#endif
                 }
             } break;
             case WIDGET_SEPARATOR: {
@@ -615,6 +617,9 @@ static const char* FleetMenu_SwitchGameLabel() {
                                                : ICON_FA_EXCHANGE " Play MM##fscswitch";
 }
 static void FleetMenu_DrawSwitchGameButton(UIWidgets::Colors themeIndex) {
+#ifdef COMBO_BUILD
+    return; // comboui owns game switching; SetActiveGame is a no-op there, so the button would lie
+#endif
     const int32_t cur = FleetShipCombo_GetActiveGame();
     if (cur < 0) {
         return; // combo not running

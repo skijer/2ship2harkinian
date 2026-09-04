@@ -15,7 +15,7 @@
 #include "transformation_masks/assets/mm_asset_loader.h"
 #include "pak_loader/pak_loader.h"
 #include "oot_asset_loader/oot_asset_loader.h" // Trident: Phantom Ganon's lance lives in oot.o2r
-#include "2s2h/FleetShipCombo/FleetComboIds.h"  // FC_SHIELD_IKANA (Trident's Mirror fallback)
+#include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_SHIELD_IKANA (Trident's Mirror fallback)
 
 // trade_items.c ships no header; declared locally, as the save editor does. The Pendant of
 // Memories lives on the adult trade wheel — that bit is its ONLY ownership flag since the ext
@@ -66,6 +66,9 @@ static Gfx* Byrna_GetCaneDL(void) {
 #include "equipment/ext_equip_icon_assets.h" // custom equipment icon dg-macros (dgItemIcon*Tex)
 #include "equipment/ext_equip_icons.c"
 #include "equipment/ext_equip_names.c"
+// Before ext_equip_behavior.c: equip_foursword.c calls straight into the clone actor's API, which
+// ships no header of its own (a new mods/*.h forces a full CMake regen).
+#include "equipment/actors/four_sword_clone.c"
 #include "equipment/ext_equip_behavior.c"
 
 // Age requirements (mirror extended_inventory.h to avoid header cycle)
@@ -140,13 +143,13 @@ static u8 sTransformBackupValid = 0;
 // Page management
 // ---------------------------------------------------------------------------
 
+// While ExtEquip_Init migrates a save, slot changes must not poke the half-built player.
+static u8 sExtEquipInitInProgress = 0;
+
 void ExtEquip_OnPlayerSceneInit(void) {
     Trident_OnPlayerInit();
     TridentChargeBall_Forget();
 }
-
-// While ExtEquip_Init migrates a save, slot changes must not poke the half-built player.
-static u8 sExtEquipInitInProgress = 0;
 
 void ExtEquip_Init(void) {
     sExtEquipInitInProgress = 1;
@@ -535,6 +538,15 @@ static void ExtEquip_ApplyVanillaBase(s16 equipType, u8 oldIndex, u8 index) {
             Nei_Save()->vanillaBoots = 0;
             break;
     }
+}
+
+// Ext shields borrow a vanilla slot for the model, so the slot's collision material is not theirs.
+// Goddess (1) and Kite (2) are wooden; the Shield of Ikana (3) is the MM Mirror Shield.
+u8 ExtEquip_ShieldIsWooden(void) {
+    if (!ExtEquip_IsEnabled()) {
+        return 0;
+    }
+    return (gExtEquipState.currentExtShield == 1) || (gExtEquipState.currentExtShield == 2);
 }
 
 // Trident: only the Divine Shield (ext 1) or a Mirror (Ikana ext 3 = MM Mirror, or the native

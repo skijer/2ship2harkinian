@@ -19,10 +19,12 @@
 
 typedef struct {
     volatile u8 wantPlay; // game thread raises, audio thread consumes
+    volatile u8 wantSeek; // ...same for a jump to the tail
     volatile u8 playing;
-    volatile f32 rate;   // 1.0 = as recorded; 2.0 = double speed (enemies)
-    volatile f32 volume; // 0..1
-    f32 pos;             // audio-thread only: sample cursor into sStasisSfxPcm
+    volatile f32 rate;     // 1.0 = as recorded; 2.0 = double speed (enemies)
+    volatile f32 volume;   // 0..1
+    volatile f32 seekTail; // seconds of cue to leave ahead of the cursor
+    f32 pos;               // audio-thread only: sample cursor into sStasisSfxPcm
 } StasisSfxState;
 
 static StasisSfxState sSfx = { 0 };
@@ -40,6 +42,18 @@ void StasisSfx_Stop(void) {
 }
 
 /**
+ * Jump the cursor so exactly `seconds` of cue remain — the release at the end of the recording.
+ *
+ * This exists for the early cancel: casting Stasis again on something already held skips the hold
+ * and fires the launch there and then, and the sound has to skip WITH it. Cutting the cue off
+ * instead would drop the one part of the recording that sells the release.
+ */
+void StasisSfx_SeekToTail(f32 seconds) {
+    sSfx.seekTail = seconds;
+    sSfx.wantSeek = 1;
+}
+
+/**
  * Audio-thread mixer. `outBuf` is interleaved stereo s16, `numSamples` is the number of STEREO
  * FRAMES — the same contract Sm64Audio_MixInto is called with right next to this.
  */
@@ -52,6 +66,15 @@ void StasisSfx_MixInto(s16* outBuf, u32 numSamples) {
         sSfx.wantPlay = 0;
         sSfx.playing = 1;
         sSfx.pos = 0.0f;
+    }
+    if (sSfx.wantSeek) {
+        f32 p = (f32)STASIS_SFX_SAMPLES - (sSfx.seekTail * (f32)STASIS_SFX_RATE);
+
+        sSfx.wantSeek = 0;
+        // Seeking a cue that already finished restarts it at the tail, so the release is heard even
+        // when the hold ran long enough for the recording to have run out.
+        sSfx.playing = 1;
+        sSfx.pos = (p > 0.0f) ? p : 0.0f;
     }
     if (!sSfx.playing || (outBuf == NULL)) {
         return;

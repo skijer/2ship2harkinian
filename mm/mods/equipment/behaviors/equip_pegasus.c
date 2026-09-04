@@ -48,9 +48,7 @@ static ColliderCylinder sPegasusCol;
 static ColliderCylinderInit sPegasusColInit = { { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE,
                                                   OC2_NONE, COLSHAPE_CYLINDER },
                                                 { ELEM_MATERIAL_UNK2,
-                                                  // TODO(port): literal 0x100 is OoT bit 8 (was DMG_SLASH). In MM bit 8
-                                                  // is DMG_GORON_PUNCH; DMG_SWORD is bit 9 (0x200). Literal left as-is.
-                                                  { 0x00000100, 0x00, 0x04 }, // 4 damage
+                                                  { DMG_SWORD, 0x00, 0x04 }, // 4 damage
                                                   { 0, 0, 0 },
                                                   ATELEM_ON | ATELEM_SFX_NORMAL,
                                                   ACELEM_NONE,

@@ -20,7 +20,12 @@ static const ColliderCylinderInit sFlameColInit = {
     // "other"-type bumpers (the ones ordinary player attacks never reach), the way a
     // loose flame in the world does.
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER | AT_TYPE_OTHER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_CYLINDER },
-    { ELEM_MATERIAL_UNK2, { DMG_FIRE_ARROW, 0x01, 0x02 }, { 0, 0, 0 }, ATELEM_ON | ATELEM_SFX_NORMAL, ACELEM_NONE, OCELEM_NONE },
+    { ELEM_MATERIAL_UNK2,
+      { DMG_FIRE_ARROW, 0x01, 0x02 },
+      { 0, 0, 0 },
+      ATELEM_ON | ATELEM_SFX_NORMAL,
+      ACELEM_NONE,
+      OCELEM_NONE },
     { 30, 80, 0, { 0, 0, 0 } }
 };
 
@@ -107,12 +112,17 @@ u8 Lantern_GetTorchTint(Actor* torch, u8* prim, u8* env) {
 }
 
 static void Lantern_TrackFlame(Actor* flame, u8 fireType, PlayState* play) {
-    if (flame == NULL) return;
-    if (fireType >= LANTERN_FIRE_MAX) return;
+    if (flame == NULL)
+        return;
+    if (fireType >= LANTERN_FIRE_MAX)
+        return;
 
     s32 slot = -1;
     for (s32 i = 0; i < LANTERN_MAX_FLAMES; i++) {
-        if (sFlames[i].timer <= 0) { slot = i; break; }
+        if (sFlames[i].timer <= 0) {
+            slot = i;
+            break;
+        }
     }
     if (slot < 0) {
         slot = 0;
@@ -144,10 +154,12 @@ static void Lantern_TrackFlame(Actor* flame, u8 fireType, PlayState* play) {
 }
 
 void Lantern_UpdateFlames(PlayState* play) {
-    if (play == NULL) return;
+    if (play == NULL)
+        return;
 
     for (s32 i = 0; i < LANTERN_MAX_FLAMES; i++) {
-        if (sFlames[i].timer <= 0) continue;
+        if (sFlames[i].timer <= 0)
+            continue;
 
         if (sFlames[i].actor == NULL || sFlames[i].actor->update == NULL) {
             sFlames[i].timer = 0;

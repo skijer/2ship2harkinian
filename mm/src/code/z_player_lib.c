@@ -77,6 +77,8 @@ extern u8 Trident_GoldenArmor(void);
 // Skijer's NEI: Boss Remains (Odolwa) — while the Odolwa remains is worn, hide Link's native
 // sword/shield (open/closed fist) and draw Odolwa's own DLs in their place (PostLimbDraw).
 extern s32 BossRemains_IsOdolwaWorn(void);
+// Recall aim / Ultrahand carry: reaching out with nothing in the hand. Skijer's NEI
+extern u8 ItemEquip_HoldsEmptyHand(void);
 extern s32 BossRemains_IsGohtWorn(void);
 extern void BossRemains_DrawOdolwaSword(PlayState* play, Player* player);
 extern void BossRemains_DrawOdolwaShield(PlayState* play, Player* player);
@@ -2825,6 +2827,9 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
 
             *dList = leftHandDLists[sPlayerLod];
 
+            // Read once: three NEI blocks below gate on it and nothing in this limb mutates it.
+            u8 extOwnsSwordDL = ExtEquip_ShouldHideSwordDL();
+
             // Skijer's NEI Net: wields via the Kokiri Sword IA, but the hand must show a plain closed
             // fist (no sword DL) — the net model is drawn on top in Player_PostLimbDrawGameplay,
             // following the hand bone so it rolls 1:1 with the sword swing.
@@ -2930,7 +2935,7 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
             //     AgeDependentEquipment "childHammer" patch, applied unconditionally here since MM
             //     Link is always young. Result: hammer + young fist, no adult hand.
             if ((player->heldItemAction == PLAYER_IA_HAMMER) && (player->transformation == PLAYER_FORM_HUMAN)) {
-                if (ExtEquip_ShouldHideSwordDL()) {
+                if (extOwnsSwordDL) {
                     *dList = gPlayerLeftHandClosedDLs[D_801F59E0 + sPlayerLod];
                 } else {
                     static Gfx* sHammerLeftHandDLs[2] = { NULL, NULL }; // [0] = near, [1] = far
@@ -2988,6 +2993,38 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
                 }
             }
 
+            u8 handIsSpokenFor = extOwnsSwordDL || BossRemains_IsOdolwaWorn() || BossRemains_IsGohtWorn();
+
+            // Skijer's NEI Four Sword (ext sword 2): blade+hilt from 2ship.o2r over Link's fist. The
+            // HAND GOES LAST — the blade DL leaves G_TEXTURE_GEN on and G_LIGHTING off (env-map
+            // shine) and the torso would inherit it.
+            // It goes in the limb override, not in ExtEquip_DrawSwordDL, because the clones draw
+            // with postLimbDraw == NULL and only this path reaches them.
+            if (!handIsSpokenFor && (player->transformation == PLAYER_FORM_HUMAN) &&
+                (player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD)) {
+                extern u8 FourSword_HeldSwordDL(void** blade, void** handle);
+                static Gfx sFourSwordHandDL[6];
+                void* fourSwordBlade = NULL;
+                void* fourSwordHilt = NULL;
+
+                if (FourSword_HeldSwordDL(&fourSwordBlade, &fourSwordHilt)) {
+                    Gfx closedHandInstr = gsSPDisplayListOTRFilePath(gLinkHumanLeftHandClosedDL);
+                    Gfx* d = sFourSwordHandDL;
+
+                    gSPDisplayList(d++, (Gfx*)fourSwordBlade);
+                    if (fourSwordHilt != NULL) {
+                        gSPDisplayList(d++, (Gfx*)fourSwordHilt);
+                    }
+                    *d++ = closedHandInstr;
+                    gDPPipeSync(d++);
+                    gSPLoadGeometryMode(d++, G_ZBUFFER | G_SHADE | G_CULL_BACK | G_LIGHTING | G_SHADING_SMOOTH);
+                    gSPEndDisplayList(d);
+
+                    *dList = sFourSwordHandDL;
+                    sPlayerLeftHandType = PLAYER_MODELTYPE_LH_CLOSED;
+                }
+            }
+
             // ⚠️ ESTE OCULTADO VA EL ÚLTIMO DE TODO EL LIMB, Y ESO ES EL ARREGLO.
             //
             // Un arma ext (Cane of Byrna, Trident) dibuja su PROPIO modelo sobre este mismo
@@ -3004,7 +3041,7 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
             //
             // Mano abierta, igual que el lado OoT (soh z_player_lib.c:1745-1751). La guarda de
             // tipo evita pisar una mano que ya se resolvió lisa (no hay hoja que esconder).
-            if (ExtEquip_ShouldHideSwordDL() && (player->transformation == PLAYER_FORM_HUMAN) &&
+            if (extOwnsSwordDL && (player->transformation == PLAYER_FORM_HUMAN) &&
                 (sPlayerLeftHandType != PLAYER_MODELTYPE_LH_OPEN) &&
                 (sPlayerLeftHandType != PLAYER_MODELTYPE_LH_CLOSED)) {
                 *dList = gPlayerLeftHandOpenDLs[D_801F59E0 + sPlayerLod];
@@ -3038,6 +3075,13 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
                             }
                         }
                     }
+                } else if (ItemEquip_HoldsEmptyHand()) {
+                    // Recall aim / Ultrahand carry: both take the HOOKSHOT group for its reaching
+                    // pose, and this is what keeps the hookshot itself out of the hand. Set HERE,
+                    // with the table, never poked into the Player — a type that disagrees with the
+                    // table resolves a NULL display list. Skijer's NEI
+                    rightHandDLists = &gPlayerRightHandOpenDLs[D_801F59E0];
+                    sPlayerRightHandType = PLAYER_MODELTYPE_RH_OPEN;
                 } else if ((player->rightHandType == PLAYER_MODELTYPE_RH_OPEN) && (player->actor.speed > 2.0f) &&
                            !(player->stateFlags1 & PLAYER_STATE1_8000000)) {
                     rightHandDLists = &gPlayerRightHandClosedDLs[D_801F59E0];
@@ -3363,7 +3407,15 @@ void Player_UpdateShieldCollider(PlayState* play, Player* player, ColliderQuad* 
     if (player->stateFlags1 & PLAYER_STATE1_400000) {
         Vec3f quadDest[4];
 
+        u8 ExtEquip_ShieldIsWooden(void); // mods/extended_equipment.c
+
         player->shieldQuad.base.colMaterial = sPlayerShieldColMaterials[player->currentShield];
+
+        // Ext shields borrow a vanilla slot for the model, so the slot's collision is not theirs.
+        if (ExtEquip_ShieldIsWooden()) {
+            player->shieldQuad.base.colMaterial = COL_MATERIAL_WOOD;
+        }
+
         Matrix_MultVec3f(&quadSrc[0], &quadDest[0]);
         Matrix_MultVec3f(&quadSrc[1], &quadDest[1]);
         Matrix_MultVec3f(&quadSrc[2], &quadDest[2]);

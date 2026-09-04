@@ -19,16 +19,17 @@
  *                  OoT tunics/boots display-only (behavior per-item later).
  *   1 "extended":  the full NEI ExtEquip grid (3 swords / 3 shields / 3 tunics / 3 boots).
  *                  A equips on the body, C-left/down/right assigns to that C button.
- *   2 "transform": Broken-Modes form selector (Link / Mario / Pikachu).
+ *   2 "transform": Crossover-Items form selector (Link / Mario / Pikachu).
  */
 
 #include "z_kaleido_scope.h"
 #include "interface/parameter_static/parameter_static.h"
 #include "archives/icon_item_static/icon_item_static_yar.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
-#include "2s2h/BenGui/CosmeticEditor.h"         // PlayerTunic_BindLocalColor (per-player tunic tint)
-#include "2s2h/FleetShipCombo/FleetComboIds.h"  // FC_SHIELD_* / FC_OOT_TUNIC/BOOTS ownership bits
-#include "2s2h/FleetShipCombo/FleetShipCombo.h" // FleetShipCombo_GetActiveGame (combo ownership gate)
+#include "2s2h/CustomMessage/PauseItemDescriptions.h" // NEI: C-Up descriptions for ext equipment
+#include "2s2h/BenGui/CosmeticEditor.h"               // PlayerTunic_BindLocalColor (per-player tunic tint)
+#include "2s2h/FleetShipCombo/FleetComboIds.h"        // FC_SHIELD_* / FC_OOT_TUNIC/BOOTS ownership bits
+#include "2s2h/FleetShipCombo/FleetShipCombo.h"       // FleetShipCombo_GetActiveGame (combo ownership gate)
 #include <libultraship/bridge/consolevariablebridge.h>
 
 #include "mods/extended_equipment.h"        // ExtEquip_* (Skijer's NEI)
@@ -76,7 +77,7 @@ u8 WeaponUpgrade_HasGreatFairy(void);
 int gPauseLinkFrameBuffer = -1;
 
 // ---------------------------------------------------------------------------
-// Sub-page + cursor state (SoH: vanilla / ExtEquip page / Broken-Modes transform)
+// Sub-page + cursor state (SoH: vanilla / ExtEquip page / Crossover-Items transform)
 // ---------------------------------------------------------------------------
 #define EQUIP_SUBPAGE_VANILLA 0
 #define EQUIP_SUBPAGE_EXT 1
@@ -509,7 +510,7 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
     // The Trident tolerates only the Divine Shield or a Mirror.
     if (cell.equipType == CELL_SHIELD || cell.equipType == CELL_SHIELD_DEKU ||
         cell.equipType == CELL_SHIELD_OOT_MIRROR) {
-        u16 wantValue = (cell.equipType == CELL_SHIELD)      ? (u16)cell.index
+        u16 wantValue = (cell.equipType == CELL_SHIELD)        ? (u16)cell.index
                         : (cell.equipType == CELL_SHIELD_DEKU) ? EQUIP_VALUE_SHIELD_HERO
                                                                : EQUIP_VALUE_SHIELD_MIRROR;
         if ((ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 3) && !ExtEquip_TridentAllowsShield(0, wantValue)) {
@@ -562,14 +563,14 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
     }
 
     if (cell.equipType == CELL_TUNIC) {
-        ExtEquip_Unequip(EQUIP_TYPE_TUNIC); // Goron/Zora tunic and an ext tunic are exclusive
+        ExtEquip_Unequip(EQUIP_TYPE_TUNIC);        // Goron/Zora tunic and an ext tunic are exclusive
         Nei_Save()->vanillaTunic = (u8)cell.index; // 0=Kokiri, 1=Goron (fireproof), 2=Zora (gas-immune)
         Audio_PlaySfx(NA_SE_SY_DECIDE);
         return;
     }
 
     if (cell.equipType == CELL_BOOTS) {
-        ExtEquip_Unequip(EQUIP_TYPE_BOOTS); // Iron/Hover boots and ext boots are exclusive
+        ExtEquip_Unequip(EQUIP_TYPE_BOOTS);        // Iron/Hover boots and ext boots are exclusive
         Nei_Save()->vanillaBoots = (u8)cell.index; // 0=Kokiri, 1=Iron (anti-KB/wind), 2=Hover (float)
         Audio_PlaySfx(NA_SE_SY_DECIDE);
         return;
@@ -622,7 +623,7 @@ static void KaleidoEquip_AssignCButton(PlayState* play, s16 row, s16 col, u16 pr
 
 // ---------------------------------------------------------------------------
 // Sub-page cycling (SoH freed-button logic, MM's free shoulder button is L):
-// vanilla -> ext (if ExtEquip on) -> transform (if Broken Modes on) -> vanilla.
+// vanilla -> ext (if ExtEquip on) -> transform (if Crossover Items on) -> vanilla.
 // NES.c's KaleidoScope_HandlePageToggles is patched to leave L to us here.
 // ---------------------------------------------------------------------------
 static void KaleidoEquip_CycleSubPage(void) {
@@ -634,7 +635,7 @@ static void KaleidoEquip_CycleSubPage(void) {
         // equipment menu is a core feature now, not gated behind the ExtEquip cheat. (The ext items'
         // ownership / gameplay behaviors are still governed by ExtEquip_IsEnabled elsewhere.)
         if (next == EQUIP_SUBPAGE_TRANSFORM && !BrokenItems_Enabled()) {
-            continue; // transform (Broken Modes) page only when that feature is on
+            continue; // transform (Crossover Items) page only when that feature is on
         }
         break;
     } while (next != sEquipSubPage);
@@ -842,6 +843,26 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
                    CHECK_BTN_ANY(input->press.button, BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT)) {
             KaleidoEquip_AssignCButton(play, sEquipCursorY, sEquipCursorX,
                                        input->press.button & (BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT));
+        } else if (CHECK_BTN_ALL(input->press.button, BTN_CUP)) {
+            // C-Up reads the cell out, the way it does on the item page. Only ext equipment and the
+            // upgrade column (Magic Cape / Pendant) have a description; the vanilla cells fall through
+            // to the error cue. Skijer's NEI
+            const char* desc = NULL;
+
+            if (sEquipCursorX == 0) {
+                desc = PauseItemDesc_GetEquipUpgrade(sEquipCursorY);
+            } else {
+                EquipCell descCell;
+
+                KaleidoEquip_GetCell(sEquipSubPage, sEquipCursorY, sEquipCursorX, &descCell);
+                desc = (descCell.item >= 0) ? PauseItemDesc_Get((u16)descCell.item, PAUSE_MASK) : NULL;
+            }
+            if (desc != NULL) {
+                pauseCtx->itemDescriptionOn = true;
+                PauseItemDesc_Show(play, desc, (sEquipCursorY < 2) ? 3 : 1);
+            } else {
+                Audio_PlaySfx(NA_SE_SY_ERROR);
+            }
         }
     }
 
@@ -1065,7 +1086,8 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
             if (tex == NULL) {
                 continue;
             }
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255,
+            u8 locked = !BrokenItems_FormUnlocked(i);
+            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, locked ? 90 : 255, locked ? 90 : 255, locked ? 90 : 255,
                             (i == BrokenItems_CurrentForm()) ? pauseCtx->alpha : (pauseCtx->alpha * 2) / 3);
             gSPVertex(POLY_OPA_DISP++, &pauseCtx->maskVtx[EQUIP_CELL(0, i + 1) * 4], 4, 0);
             KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, tex, 32, 32, 0);

@@ -222,4 +222,9 @@ void RegisterFleetPicto() {
     COND_HOOK(OnSaveLoad, true, [](s16 fileNum) { FleetPicto_Import(); });
 }
 
+#ifdef COMBO_BUILD
+// Both games share one exe dir here, so the fleet/ picture file IS the shared picture: always on.
+static RegisterShipInitFunc initFuncFleetPicto(RegisterFleetPicto, {});
+#else
 static RegisterShipInitFunc initFuncFleetPicto(RegisterFleetPicto, { "isFleetShipCombo.Enabled" });
+#endif

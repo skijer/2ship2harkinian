@@ -64,6 +64,9 @@ int FleetShipCombo_GetActiveGame(void);
 // Write the active game to shared memory (used by the Switch button).
 void FleetShipCombo_SetActiveGame(int game);
 
+// True while MM's pool is built for the shared OoT+MM fill (combo-only items in, duplicates out).
+int FleetCombo_UnifiedPoolActive(void);
+
 // ---- Cross-game loading-zone WARP (the world connector) ----
 // Trigger side: record the target (in the TARGET game's scene-id + world coords), bump the warp
 // seq, and flip activeGame so the target game becomes active and applies it. targetGame: 0 = OoT

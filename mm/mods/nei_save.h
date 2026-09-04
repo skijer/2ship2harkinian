@@ -46,16 +46,26 @@ extern "C" {
 #define WAND_RANDO_SINGLE 1     // 1 pool item; obtaining it lights all six modes
 #define WAND_RANDO_ELEMENTAL 2  // 6 pool items; each lights its own mode
 
-// Sheikah Slate runes (Skijer's NEI) — four runes in ONE page-2 cell, wand idiom: sibling
+// Sheikah Slate runes (Skijer's NEI) — five runes in ONE page-2 cell, wand idiom: sibling
 // obtainable items over one slot (each with its own textbox), gettable in any order, no levels.
 // Index order IS the wheel order.
 #define SLATE_RUNE_BOMB 0 // Remote Bomb
 #define SLATE_RUNE_STASIS 1
 #define SLATE_RUNE_CRYONIS 2
 #define SLATE_RUNE_MASTER_CYCLE 3 // Master Cycle Zero
-#define SLATE_RUNE_COUNT 4
+#define SLATE_RUNE_SENSOR 4       // Sheikah Sensor — the old Desire Sensor, rehoused as a rune
+#define SLATE_RUNE_COUNT 5
 // Future runes with art already staged in icon_item_custom: Magnesis, Camera
 // (gItemIconSlateRuneMagnesisTex / gItemIconSlateRuneCameraTex).
+
+// Rod of Seasons (Skijer's NEI) — four seasons in ONE page-2 cell, slate idiom. Same indices as soh:
+// the bitmask travels between the games as-is. The rod itself is model-only on this side.
+#define SEASON_SPRING 0
+#define SEASON_SUMMER 1
+#define SEASON_AUTUMN 2
+#define SEASON_WINTER 3
+#define SEASON_COUNT 4
+#define SEASON_OFF 4 // the blank coin: free with the rod, never stored in the bitmask
 
 // Randomizer treatment of Bomb Arrows.
 #define BOMB_ARROWS_RANDO_OFF 0      // never granted on their own (Twilight Upgrade still works)
@@ -75,7 +85,7 @@ typedef struct NeiSaveData {
     uint16_t ownedItems[48];
     // 2026-08-06 page-2 re-layout: Shovel and Dominion Rod share cell 46 behind a wheel, so the cell
     // value alone cannot say "both owned" — each carries its own flag (Power Keg idiom). The
-    // Pokeball left page 2 for the Broken Items page; its ownership is a flag too. Skijer's NEI
+    // Pokeball left page 2 for the Crossover Items page; its ownership is a flag too. Skijer's NEI
     uint8_t shovelOwned;
     uint8_t dominionOwned;
     uint8_t pokeballOwned;
@@ -290,6 +300,17 @@ typedef struct NeiSaveData {
     // level on purpose: renumbering ootUpgrades strength@9 would silently demote every existing
     // save's Golden Gauntlets to Silver. 0 = not granted yet, 1 = granted. APPENDED AT THE END.
     uint8_t ootCanGrab;
+    // Custom form worn via its mask (mods/forms/custom_forms.cpp): 0 = none, 1..4 = CustomFormId + 1.
+    // APPENDED AT THE END.
+    uint8_t activeCustomForm;
+    // Crossover Items: Mario Mask ownership, the Mario twin of pokeballOwned. Without it a
+    // gSm64Mario left over from another file would boot this one straight into Mario mode.
+    // APPENDED AT THE END.
+    uint8_t marioMaskOwned;
+    // Rod of Seasons — Skijer's NEI. Four seasons share the one SLOT_ROD_OF_SEASONS cell; each
+    // pickup grants one season (slate idiom, no levels). APPENDED AT THE END.
+    uint8_t season;       // SEASON_* — the season the cell shows
+    uint8_t seasonsOwned; // SEASON_* bitmask (four bits) — 0 = rod not owned at all
 } NeiSaveData;
 
 // Hookshot-cell variant ids (which item currently fires from SLOT_HOOKSHOT). Returned by

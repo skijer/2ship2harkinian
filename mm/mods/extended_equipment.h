@@ -118,10 +118,10 @@ void ExtEquip_Unequip(s16 equipType);
  * the player. Equip/Unequip/C-button/kaleido/FleetSync all end here.
  */
 void ExtEquip_SetSlot(s16 equipType, u8 index);
-void ExtEquip_RefreshPlayer(void);       // Player_SetEquipmentData on the live player, if any
-void ExtEquip_ResyncFromSave(void);      // Nei_Save()->extEquip* -> RAM copy (after a FleetSync apply)
+void ExtEquip_RefreshPlayer(void);  // Player_SetEquipmentData on the live player, if any
+void ExtEquip_ResyncFromSave(void); // Nei_Save()->extEquip* -> RAM copy (after a FleetSync apply)
 u8 ExtEquip_TridentAllowsShield(u8 extIndex, u16 vanillaValue); // Divine or a Mirror only
-void ExtEquip_OnSaveOpened(void);        // Sram_OpenSave -> Player_Init re-runs ExtEquip_Init
+void ExtEquip_OnSaveOpened(void);                               // Sram_OpenSave -> Player_Init re-runs ExtEquip_Init
 u8 ExtEquip_ConsumeSaveOpened(void);
 void ExtEquip_SagesFlashReset(void);
 
@@ -264,6 +264,7 @@ void ExtPlayer_CopyUpperBody(PlayState* play, Player* player);
 // ---------------------------------------------------------------------------
 u8 DivineShield_IsWoodType(void);
 u8 DivineShield_IsFireproof(void);
+u8 ExtEquip_ShieldIsWooden(void);
 void DivineShield_OnShieldBlock(Player* player, PlayState* play);
 
 // ---------------------------------------------------------------------------
@@ -286,11 +287,6 @@ typedef enum {
     DSCALE_INACTIVE,
     DSCALE_SWIMMING,
 } DragonScaleState;
-
-typedef struct {
-    Vec3f offset; // relative offset from player world pos (set at spawn, Y = 0 keeps same ground height)
-    u8 alive;     // 1 = active, 0 = dead / not spawned
-} FourSwordClone;
 
 typedef struct {
     // Cane of Byrna (Ext Sword 1)
@@ -321,17 +317,16 @@ typedef struct {
     u8 ikAxeDrawing; // 1 when hammer is out (hide vanilla sword DL), 0 in free mode
 
     // Four Sword (Ext Sword 2)
-    u8 fourSwordActive;                // pak loader is live
-    s16 fourSwordBHoldTimer;           // frames B has been held while shielding
-    u8 fourSwordCharging;              // 1 while charge is armed (B+shield >= threshold)
-    u8 fourSwordCloneCount;            // number of currently alive clones (0-3)
-    FourSwordClone fourSwordClones[3]; // per-clone data
-    u8 fourSwordColInit;               // bitmask: bit i = colliders for clone i are initialised
+    s16 fourSwordBHoldTimer; // frames B has been held while shielding
+    u8 fourSwordCharging;    // 1 while charge is armed (B+shield >= threshold)
+    // Bit i = clone i SHOULD exist. The actors themselves die with the scene, so this is the intent
+    // the summon is rebuilt from on the next scene load.
+    u8 fourSwordCloneMask;
 
     // Four Sword: rising-edge detection for Ivan-style item spawn
-    u8 fourSwordPrevA73;       // previous player->unk_A73 (arrow/boomerang fire)
+    u8 fourSwordPrevFireTimer; // previous player->unk_D57 (arrow/boomerang fire)
     u8 fourSwordPrevCarrying;  // previous PLAYER_STATE1_CARRYING_ACTOR bit
-    u8 fourSwordPrevBoomerang; // previous (player->boomerangActor != NULL)
+    u8 fourSwordPrevBoomerang; // previous (player->zoraBoomerangActor != NULL)
     s16 fourSwordItemCooldown; // global cooldown prevents actor spam (10 frames)
 } ExtEquipBehaviorState;
 

@@ -1153,6 +1153,9 @@ extern "C" {
 // the freeze only remains as the fallback for an inactive game that is NOT parked (limbo failed to
 // load, or a title/file-select state where there is nothing to park).
 int FleetShipCombo_IsGameSuspended(void) {
+#ifdef COMBO_BUILD
+    return 0; // ComboShip parks the dormant game by not running its loop at all; nothing to freeze here
+#else
     if (FleetShipCombo_IsThisGameActive()) {
         return 0;
     }
@@ -1160,6 +1163,7 @@ int FleetShipCombo_IsGameSuspended(void) {
         return 0; // still walking into the room: the transition must be allowed to finish
     }
     return LimboInRoom() ? 0 : 1;
+#endif
 }
 
 int FleetShipCombo_IsParkedInLimbo(void) {
@@ -1191,6 +1195,11 @@ void FleetShipCombo_LimboSaveShadowEnd(void) {
 } // extern "C"
 
 static void RegisterFleetWarpArrival() {
+#ifdef COMBO_BUILD
+    // ComboShip owns arrivals and departures (scene seams + resume); the limbo scene and the
+    // two-process warp pipeline must not be installed on top of it.
+    return;
+#endif
     LimboInstallScene(); // patch the scene + entrance tables before anything can boot a scene
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldEnd>(
         []() { GuardedTick("FleetWarp_Tick", FleetWarp_Tick); });

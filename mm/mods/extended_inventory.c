@@ -587,19 +587,23 @@ static const CustomItemAsset sCustomItemAssets[] = {
     // Bomb Arrows keeps its icon/name row even though it owns no inventory cell any more: the
     // wheel's corner badge and the get-item textbox still look them up by item id.
     { ITEM_BOMB_ARROWS, (void*)gItemIconBombArrowsTex, (void*)gBombArrowsNameTex }, // 0xAD
-    // Elemental Wand's icon/name are per-MODE, resolved in ExtInv_GetItemIcon /
-    // ExtInv_GetCustomItemNameTex; this row is only the fallback.
-    { ITEM_ELEMENTAL_WAND, (void*)gItemIconSandRodTex, (void*)gSandRodNameTex }, // 0xD0
-    { ITEM_ROD_FIRE, (void*)gItemIconFireRodTex, (void*)gFireRodNameTex },       // 0xAE
-    { ITEM_ROD_ICE, (void*)gItemIconIceRodTex, (void*)gIceRodNameTex },          // 0xAF
-    { ITEM_ROD_LIGHT, (void*)gItemIconLightRodTex, (void*)gLightRodNameTex },    // 0xB0
-    { ITEM_BEETLE, (void*)gItemIconBeetleTex, (void*)gBeetleNameTex },           // 0xB1
-    { ITEM_SHOVEL, (void*)gItemIconShovelTex, (void*)gShovelNameTex },           // 0xB2
-    { ITEM_MINISH_CAP, (void*)gItemIconMinishCapTex, (void*)gMinishCapNameTex }, // 0xB3
+    // Elemental Wand's name is per-MODE, resolved in ExtInv_GetCustomItemNameTex; this row is only
+    // the fallback, and the icon is the same for every rod.
+    { ITEM_ELEMENTAL_WAND, (void*)gItemIconElementalWandTex, (void*)gSandRodNameTex }, // 0xD0
+    { ITEM_ROD_FIRE, (void*)gItemIconFireRodTex, (void*)gFireRodNameTex },             // 0xAE
+    { ITEM_ROD_ICE, (void*)gItemIconIceRodTex, (void*)gIceRodNameTex },                // 0xAF
+    { ITEM_ROD_LIGHT, (void*)gItemIconLightRodTex, (void*)gLightRodNameTex },          // 0xB0
+    { ITEM_BEETLE, (void*)gItemIconBeetleTex, (void*)gBeetleNameTex },                 // 0xB1
+    { ITEM_SHOVEL, (void*)gItemIconShovelTex, (void*)gShovelNameTex },                 // 0xB2
+    { ITEM_MINISH_CAP, (void*)gItemIconMinishCapTex, (void*)gMinishCapNameTex },       // 0xB3
     // Lantern: name texture is constant, but the icon is chosen dynamically by
     // fire type -> icon left NULL so the icon getter handles it below.
     { ITEM_LANTERN, NULL, (void*)gLanternNameTex }, // 0xB4
     { ITEM_POKEBALL, (void*)gItemIconPokeballTex, (void*)gPokeballNameTex },
+    // Ship-vanilla feather and Mario Mask draw their icons through their own paths above;
+    // these rows exist so the pause name panel resolves to something other than gEmptyTexture.
+    { ITEM_ROCS_FEATHER, NULL, (void*)gRocsFeatherNameTex }, // 0xA6
+    { ITEM_MARIO_MASK, NULL, (void*)gMarioMaskNameTex },
     // Bottle Randomizer extra items (Skijer's NEI). Net + Bottomless Bottle; SLOT_BOTTLE_3/4.
     { ITEM_NET, (void*)gItemIconNetTex, (void*)gNetNameTex },                                         // 0xF4
     { ITEM_BOTTOMLESS_BOTTLE, (void*)gItemIconBottomlessBottleTex, (void*)gBottomlessBottleNameTex }, // 0xF5
@@ -777,7 +781,16 @@ void* ExtInv_GetCapIcon(uint8_t cap) {
 uint8_t Nei_CaneOwned(void);
 uint8_t Nei_CaneActiveSkill(void);
 
+// mods/forms/form_kafei.cpp — Kafei rides the Bombchu actor to lay SW97 landmines.
+u8 KafeiLandmine_Active(void);
+
 void* ExtInv_GetItemIcon(uint16_t itemId) {
+
+    // Kafei lays SW97 landmines rather than throwing homing mice, so the slot has to read as one
+    // while he is transformed and go back to the mouse the moment he is not. Skijer's NEI
+    if (itemId == ITEM_BOMBCHU && KafeiLandmine_Active()) {
+        return (void*)"__OTR__textures/icon_item_custom/gItemIconLandmineTex";
+    }
 
     // ── Unified trade wheel: 23 entries share one placeholder id ─────────────
     // Same situation as the Dual Cane below — the icon cannot come from the id, because the 14 OoT
@@ -1073,10 +1086,9 @@ void* ExtInv_GetItemIcon(uint16_t itemId) {
     // icon. Return the real OoT icon path (interpreter resolves it), FileExists-gated so a missing OoT
     // icon yields empty rather than the wrong ocarina.
     if (itemId == ITEM_SWORD_MASTER || itemId == ITEM_SWORD_BGS || itemId == ITEM_SWORD_KNIFE) {
-        const char* p = (itemId == ITEM_SWORD_BGS) ? "__OTR__textures/icon_item_static/gItemIconSwordBiggoronTex"
-                        : (itemId == ITEM_SWORD_KNIFE)
-                            ? "__OTR__textures/icon_item_static/gItemIconSwordKnifeTex"
-                            : "__OTR__textures/icon_item_static/gItemIconSwordMasterTex";
+        const char* p = (itemId == ITEM_SWORD_BGS)     ? "__OTR__textures/icon_item_static/gItemIconSwordBiggoronTex"
+                        : (itemId == ITEM_SWORD_KNIFE) ? "__OTR__textures/icon_item_static/gItemIconSwordKnifeTex"
+                                                       : "__OTR__textures/icon_item_static/gItemIconSwordMasterTex";
         return ResourceMgr_FileExists(p) ? (void*)p : NULL;
     }
 
@@ -1513,19 +1525,16 @@ static const uint16_t sWandMedallion[WAND_MODE_COUNT] = {
     ITEM_MEDALLION_SPIRIT, ITEM_MEDALLION_FOREST, ITEM_MEDALLION_WATER,
     ITEM_MEDALLION_FIRE,   ITEM_MEDALLION_LIGHT,  ITEM_MEDALLION_SHADOW,
 };
-// Placeholder art note: until the six real PNGs land, dropping the rod texture files in place is the
-// only change needed — these paths are already the final ones.
-static void* const sWandIcon[WAND_MODE_COUNT] = {
-    (void*)gItemIconSandRodTex,   (void*)gItemIconTornadoRodTex, (void*)gItemIconWaterRodTex,
-    (void*)gItemIconMeteorRodTex, (void*)gItemIconStormRodTex,   (void*)gItemIconShadowScepterTex,
-};
 static void* const sWandNameTex[WAND_MODE_COUNT] = {
     (void*)gSandRodNameTex,   (void*)gTornadoRodNameTex, (void*)gWaterRodNameTex,
     (void*)gMeteorRodNameTex, (void*)gStormRodNameTex,   (void*)gShadowScepterNameTex,
 };
 
+// One icon for all six rods: the ELEMENT is the medallion the kaleido cell draws with it, not a
+// different staff sprite. Keeps the six modes reading as one item you retune.
 void* Wand_ModeIcon(uint8_t mode) {
-    return (mode < WAND_MODE_COUNT) ? sWandIcon[mode] : sWandIcon[0];
+    (void)mode;
+    return (void*)gItemIconElementalWandTex;
 }
 void* Wand_ModeNameTex(uint8_t mode) {
     return (mode < WAND_MODE_COUNT) ? sWandNameTex[mode] : sWandNameTex[0];
@@ -1567,6 +1576,39 @@ void Wand_GrantMode(uint8_t mode) {
     }
     // Obtaining ANY rod hands over the slot if it isn't there yet.
     ExtInv_SetSlotItem(SLOT_ELEMENTAL_WAND, ITEM_ELEMENTAL_WAND);
+}
+
+// A dev toggle has to write the field the ACTIVE treatment reads. Writing only wandRodsOwned looks
+// like it works and then changes nothing under the default Medallions rule.
+void Wand_SetModeOwned(uint8_t mode, uint8_t owned) {
+    if (mode >= WAND_MODE_COUNT) {
+        return;
+    }
+
+    uint8_t rule = Wand_RandoMode();
+
+    if (owned && (rule != WAND_RANDO_MEDALLIONS)) {
+        Wand_GrantMode(mode);
+        return;
+    }
+
+    if (rule == WAND_RANDO_MEDALLIONS) {
+        if (owned) {
+            Nei_Save()->ootQuestItems |= (1u << sWandQuest[mode]);
+        } else {
+            Nei_Save()->ootQuestItems &= ~(1u << sWandQuest[mode]);
+        }
+    } else if (rule == WAND_RANDO_SINGLE) {
+        Nei_Save()->wandRodsOwned = 0; // one flag lights all six, so it only clears wholesale
+    } else {
+        Nei_Save()->wandRodsOwned &= (uint8_t) ~(1 << mode);
+    }
+
+    if (owned) {
+        ExtInv_SetSlotItem(SLOT_ELEMENTAL_WAND, ITEM_ELEMENTAL_WAND);
+    } else if (Wand_ModeCount() == 0) {
+        ExtInv_SetSlotItem(SLOT_ELEMENTAL_WAND, ITEM_NONE);
+    }
 }
 
 uint8_t Wand_ModeCount(void) {
@@ -1620,19 +1662,21 @@ uint8_t Wand_ModeNeighbor(uint8_t mode, int32_t dir) {
     return Wand_ModeAt(0);
 }
 
-// ── Sheikah Slate — four runes in one page-2 cell (wand idiom, no rando-mode split: each rune is
+// ── Sheikah Slate — five runes in one page-2 cell (wand idiom, no rando-mode split: each rune is
 // always its own sibling item, "random" order comes from where the seed hides them) ──────────────
 static void* const sSlateRuneMiniIcon[SLATE_RUNE_COUNT] = {
     (void*)"__OTR__textures/icon_item_custom/gItemIconSlateRuneBombTex",
     (void*)"__OTR__textures/icon_item_custom/gItemIconSlateRuneStasisTex",
     (void*)"__OTR__textures/icon_item_custom/gItemIconSlateRuneCryonisTex",
     (void*)"__OTR__textures/icon_item_custom/gItemIconSlateRuneMasterCycleTex",
+    (void*)"__OTR__textures/icon_item_custom/gItemIconDesireSensorTex",
 };
 static void* const sSlateRuneIcon[SLATE_RUNE_COUNT] = {
     (void*)"__OTR__textures/icon_item_custom/gItemIconSheikahSlateBombTex",
     (void*)"__OTR__textures/icon_item_custom/gItemIconSheikahSlateStasisTex",
     (void*)"__OTR__textures/icon_item_custom/gItemIconSheikahSlateCryonisTex",
     (void*)"__OTR__textures/icon_item_custom/gItemIconSheikahSlateMasterCycleTex",
+    (void*)"__OTR__textures/icon_item_custom/gItemIconSheikahSlateSensorTex",
 };
 
 void* Slate_RuneMiniIcon(uint8_t rune) {
@@ -1710,6 +1754,66 @@ uint8_t Slate_RuneNeighbor(uint8_t rune, int32_t dir) {
         }
     }
     return Slate_RuneAt(0);
+}
+
+// ── Rod of Seasons — four seasons in one page-2 cell (slate idiom). The rod is model-only here; the
+// state exists so a season found in MM reaches OoT, and OoT's seasons show up owned on this side. ──
+uint8_t Seasons_SeasonOwned(uint8_t season) {
+    if (season == SEASON_OFF) {
+        return 1; // the blank coin comes with the rod
+    }
+    if (season >= SEASON_COUNT) {
+        return 0;
+    }
+    return (Nei_Save()->seasonsOwned & (1 << season)) != 0;
+}
+
+void Seasons_GrantSeason(uint8_t season) {
+    if (season >= SEASON_COUNT) {
+        return;
+    }
+    Nei_Save()->seasonsOwned |= (1 << season);
+    Nei_Save()->season = season;
+    // Obtaining ANY season hands over the rod itself if it isn't there yet.
+    ExtInv_GiveItem(SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS);
+}
+
+uint8_t Seasons_SeasonCount(void) {
+    uint8_t n = 0;
+    for (uint8_t s = 0; s < SEASON_COUNT; s++) {
+        if (Seasons_SeasonOwned(s)) {
+            n++;
+        }
+    }
+    return n;
+}
+
+uint8_t Seasons_SeasonAt(uint8_t index) {
+    uint8_t n = 0;
+    for (uint8_t s = 0; s < SEASON_COUNT; s++) {
+        if (Seasons_SeasonOwned(s)) {
+            if (n == index) {
+                return s;
+            }
+            n++;
+        }
+    }
+    return SEASON_SPRING;
+}
+
+uint8_t Seasons_GetSeason(void) {
+    uint8_t s = Nei_Save()->season;
+    if (!Seasons_SeasonOwned(s)) {
+        s = Seasons_SeasonAt(0);
+        Nei_Save()->season = s;
+    }
+    return s;
+}
+
+void Seasons_SetSeason(uint8_t season) {
+    if (Seasons_SeasonOwned(season)) {
+        Nei_Save()->season = season;
+    }
 }
 
 uint8_t ExtInv_GetItemSlot(uint16_t itemId) {

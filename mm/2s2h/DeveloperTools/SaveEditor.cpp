@@ -2461,6 +2461,10 @@ void Nei_GiveAllOotItems(void);
 // Dual Cane (Somaria / Pacci) — item_cane_of_somaria.c. Cane_GiveSkill lights one of the six
 // skill bits and, on the first one, also drops the cane into its inventory slot.
 uint8_t Cane_GiveSkill(uint8_t skill);
+// Elemental Wand — extended_inventory.c. These route to whichever field the ACTIVE randomizer
+// treatment reads; wandRodsOwned alone is ignored under the default Medallions rule.
+uint8_t Wand_ModeOwned(uint8_t mode);
+void Wand_SetModeOwned(uint8_t mode, uint8_t owned);
 }
 
 // Dual Cane skill rows for the editor. Index == CANE_SKILL_* bit index.
@@ -2468,11 +2472,6 @@ static const char* kCaneSkillNames[6] = {
     "Somaria: Statues", "Somaria: Blocks", "Somaria: Trirod", "Pacci: Flip", "Pacci: Lift", "Pacci: Ultrahand",
 };
 #define SAVEEDIT_SLOT_CANE_OF_SOMARIA 45 // mods/extended_inventory.h SLOT_CANE_OF_SOMARIA
-// Elemental Wand — six rods in ONE page-2 cell (the one Bomb Arrows vacated). Mirrored here for the
-// same reason as the cane above: this file does not include extended_inventory.h / z64item.h's
-// custom block. Skijer's NEI
-#define SAVEEDIT_SLOT_ELEMENTAL_WAND 27   // mods/extended_inventory.h SLOT_ELEMENTAL_WAND
-#define SAVEEDIT_ITEM_ELEMENTAL_WAND 0xD0 // include/z64item.h ITEM_ELEMENTAL_WAND
 
 static void DrawDualCaneEditor() {
     // The six skills are six SEPARATE obtainable items sharing ONE inventory slot, so this is
@@ -2665,20 +2664,9 @@ static void DrawNeiTab() {
                 "Sand Rod", "Tornado Rod", "Water Rod", "Meteor Rod", "Storm Rod", "Shadow Scepter",
             };
             for (int m = 0; m < WAND_MODE_COUNT; m++) {
-                bool owned = (nei->wandRodsOwned & (1 << m)) != 0;
+                bool owned = Wand_ModeOwned((uint8_t)m) != 0;
                 if (ImGui::Checkbox(sWandNames[m], &owned)) {
-                    if (owned) {
-                        nei->wandRodsOwned |= (uint8_t)(1 << m);
-                        // Obtaining any rod hands over the shared page-2 cell. Written through
-                        // Nei_SetOwnedItem rather than ExtInv_SetSlotItem because this file
-                        // deliberately does not include extended_inventory.h (see the top).
-                        Nei_SetOwnedItem(SAVEEDIT_SLOT_ELEMENTAL_WAND, SAVEEDIT_ITEM_ELEMENTAL_WAND);
-                    } else {
-                        nei->wandRodsOwned &= (uint8_t) ~(1 << m);
-                        if (nei->wandRodsOwned == 0) {
-                            Nei_SetOwnedItem(SAVEEDIT_SLOT_ELEMENTAL_WAND, ITEM_NONE);
-                        }
-                    }
+                    Wand_SetModeOwned((uint8_t)m, owned ? 1 : 0);
                 }
             }
         }

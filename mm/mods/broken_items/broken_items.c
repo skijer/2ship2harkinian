@@ -1,5 +1,5 @@
 /**
- * broken_items.c - "Broken Modes" pause subscreen. See broken_items.h.
+ * broken_items.c - "Crossover Items" pause subscreen. See broken_items.h.
  *
  * Renders INSIDE the Map pause page: the Map page's own stone/parchment frame
  * (KaleidoScope_DrawPageSections + sMapTexs) is kept, the dungeon/world map
@@ -27,6 +27,11 @@ static const ALIGN_ASSET(2) char gPikaIconPikachuTex[] = dgPikaIconPikachuTex;
 // This MODE coexists with the Pokeball ITEM (extended inventory page 2), which
 // keeps its classic transform flow + cutscene untouched.
 #define CVAR_PIKACHU_MODE "gPikachuMode"
+
+// The form the equipment page has EQUIPPED, which is not the same as the form currently worn:
+// once you turn back into Link the mode CVars are both 0 and there is nothing left to toggle
+// back into. The quick-transform hotkey needs that memory.
+#define CVAR_EQUIPPED_FORM "gCrossover.EquippedForm"
 
 // ---------------------------------------------------------------------------
 // Mode + control-map data (English on purpose). Keep action strings short.
@@ -84,13 +89,16 @@ static void BrokenItems_PlaySfx(u16 sfxId) {
 // (A pokeball-item transformation is intentionally NOT reflected here — that is
 // the other, transient system and doesn't change the equipped MODE.)
 static s32 BrokenItems_CurrentEquipped(void) {
+    // A set-but-unearned CVar (another file's leftovers) reads LINK — the mode CVars are global,
+    // the ownership flags are per-save. Skijer's NEI
+    extern s32 BrokenItems_FormUnlocked(s32 i);
     if (CVarGetInteger(CVAR_PIKACHU_MODE, 0) != 0) {
-        // A set-but-unearned CVar (another file's leftovers) reads LINK — CVars are global, the
-        // Pokeball ownership is per-save. Mirrors soh's Mario guard. Skijer's NEI
-        extern s32 BrokenItems_FormUnlocked(s32 i);
         return BrokenItems_FormUnlocked(BROKEN_MODE_PIKACHU) ? BROKEN_MODE_PIKACHU : BROKEN_MODE_LINK;
     }
-    return (CVarGetInteger(CVAR_SM64_MARIO, 0) != 0) ? BROKEN_MODE_MARIO : BROKEN_MODE_LINK;
+    if (CVarGetInteger(CVAR_SM64_MARIO, 0) != 0) {
+        return BrokenItems_FormUnlocked(BROKEN_MODE_MARIO) ? BROKEN_MODE_MARIO : BROKEN_MODE_LINK;
+    }
+    return BROKEN_MODE_LINK;
 }
 
 s32 BrokenItems_Enabled(void) {
@@ -104,10 +112,46 @@ s32 BrokenItems_Enabled(void) {
 // C-Down, and we never touch the pokeball-item transform flow.
 static void BrokenItems_Equip(PlayState* play, s32 mode) {
     (void)play;
+    extern s32 BrokenItems_FormUnlocked(s32 i);
+    if (!BrokenItems_FormUnlocked(mode)) {
+        BrokenItems_PlaySfx(NA_SE_SY_ERROR);
+        return;
+    }
     CVarSetInteger(CVAR_SM64_MARIO, (mode == BROKEN_MODE_MARIO) ? 1 : 0);
     CVarSetInteger(CVAR_PIKACHU_MODE, (mode == BROKEN_MODE_PIKACHU) ? 1 : 0);
+    if (mode != BROKEN_MODE_LINK) {
+        CVarSetInteger(CVAR_EQUIPPED_FORM, mode);
+    }
     CVarSave();
     BrokenItems_PlaySfx(NA_SE_SY_DECIDE);
+}
+
+s32 BrokenItems_GetEquippedForm(void) {
+    extern s32 BrokenItems_FormUnlocked(s32 i);
+    s32 form = CVarGetInteger(CVAR_EQUIPPED_FORM, BROKEN_MODE_LINK);
+    if (form <= BROKEN_MODE_LINK || form >= BROKEN_MODE_COUNT) {
+        return BROKEN_MODE_LINK;
+    }
+    return BrokenItems_FormUnlocked(form) ? form : BROKEN_MODE_LINK;
+}
+
+// The quick-transform hotkey: worn form -> Link, Link -> the equipped form. With nothing
+// equipped (or the form no longer earned) it beeps rather than silently doing nothing.
+void BrokenItems_ToggleEquippedForm(void) {
+    if (!BrokenItems_Enabled()) {
+        return;
+    }
+    if (BrokenItems_CurrentEquipped() != BROKEN_MODE_LINK) {
+        BrokenItems_Equip(NULL, BROKEN_MODE_LINK);
+        return;
+    }
+
+    s32 form = BrokenItems_GetEquippedForm();
+    if (form == BROKEN_MODE_LINK) {
+        BrokenItems_PlaySfx(NA_SE_SY_ERROR);
+        return;
+    }
+    BrokenItems_Equip(NULL, form);
 }
 
 // Forward decl — the icon resolver is defined in the Drawing section below, but
@@ -145,21 +189,18 @@ u16 BrokenItems_FormItem(s32 i) {
 s32 BrokenItems_CurrentForm(void) {
     return BrokenItems_CurrentEquipped();
 }
-// Ownership gate (2026-08-06): PIKACHU MODE belongs to the Pokeball, which left page 2 for this
-// page — so the form is only equippable once the Pokeball is owned (NeiSaveData.pokeballOwned,
-// set by the rando give / the page-2 relayout heal). LINK and MARIO stay ungated: Link is the
-// default form and Mario's gating belongs to the SM64 expansion's own flow. Skijer's NEI
+// Ownership gate: neither Crossover item has an inventory cell, so both are plain per-save
+// flags set by the randomizer give. LINK is always available.
 s32 BrokenItems_FormUnlocked(s32 i) {
     if (i == BROKEN_MODE_PIKACHU) {
         return Nei_Save()->pokeballOwned != 0;
     }
+    if (i == BROKEN_MODE_MARIO) {
+        return Nei_Save()->marioMaskOwned != 0;
+    }
     return 1;
 }
 void BrokenItems_EquipForm(PlayState* play, s32 i) {
-    if (!BrokenItems_FormUnlocked(i)) {
-        BrokenItems_PlaySfx(NA_SE_SY_ERROR); // locked: refuse with the error beep instead of silence
-        return;
-    }
     BrokenItems_Equip(play, i);
 }
 

@@ -10,6 +10,11 @@
 #define RANDO_SAVE_OPTIONS gSaveContext.save.shipSaveInfo.rando.randoSaveOptions
 #define RANDO_EVENTS gSaveContext.save.shipSaveInfo.rando.randoEvents
 
+// Sheikah Sensor rune: the five wished-for items, consulted in slot order. Each CVar holds a
+// RandoItemId outright, so the menu writes exactly what the rune reads.
+#define SENSOR_DESIRE_SLOTS 5
+#define CVAR_SENSOR_DESIRE_PREFIX "gNei.SensorDesire"
+
 namespace Rando {
 
 void Init();

@@ -206,7 +206,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     // any source in the world. In a combo this block is skipped: there the 8 come from the shared
     // pool and are split across both worlds (bottleSlots is synced by FleetSync, so the two games
     // share ONE 8-slot inventory and adding more here would overflow it and silently lose bottles).
-    if (FleetShipCombo_GetActiveGame() < 0) {
+    if (!FleetCombo_UnifiedPoolActive()) {
         itemPool.push_back(RI_BOTTLE_EMPTY);
         itemPool.push_back(RI_BOTTLE_EMPTY);
     }
@@ -219,7 +219,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     // Gated on the combo actually being active so a solo-MM randomizer never offers an OoT-only
     // sword. This is also true while the host drives the oracle (manifest / fillTurn), which is
     // exactly when the pool has to contain it. Skijer's NEI
-    if (FleetShipCombo_GetActiveGame() >= 0) {
+    if (FleetCombo_UnifiedPoolActive()) {
         itemPool.push_back(RI_OOT_PROGRESSIVE_MASTER_SWORD); // L1 Master
         itemPool.push_back(RI_OOT_PROGRESSIVE_MASTER_SWORD); // L2 True Master
         // BGS chain. The standalone Great Fairy's Sword (vanilla item of RC_IKANA_GREAT_FAIRY) is a
@@ -289,7 +289,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     // additions: the swap idiom above (songs, GFS) encodes COMBO decisions and must not leak into a
     // standalone MM seed. None of these are referenced by MM logic, so they place as extras — a seed
     // can never become unbeatable through them. All four options default OFF. Skijer's NEI
-    if (FleetShipCombo_GetActiveGame() < 0) {
+    if (!FleetCombo_UnifiedPoolActive()) {
         if (saveInfo.randoSaveOptions[RO_SHUFFLE_OOT_GEAR] == RO_GENERIC_YES) {
             itemPool.push_back(RI_OOT_PROGRESSIVE_MASTER_SWORD); // L1 Master
             itemPool.push_back(RI_OOT_PROGRESSIVE_MASTER_SWORD); // L2 True Master
@@ -571,7 +571,6 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             RI_OOT_NEI_LIGHT_ROD,
             RI_OOT_NEI_MINISH_CAP,
             RI_OOT_NEI_MOGMA_MITTS,
-            RI_OOT_NEI_POKE_BALL,
             RI_OOT_NEI_SHOVEL,
             RI_OOT_NEI_SPINNER,
             RI_OOT_NEI_SWITCH_HOOK,
@@ -581,6 +580,10 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             RI_OOT_NEI_PHANTOM_HOURGLASS,
             RI_OOT_NEI_SHADOW_CRYSTAL,
             RI_OOT_NEI_ROD_OF_SEASONS,
+            RI_OOT_NEI_SEASON_SPRING,
+            RI_OOT_NEI_SEASON_SUMMER,
+            RI_OOT_NEI_SEASON_AUTUMN,
+            RI_OOT_NEI_SEASON_WINTER,
             // Sheikah Slate: the pool item is gone — the FOUR RUNES are the placeable siblings now
             // (wand idiom: any order, each with its own textbox; the first found hands over the slate).
             RI_OOT_NEI_SLATE_RUNE_BOMB,
@@ -609,7 +612,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         // The combo branch above already puts the ship-vanilla feather in MM's pool (it is an OoT-side
         // item that has to be there for cross-placement), so only add it here when running solo —
         // otherwise a combo seed would place two of them.
-        if (FleetShipCombo_GetActiveGame() < 0) {
+        if (!FleetCombo_UnifiedPoolActive()) {
             itemPool.push_back(RI_OOT_ROCS_FEATHER);
         }
 
@@ -643,6 +646,15 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         } else {
             itemPool.push_back(RI_OOT_NEI_ELEMENTAL_WAND);
         }
+    }
+
+    // Crossover Items. Outside the NEI block on purpose: they have no page-2 cell, so a seed can
+    // shuffle the form selector without shuffling page 2, and the other way round.
+    if (saveInfo.randoSaveOptions[RO_CROSSOVER_POKEBALL] == RO_GENERIC_YES) {
+        itemPool.push_back(RI_OOT_NEI_POKE_BALL);
+    }
+    if (saveInfo.randoSaveOptions[RO_CROSSOVER_MARIO_MASK] == RO_GENERIC_YES) {
+        itemPool.push_back(RI_OOT_NEI_MARIO_MASK);
     }
 }
 

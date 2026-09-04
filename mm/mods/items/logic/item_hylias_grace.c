@@ -48,15 +48,16 @@ extern u8 gIvanPossessActive; // shared Ivan-possess flag (defined in sm64_mario
 
 // Pink fairy skeleton (Hylia's Grace uses Ivan's 3D model with pink colors)
 static SkelAnime sPinkFairySkel;
-static Vec3s sPinkFairyJointTable[15];
-static Vec3s sPinkFairyMorphTable[15];
+static Vec3s sPinkFairyJointTable[FAIRY_LIMB_MAX];
+static Vec3s sPinkFairyMorphTable[FAIRY_LIMB_MAX];
 static u8 sPinkFairySkelInited = 0;
 
 static void HGrace_InitPinkFairySkel(PlayState* play) {
-    if (sPinkFairySkelInited)
+    if (sPinkFairySkelInited) {
         return;
-    // (OoT gFairySkel/gFairyAnim have no MM equivalent — fairy model init skipped. TODO adapt.)
-    (void)play;
+    }
+    SkelAnime_Init(play, &sPinkFairySkel, &gameplay_keep_Skel_02AF58, &gameplay_keep_Anim_029140, sPinkFairyJointTable,
+                   sPinkFairyMorphTable, FAIRY_LIMB_MAX);
     sPinkFairySkelInited = 1;
 }
 
@@ -165,7 +166,8 @@ static void HGrace_DrawFairy(Actor* thisx, PlayState* play) {
     f32 s = 0.008f * pulse;
     Matrix_Scale(s, s, s, MTXMODE_APPLY);
 
-    POLY_XLU_DISP = SkelAnime_DrawSkeleton2(play, &sPinkFairySkel, NULL, NULL, NULL, POLY_XLU_DISP);
+    POLY_XLU_DISP =
+        SkelAnime_Draw(play, sPinkFairySkel.skeleton, sPinkFairySkel.jointTable, NULL, NULL, &p->actor, POLY_XLU_DISP);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -416,14 +418,25 @@ static s32 HGrace_IsPassableBarrier(PlayState* play, s32 bgId) {
 // L = sprint (2x speed, 2x timer drain)
 // =============================================================================
 
+// OoT skipped this for ROOM_BEHAVIOR_TYPE1_5; MM's Room carries environmentType instead,
+// which means something else entirely, so the dim applies everywhere here.
 static void HGrace_DimLighting(PlayState* play, f32 intensity) {
-    (void)play;
-    (void)intensity;
-    // (MM Room/EnvironmentContext have no behaviorType1 / adjFog* — fairy fog-dim dropped. TODO adapt.)
+    intensity = CLAMP(intensity, 0.0f, 1.0f);
+
+    f32 fogFactor = (intensity > 0.2f) ? (intensity - 0.2f) : 0.0f;
+    play->envCtx.adjLightSettings.fogNear = (s16)((850.0f - play->envCtx.lightSettings.fogNear) * fogFactor);
+
+    f32 colorFactor = CLAMP_MAX(intensity * 5.0f, 1.0f);
+    for (s32 i = 0; i < ARRAY_COUNT(play->envCtx.adjLightSettings.fogColor); i++) {
+        play->envCtx.adjLightSettings.fogColor[i] = -(s16)(play->envCtx.lightSettings.fogColor[i] * colorFactor);
+    }
 }
 
 static void HGrace_ResetLighting(PlayState* play) {
-    (void)play; // (no adjFog* in MM EnvironmentContext)
+    play->envCtx.adjLightSettings.fogNear = 0;
+    for (s32 i = 0; i < ARRAY_COUNT(play->envCtx.adjLightSettings.fogColor); i++) {
+        play->envCtx.adjLightSettings.fogColor[i] = 0;
+    }
 }
 
 static void HGrace_SpawnTrailSparkles(Player* p, PlayState* play, f32 actualSpeed) {

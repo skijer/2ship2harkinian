@@ -12,7 +12,7 @@
 #define S2H_MOD_EXPORT __attribute__((visibility("default")))
 #endif
 
-#define DEFINE_HOOK(name, args) typedef void (*S2HCb_##name) args;
+#define DEFINE_HOOK(name, args) typedef void(*S2HCb_##name) args;
 #include "2s2h/GameInteractor/GameInteractor_HookTable.h"
 #undef DEFINE_HOOK
 
@@ -26,8 +26,7 @@ typedef struct {
     void* (*GetSymbol)(const char* name);
 } S2HModApi;
 
-#define S2H_REGISTER_HOOK(api, name, callback) \
-    ((api)->RegisterHookByName(#name, (void*)(S2HCb_##name)(callback)))
+#define S2H_REGISTER_HOOK(api, name, callback) ((api)->RegisterHookByName(#name, (void*)(S2HCb_##name)(callback)))
 
 #define S2H_BIND(api, symbol) (*(void**)&(symbol) = (api)->GetSymbol(#symbol))
 

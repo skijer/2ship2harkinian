@@ -75,7 +75,11 @@ static const ALIGN_ASSET(2) char gItemIconTimeGateTex[] = dgItemIconTimeGateTex;
 #define dgItemIconBombArrowsTex "__OTR__textures/icon_item_custom/gItemIconBombArrowsTex"
 static const ALIGN_ASSET(2) char gItemIconBombArrowsTex[] = dgItemIconBombArrowsTex;
 
-// Elemental Wand — one icon per rod; the page-2 cell shows whichever mode is active.
+// Elemental Wand — ONE icon everywhere; the active element shows as the medallion the kaleido draws
+// with it. The six per-rod icons below are unused, kept only as art.
+#define dgItemIconElementalWandTex "__OTR__textures/icon_item_custom/gItemIconElementalWandTex"
+static const ALIGN_ASSET(2) char gItemIconElementalWandTex[] = dgItemIconElementalWandTex;
+
 #define dgItemIconSandRodTex "__OTR__textures/icon_item_custom/gItemIconSandRodTex"
 static const ALIGN_ASSET(2) char gItemIconSandRodTex[] = dgItemIconSandRodTex;
 
@@ -645,6 +649,8 @@ static const ALIGN_ASSET(2) char gMinishCapNameTex[] = dgMinishCapNameTex;
 static const ALIGN_ASSET(2) char gMogmaMittsNameTex[] = dgMogmaMittsNameTex;
 #define dgNetNameTex "__OTR__textures/item_name_custom/gNetNameTex"
 static const ALIGN_ASSET(2) char gNetNameTex[] = dgNetNameTex;
+#define dgMarioMaskNameTex "__OTR__textures/item_name_custom/gMarioMaskNameTex"
+static const ALIGN_ASSET(2) char gMarioMaskNameTex[] = dgMarioMaskNameTex;
 #define dgPokeballNameTex "__OTR__textures/item_name_custom/gPokeballNameTex"
 static const ALIGN_ASSET(2) char gPokeballNameTex[] = dgPokeballNameTex;
 #define dgRocsCapeNameTex "__OTR__textures/item_name_custom/gRocsCapeNameTex"

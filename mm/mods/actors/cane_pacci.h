@@ -114,6 +114,36 @@
 // materialise inside the floor before the carry has taken it.
 #define PACCI_UH_SUMMON_RISE 40.0f
 
+// -- Hauling, throwing, cutting -----------------------------------------------
+// The cut. Damage 2 is one boomerang hit, so a body with four points of health takes four goes
+// exactly as it would with the real thing.
+#define PACCI_UH_CUT_DAMAGE 2
+#define PACCI_UH_CUT_RADIUS 30.0f
+#define PACCI_UH_CUT_HEIGHT 80.0f
+#define PACCI_UH_CUT_FRAMES 6 // an AT and an AC only meet inside one frame's lists
+// How much one D-pad press grows or shrinks a HEIGHT body, and how tall it may get.
+#define PACCI_UH_HEIGHT_STEP 40.0f
+#define PACCI_UH_HEIGHT_MAX 600.0f
+// Frames the thrown body is held as "lifted" before its parent is cleared. Long enough that its
+// own update has certainly seen the parent, whatever order the categories happen to run in.
+#define PACCI_UH_THROW_HOLD 4
+// Hauling: how far one frame of held D-pad drags a body along the ground.
+#define PACCI_UH_PULL_RATE 1.6f
+// Throwing. REACH and RISE put the body just past Link's throwing hand while he winds up; SPEED
+// and LIFT are the throw itself, a flat hard toss rather than a lob.
+#define PACCI_UH_THROW_REACH 18.0f
+#define PACCI_UH_THROW_RISE 6.0f
+#define PACCI_UH_THROW_SPEED 14.0f
+#define PACCI_UH_THROW_LIFT 3.0f
+// Horizontal half-extent past which a dynapoly body is a piece of the room rather than an object.
+// A crate is ~30, a gravestone ~40, a pushblock ~60, a lift platform under 200; a room quadrant is
+// thousands. Only applies to actors the trait table says nothing about.
+#define PACCI_UH_MAX_HALF 300.0f
+// Frames between the ordinary flames a carried blue fire sheds. Each lives 44 frames.
+#define PACCI_UH_ICE_PERIOD 16
+// A JAW body's open pose, as a raw shape.rot.x.
+#define PACCI_UH_LOCKED_OPEN_X 0x1333
+
 // How many enemies may be flipped / petrified at once.
 #define PACCI_MAX_AFFECTED 8
 
@@ -197,6 +227,19 @@ u8 Pacci_FuseIsPart(Actor* actor);
 /** The assembly this actor belongs to, root or part; NULL if it is in none. */
 Actor* Pacci_FuseRootOf(Actor* actor);
 u8 Pacci_FuseCount(void);
+
+// -- Hauling, throwing, cutting ------------------------------------------------
+// Three answers to a grab that are not a carry: the body is handed to a mechanism it already owns
+// and the cane steps back. Each ticks from Pacci_UpdateUltrahand, above its early return, because
+// each owns a body that is not the carried one.
+void Pacci_CutTick(PlayState* play);
+void Pacci_ThrowTick(PlayState* play);
+/** Is a THROWS body mid-hand-off? Asked so Link is not frozen into a carry he never performed. */
+u8 Pacci_IsThrowing(void);
+u8 Pacci_PullActive(void);
+void Pacci_PullStop(PlayState* play);
+/** Drop every tracked collider. Call after a scene change, when the actors are already gone. */
+void Pacci_AnchorClear(void);
 
 // -- Stored geometry ----------------------------------------------------------
 // What is kept is the RECIPE - actor id, params, and each piece's place in the root's

@@ -556,6 +556,20 @@ void FleetShipCombo_SharedInit(unsigned long instanceKey) {
     MapShared(true);
 }
 
+#ifdef COMBO_BUILD
+// ComboShip: one process, and comboui knows which game is in front. The shared-memory region belongs
+// to the two-process layout and is never created here, so answering -1 ("standalone") would make
+// every caller drop its combo gating — the kaleido then marks all equipment as owned.
+bool Combo_MmIsForeground(void);
+
+int FleetShipCombo_GetActiveGame(void) {
+    return Combo_MmIsForeground() ? 1 : 0;
+}
+
+void FleetShipCombo_SetActiveGame(int game) {
+    (void)game; // the launcher switches games at scene seams; there is nothing to write
+}
+#else
 int FleetShipCombo_GetActiveGame(void) {
     FscShared* s = LazyOpen();
     return s ? s->activeGame : -1;
@@ -566,6 +580,18 @@ void FleetShipCombo_SetActiveGame(int game) {
     if (s) {
         s->activeGame = game;
     }
+}
+#endif
+
+// "Is MM's pool being built for the shared OoT+MM fill?" Standalone that is the same as "is the combo
+// running"; under ComboShip it is a separate switch, off until NEI's unified fill replaces the
+// launcher's own — with it on and no dedupe on the OoT side, seeds would carry duplicated chains.
+int FleetCombo_UnifiedPoolActive(void) {
+#ifdef COMBO_BUILD
+    return 0;
+#else
+    return FleetShipCombo_GetActiveGame() >= 0;
+#endif
 }
 
 // Per-process seq of the last warp we issued/consumed, so the REQUESTER never re-consumes its own.
@@ -759,6 +785,11 @@ int FleetShipCombo_PopPacket(char* out, int cap) {
     return 1;
 }
 
+#ifdef COMBO_BUILD
+bool FleetShipCombo_IsThisGameActive(void) {
+    return Combo_MmIsForeground();
+}
+#else
 bool FleetShipCombo_IsThisGameActive(void) {
     FscShared* s = LazyOpen();
     if (!s) {
@@ -766,6 +797,7 @@ bool FleetShipCombo_IsThisGameActive(void) {
     }
     return s->activeGame == kThisGame;
 }
+#endif
 
 int FleetShipCombo_GetUiFocus(void) {
     FscShared* s = LazyOpen();
