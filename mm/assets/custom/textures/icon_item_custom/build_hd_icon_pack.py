@@ -50,10 +50,14 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..",
 BASE_O2R = os.path.join(REPO, "mm", "2ship.o2r")
 OUT_DIR = os.path.join(REPO, "mm", "mods", "hd_icon_packs")
 
-# Source art folders (1024x1024 RGBA) -> output pack name.
+# Source art folders (1024x1024 RGBA) -> output pack name. Both live outside the repo:
+#   python build_hd_icon_pack.py <toon art folder> <3d art folder>
+if len(sys.argv) < 3:
+    sys.exit("usage: build_hd_icon_pack.py <toon art folder> <3d art folder>")
+
 STYLES = [
-    ("toon", r"C:\Users\LENOVO\Downloads\hd 2d"),
-    ("3d", r"C:\Users\LENOVO\Downloads\hd 3d"),
+    ("toon", sys.argv[1]),
+    ("3d", sys.argv[2]),
 ]
 
 # Normalized source-filename token -> gItemIcon<Name> (the base resource path stem).

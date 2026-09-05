@@ -1,6 +1,6 @@
 /**
  * Spirit Breastplate DL - Iron Knuckle armor from OOT decomp
- * Source: C:\Users\LENOVO\Documents\z_oot_decomp (object_ik)
+ * Source: OoT decomp (object_ik)
  *
  * 4 separate DLs, each drawn with its own matrix using IK skeleton offsets.
  * Segments 0x08/0x09 replaced with inline PrimColor/EnvColor.
