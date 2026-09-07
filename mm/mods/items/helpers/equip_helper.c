@@ -213,15 +213,29 @@ u8 ItemEquip_Update(ItemEquipState* state, ItemInputState* input, EquipCallback 
     return state->isEquipped;
 }
 
+// Chateau Romani. MM's own magic path (z_parameter.c) already honours this reg, so custom items
+// must read it too or they drain a meter the engine calls bottomless.
+static u8 ItemMagic_IsInfinite(void) {
+    return CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) != 0;
+}
+
 void ItemMagic_Consume(PlayState* play, s16 amount) {
+    if (ItemMagic_IsInfinite())
+        return;
+
     amount = MAGIC_REQ(amount); // Magic Cape (ext tunic 1) halves the cost
     if (gSaveContext.save.saveInfo.playerData.magic >= amount)
         gSaveContext.save.saveInfo.playerData.magic -= amount;
 }
 
 s32 ItemMagic_HasEnough(PlayState* play, s16 amount) {
+    if (gSaveContext.magicCapacity <= 0)
+        return 0;
+    if (ItemMagic_IsInfinite())
+        return 1;
+
     amount = MAGIC_REQ(amount); // Magic Cape (ext tunic 1) halves the requirement
-    return (gSaveContext.magicCapacity > 0 && gSaveContext.save.saveInfo.playerData.magic >= amount);
+    return (gSaveContext.save.saveInfo.playerData.magic >= amount);
 }
 
 u8 ItemSword_HasAnySword(void) {

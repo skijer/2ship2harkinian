@@ -26,7 +26,8 @@
 
 #include "boss_remains.h"
 
-#include <libultraship/bridge.h> // CVarGetInteger
+#include <libultraship/bridge.h>                  // CVarGetInteger
+#include "2s2h/CustomMessage/PauseItemDescriptions.h" // C-Up description on the quest page
 
 // OPEN_DISPS / CLOSE_DISPS redeclare these two symbols inline at each call site; in a C++ TU that
 // takes C++ linkage unless a C declaration exists at file scope. Force the C symbols (same trick as
@@ -280,6 +281,18 @@ extern "C" s32 BossRemains_TryEquipAtCursor(PlayState* play, Input* input) {
     // Must actually own it (the quest bit), so an empty slot can't be equipped.
     if (!CHECK_QUEST_ITEM(QUEST_REMAINS_ODOLWA + idx)) {
         return false;
+    }
+
+    // C-Up reads the remains out, the way it does on the item page and on the OoT quest page. The
+    // native MM quest page has no description path of its own, so it has to happen here.
+    if (CHECK_BTN_ALL(input->press.button, BTN_CUP)) {
+        const char* desc = PauseItemDesc_Get((u16)item, PAUSE_QUEST);
+
+        if (desc != nullptr) {
+            play->pauseCtx.itemDescriptionOn = true;
+            PauseItemDesc_Show(play, desc, 1);
+            return true;
+        }
     }
 
     // C-button equip (remains are u8, so the direct BUTTON_ITEM_EQUIP idiom — same as medallions).

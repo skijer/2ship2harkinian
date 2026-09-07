@@ -91,7 +91,7 @@ void Rando::MiscBehavior::CheckQueue() {
                                 });
                             }
                         }
-                        Rando::GiveItem(randoItemId);
+                        Rando::GiveItem(randoItemId, (RandoCheckId)CUSTOM_ITEM_PARAM);
                         randoSaveCheck.cycleObtained = true;
                         randoSaveCheck.obtained = true;
                         randoSaveCheck.eligible = false;

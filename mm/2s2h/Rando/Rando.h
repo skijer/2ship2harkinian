@@ -19,7 +19,9 @@ namespace Rando {
 
 void Init();
 void DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN, Actor* actor = nullptr);
-void GiveItem(RandoItemId randoItemId);
+// randoCheckId is only for naming: junk, traps and (in combo) foreign items resolve their display
+// name from the CHECK, so a give that omits it toasts the sentinel's name instead of the real one.
+void GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN);
 void RemoveItem(RandoItemId randoItemId);
 RandoItemId CurrentJunkItem(RandoCheckId randoCheckId = RC_UNKNOWN);
 RandoItemId CurrentTrapItem(RandoCheckId randoCheckId = RC_UNKNOWN);

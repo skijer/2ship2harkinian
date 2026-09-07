@@ -281,6 +281,19 @@ bool PathTestCleanup(FILE* tfile) {
     return true;
 }
 
+// The NEI asset folder for THIS game. ComboShip runs both games out of one Ship directory and their
+// packs collide by NAME while differing in content (the MHR anim packs are rebuilt per game because
+// the two Links' skeletons are not equivalent), so each side gets its own subfolder there.
+// Every nei/ path must go through this — a literal "nei/x" reads the wrong game's file in combo.
+extern "C" const char* Nei_AssetDir(void) {
+#ifdef COMBO_BUILD
+    static const std::string dir = "nei/" + appShortName;
+    return dir.c_str();
+#else
+    return "nei";
+#endif
+}
+
 void CheckAndCreateModFolder() {
     try {
         std::string modsPath = Ship::Context::LocateFileAcrossAppDirs("mods", appShortName);
@@ -797,9 +810,10 @@ void OTRGlobals::Initialize() {
     // icons, icon_item_24_static medallions) resolve to the companion. This is the EXACT pattern
     // SoH uses to mount MM's mm.o2r alongside OoT (mm_asset_loader.cpp LoadMmO2r).
     {
-        const char* companionCandidates[] = { "oot.o2r", "nei/oot.o2r", "mods/oot.o2r", "../oot.o2r" };
+        const std::string companionCandidates[] = { "oot.o2r", std::string(Nei_AssetDir()) + "/oot.o2r",
+                                                    "mods/oot.o2r", "../oot.o2r" };
         std::string ootPath;
-        for (const char* candidate : companionCandidates) {
+        for (const std::string& candidate : companionCandidates) {
             std::string p = Ship::Context::LocateFileAcrossAppDirs(candidate, appShortName);
             if (p.empty() || !std::filesystem::exists(p)) {
                 p = candidate; // plain relative (parent-dir / working-dir case)
@@ -828,6 +842,55 @@ void OTRGlobals::Initialize() {
                 }
                 SPDLOG_INFO("Skijer's NEI: mounted OoT companion {} at lowest priority (MM wins shared paths)",
                             ootPath);
+            }
+        }
+    }
+
+    // Nothing mounted these before. mods/ in particular is NOT auto-mounted despite what
+    // pak_loader's comment claims: libultraship only appends its mPatchesPath when the archive list
+    // handed to InitResourceManager is EMPTY (Context.cpp), and ours always carries 2ship.o2r.
+    {
+        // Both folders are per game in ComboShip: mods are a per-game choice, and the nei packs
+        // collide by name across games (see Nei_AssetDir).
+        std::vector<std::string> assetFolders = { Nei_AssetDir() };
+#ifdef COMBO_BUILD
+        assetFolders.push_back("mods/" + appShortName);
+#else
+        assetFolders.push_back("mods");
+#endif
+        for (const std::string& assetFolder : assetFolders) {
+            std::string folderPath = Ship::Context::LocateFileAcrossAppDirs(assetFolder, appShortName);
+            if (folderPath.empty() || !std::filesystem::exists(folderPath)) {
+                folderPath = Ship::Context::GetPathRelativeToAppDirectory(assetFolder, appShortName);
+            }
+            if (!std::filesystem::exists(folderPath) || !std::filesystem::is_directory(folderPath)) {
+                SPDLOG_INFO("Skijer's NEI: no {}/ folder to scan", assetFolder);
+                continue;
+            }
+            auto lower = [](std::string s) {
+                for (char& c : s) {
+                    if (c >= 'A' && c <= 'Z') {
+                        c += 32;
+                    }
+                }
+                return s;
+            };
+            auto archiveManager = context->GetResourceManager()->GetArchiveManager();
+            for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
+                if (!entry.is_regular_file()) {
+                    continue;
+                }
+                // The ROM archives are mounted above with their own priority order; re-adding one
+                // here would put it last and let it win paths the other archives must own.
+                const std::string name = lower(entry.path().filename().string());
+                if (name == "oot.o2r" || name == "oot-mq.o2r" || name == "mm.o2r" || name == "2ship.o2r") {
+                    continue;
+                }
+                const std::string ext = lower(entry.path().extension().string());
+                if (ext == ".o2r" || ext == ".zip") {
+                    archiveManager->AddArchive(entry.path().generic_string());
+                    SPDLOG_INFO("Skijer's NEI: mounted {} from {}/", entry.path().filename().string(), assetFolder);
+                }
             }
         }
     }

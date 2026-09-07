@@ -62,7 +62,7 @@ extern "C" {
 u32 gRandoPickupSerial = 0;
 }
 
-void Rando::GiveItem(RandoItemId randoItemId) {
+void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
     // FleetShipCombo cross-item record: on obtaining ANY FC-shared item, bump its fcId-indexed count
     // (comboObtainedFc, synced to OoT) and the local shadow (comboAppliedFc, since it's granted here).
     // Re-entrancy guard: GiveItem recurses for progressives/ConvertItem and RI_TRIFORCE_PIECE ->
@@ -120,7 +120,7 @@ void Rando::GiveItem(RandoItemId randoItemId) {
         if (Rando::StaticData::Items.contains(randoItemId)) {
             Notification::Emit({
                 .message = "You found",
-                .suffix = Rando::StaticData::GetItemName(randoItemId),
+                .suffix = Rando::StaticData::GetItemName(randoItemId, true, randoCheckId),
             });
         }
     }

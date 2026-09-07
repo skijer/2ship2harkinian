@@ -14,10 +14,10 @@
  */
 
 #include "mods/nei_save.h"
-#include "mods/extended_equipment.h" // ExtEquip_GiveItem/HasItem, ITEM_EXT_BOOTS_2
+#include "mods/extended_equipment.h" // ExtEquip_GiveItem/HasItem
 
 #define TRADE_ADULT_COUNT 23
-#define TRADE_ADULT_PENDANT 19 // Pendant of Memories (== ITEM_EXT_BOOTS_2)
+#define TRADE_ADULT_PENDANT 19 // Pendant of Memories
 
 // NEI trade index -> inventory item id. Order MUST match the tradeAdultOwned bit layout (nei_save.h).
 // APPEND ONLY — the index is the save bit, so reordering invalidates existing saves.
@@ -44,7 +44,9 @@ static const u8 sTradeAdultItems[TRADE_ADULT_COUNT] = {
     ITEM_MM_ROOM_KEY,
     ITEM_MM_LETTER_KAFEI,
     ITEM_MM_SPECIAL_DELIVERY, // 16-18
-    ITEM_EXT_BOOTS_2,         // 19 Pendant of Memories
+    // MM has a native Pendant, so the wheel must carry ITS id: Anju's script gates the trade on
+    // MSCRIPT_CMD_CHECK_ITEM_ACTION(PLAYER_IA_PENDANT_OF_MEMORIES), which only resolves from 0x30.
+    ITEM_PENDANT_OF_MEMORIES, // 19
     ITEM_WEIRD_EGG,
     ITEM_CHICKEN,
     ITEM_LETTER_ZELDA, // 20-22 (OoT child)

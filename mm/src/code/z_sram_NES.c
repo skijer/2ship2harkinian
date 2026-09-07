@@ -653,7 +653,9 @@ void Sram_SaveEndOfCycle(PlayState* play) {
     SET_STOLEN_ITEM_1(STOLEN_ITEM_NONE);
     SET_STOLEN_ITEM_2(STOLEN_ITEM_NONE);
 
-    Inventory_DeleteItem(ITEM_OCARINA_FAIRY, SLOT_TRADE_DEED);
+    // NEI: the item argument only unbinds C buttons, and 0x05 is the combo's Fairy Ocarina now —
+    // naming it here wiped the ocarina off C on every cycle reset. The loop below clears the deeds.
+    Inventory_DeleteItem(ITEM_NONE, SLOT_TRADE_DEED);
     Inventory_DeleteItem(ITEM_SLINGSHOT, SLOT_TRADE_KEY_MAMA);
     Inventory_DeleteItem(ITEM_LONGSHOT, SLOT_TRADE_COUPLE);
 

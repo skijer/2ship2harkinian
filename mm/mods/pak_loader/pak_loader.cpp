@@ -8,6 +8,7 @@
 
 #include "pak_loader.h"
 #include "mods/transformation_masks/transformation_masks.h"
+#include "mods/items/logic/adult_link_render.h" // AdultLink_IsActive — MM's real age (see sGetActiveIndex)
 
 extern "C" Gfx* ResourceMgr_LoadGfxByName(const char* path);
 extern "C" int ResourceMgr_OTRSigCheck(char* imgData);
@@ -257,7 +258,10 @@ static inline s32 sGetActiveIndex(void) {
     if (sForcedModelIndex >= 0 && sForcedModelIndex < (s32)sModels.size()) {
         return sForcedModelIndex;
     }
-    return (LINK_AGE_IN_YEARS == YEARS_ADULT) ? sSelectedAdultIndex : sSelectedChildIndex;
+    // NOT LINK_AGE_IN_YEARS: MM pins linkAge to adult forever (z64save.h:566), so that test picked
+    // the adult slot every frame and no child pak could ever be selected. NEI's age is the Time
+    // Gate's flag.
+    return AdultLink_IsActive() ? sSelectedAdultIndex : sSelectedChildIndex;
 }
 
 // ============================================================================
@@ -4378,6 +4382,12 @@ static void PakLoader_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, 
 // Public API Implementation
 // ============================================================================
 
+// mods/soh and mods/2ship sit side by side when both games share one install (ComboShip); the
+// other game's skins are not ours to list.
+static bool IsSiblingGameModsDir(const std::string& name) {
+    return (name == "soh" || name == "2ship") && name != appShortName;
+}
+
 extern "C" void PakLoader_Init(void) {
     if (sInitialized)
         return;
@@ -4413,8 +4423,12 @@ extern "C" void PakLoader_Init(void) {
         for (; it != end; it.increment(ec)) {
             if (ec)
                 break;
-            if (it->is_directory(ec))
+            if (it->is_directory(ec)) {
+                if (IsSiblingGameModsDir(it->path().filename().string())) {
+                    it.disable_recursion_pending();
+                }
                 continue;
+            }
             std::string ext = it->path().extension().string();
             for (char& c : ext)
                 c = (char)tolower((unsigned char)c);
@@ -4550,7 +4564,7 @@ extern "C" void PakLoader_Init(void) {
 static void PakLoader_CheckMaskForce(void) {
     // CVar disabled at runtime — clear kafei forced model if active
     if (!CVarGetInteger("gMods.KafeiMaskTransform", 0) && sForcedModelIndex >= 0 &&
-        sForcedModelPath == "nei/N64_Kafei.pak") {
+        sForcedModelPath == std::string(Nei_AssetDir()) + "/N64_Kafei.pak") {
         PakLoader_ClearForcedModel();
     }
 }

@@ -38,36 +38,40 @@ struct ItemDescEntry {
 static const ItemDescEntry sCustomItemDescs[] = {
     { ITEM_ROCS_FEATHER_SKIJER, "Jump in ground and small jump\nfrom water." },
     { ITEM_ROCS_CAPE, "Jump from ground or water. Press\nagain in the air for a double jump." },
-    { ITEM_DESIRE_SENSOR, "Sense major items in this area.\nCosts 3 hearts. Randomizer only." },
+    // (No ITEM_DESIRE_SENSOR row: the item is retired and its hint is the slate's Sensor rune, which
+    // costs a Heart Container rather than the 3 hearts this row used to advertise.)
     { ITEM_HYLIAS_GRACE,
       "Fairy flight for 10s. Ignores walls.\nA=up, B=down, L=sprint. 24 MP." }, // RETIRED item; row kept for old saves
     // 2026-08-06 page-2 additions. Shadow Crystal and Rod of Seasons are model-only on this side.
-    { EXT_ITEM_SHEIKAH_SLATE,
-      "Draw the slate to cast a rune.\nA cycles Remote Bomb, Stasis,\nCryonis and Master Cycle." },
-    { EXT_ITEM_PHANTOM_HOURGLASS, "Recall an object along its own path.\nC aims, C rewinds, C lets go. 4 MP+" },
+    { EXT_ITEM_SHEIKAH_SLATE, "C draws the slate, then casts the\nactive rune. Hold L for the rune wheel." },
+    { EXT_ITEM_PHANTOM_HOURGLASS, "C stops time and aims. C again rewinds\nwhat the reticle holds along its own\npath. C or B lets go." },
     { EXT_ITEM_SHADOW_CRYSTAL, "Cursed twilight crystal. Turns Link\ninto Wolf Link. OoT only for now." },
     { EXT_ITEM_ROD_OF_SEASONS, "Rod bearing the four seasons.\nOoT only for now." },
-    { ITEM_ZONAI_PERMAFROST, "Stop time for 10s. Enemies, NPCs\nand bosses freeze. Costs 12 magic." },
+    { ITEM_ZONAI_PERMAFROST,
+      "Toggle the time stop. 4 MP to start,\nthen 1 MP every 10 frames. Ends on\na second press or an empty meter." },
     { ITEM_DEMISE_DESTRUCTION, "Massive AoE explosion. Damages all\nenemies in range. Ground only. 12 MP." },
     { ITEM_DEKU_LEAF, "Ground: blow wind gust. Air: hold\nto glide. Drains magic while gliding." },
     { ITEM_SWITCH_HOOK, "Aim and fire to swap positions\nwith objects and enemies." },
     { ITEM_MOGMA_MITTS, "Toggle to climb any wall.\nDrains magic over time." },
-    { ITEM_GUST_JAR, "Pull enemies toward you, then push\nthem away. Hold C for element select." },
+    { ITEM_GUST_JAR,
+      "Hold C to suck things in, release to\nfire them back. Hold C 20 frames while\nidle for the element wheel." },
     { ITEM_BALL_AND_CHAIN,
       "Heavy thrown weapon. Breaks ice walls\nand heavy objects. Hold C to charge.\nC-Up to aim." },
     { ITEM_WHIP, "Grapple from any bar surface. Swing\nwith joystick. Release for momentum\nlaunch." },
-    { ITEM_SPINNER, "Toggle to ride. A for homing dash\nattack. Breaks rocks." },
+    { ITEM_SPINNER, "Hold C to charge, release to ride.\nRelease while Z-targeting for a\nhoming dash. Breaks rocks." },
     { ITEM_CANE_OF_SOMARIA,
-      "Four canes on one cell. Summon\nblocks, flip enemies, build with\nUltrahand. A cycles the cane." },
+      "Four canes on one cell. A here cycles\nthe cane; C draws it, then casts.\nL and R step the summon." },
     { ITEM_DOMINION_ROD, "Fire orb to possess Beamos, Armos\nor Anubis. Control them with analog+C." },
     { ITEM_TIME_GATE, "Travel through time. Swap between\nyoung and adult Link. Costs 48 magic." },
-    { ITEM_BOMB_ARROWS, "Explosive arrows. Hold C to aim.\nConsumes 1 arrow and 1 bomb per shot." },
+    { ITEM_BOMB_ARROWS,
+      "Hold C to aim, release to fire. Costs\n1 arrow and 1 bomb. Holding past 70\nframes drops a live bomb instead." },
     { ITEM_ROD_FIRE, "Slash=3 fireballs. Stab=long shot.\nJump=flamethrower. Spin=fire AoE.\nC-Up to aim." },
     { ITEM_ROD_ICE, "Slash=3 iceballs. Stab=long shot.\nJump=ice wave. Spin=ice AoE.\nC-Up to aim." },
     { ITEM_ROD_LIGHT, "Slash=3 orbs. Stab=long shot.\nJump=beam. Spin=light AoE.\nC-Up to aim." },
-    { ITEM_BEETLE, "Launch remote beetle. Steer with\njoystick. B=boost. Grabs items and\nhits enemies." },
+    { ITEM_BEETLE, "Hold C to aim, release to launch.\nStick steers, A boosts, Z locks on,\nB lets it fly home on its own." },
     { ITEM_SHOVEL, "Dig to uncover grottos, Gold\nSkulltulas and buried rewards." },
-    { ITEM_MINISH_CAP, "Fast travel to pod soil spots.\nKill Gold Skulltulas to unlock them." },
+    { ITEM_MINISH_CAP,
+      "C by a pod soil: fast travel map.\nC away from one: shrink or grow back.\nGold Skulltulas unlock the soils." },
     { ITEM_LANTERN, "Swing near fire to catch it. 4 types.\nBlue=melts red ice. Green=HP regen.\nPoe/Green=free Lens. "
                     "Swing=fire dmg." },
     { ITEM_CHATEAU_ROMANI, "Drink for infinite magic.\nOne-time consumable." },
@@ -79,7 +83,7 @@ static const ItemDescEntry sCustomItemDescs[] = {
 
     // Bottle-side custom items
     { ITEM_NET, "Catch bugs, fish and fairies.\nSwing it like a sword." },
-    { ITEM_BOTTOMLESS_BOTTLE, "Holds an unlimited supply of\nwhatever you last poured into it." },
+    { ITEM_BOTTOMLESS_BOTTLE, "Refills itself for a set number of\nuses per fill." },
     { ITEM_MAGIC_MUSHROOM, "A strange mushroom.\nBottle it before it spoils." },
     { ITEM_BOTTLE_WITH_MAGIC_MUSHROOM, "A bottled magic mushroom." },
 };
@@ -100,8 +104,10 @@ static const ItemDescEntry sSw97ElemDescs[] = {
     // PauseItemDesc_Get rather than living in this element-keyed table.
 };
 
-static const char* kBombArrowsDesc = "Explosive arrows. Hold C to aim.\nConsumes 1 arrow and 1 bomb per shot.";
-static const char* kBombBulletsDesc = "Explosive bullets. Hold C to aim.\nConsumes 1 seed and 1 bomb per shot.";
+static const char* kBombArrowsDesc =
+    "Hold C to aim, release to fire. Costs\n1 arrow and 1 bomb. Holding past 70\nframes drops a live bomb instead.";
+static const char* kBombBulletsDesc =
+    "Hold C to aim, release to fire. Costs\n1 seed and 1 bomb. Holding past 70\nframes drops a live bomb instead.";
 
 // The six rods share one item id, so their descriptions key off the active mode.
 static const ItemDescEntry sWandModeDescs[] = {
@@ -130,15 +136,19 @@ static const ItemDescEntry sOotPageZeroDescs[] = {
 // Page-2 equipment, read on the EQUIP page. Slot contents differ from SoH's: sword 3 is the Trident,
 // shield 2 the Kite Shield, boots 2 the Climb Boots and boots 3 the Roc Boots.
 static const ItemDescEntry sExtEquipDescs[] = {
-    { ITEM_EXT_SWORD_1, "Cane of Byrna. Two-handed glaive with\na Kinsect orb. OoT only for now." },
-    { ITEM_EXT_SWORD_2, "Four Sword. R+B to charge. Spawns 3\nclones (36 MP) that mirror your attacks." },
-    { ITEM_EXT_SWORD_3, "Trident. Gunlance moveset: guard dash,\ncharged blast and flight." },
+    // The reach and the HP/MP-on-hit belong to the Great Fairy's Sword here; this slot is a dummy.
+    { ITEM_EXT_SWORD_1, "Cane of Byrna. Cosmetic for now: its\ncombat perks moved to the Great\nFairy's Sword." },
+    { ITEM_EXT_SWORD_2,
+      "Four Sword. Hold R+B for 3 clones that\nmirror your attacks, 12 MP each.\nHold L for the formation wheel." },
+    { ITEM_EXT_SWORD_3, "Trident. B chains, hold B charges,\nR+B guard dashes, hold R+A flies." },
     { ITEM_EXT_SHIELD_1, "Goddess Shield. Fireproof; an early\nblock stuns every enemy nearby.\nOoT only for now." },
     { ITEM_EXT_SHIELD_2, "Kite Shield. R in mid-air to surf.\nDownhill builds speed. A hops, B spins." },
     { ITEM_EXT_SHIELD_3,
       "Shield of Ikana. Perfect guards drain\nlife; revives you once per scene.\nOoT only for now." },
-    { ITEM_EXT_TUNIC_1, "Champion's Tunic. Perfect dodges open\na Flurry Rush; aiming in mid-air slows\nthe world." },
-    { ITEM_EXT_TUNIC_2, "Magic Tunic. Rupees absorb every hit.\nAt zero you are slow and unprotected." },
+    { ITEM_EXT_TUNIC_1,
+      "Champion's Tunic. Dodge past an attack\nfor a Flurry Rush, aim in mid-air for\nBullet Time. Both slow time to 33%." },
+    { ITEM_EXT_TUNIC_2,
+      "Spirit Tunic. Rupees absorb damage,\n1 HP each, and the fire and water\ntimers stop. At zero you are slow." },
     { ITEM_EXT_TUNIC_3, "Sage's Tunic. Each medallion you own\nadds a passive resistance while worn." },
     { ITEM_EXT_BOOTS_1, "Pegasus Boots. Keep holding B after a\nswing to charge forward, sword first." },
     { ITEM_EXT_BOOTS_2, "Climb Boots. Full traction: ice stops\nbeing slippery and steep slopes stop\nsliding you." },
@@ -151,15 +161,6 @@ static const char* kMagicCapeDesc =
 static const char* kPendantDesc =
     "Pendant of Memories. Three extra B\nmoves: Mortal Draw, Ground Pound and\nParry Leap. "
     "A toggles the moveset.";
-
-extern "C" const char* PauseItemDesc_GetEquip(u16 extItemId) {
-    for (size_t i = 0; i < ARRAY_COUNT(sExtEquipDescs); i++) {
-        if (sExtEquipDescs[i].itemId == extItemId) {
-            return sExtEquipDescs[i].desc;
-        }
-    }
-    return NULL;
-}
 
 extern "C" const char* PauseItemDesc_GetEquipUpgrade(s16 row) {
     switch (row) {
@@ -174,12 +175,31 @@ extern "C" const char* PauseItemDesc_GetEquipUpgrade(s16 row) {
 
 // SW97 medallions, read on the OoT quest page. Each one arms a spell on a C button.
 static const ItemDescEntry sMedallionDescs[] = {
-    { ITEM_MEDALLION_FOREST, "Wind spell. 12 MP.\nC to equip the spell." },
-    { ITEM_MEDALLION_FIRE, "Fire spell. 12 MP.\nC to equip the spell." },
-    { ITEM_MEDALLION_WATER, "Ice spell. 24 MP.\nC to equip the spell." },
-    { ITEM_MEDALLION_SPIRIT, "Soul spell. 24 MP.\nC to equip the spell." },
-    { ITEM_MEDALLION_SHADOW, "Dark spell. 12 MP.\nC to equip the spell." },
-    { ITEM_MEDALLION_LIGHT, "Light spell. 24 MP.\nC to equip the spell." },
+    { ITEM_MEDALLION_FOREST,
+      "Wind spell, 12 MP. A tornado that\ndrags enemies in and grinds them.\nC here equips the spell." },
+    { ITEM_MEDALLION_FIRE,
+      "Fire spell, 12 MP. A column of flame\nthat burns harder the longer it\nstands. C here equips the spell." },
+    { ITEM_MEDALLION_WATER,
+      "Ice spell, 24 MP. Freezes every enemy\nit touches for 6 seconds.\nC here equips the spell." },
+    { ITEM_MEDALLION_SPIRIT,
+      "Soul spell, 24 MP. Turns you into a\nfairy until you cast it again.\nC here equips the spell." },
+    { ITEM_MEDALLION_SHADOW,
+      "Dark spell, 12 MP. A shield that blocks\nall damage for a minute while the\nworld dims. C here equips it." },
+    { ITEM_MEDALLION_LIGHT,
+      "Light spell, 24 MP. Undead freeze for\n30 seconds and you heal 6 hearts.\nC here equips the spell." },
+};
+
+// Boss remains, read on the MM quest page. Unlike the medallions these are real MM item ids, so the
+// PAUSE_QUEST lookup below finds them by id.
+static const ItemDescEntry sBossRemainsDescs[] = {
+    { ITEM_REMAINS_ODOLWA, "Press its button to wear it.\nHold A to sprint, trailing fire.\nR+B calls 6 beetles "
+                           "(6 MP).\nA by soft soil takes off on moths." },
+    { ITEM_REMAINS_GOHT, "Press its button to wear it.\nHold A to charge like a bull, R+A to\nground-pound. Hold B "
+                         "for a thunder\nbolt (4 MP). R+B throws a bombchu." },
+    { ITEM_REMAINS_GYORG, "Press its button to wear it.\nSwim like a Zora. In water R calls a\nfish school and B "
+                          "holds a whirlpool;\non land R+B calls the fish." },
+    { ITEM_REMAINS_TWINMOLD,
+      "Press its button to wear it.\nIts Dark Link companion is not\nimplemented yet." },
 };
 
 static const char* PauseItemDesc_Find(const ItemDescEntry* table, size_t count, u16 itemId) {
@@ -198,6 +218,10 @@ extern "C" const char* PauseItemDesc_Get(u16 itemId, s32 pageIndex) {
         return PauseItemDesc_Find(sExtEquipDescs, ARRAY_COUNT(sExtEquipDescs), itemId);
     }
     if (pageIndex == PAUSE_QUEST) {
+        const char* remains = PauseItemDesc_Find(sBossRemainsDescs, ARRAY_COUNT(sBossRemainsDescs), itemId);
+        if (remains != NULL) {
+            return remains;
+        }
         return PauseItemDesc_Find(sMedallionDescs, ARRAY_COUNT(sMedallionDescs), itemId);
     }
     if (pageIndex != PAUSE_ITEM) {

@@ -3106,7 +3106,9 @@ s8 sItemItemActions[] = {
     PLAYER_IA_BOW_FIRE,                // ITEM_ARROW_FIRE,
     PLAYER_IA_BOW_ICE,                 // ITEM_ARROW_ICE,
     PLAYER_IA_BOW_LIGHT,               // ITEM_ARROW_LIGHT,
-    PLAYER_IA_PICTOGRAPH_BOX,          // ITEM_OCARINA_FAIRY,
+    // NEI: 0x05 is a dead OoT leftover in vanilla MM, wired to the Pictograph Box. The combo hands
+    // OoT's Fairy Ocarina over on this id, so it has to play like an ocarina.
+    PLAYER_IA_OCARINA,                 // ITEM_OCARINA_FAIRY,
     PLAYER_IA_BOMB,                    // ITEM_BOMB,
     PLAYER_IA_BOMBCHU,                 // ITEM_BOMBCHU,
     PLAYER_IA_DEKU_STICK,              // ITEM_DEKU_STICK,
