@@ -95,6 +95,7 @@ std::map<RandoOptionId, RandoStaticOption> Options = {
     RO(RO_SHUFFLE_OOT_MASKS,           RO_GENERIC_OFF),
     RO(RO_CROSSOVER_POKEBALL,          RO_GENERIC_OFF),
     RO(RO_CROSSOVER_MARIO_MASK,        RO_GENERIC_OFF),
+    RO(RO_SHUFFLE_MARIO_CAPS,          RO_GENERIC_OFF),
 };
 // clang-format on
 

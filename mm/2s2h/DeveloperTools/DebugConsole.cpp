@@ -511,7 +511,10 @@ static const RandoItemId kProgressiveWalk[] = {
     RI_OOT_NEI_WAND_STORM_ROD, RI_OOT_NEI_WAND_SHADOW_SCEPTER,
     // Las 4 runas del Sheikah Slate: items hermanos sobre un slot (cada una con su textbox).
     RI_OOT_NEI_SLATE_RUNE_BOMB, RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE, RI_OOT_NEI_SLATE_RUNE_STASIS,
-    RI_OOT_NEI_SLATE_RUNE_CRYONIS, RI_SONG_LULLABY_INTRO, RI_SONG_LULLABY, // la "cadena" de la Lullaby
+    RI_OOT_NEI_SLATE_RUNE_CRYONIS,
+    // Las 4 caps de Mario Mode: items hermanos sobre los cuatro slots del D-pad.
+    RI_OOT_NEI_MARIO_CAP_WING, RI_OOT_NEI_MARIO_CAP_METAL, RI_OOT_NEI_MARIO_CAP_VANISH, RI_OOT_NEI_MARIO_CAP_FIRE,
+    RI_SONG_LULLABY_INTRO, RI_SONG_LULLABY, // la "cadena" de la Lullaby
 };
 
 // The walk order is the table order, which is also the order the audit script reports in.

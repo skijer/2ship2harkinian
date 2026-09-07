@@ -54,6 +54,7 @@ uint8_t Sm64MarioCaps_GetPhase(int32_t idx); // 0 ready, 1 active, 2 cooldown
 float Sm64MarioCaps_GetCharge(int32_t idx);  // 0..1
 int32_t Sm64MarioCaps_GetRemainingSeconds(int32_t idx);
 int32_t Sm64MarioCaps_GetActiveIndex(void);
+uint8_t Sm64MarioCaps_IsOwned(int32_t idx);
 
 // Mario's independent health as 0..8 wedges (SM64 power-meter segments).
 int32_t Sm64Mario_GetHealthWedges(void);
@@ -332,8 +333,9 @@ void Sm64CapsHudWindow::Draw() {
 
     for (int i = 0; i < kSlotCount; i++) {
         int slot = kDisplayOrder[i]; // panel position i shows this real cap slot
+        bool owned = Sm64MarioCaps_IsOwned(slot) != 0;
         int phase = Sm64MarioCaps_GetPhase(slot);
-        float charge = Sm64MarioCaps_GetCharge(slot);
+        float charge = owned ? Sm64MarioCaps_GetCharge(slot) : 0.0f;
         bool isActive = (slot == activeIdx);
 
         float cy = topY + i * pitch + radius;
@@ -354,7 +356,12 @@ void Sm64CapsHudWindow::Draw() {
         const char* texName = isActive ? kMaskTexName : kSlots[slot].texName;
         ImTextureID tex = fastGui->GetTextureByName(texName);
         if (tex != (ImTextureID)0) {
-            ImU32 tint = (phase == kPhaseCooldown) ? IM_COL32(120, 120, 120, 255) : IM_COL32(255, 255, 255, 255);
+            ImU32 tint = IM_COL32(255, 255, 255, 255);
+            if (!owned) {
+                tint = IM_COL32(40, 40, 40, 160); // silhouette: the cap exists, you just haven't found it
+            } else if (phase == kPhaseCooldown) {
+                tint = IM_COL32(120, 120, 120, 255);
+            }
             ImVec2 iconMin(center.x - iconSize * 0.5f, center.y - iconSize * 0.5f);
             ImVec2 iconMax(center.x + iconSize * 0.5f, center.y + iconSize * 0.5f);
             dl->AddImage(tex, iconMin, iconMax, ImVec2(0, 0), ImVec2(1, 1), tint);
@@ -367,14 +374,15 @@ void Sm64CapsHudWindow::Draw() {
         ImVec2 dpadBtnCenter(center.x - radius - btnGap - btnSize * 0.5f, center.y);
         ImTextureID dpadTex = fastGui->GetTextureByName(kDpadBtnTexName);
         if (dpadTex != (ImTextureID)0) {
-            ImU32 btnTint = (phase == kPhaseCooldown) ? IM_COL32(150, 150, 150, 210) : IM_COL32(255, 255, 255, 255);
+            ImU32 btnTint = (!owned || phase == kPhaseCooldown) ? IM_COL32(150, 150, 150, 210)
+                                                                : IM_COL32(255, 255, 255, 255);
             DrawRotatedImage(dl, dpadTex, dpadBtnCenter, btnSize, kSlots[slot].rot, btnTint);
         } else {
             DrawDirBadge(dl, dpadBtnCenter, btnSize, kSlots[slot].rot, false);
         }
 
         // Timer badge — seconds remaining, only while ACTIVE or COOLDOWN.
-        if (phase != kPhaseReady) {
+        if (owned && phase != kPhaseReady) {
             int secs = Sm64MarioCaps_GetRemainingSeconds(slot);
             std::string txt = std::to_string(secs);
             ImVec2 tsz = font->CalcTextSizeA(timerFontSize, FLT_MAX, 0.0f, txt.c_str());

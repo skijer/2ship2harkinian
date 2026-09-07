@@ -148,6 +148,7 @@ f32 Sm64MarioCaps_GetCharge(s32 idx);           // 0..1 (ACTIVE drains, COOLDOWN
 s32 Sm64MarioCaps_GetRemainingSeconds(s32 idx); // whole seconds left in ACTIVE/COOLDOWN (0 if READY)
 s32 Sm64MarioCaps_GetActiveIndex(void);         // active slot index, or -1
 u8 Sm64MarioCaps_IsFireActive(void);            // true while the Fire cap (D-Up) is active
+u8 Sm64MarioCaps_IsOwned(s32 idx);              // false only for a cap a caps-shuffle seed hasn't placed yet
 
 // Fire Flower: launch a bouncing fireball forward on a fresh B press (Fire cap
 // only). The ball arcs with gravity, bounces off floors, and deals fire damage.

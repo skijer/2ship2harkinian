@@ -99,16 +99,23 @@ u8 gIvanPossessActive = 0;
 // Mario sub-branch.
 #define PLAYER_BOOTS_HOVER (-1)
 
+// The names are libsm64's own Makefile output per platform, so a build of the fork drops in as is.
 #ifdef _WIN32
 #include <windows.h>
 #define SM64_LOAD_LIB(path) LoadLibraryA(path)
 #define SM64_GET_PROC(h, name) (void*)GetProcAddress((HMODULE)(h), name)
 #define SM64_FREE_LIB(h) FreeLibrary((HMODULE)(h))
+#define SM64_LIB_NAME "sm64.dll"
 #else
 #include <dlfcn.h>
 #define SM64_LOAD_LIB(path) dlopen(path, RTLD_LAZY)
 #define SM64_GET_PROC(h, name) dlsym(h, name)
 #define SM64_FREE_LIB(h) dlclose(h)
+#ifdef __APPLE__
+#define SM64_LIB_NAME "libsm64.dylib"
+#else
+#define SM64_LIB_NAME "libsm64.so"
+#endif
 #endif
 
 // =============================================================================
@@ -187,16 +194,35 @@ static void* sDllHandle = NULL;
 // The NEI folder is per game in ComboShip, so the path is built, never a literal (BenPort.h).
 extern const char* Nei_AssetDir(void);
 
+static s32 Sm64_FileExists(const char* path) {
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        return 0;
+    }
+    fclose(f);
+    return 1;
+}
+
+// Nei_AssetDir() is per game under ComboShip ("nei/2ship"), but both builds drop sm64.dll next to
+// the executable, so the plain name is the fallback when the asset folder has no copy.
+static void Sm64_ResolveAssetPath(char* out, size_t size, const char* name) {
+    snprintf(out, size, "%s/%s", Nei_AssetDir(), name);
+    if (Sm64_FileExists(out)) {
+        return;
+    }
+    snprintf(out, size, "%s", name);
+}
+
 static s32 Sm64_LoadDll(void) {
     char libPath[128];
 
     if (sDllHandle)
         return 1;
 
-    snprintf(libPath, sizeof(libPath), "%s/sm64.dll", Nei_AssetDir());
+    Sm64_ResolveAssetPath(libPath, sizeof(libPath), SM64_LIB_NAME);
     sDllHandle = SM64_LOAD_LIB(libPath);
     if (!sDllHandle) {
-        lusprintf(__FILE__, __LINE__, 2, "[SM64] ERROR: Could not load sm64.dll\n");
+        lusprintf(__FILE__, __LINE__, 2, "[SM64] ERROR: Could not load %s\n", SM64_LIB_NAME);
         return 0;
     }
 
@@ -352,19 +378,20 @@ static struct SM64MarioGeometryBuffers sSm64OutBuffers;
     (SM64_MARIO_NORMAL_CAP | SM64_MARIO_VANISH_CAP | SM64_MARIO_METAL_CAP | SM64_MARIO_WING_CAP | \
      SM64_MARIO_CAP_ON_HEAD)
 
-// How often (in frames) to re-upload OOT collision into libsm64 so the LIVE
-// world stays in sync: broken blocks stop colliding, dynapoly doors / moving
-// platforms track their current pose, vanish-cap phase-through uses the current
-// wall set. The static set is otherwise frozen at scene-load.
+// Re-uploading OOT collision into libsm64 is what keeps the LIVE world in sync:
+// moving platforms and dynapoly doors track their current pose, broken blocks stop
+// colliding, actor props appear. It is also the single most expensive thing Mario
+// Mode does — sm64_static_surfaces_load re-partitions thousands of polys — so a
+// rebuild only happens when Sm64Surfaces_GetLiveSignature says something actually
+// moved, no more often than the quality level's frame budget, and at least once
+// every _MAX frames as a safety net for changes the signature can't see (a scene
+// swapping its own collision header).
 //
-// PERF (#4): re-extracting the whole scene + sm64_static_surfaces_load (which
-// rebuilds libsm64's spatial partition for thousands of polys) every 4 frames was
-// the main Mario lag. We now only rebuild when the DYNAPOLY actually changed (a
-// cheap per-frame signature) — but no more often than _FRAMES while it keeps
-// moving, and at least every _MAX frames as a safety net. Net: static scenes load
-// surfaces ONCE; only moving platforms/doors trigger periodic rebuilds.
-#define SM64_SURFACE_REFRESH_FRAMES 4 // min frames between rebuilds while dynapoly moves
-#define SM64_SURFACE_REFRESH_MAX 30   // safety-net rebuild interval when nothing moves
+// gSm64SurfaceRefresh picks the budget: index into kSurfaceRefreshFrames, 0 = off
+// (surfaces frozen at scene load — the cheapest setting for low-end machines).
+static const u8 kSurfaceRefreshFrames[] = { 0, 8, 4, 2 };
+#define SM64_SURFACE_REFRESH_DEFAULT 2
+#define SM64_SURFACE_REFRESH_MAX 300
 
 // =============================================================================
 // Damage / environment reaction actions (sm64.h). Forced via set_mario_action
@@ -448,6 +475,21 @@ static uint8_t* Sm64_LoadRomFile(const char* path, size_t* outSize) {
     return data;
 }
 
+// libsm64 is built from the US decompilation and reads the cartridge data itself, so a byte-swapped
+// dump or another region passes the size check and then renders garbage. The N64 header settles it:
+// magic at 0, internal name at 0x20, country code at 0x3E.
+static s32 Sm64_IsUsRom(const uint8_t* rom) {
+    static const char internalName[] = "SUPER MARIO 64";
+
+    if (rom[0] != 0x80 || rom[1] != 0x37 || rom[2] != 0x12 || rom[3] != 0x40) {
+        return 0;
+    }
+    if (memcmp(&rom[0x20], internalName, sizeof(internalName) - 1) != 0) {
+        return 0;
+    }
+    return rom[0x3E] == 'E';
+}
+
 // =============================================================================
 // Initialization
 // =============================================================================
@@ -468,7 +510,7 @@ static s32 Sm64_InitLibrary(void) {
     romPath = CVarGetString("gSm64RomPath", "");
     if (romPath == NULL || romPath[0] == '\0') {
         static char romDefault[128];
-        snprintf(romDefault, sizeof(romDefault), "%s/sm64.z64", Nei_AssetDir());
+        Sm64_ResolveAssetPath(romDefault, sizeof(romDefault), "sm64.z64");
         romPath = romDefault;
     }
 
@@ -481,6 +523,13 @@ static s32 Sm64_InitLibrary(void) {
 
     if (romSize != 8 * 1024 * 1024) {
         lusprintf(__FILE__, __LINE__, 2, "[SM64] FAIL: ROM wrong size %zu", romSize);
+        free(sSm64RomData);
+        sSm64RomData = NULL;
+        return 0;
+    }
+
+    if (!Sm64_IsUsRom(sSm64RomData)) {
+        lusprintf(__FILE__, __LINE__, 2, "[SM64] FAIL: not the US ROM (byte-swapped dump or another region)");
         free(sSm64RomData);
         sSm64RomData = NULL;
         return 0;
@@ -582,6 +631,39 @@ static u32 Sm64_LoadSceneSurfacesEx(PlayState* play, u8 floorOnly) {
 
 static u32 Sm64_LoadSceneSurfaces(PlayState* play) {
     return Sm64_LoadSceneSurfacesEx(play, 0);
+}
+
+// Keep libsm64's surface set in step with the live world. Runs once per player
+// update; see kSurfaceRefreshFrames for the cost/accuracy trade-off it arbitrates.
+static void Sm64_RefreshLiveSurfaces(PlayState* play) {
+    static u32 sFramesSinceRebuild = 0;
+    static u32 sLastSignature = 0;
+    u32 signature;
+    u8 moved;
+
+    s32 quality = CVarGetInteger("gSm64SurfaceRefresh", SM64_SURFACE_REFRESH_DEFAULT);
+    if (quality <= 0) {
+        return;
+    }
+    if (quality >= (s32)ARRAY_COUNT(kSurfaceRefreshFrames)) {
+        quality = (s32)ARRAY_COUNT(kSurfaceRefreshFrames) - 1;
+    }
+
+    sFramesSinceRebuild++;
+    signature = Sm64Surfaces_GetLiveSignature(play);
+    moved = (signature != sLastSignature);
+
+    if (moved) {
+        if (sFramesSinceRebuild < kSurfaceRefreshFrames[quality]) {
+            return;
+        }
+    } else if (sFramesSinceRebuild < SM64_SURFACE_REFRESH_MAX) {
+        return;
+    }
+
+    Sm64_LoadSceneSurfacesEx(play, (sSm64OutState.flags & SM64_MARIO_VANISH_CAP) != 0);
+    sLastSignature = signature;
+    sFramesSinceRebuild = 0;
 }
 
 // =============================================================================
@@ -1140,6 +1222,7 @@ void Sm64Mario_Update(PlayState* play, Player* player) {
         }
         sSm64OutBuffers.numTrianglesUsed = 0; // stop rendering stale mesh
         sSm64SurfacesForScene = -1;
+        Sm64Surfaces_ClearActorColliders();
 
         // Step 2 — gate creation on collision availability only.
         if (blockReason != 0) {
@@ -1345,6 +1428,8 @@ void Sm64Mario_Update(PlayState* play, Player* player) {
         }
         // Fall through to tick so the animation state machine advances.
     }
+
+    Sm64_RefreshLiveSurfaces(play);
 
     // Build inputs
     cam = GET_ACTIVE_CAM(play);
@@ -1578,6 +1663,12 @@ void Sm64Mario_Draw(PlayState* play, Player* player) {
     Sm64Mario_DrawHeldStick(play);
     Sm64Cappy_Draw(play);
     Sm64Mario_DrawFireballs(play);
+
+    // Snapshot the frame's actor OC cylinders here and not in the update: the OC
+    // list is cleared right before Actor_UpdateAll and props register AFTER the
+    // player, so mid-update it is still half empty. Draw runs once the whole list
+    // is built; the next Sm64_RefreshLiveSurfaces uploads it (1-frame lag).
+    Sm64Surfaces_RefreshActorColliders(play);
 }
 
 // Suspend cascade. While sSm64SuspendActive is true, Sm64Mario_IsActive()

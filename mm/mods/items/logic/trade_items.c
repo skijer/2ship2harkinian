@@ -25,30 +25,21 @@
 // free u8 id. They are still fully visible/cyclable — the wheel runs off the index cursor and resolves
 // art through sTradeIconPaths below, never through the id. Skijer 2026-07-29
 static const u8 sTradeAdultItems[TRADE_ADULT_COUNT] = {
-    ITEM_POCKET_EGG,
-    ITEM_POCKET_CUCCO,
-    ITEM_COJIRO,
+    ITEM_POCKET_EGG, ITEM_POCKET_CUCCO, ITEM_COJIRO,
     ITEM_ODD_MUSHROOM, // 0-3  (OoT adult)
-    ITEM_ODD_POTION,
-    ITEM_SAW,
-    ITEM_SWORD_BROKEN,
+    ITEM_ODD_POTION, ITEM_SAW, ITEM_SWORD_BROKEN,
     ITEM_PRESCRIPTION, // 4-7  (OoT adult)
-    ITEM_FROG,
-    ITEM_EYEDROPS,
+    ITEM_FROG, ITEM_EYEDROPS,
     ITEM_CLAIM_CHECK,   // 8-10 (OoT adult)
     ITEM_MM_MOONS_TEAR, // 11
-    ITEM_MM_DEED_LAND,
-    ITEM_MM_DEED_SWAMP,
-    ITEM_MM_DEED_MOUNTAIN,
+    ITEM_MM_DEED_LAND, ITEM_MM_DEED_SWAMP, ITEM_MM_DEED_MOUNTAIN,
     ITEM_MM_DEED_OCEAN, // 12-15
-    ITEM_MM_ROOM_KEY,
-    ITEM_MM_LETTER_KAFEI,
+    ITEM_MM_ROOM_KEY, ITEM_MM_LETTER_KAFEI,
     ITEM_MM_SPECIAL_DELIVERY, // 16-18
     // MM has a native Pendant, so the wheel must carry ITS id: Anju's script gates the trade on
     // MSCRIPT_CMD_CHECK_ITEM_ACTION(PLAYER_IA_PENDANT_OF_MEMORIES), which only resolves from 0x30.
     ITEM_PENDANT_OF_MEMORIES, // 19
-    ITEM_WEIRD_EGG,
-    ITEM_CHICKEN,
+    ITEM_WEIRD_EGG, ITEM_CHICKEN,
     ITEM_LETTER_ZELDA, // 20-22 (OoT child)
 };
 

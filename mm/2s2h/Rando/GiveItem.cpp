@@ -1141,6 +1141,20 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         case RI_OOT_NEI_MARIO_MASK:
             Nei_Save()->marioMaskOwned = 1;
             break;
+        // Mario Mode caps — sibling items over the four D-pad power-ups. Ownership is a bit each;
+        // sm64_mario_items.c only consults it when the seed shuffled them.
+        case RI_OOT_NEI_MARIO_CAP_WING:
+            Nei_Save()->marioCapsOwned |= (1 << SM64_CAP_WING);
+            break;
+        case RI_OOT_NEI_MARIO_CAP_METAL:
+            Nei_Save()->marioCapsOwned |= (1 << SM64_CAP_METAL);
+            break;
+        case RI_OOT_NEI_MARIO_CAP_VANISH:
+            Nei_Save()->marioCapsOwned |= (1 << SM64_CAP_VANISH);
+            break;
+        case RI_OOT_NEI_MARIO_CAP_FIRE:
+            Nei_Save()->marioCapsOwned |= (1 << SM64_CAP_FIRE);
+            break;
         // Dual Cane: six separate skills on ONE slot. Cane_GiveSkill lights that
         // skill's bit and, if this is the first one found, drops the cane itself
         // into SLOT_CANE_OF_SOMARIA — so any of the six can be the "first" pickup.

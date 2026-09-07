@@ -268,6 +268,10 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_OOT_NEI_MOGMA_MITTS,        "the",  "Mogma Mitts",                RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_POKE_BALL,          "a",    "Poke Ball",                  RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE), // soh English is "Poké Ball"; é dropped (MM charmap-safe)
     RI(RI_OOT_NEI_MARIO_MASK,         "the",  "Mario Mask",                 RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
+    RI(RI_OOT_NEI_MARIO_CAP_WING,     "the",  "Wing Cap",                   RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
+    RI(RI_OOT_NEI_MARIO_CAP_METAL,    "the",  "Metal Cap",                  RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
+    RI(RI_OOT_NEI_MARIO_CAP_VANISH,   "the",  "Vanish Cap",                 RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
+    RI(RI_OOT_NEI_MARIO_CAP_FIRE,     "the",  "Fire Flower",                RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SHOVEL,             "the",  "Shovel",                     RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SPINNER,            "the",  "Spinner",                    RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_NEI_SWITCH_HOOK,        "the",  "Switch Hook",                RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
@@ -1104,7 +1108,12 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
             return "__OTR__textures/icon_item_custom/gItemIconMinishCapTex";
         case RI_OOT_NEI_MOGMA_MITTS:
             return "__OTR__textures/icon_item_custom/gItemIconMogmaMittsTex";
+        // The caps have no icons of their own; the mask is Mario Mode's identity in the pool.
         case RI_OOT_NEI_MARIO_MASK:
+        case RI_OOT_NEI_MARIO_CAP_WING:
+        case RI_OOT_NEI_MARIO_CAP_METAL:
+        case RI_OOT_NEI_MARIO_CAP_VANISH:
+        case RI_OOT_NEI_MARIO_CAP_FIRE:
             return "__OTR__textures/icon_item_custom/gItemIconMarioMaskTex";
         case RI_OOT_NEI_POKE_BALL:
             return "__OTR__textures/icon_item_custom/gItemIconPokeballTex";

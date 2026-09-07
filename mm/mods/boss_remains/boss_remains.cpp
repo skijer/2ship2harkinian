@@ -26,7 +26,7 @@
 
 #include "boss_remains.h"
 
-#include <libultraship/bridge.h>                  // CVarGetInteger
+#include <libultraship/bridge.h>                      // CVarGetInteger
 #include "2s2h/CustomMessage/PauseItemDescriptions.h" // C-Up description on the quest page
 
 // OPEN_DISPS / CLOSE_DISPS redeclare these two symbols inline at each call site; in a C++ TU that

@@ -944,6 +944,7 @@ static const NeiRandoOption kNeiRandoOptions[] = {
     { RO_ELEMENTAL_WAND_SHUFFLE, RO_WAND_ELEMENTAL_SHUFFLE },
     { RO_CROSSOVER_POKEBALL, 1 },
     { RO_CROSSOVER_MARIO_MASK, 1 },
+    { RO_SHUFFLE_MARIO_CAPS, 1 },
 };
 
 // Both Crossover items share ONE feature toggle, so this only ever turns it on: mirroring either
@@ -1303,6 +1304,13 @@ static void DrawItemPoolTab() {
                                            "Not considered by logic." } }))) {
         NeiRando_EnableCrossover();
     }
+    CVarCheckbox("Shuffle Mario Caps", Rando::StaticData::Options[RO_SHUFFLE_MARIO_CAPS].cvar,
+                 CheckboxOptions({ { .tooltip =
+                                         "Adds Mario Mode's four D-pad power-ups — Wing, Metal, Vanish and Fire —\n"
+                                         "to the pool as separate items. Until each one is found its D-pad slot is\n"
+                                         "locked and shows a silhouette.\n\n"
+                                         "Off: every cap works from the start, as it always has.\n\n"
+                                         "Not considered by logic." } }));
     if (CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_NEI_ITEMS].cvar, RO_GENERIC_OFF)) {
         // Bomb Arrows have no inventory slot any more — they are the last entry of the bow's
         // element wheel, so this is purely about how you come by them. The seed-locked value mirrors

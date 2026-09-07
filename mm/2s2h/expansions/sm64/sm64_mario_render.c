@@ -31,6 +31,7 @@
 
 #include "z64.h"
 #include "functions.h"
+#include <math.h>
 
 #define SM64_LIB_FN
 #include "expansions/sm64/libsm64.h"
@@ -143,6 +144,94 @@ static inline void Sm64Render_SampleChrome(const f32* nrm, u8* outR, u8* outG, u
     *outB = sSm64MetalTex[mtIdx + 2];
 }
 
+// =============================================================================
+// Scene lighting. libsm64 bakes its own directional shading into the vertex
+// colors and we render with G_LIGHTING OFF, so Mario used to look identical at
+// noon, at midnight and inside a cave. We can't hand the job to the RSP — Vtx
+// packs the normal and the color into the same bytes, and the color is carrying
+// the chrome envmap / Fire / Harpoon recolors — so the scene's light is folded
+// into the vertex color in CPU instead, with the same math the RSP would do:
+// ambient + Σ max(0, N·L) × lightColor, clamped at 255. A vert already lit to
+// full white by the scene comes out unchanged, which is why the old look is
+// exactly what a bright outdoor setting still produces.
+// =============================================================================
+typedef struct {
+    f32 ambient[3];
+    f32 dir[2][3];
+    f32 color[2][3];
+    f32 strength;
+} Sm64SceneLight;
+
+static Sm64SceneLight sSceneLight;
+
+static void Sm64Render_ReadDirLight(LightInfo* info, f32* outDir, f32* outColor) {
+    f32 x = (f32)info->params.dir.x;
+    f32 y = (f32)info->params.dir.y;
+    f32 z = (f32)info->params.dir.z;
+    f32 mag = sqrtf(x * x + y * y + z * z);
+
+    if (mag < 0.001f) {
+        mag = 1.0f;
+    }
+    outDir[0] = x / mag;
+    outDir[1] = y / mag;
+    outDir[2] = z / mag;
+    outColor[0] = (f32)info->params.dir.color[0];
+    outColor[1] = (f32)info->params.dir.color[1];
+    outColor[2] = (f32)info->params.dir.color[2];
+}
+
+// Snapshot the frame's light once, so the per-vertex path is three dot products.
+// A NULL play means "no world light" (the kaleido pause doll, which is lit by its
+// own setup and must not go dark because the room behind the menu is).
+static void Sm64Render_UpdateSceneLight(PlayState* play) {
+    s32 i;
+
+    sSceneLight.strength = (play != NULL) ? CVarGetFloat("gSm64SceneLighting", 1.0f) : 0.0f;
+    if (sSceneLight.strength <= 0.0f) {
+        return;
+    }
+    for (i = 0; i < 3; i++) {
+        sSceneLight.ambient[i] = (f32)play->lightCtx.ambientColor[i];
+    }
+    Sm64Render_ReadDirLight(&play->envCtx.dirLight1, sSceneLight.dir[0], sSceneLight.color[0]);
+    Sm64Render_ReadDirLight(&play->envCtx.dirLight2, sSceneLight.dir[1], sSceneLight.color[1]);
+}
+
+// Modulate one vertex color by the scene light for the vertex's normal.
+static void Sm64Render_ApplySceneLight(const f32* normal, u32* r, u32* g, u32* b) {
+    f32 lit[3];
+    s32 i;
+    s32 c;
+
+    if (sSceneLight.strength <= 0.0f) {
+        return;
+    }
+    for (c = 0; c < 3; c++) {
+        lit[c] = sSceneLight.ambient[c];
+    }
+    for (i = 0; i < 2; i++) {
+        f32 diffuse = normal[0] * sSceneLight.dir[i][0] + normal[1] * sSceneLight.dir[i][1] +
+                      normal[2] * sSceneLight.dir[i][2];
+        if (diffuse <= 0.0f) {
+            continue;
+        }
+        for (c = 0; c < 3; c++) {
+            lit[c] += sSceneLight.color[i][c] * diffuse;
+        }
+    }
+
+    u32* channel[3] = { r, g, b };
+    for (c = 0; c < 3; c++) {
+        f32 scale;
+        if (lit[c] > 255.0f) {
+            lit[c] = 255.0f;
+        }
+        scale = 1.0f + (lit[c] / 255.0f - 1.0f) * sSceneLight.strength;
+        *channel[c] = (u32)((f32)*channel[c] * scale);
+    }
+}
+
 // Single-pass triangle emission. Combiner is constant — vertex color (SHADE)
 // drives the appearance for body verts (texel alpha=0), texture drives it
 // for face/M-logo/eye verts (texel alpha>0). For metal cap, SHADE is the
@@ -194,9 +283,13 @@ static void emitTrisSingle(PlayState* play, struct SM64MarioGeometryBuffers* buf
             if (metalActive && nrm != NULL && sSm64MetalTexBuilt) {
                 u8 cr, cg, cb;
                 Sm64Render_SampleChrome(&nrm[vIdx], &cr, &cg, &cb);
-                vtx[vCount].v.cn[0] = cr;
-                vtx[vCount].v.cn[1] = cg;
-                vtx[vCount].v.cn[2] = cb;
+                u32 r = cr;
+                u32 g = cg;
+                u32 b = cb;
+                Sm64Render_ApplySceneLight(&nrm[vIdx], &r, &g, &b);
+                vtx[vCount].v.cn[0] = (u8)r;
+                vtx[vCount].v.cn[1] = (u8)g;
+                vtx[vCount].v.cn[2] = (u8)b;
             } else {
                 u32 r = (u32)(col[vIdx + 0] * 255.0f);
                 u32 g = (u32)(col[vIdx + 1] * 255.0f);
@@ -232,6 +325,9 @@ static void emitTrisSingle(PlayState* play, struct SM64MarioGeometryBuffers* buf
                 u32 ar = (r * SM64_BODY_BRIGHTNESS_NUM / SM64_BODY_BRIGHTNESS_DEN);
                 u32 ag = (g * SM64_BODY_BRIGHTNESS_NUM / SM64_BODY_BRIGHTNESS_DEN);
                 u32 ab = (b * SM64_BODY_BRIGHTNESS_NUM / SM64_BODY_BRIGHTNESS_DEN);
+                if (nrm != NULL) {
+                    Sm64Render_ApplySceneLight(&nrm[vIdx], &ar, &ag, &ab);
+                }
                 vtx[vCount].v.cn[0] = (u8)ar;
                 vtx[vCount].v.cn[1] = (u8)ag;
                 vtx[vCount].v.cn[2] = (u8)ab;
@@ -293,6 +389,8 @@ void Sm64Render_DrawMarioMesh(PlayState* play, struct SM64MarioGeometryBuffers* 
     //   Vanish: same as normal, all verts dropped to alpha=100 (ghost).
     if (buffers->numTrianglesUsed == 0 || sMarioTextureAtlas == NULL)
         return;
+
+    Sm64Render_UpdateSceneLight((modelMtx != NULL) ? NULL : play);
 
     // Bucket selection:
     //   Vanish:   XLU (translucent ghost — needs per-pixel alpha blend).

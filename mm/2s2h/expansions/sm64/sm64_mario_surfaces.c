@@ -19,6 +19,11 @@
 // (~60u), so we upsize OOT geometry by 4 to give Mario room to fit.
 #define SM64_WORLD_SCALE 4
 
+// FNV-1a step, used to fingerprint the moving parts of the surface set.
+static u32 hashSurfaceValue(u32 hash, s32 value) {
+    return (hash ^ (u32)value) * 16777619u;
+}
+
 // Write one SM64 surface from an OOT poly+vtxList. Vertices are passed in
 // OOT's original order (A, B, C). libsm64 computes normals as
 // (v2-v1)×(v3-v2), which is mathematically equivalent to (v2-v1)×(v3-v1),
@@ -61,6 +66,7 @@ static void writeSurface(struct SM64Surface* out, CollisionPoly* poly, Vec3s* vt
 #define SM64_ACTOR_SURF_MAX 1024 // ~ COLLISION_CHECK_OC_MAX(50) * 16 walls + headroom
 static struct SM64Surface sActorSurfaces[SM64_ACTOR_SURF_MAX];
 static u32 sActorSurfaceCount = 0;
+static u32 sActorSurfaceSig = 0;
 
 // Write one SM64 surface from three OOT-space points (scaled into libsm64 world).
 static void emitActorTri(struct SM64Surface* out, f32 ax, f32 ay, f32 az, f32 bx, f32 by, f32 bz, f32 cx, f32 cy,
@@ -251,6 +257,7 @@ void Sm64Surfaces_RefreshActorColliders(PlayState* play) {
     s32 i;
 
     sActorSurfaceCount = 0;
+    sActorSurfaceSig = 0;
     if (play == NULL)
         return;
     cc = &play->colChkCtx;
@@ -286,7 +293,51 @@ void Sm64Surfaces_RefreshActorColliders(PlayState* play) {
         by = (f32)cyl->dim.pos.y + (f32)cyl->dim.yShift;
         ty = by + (f32)cyl->dim.height;
         emitActorPrism(cx, cz, by, ty, r);
+        sActorSurfaceSig = hashSurfaceValue(sActorSurfaceSig, (s32)cx);
+        sActorSurfaceSig = hashSurfaceValue(sActorSurfaceSig, (s32)cz);
+        sActorSurfaceSig = hashSurfaceValue(sActorSurfaceSig, (s32)by);
+        sActorSurfaceSig = hashSurfaceValue(sActorSurfaceSig, (s32)ty);
+        sActorSurfaceSig = hashSurfaceValue(sActorSurfaceSig, (s32)r);
     }
+}
+
+// Drop the snapshot so a scene change can't upload the previous scene's props as
+// phantom walls on the first frame of the new one.
+void Sm64Surfaces_ClearActorColliders(void) {
+    sActorSurfaceCount = 0;
+    sActorSurfaceSig = 0;
+}
+
+// Cheap per-frame fingerprint of everything in the surface set that can MOVE:
+// every active dynapoly actor's pose plus the actor-collider snapshot. Compared
+// frame to frame by Sm64_RefreshLiveSurfaces to decide whether a rebuild (which
+// re-partitions thousands of polys inside libsm64) is worth paying for.
+// Positions are truncated to whole OOT units so a platform's idle sub-unit bob
+// doesn't rebuild every frame.
+u32 Sm64Surfaces_GetLiveSignature(PlayState* play) {
+    DynaCollisionContext* dyna;
+    u32 sig = 2166136261u;
+    s32 bgId;
+
+    if (play == NULL)
+        return 0;
+
+    dyna = &play->colCtx.dyna;
+    for (bgId = 0; bgId < BG_ACTOR_MAX; bgId++) {
+        BgActor* bg;
+        if (!(dyna->bgActorFlags[bgId] & 1))
+            continue;
+        bg = &dyna->bgActors[bgId];
+        sig = hashSurfaceValue(sig, bgId);
+        sig = hashSurfaceValue(sig, bg->dynaLookup.polyStartIndex);
+        sig = hashSurfaceValue(sig, (s32)bg->curTransform.pos.x);
+        sig = hashSurfaceValue(sig, (s32)bg->curTransform.pos.y);
+        sig = hashSurfaceValue(sig, (s32)bg->curTransform.pos.z);
+        sig = hashSurfaceValue(sig, bg->curTransform.rot.x);
+        sig = hashSurfaceValue(sig, bg->curTransform.rot.y);
+        sig = hashSurfaceValue(sig, bg->curTransform.rot.z);
+    }
+    return sig ^ sActorSurfaceSig;
 }
 
 f32 Sm64Surfaces_GetWaterLevel(PlayState* play, f32 x, f32 z) {

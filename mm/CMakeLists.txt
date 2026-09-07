@@ -572,20 +572,8 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
     )
 endif()
 
-# Mario Mode: ship sm64.dll next to the executable. The DLL is loaded
-# dynamically via LoadLibraryA at runtime (see sm64_mario.c — no import
-# library, no link-time dependency), so this copy is the only wiring the
-# build system needs.
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    add_custom_command(
-        TARGET ${PROJECT_NAME}
-        POST_BUILD
-        COMMENT "Copying sm64.dll for Mario Mode..."
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${CMAKE_CURRENT_SOURCE_DIR}/2s2h/expansions/sm64/sm64.dll
-            $<TARGET_FILE_DIR:2ship>/sm64.dll
-    )
-endif()
+# Mario Mode's sm64.dll is not copied by the build: it is installed next to the ROM, in nei/, by
+# the installer (see sm64_mario.c — the library is opened by name at run time, never linked).
 
 # Harpoon multiplayer data: copy the harpoon/ folder (gamemodes/*/gamemode.yaml
 # + skins/) next to the executable so the client can scan installed gamemodes

@@ -311,7 +311,19 @@ typedef struct NeiSaveData {
     // pickup grants one season (slate idiom, no levels). APPENDED AT THE END.
     uint8_t season;       // SEASON_* — the season the cell shows
     uint8_t seasonsOwned; // SEASON_* bitmask (four bits) — 0 = rod not owned at all
+    // Mario Mode caps — SM64_CAP_* bitmask. Only consulted when the seed shuffles them
+    // (RO_SHUFFLE_MARIO_CAPS); outside that every cap is available, which is what keeps
+    // Mario Mode unchanged for non-rando files. APPENDED AT THE END.
+    uint8_t marioCapsOwned;
 } NeiSaveData;
+
+// Mario Mode cap ids. Index == D-pad slot in sm64_mario_items.c kCapDefs; the bitmask is
+// what marioCapsOwned stores.
+#define SM64_CAP_WING 0
+#define SM64_CAP_METAL 1
+#define SM64_CAP_VANISH 2
+#define SM64_CAP_FIRE 3
+#define SM64_CAP_COUNT 4
 
 // Hookshot-cell variant ids (which item currently fires from SLOT_HOOKSHOT). Returned by
 // Nei_HookshotVariant(); consumed by z_arms_hook.c (reach/speed) and the in-hand draw.

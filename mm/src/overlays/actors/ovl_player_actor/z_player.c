@@ -3101,11 +3101,11 @@ void Player_InitItemActionWithAnim(PlayState* play, Player* this, PlayerItemActi
 }
 
 s8 sItemItemActions[] = {
-    PLAYER_IA_OCARINA,                 // ITEM_OCARINA_OF_TIME,
-    PLAYER_IA_BOW,                     // ITEM_BOW,
-    PLAYER_IA_BOW_FIRE,                // ITEM_ARROW_FIRE,
-    PLAYER_IA_BOW_ICE,                 // ITEM_ARROW_ICE,
-    PLAYER_IA_BOW_LIGHT,               // ITEM_ARROW_LIGHT,
+    PLAYER_IA_OCARINA,   // ITEM_OCARINA_OF_TIME,
+    PLAYER_IA_BOW,       // ITEM_BOW,
+    PLAYER_IA_BOW_FIRE,  // ITEM_ARROW_FIRE,
+    PLAYER_IA_BOW_ICE,   // ITEM_ARROW_ICE,
+    PLAYER_IA_BOW_LIGHT, // ITEM_ARROW_LIGHT,
     // NEI: 0x05 is a dead OoT leftover in vanilla MM, wired to the Pictograph Box. The combo hands
     // OoT's Fairy Ocarina over on this id, so it has to play like an ocarina.
     PLAYER_IA_OCARINA,                 // ITEM_OCARINA_FAIRY,

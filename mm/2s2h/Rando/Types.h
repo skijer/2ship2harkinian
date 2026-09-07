@@ -3219,6 +3219,13 @@ typedef enum {
     // Crossover Items: the Mario Mask twin of RI_OOT_NEI_POKE_BALL. No inventory cell — it lights
     // NeiSaveData.marioMaskOwned, which is what unlocks MARIO MODE on the equipment page.
     RI_OOT_NEI_MARIO_MASK,
+    // Mario Mode caps — four sibling items over the D-pad power-ups (slate idiom: any order, no
+    // levels). Each lights its bit in NeiSaveData.marioCapsOwned; without the shuffle option every
+    // cap is available from the start, exactly as before. Skijer's NEI
+    RI_OOT_NEI_MARIO_CAP_WING,
+    RI_OOT_NEI_MARIO_CAP_METAL,
+    RI_OOT_NEI_MARIO_CAP_VANISH,
+    RI_OOT_NEI_MARIO_CAP_FIRE,
     RI_MAX_TRAP, // Just used for ice trap ice cube model
     RI_MAX,
 } RandoItemId;
@@ -3625,6 +3632,9 @@ typedef enum {
     // gate instead of riding RO_SHUFFLE_NEI_ITEMS.
     RO_CROSSOVER_POKEBALL,
     RO_CROSSOVER_MARIO_MASK,
+    // Mario Mode's four caps as real items instead of a starting loadout. Read from C by
+    // sm64_mario_items.c through the option's CVar.
+    RO_SHUFFLE_MARIO_CAPS,
     RO_MAX,
 } RandoOptionId;
 

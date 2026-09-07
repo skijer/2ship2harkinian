@@ -44,7 +44,8 @@ static const ItemDescEntry sCustomItemDescs[] = {
       "Fairy flight for 10s. Ignores walls.\nA=up, B=down, L=sprint. 24 MP." }, // RETIRED item; row kept for old saves
     // 2026-08-06 page-2 additions. Shadow Crystal and Rod of Seasons are model-only on this side.
     { EXT_ITEM_SHEIKAH_SLATE, "C draws the slate, then casts the\nactive rune. Hold L for the rune wheel." },
-    { EXT_ITEM_PHANTOM_HOURGLASS, "C stops time and aims. C again rewinds\nwhat the reticle holds along its own\npath. C or B lets go." },
+    { EXT_ITEM_PHANTOM_HOURGLASS,
+      "C stops time and aims. C again rewinds\nwhat the reticle holds along its own\npath. C or B lets go." },
     { EXT_ITEM_SHADOW_CRYSTAL, "Cursed twilight crystal. Turns Link\ninto Wolf Link. OoT only for now." },
     { EXT_ITEM_ROD_OF_SEASONS, "Rod bearing the four seasons.\nOoT only for now." },
     { ITEM_ZONAI_PERMAFROST,
@@ -68,7 +69,8 @@ static const ItemDescEntry sCustomItemDescs[] = {
     { ITEM_ROD_FIRE, "Slash=3 fireballs. Stab=long shot.\nJump=flamethrower. Spin=fire AoE.\nC-Up to aim." },
     { ITEM_ROD_ICE, "Slash=3 iceballs. Stab=long shot.\nJump=ice wave. Spin=ice AoE.\nC-Up to aim." },
     { ITEM_ROD_LIGHT, "Slash=3 orbs. Stab=long shot.\nJump=beam. Spin=light AoE.\nC-Up to aim." },
-    { ITEM_BEETLE, "Hold C to aim, release to launch.\nStick steers, A boosts, Z locks on,\nB lets it fly home on its own." },
+    { ITEM_BEETLE,
+      "Hold C to aim, release to launch.\nStick steers, A boosts, Z locks on,\nB lets it fly home on its own." },
     { ITEM_SHOVEL, "Dig to uncover grottos, Gold\nSkulltulas and buried rewards." },
     { ITEM_MINISH_CAP,
       "C by a pod soil: fast travel map.\nC away from one: shrink or grow back.\nGold Skulltulas unlock the soils." },
@@ -145,8 +147,8 @@ static const ItemDescEntry sExtEquipDescs[] = {
     { ITEM_EXT_SHIELD_2, "Kite Shield. R in mid-air to surf.\nDownhill builds speed. A hops, B spins." },
     { ITEM_EXT_SHIELD_3,
       "Shield of Ikana. Perfect guards drain\nlife; revives you once per scene.\nOoT only for now." },
-    { ITEM_EXT_TUNIC_1,
-      "Champion's Tunic. Dodge past an attack\nfor a Flurry Rush, aim in mid-air for\nBullet Time. Both slow time to 33%." },
+    { ITEM_EXT_TUNIC_1, "Champion's Tunic. Dodge past an attack\nfor a Flurry Rush, aim in mid-air for\nBullet Time. "
+                        "Both slow time to 33%." },
     { ITEM_EXT_TUNIC_2,
       "Spirit Tunic. Rupees absorb damage,\n1 HP each, and the fire and water\ntimers stop. At zero you are slow." },
     { ITEM_EXT_TUNIC_3, "Sage's Tunic. Each medallion you own\nadds a passive resistance while worn." },
@@ -198,8 +200,7 @@ static const ItemDescEntry sBossRemainsDescs[] = {
                          "for a thunder\nbolt (4 MP). R+B throws a bombchu." },
     { ITEM_REMAINS_GYORG, "Press its button to wear it.\nSwim like a Zora. In water R calls a\nfish school and B "
                           "holds a whirlpool;\non land R+B calls the fish." },
-    { ITEM_REMAINS_TWINMOLD,
-      "Press its button to wear it.\nIts Dark Link companion is not\nimplemented yet." },
+    { ITEM_REMAINS_TWINMOLD, "Press its button to wear it.\nIts Dark Link companion is not\nimplemented yet." },
 };
 
 static const char* PauseItemDesc_Find(const ItemDescEntry* table, size_t count, u16 itemId) {

@@ -4,6 +4,7 @@
  */
 
 #include "expansions/sm64/sm64_mario.h"
+#include "mods/nei_save.h" // marioCapsOwned + SM64_CAP_* — lands later in z_player.c's own chain
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h"
 #include "overlays/actors/ovl_En_Boom/z_en_boom.h"
 #include "overlays/actors/ovl_En_Arrow/z_en_arrow.h"
@@ -37,11 +38,13 @@
 // =============================================================================
 
 // Slot / panel order (top→bottom in the corner HUD): Wing, Metal, Vanish, Fire.
-#define SM64_CAP_SLOT_WING 0
-#define SM64_CAP_SLOT_METAL 1
-#define SM64_CAP_SLOT_VANISH 2
-#define SM64_CAP_SLOT_FIRE 3
-#define SM64_CAP_SLOT_COUNT 4
+// The ids themselves live in nei_save.h — marioCapsOwned stores them as a bitmask and
+// the randomizer's give arms write them, so the two can't be allowed to drift.
+#define SM64_CAP_SLOT_WING SM64_CAP_WING
+#define SM64_CAP_SLOT_METAL SM64_CAP_METAL
+#define SM64_CAP_SLOT_VANISH SM64_CAP_VANISH
+#define SM64_CAP_SLOT_FIRE SM64_CAP_FIRE
+#define SM64_CAP_SLOT_COUNT SM64_CAP_COUNT
 
 typedef struct {
     u16 btn;         // D-pad bind
@@ -70,6 +73,24 @@ typedef struct {
 static Sm64CapState sCapStates[SM64_CAP_SLOT_COUNT];
 static s32 sActiveCap = -1; // index of the ACTIVE cap, or -1
 static u8 sCapStatesInited = 0;
+
+// A cap is yours unless the seed shuffled the four of them into the item pool, in
+// which case marioCapsOwned is the record of which ones you have found.
+u8 Sm64MarioCaps_IsOwned(s32 idx) {
+    if (idx < 0 || idx >= SM64_CAP_SLOT_COUNT) {
+        return 0;
+    }
+    // The option's CVar is the only view of it C code has (same route the Elemental Wand
+    // shuffle takes). Pairing it with the save type keeps a menu tick from locking the caps
+    // of a plain file.
+    if (gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO) {
+        return 1;
+    }
+    if (!CVarGetInteger("gRando.Options.RO_SHUFFLE_MARIO_CAPS", 0)) {
+        return 1;
+    }
+    return (Nei_Save()->marioCapsOwned & (1 << idx)) != 0;
+}
 
 static void Sm64Caps_EnsureInit(void) {
     if (sCapStatesInited)
@@ -179,6 +200,10 @@ static void Sm64Caps_Press(s32 idx) {
     Sm64Caps_EnsureInit();
     Sm64CapState* s = &sCapStates[idx];
 
+    if (!Sm64MarioCaps_IsOwned(idx)) {
+        Audio_PlaySfx(NA_SE_SY_ERROR);
+        return;
+    }
     if (s->phase == SM64_CAP_PHASE_ACTIVE) {
         // Toggle off → proportional cooldown.
         Sm64Caps_DeactivateActive(1);

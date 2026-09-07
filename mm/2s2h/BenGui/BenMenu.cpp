@@ -216,6 +216,15 @@ static const std::vector<const char*> mirroredWorldModes = {
     "Dungeons Random (Seeded)", // MIRRORED_WORLD_DUNGEONS_RANDOM_SEEDED
 };
 
+// Index into kSurfaceRefreshFrames (sm64_mario.c) — how eagerly Mario's collision
+// tracks moving geometry.
+static const std::vector<const char*> sm64SurfaceRefreshModes = {
+    "Off (scene load only)",
+    "Low",
+    "Medium",
+    "High",
+};
+
 static const std::unordered_map<int32_t, const char*> damageMultiplierOptions = {
     { 0, "1x" }, { 1, "2x" }, { 2, "4x" }, { 3, "8x" }, { 4, "16x" }, { 10, "1 Hit KO" },
 };
@@ -1200,6 +1209,24 @@ void BenMenu::AddEnhancements() {
             "volume. Default 0.8 to blend with MM's BGM.\n\n"
             "Place your SM64 US Z64 ROM as `sm64.z64` next to 2ship.exe to "
             "enable Mario Mode."));
+    AddWidget(path, "Mario Scene Lighting", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gSm64SceneLighting")
+        .Options(FloatSliderOptions().Min(0.0f).Max(1.0f).DefaultValue(1.0f).Step(0.05f).Format("%.2f").Tooltip(
+            "How much the scene's own light affects Mario. libsm64 ships its own baked shading, so "
+            "at 0 Mario looks the same at noon, at midnight and inside a cave.\n\n"
+            "1 lights him like any other actor: ambient plus the two directional scene lights."));
+    AddWidget(path, "Mario Collision Updates", WIDGET_CVAR_COMBOBOX)
+        .CVar("gSm64SurfaceRefresh")
+        .Options(ComboboxOptions()
+                     .DefaultIndex(2)
+                     .Tooltip("How often Mario's collision is rebuilt from the live world. Rebuilding is the "
+                              "most expensive part of Mario Mode, so lower it on weaker machines.\n\n"
+                              " - Off: collision is frozen at scene load. Cheapest, but moving platforms, "
+                              "doors and props stay where they were when the scene loaded.\n"
+                              " - Low / Medium / High: rebuild at most every 8 / 4 / 2 frames, and only "
+                              "when something actually moved. A completely static room costs nothing at "
+                              "any of these settings.")
+                     .ComboVec(&sm64SurfaceRefreshModes));
     AddWidget(path, "Other", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Milk Run Reward Options", WIDGET_CVAR_COMBOBOX)
         .CVar("gEnhancements.Minigames.CremiaHugs")

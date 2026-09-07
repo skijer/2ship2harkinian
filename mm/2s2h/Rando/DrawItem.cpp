@@ -3560,7 +3560,13 @@ void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* 
         case RI_OOT_NEI_MOGMA_MITTS:
             DrawOotNeiMogmaMitts();
             break;
+        // The caps have no models of their own, so they present as the Mario Mask — the
+        // textbox name is what tells the four apart.
         case RI_OOT_NEI_MARIO_MASK:
+        case RI_OOT_NEI_MARIO_CAP_WING:
+        case RI_OOT_NEI_MARIO_CAP_METAL:
+        case RI_OOT_NEI_MARIO_CAP_VANISH:
+        case RI_OOT_NEI_MARIO_CAP_FIRE:
             DrawOotNeiMarioMask();
             break;
         case RI_OOT_NEI_POKE_BALL:

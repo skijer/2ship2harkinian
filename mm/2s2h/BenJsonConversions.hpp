@@ -140,6 +140,11 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "ootCanGrab", n.ootCanGrab },
         { "activeCustomForm", n.activeCustomForm },
         { "marioMaskOwned", n.marioMaskOwned },
+        // season / seasonsOwned were never listed here, so the Rod of Seasons lost every
+        // season it had found on save/load.
+        { "season", n.season },
+        { "seasonsOwned", n.seasonsOwned },
+        { "marioCapsOwned", n.marioCapsOwned },
     };
 }
 
@@ -267,6 +272,9 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.ootCanGrab = j.value("ootCanGrab", (uint8_t)0);
     n.activeCustomForm = j.value("activeCustomForm", (uint8_t)0);
     n.marioMaskOwned = j.value("marioMaskOwned", (uint8_t)0);
+    n.season = j.value("season", (uint8_t)0);
+    n.seasonsOwned = j.value("seasonsOwned", (uint8_t)0);
+    n.marioCapsOwned = j.value("marioCapsOwned", (uint8_t)0);
 }
 
 // Spiritual Stones — per-save state (gSaveContext.save.shipSaveInfo.spiritualStones).

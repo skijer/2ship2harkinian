@@ -656,6 +656,14 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     if (saveInfo.randoSaveOptions[RO_CROSSOVER_MARIO_MASK] == RO_GENERIC_YES) {
         itemPool.push_back(RI_OOT_NEI_MARIO_MASK);
     }
+    // Mario Mode caps. Independent of the mask on purpose: the mask decides whether Mario Mode is
+    // reachable at all, this decides whether its power-ups start unlocked.
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_MARIO_CAPS] == RO_GENERIC_YES) {
+        itemPool.push_back(RI_OOT_NEI_MARIO_CAP_WING);
+        itemPool.push_back(RI_OOT_NEI_MARIO_CAP_METAL);
+        itemPool.push_back(RI_OOT_NEI_MARIO_CAP_VANISH);
+        itemPool.push_back(RI_OOT_NEI_MARIO_CAP_FIRE);
+    }
 }
 
 } // namespace Logic

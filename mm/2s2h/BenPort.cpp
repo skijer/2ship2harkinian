@@ -378,6 +378,16 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
     CheckAndCreateModFolder();
 #endif
 
+    // `--fleet-extract` means nobody is at the keyboard: extract the ROM we were given and exit,
+    // instead of stopping at "All files have been processed. Run 2S2H?".
+    const bool fleetExtractOnly = FleetShipCombo_IsExtractOnly();
+    if (fleetExtractOnly) {
+        if (args.empty()) {
+            exit(1);
+        }
+        extractStep = ES_EXTRACT_ARGS;
+    }
+
     while (!extractDone) {
         if (BenGui::PopupsQueued() > 0 || extractionTask.has_value()) {
             goto render;
@@ -487,6 +497,9 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
             }
             case ES_EXTRACT_ARGS: {
 #if !defined(__SWITCH__) && !defined(__WIIU__)
+                if (args.empty() && fleetExtractOnly) {
+                    exit(0);
+                }
                 if (args.empty()) {
                     BenGui::RegisterPopup(
                         "Run 2 Ship 2 Harkinian", "All files have been processed. Run 2S2H?", "Yes", "No",
@@ -506,8 +519,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                 args.erase(args.begin());
                 extract = Extractor();
                 if (extract.RunFileStandalone(file)) {
-                    bool doExtract = true;
-                    if (std::filesystem::exists(Ship::Context::GetAppDirectoryPath(appShortName) + "/mm.o2r")) {
+                    if (!fleetExtractOnly &&
+                        std::filesystem::exists(Ship::Context::GetAppDirectoryPath(appShortName) + "/mm.o2r")) {
                         std::string msg = "Archive for current ROM, mm.o2r, already exists.\nExtract again?";
                         BenGui::RegisterPopup("Confirm Re-extract", msg.c_str(), "Yes", "No", [&]() {
                             extractionTask = threadPool->submit_task([&]() -> void {
@@ -523,8 +536,9 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                             extractCount = totalExtract = 0;
                         });
                     }
+                } else if (fleetExtractOnly) {
+                    exit(1);
                 } else {
-                    bool open = true;
                     std::string msg = "File\n" + std::string(file) + "\nis not a ROM or does not match supported ROMs.";
                     BenGui::RegisterPopup("2S2H ROM Error", msg.c_str());
                 }
@@ -810,8 +824,8 @@ void OTRGlobals::Initialize() {
     // icons, icon_item_24_static medallions) resolve to the companion. This is the EXACT pattern
     // SoH uses to mount MM's mm.o2r alongside OoT (mm_asset_loader.cpp LoadMmO2r).
     {
-        const std::string companionCandidates[] = { "oot.o2r", std::string(Nei_AssetDir()) + "/oot.o2r",
-                                                    "mods/oot.o2r", "../oot.o2r" };
+        const std::string companionCandidates[] = { "oot.o2r", std::string(Nei_AssetDir()) + "/oot.o2r", "mods/oot.o2r",
+                                                    "../oot.o2r" };
         std::string ootPath;
         for (const std::string& candidate : companionCandidates) {
             std::string p = Ship::Context::LocateFileAcrossAppDirs(candidate, appShortName);
