@@ -1,0 +1,11 @@
+{
+    "name": "enemy_rain",
+    "author": "claude",
+    "version": "1.0",
+    "description": "Every minute a random small enemy shows up next to you.",
+    "binaries": {
+        "windows_x64": "bin/enemy_rain.dll",
+        "linux_x64": "bin/enemy_rain.so",
+        "darwin": "bin/enemy_rain.dylib"
+    }
+}

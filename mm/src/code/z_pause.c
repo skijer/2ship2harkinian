@@ -24,6 +24,7 @@
 #include "controller.h"
 #include "padutils.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#include "2s2h/FleetShipCombo/FleetShipCombo.h"
 
 void FrameAdvance_Init(FrameAdvanceContext* frameAdvCtx) {
     frameAdvCtx->timer = 0;
@@ -34,6 +35,13 @@ void FrameAdvance_Init(FrameAdvanceContext* frameAdvCtx) {
  * Returns true when frame advance is not active (game will run normally)
  */
 s32 FrameAdvance_Update(FrameAdvanceContext* frameAdvCtx, Input* input) {
+    // Fleet Ship Combo: an inactive game is normally PARKED in the waiting room (a sealed scene
+    // with time speed 0) and keeps running there. The full freeze only remains as the fallback for
+    // an inactive game that could not be parked.
+    if (FleetShipCombo_IsGameSuspended()) {
+        return false;
+    }
+
     if (CVarGetInteger("gDeveloperTools.DebugEnabled", 0)) {
         if (CHECK_BTN_ALL(input->cur.button, BTN_R) && CHECK_BTN_ALL(input->press.button, BTN_DDOWN)) {
             frameAdvCtx->enabled = !frameAdvCtx->enabled;

@@ -113,6 +113,25 @@ endif()
 
 list(FILTER ship__ EXCLUDE REGEX "2s2h/Extractor/*")
 
+# expansions/sm64: .c files are #include'd into z_player.c (same pattern as
+# Ship of Harkinian). Excluding them from the glob keeps the linker from
+# building them as separate translation units, which would duplicate the
+# static state and break the single-instance assumption inside the libsm64
+# integration. Headers stay in the glob for IDE indexing.
+list(FILTER ship__ EXCLUDE REGEX "2s2h/expansions/sm64/.*\\.c$")
+
+# mods + expansions (Skijer's NEI port, mirrors the Ship of Harkinian layout).
+# Only .cpp/.h/.hpp are compiled as their own translation units; the .c / .inc.c
+# logic files are #include'd into their .cpp owners (and into z_player.c /
+# the kaleido overlays), so they must NOT be globbed as standalone sources.
+# Note: expansions/sm64 lives under 2s2h/expansions/sm64 (already adapted), so
+# it is intentionally absent from this mm/expansions tree.
+file(GLOB_RECURSE mods__ CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "mods/*.cpp" "mods/*.h" "mods/*.hpp")
+list(APPEND ship__ ${mods__})
+
+file(GLOB_RECURSE expansions__ CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "expansions/*.cpp" "expansions/*.h" "expansions/*.hpp")
+list(APPEND ship__ ${expansions__})
+
 if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
     file(GLOB_RECURSE ship__Extractor RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
         "2s2h/Extractor/*.c"
@@ -128,7 +147,7 @@ else()
 endif()
 
 # src (decomp) {{{
-file(GLOB_RECURSE src__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/*.c" "src/*.h")
+file(GLOB_RECURSE src__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/*.c" "src/*.h") # NEI: touched to re-glob (z_kaleido_equipment.c)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND src__ ${CMAKE_CURRENT_SOURCE_DIR}/windows/Resource.rc)
@@ -228,6 +247,19 @@ if (BUILD_CROWD_CONTROL)
     set(SDL2-NET-INCLUDE ${SDL_NET_INCLUDE_DIRS})
 endif()
 
+# Harpoon multiplayer: WebSocket client against the official Harpoon relay.
+# Needs SDL2_net for raw TCP. Default ON; disable with -DBUILD_HARPOON=OFF.
+option(BUILD_HARPOON "Build the Harpoon multiplayer client" ON)
+if (BUILD_HARPOON)
+    find_package(SDL2_net)
+    if(NOT SDL2_net_FOUND)
+        message(STATUS "SDL2_net not found. Disabling BUILD_HARPOON.")
+        set(BUILD_HARPOON OFF)
+    else()
+        set(SDL2-NET-INCLUDE ${SDL_NET_INCLUDE_DIRS})
+    endif()
+endif()
+
 target_include_directories(${PROJECT_NAME} PRIVATE assets
 	${CMAKE_CURRENT_SOURCE_DIR}/include/
 	${CMAKE_CURRENT_SOURCE_DIR}/include/PR
@@ -236,6 +268,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE assets
     ${CMAKE_CURRENT_SOURCE_DIR}/../ZAPDTR/ZAPD/resource/type
 	${CMAKE_CURRENT_SOURCE_DIR}
 	${CMAKE_CURRENT_SOURCE_DIR}/2s2h/
+	${CMAKE_CURRENT_SOURCE_DIR}/mods/
 	${SDL2-INCLUDE}
     ${SDL2-NET-INCLUDE}
 	${CMAKE_CURRENT_SOURCE_DIR}/assets/
@@ -254,6 +287,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 			"NDEBUG;"
 		">"
            #"$<$<BOOL:${BUILD_CROWD_CONTROL}>:ENABLE_CROWD_CONTROL>"
+           "$<$<BOOL:${BUILD_HARPOON}>:ENABLE_HARPOON>"
 		"INCLUDE_GAME_PRINTF;"
            #"ENABLE_CROWD_CONTROL;"
 		"F3DEX_GBI_2"
@@ -290,6 +324,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU|Clang|AppleClang")
 		">"
         "F3DEX_GBI_2;"
 		# "$<$<BOOL:${BUILD_CROWD_CONTROL}>:ENABLE_CROWD_CONTROL>"
+		"$<$<BOOL:${BUILD_HARPOON}>:ENABLE_HARPOON>"
 		"_CONSOLE;"
 		"_CRT_SECURE_NO_WARNINGS;"
 		"ENABLE_OPENGL;"
@@ -322,13 +357,24 @@ if(MSVC)
 		/wd4101 # unreferenced local variable. Things like stack pads.
 		/wd4133 #incompatible types. Usually caused by passing a c string into a function that takes a pointer.
 		/wd4244 #conversion from [a] to [b]. Used to warn when copying to smaller type without a cast.
+        # z_player.c is a huge unity translation unit (it #includes expansions/sm64, ssbb, sw97,
+        # mods/extended_player.c, extended_inventory.c, items/logic/custom_items.c with every
+        # custom item, extended_equipment.c, transformation_masks...). Without /bigobj an object
+        # is capped at 65,536 sections, and /Gy gives every function its own COMDAT section, so
+        # the cap is reached and the linker fails with LNK1179 "duplicate COMDAT" naming some
+        # arbitrary symbol. Shipwright hit this first and carries the same flag (soh/CMakeLists.txt).
+        /bigobj;
         /sdl-;
         /permissive-;
         /MP;
         ${DEFAULT_CXX_DEBUG_INFORMATION_FORMAT};
         ${DEFAULT_CXX_EXCEPTION_HANDLING}
     )
-    target_compile_options(${PROJECT_NAME} PRIVATE  $<$<CONFIG:Debug>:/ZI;>)
+    # /ZI is Edit and Continue, usable only by the Visual Studio debugger. It overrides the /Z7 or
+    # /Zi chosen above, and forces every parallel cl.exe through one mspdbsrv.exe.
+    if (CMAKE_GENERATOR MATCHES "Visual Studio")
+        target_compile_options(${PROJECT_NAME} PRIVATE  $<$<CONFIG:Debug>:/ZI;>)
+    endif()
     target_link_options(${PROJECT_NAME} PRIVATE
         $<$<CONFIG:Debug>:
             /INCREMENTAL
@@ -491,6 +537,23 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
     "$<$<COMPILE_LANGUAGE:C>:${CMAKE_CURRENT_SOURCE_DIR}/include/variables.h>"
 )
 
+# MSVC only: the header is expensive to parse there, few sources include it, and MSVC's PCH load
+# barely grows with content. On Clang the parse is cheap by comparison and the bigger PCH is paid
+# for by every source in the target, making it a net loss.
+if (MSVC)
+    target_precompile_headers(${PROJECT_NAME} PRIVATE
+        "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/2s2h/BenGui/UIWidgets.hpp>"
+    )
+endif()
+
+# Instantiate templates once while building the PCH instead of replaying them in every TU that
+# consumes it. Slightly slower and larger PCH, much cheaper for every object that uses it.
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:-fpch-instantiate-templates>
+    )
+endif()
+
 ################################################################################
 # Pre build events
 ################################################################################
@@ -506,6 +569,23 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
         COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/mm/assets/xml $<TARGET_FILE_DIR:2ship>/assets/xml
         COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:2ship>/assets/symbols
         COMMAND ${VS_COPY_ASSETS_CMD}
+    )
+endif()
+
+# Mario Mode's sm64.dll is not copied by the build: it is installed next to the ROM, in nei/, by
+# the installer (see sm64_mario.c — the library is opened by name at run time, never linked).
+
+# Harpoon multiplayer data: copy the harpoon/ folder (gamemodes/*/gamemode.yaml
+# + skins/) next to the executable so the client can scan installed gamemodes
+# and skin packs at runtime, mirroring SoH's x64/Release/harpoon/ layout.
+if (BUILD_HARPOON AND NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
+    add_custom_command(
+        TARGET ${PROJECT_NAME}
+        POST_BUILD
+        COMMENT "Copying harpoon/ gamemodes and skins..."
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/harpoon
+            $<TARGET_FILE_DIR:2ship>/harpoon
     )
 endif()
 ################################################################################
@@ -540,6 +620,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 		"SDL2::SDL2;"
 		"SDL2::SDL2main;"
         #"$<$<BOOL:${BUILD_CROWD_CONTROL}>:SDL2_net::SDL2_net-static>"
+		"$<$<BOOL:${BUILD_HARPOON}>:SDL2_net::SDL2_net-static>"
 		"glfw;"
 		"winmm;"
 		"imm32;"
@@ -593,6 +674,7 @@ else()
         "Opusfile::Opusfile"
 		SDL2::SDL2
  #       "$<$<BOOL:${BUILD_CROWD_CONTROL}>:SDL2_net::SDL2_net>"
+		"$<$<BOOL:${BUILD_HARPOON}>:SDL2_net::SDL2_net>"
 		${CMAKE_DL_LIBS}
 		Threads::Threads
 	)

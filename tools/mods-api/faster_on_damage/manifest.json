@@ -1,0 +1,11 @@
+{
+    "name": "faster_on_damage",
+    "author": "claude",
+    "version": "1.0",
+    "description": "You move at 90% speed, and every hit adds 1%.",
+    "binaries": {
+        "windows_x64": "bin/faster_on_damage.dll",
+        "linux_x64": "bin/faster_on_damage.so",
+        "darwin": "bin/faster_on_damage.dylib"
+    }
+}

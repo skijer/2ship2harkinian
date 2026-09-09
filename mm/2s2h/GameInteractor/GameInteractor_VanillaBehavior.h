@@ -554,6 +554,14 @@ typedef enum {
     // true
     // ```
     // #### `args`
+    // - `*FileSelectState`
+    VB_FILE_SELECT_ROTATE_TO_NAME_ENTRY,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
     // - `*ItemId`
     // - `s32` (slot)
     // - `s32` (isDpad)
@@ -1027,6 +1035,14 @@ typedef enum {
 
     // #### `result`
     // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `ObjDora*`
+    VB_GONG_DROP_COLLECTIBLE,
+
+    // #### `result`
+    // ```c
     // phi_f0 > 0.0f
     // ```
     // #### `args`
@@ -1221,6 +1237,22 @@ typedef enum {
 
     // #### `result`
     // ```c
+    // bubble != NULL
+    // ```
+    // #### `args`
+    // - `*Player`
+    VB_DEKU_COMMON_HEAD_OVERRIDE_HELD_ACTOR,
+
+    // #### `result`
+    // ```c
+    // player->heldActor != NULL
+    // ```
+    // #### `args`
+    // - `*Actor` (player->heldActor)
+    VB_DEKU_COMMON_UPPER_LIMB_OVERRIDE_HELD_ACTOR,
+
+    // #### `result`
+    // ```c
     // true
     // ```
     // #### `args`
@@ -1308,6 +1340,23 @@ typedef enum {
 
     // #### `result`
     // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*EnKusa2`
+    // - `s32` (index within the patch)
+    VB_KEATON_GRASS_ATTACH_CHILD,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*EnKusa2`
+    VB_KEATON_GRASS_DRAW,
+
+    // #### `result`
+    // ```c
     // CHECK_WEEKEVENTREG(WEEKEVENTREG_08_80)
     // ```
     // #### `args`
@@ -1336,7 +1385,7 @@ typedef enum {
     // ```
     // #### `args`
     // - `*EnKusa`
-    VB_KUSA_BUSH_DRAW_BE_OVERRIDDEN,
+    VB_KUSA_DRAW_BE_OVERRIDDEN,
 
     // #### `result`
     // ```c
@@ -1419,6 +1468,14 @@ typedef enum {
     // #### `args`
     // - `*EnMnk`
     VB_MONKEY_WAIT_TO_TALK_AFTER_APPROACH,
+
+    // #### `result`
+    // ```c
+    // CHECK_BTN_ALL(controller->press.button, BTN_A) || ...
+    // ```
+    // #### `args`
+    // - None
+    VB_MSG_ADVANCE,
 
     // #### `result`
     // ```c
@@ -2401,6 +2458,15 @@ typedef enum {
 
     // #### `result`
     // ```c
+    // btn <= EQUIP_SLOT_NONE
+    // ```
+    // #### `args`
+    // - `*Player`
+    // - `*s32` (button)
+    VB_UNEQUIP_MASK_NOT_ON_BUTTON,
+
+    // #### `result`
+    // ```c
     // true
     // ```
     // #### `args`
@@ -2473,6 +2539,21 @@ typedef enum {
     // #### `args`
     // - `*f32` (speed)
     VB_ZTARGET_SPEED_CHECK,
+
+    // Player floor impact may deal fall damage.
+    VB_RECEIVE_FALL_DAMAGE,
+
+    // A Like Like may transition into its player-grab state.
+    VB_LIKE_LIKE_GRAB_PLAYER,
+
+    // A Redead or Gibdo may freeze the player with its gaze or scream.
+    VB_REDEAD_GIBDO_FREEZE_PLAYER,
+
+    // An enemy may transition into a player-grab state.
+    VB_ENEMY_GRAB_PLAYER,
+
+    // An aimable item may enter and remain in its aiming state while the player is airborne.
+    VB_PLAYER_ALLOW_MIDAIR_AIM,
 } GIVanillaBehavior;
 
 #endif

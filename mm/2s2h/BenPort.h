@@ -5,6 +5,9 @@
 
 #define BTN_CUSTOM_MODIFIER1 0x0040
 #define BTN_CUSTOM_MODIFIER2 0x0080
+// 0x0040 and 0x0080 are the only free bits below 0x10000; everything from 0x10000 to 0x800000 is
+// LUS stick/vstick, so a third modifier has to start above them. Skijer's NEI
+#define BTN_CUSTOM_MODIFIER3 ((CONTROLLERBUTTONS_T)0x01000000)
 
 // Ocarina custom controls (using bits beyond standard 16-bit N64 buttons)
 #define BTN_CUSTOM_OCARINA_NOTE_D4 ((CONTROLLERBUTTONS_T)0x00010000)
@@ -114,6 +117,20 @@ AnimatedMaterial* ResourceMgr_LoadAnimatedMatByName(const char* path);
 char* ResourceMgr_LoadTexOrDListByName(const char* filePath);
 char* ResourceMgr_LoadIfDListByName(const char* filePath);
 char* ResourceMgr_LoadPlayerAnimByName(const char* animPath);
+// Wraps a raw SOH_PlayerAnimation payload in a real header (cached). Skijer's NEI
+PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeader(const char* animPath);
+// Same, REWRITTEN: root frozen (stripY also pins Y), optionally cut to an inclusive
+// sub-range, optionally resampled to an exact length. The imported movesets need all
+// three — a clip carrying its own root would teleport the player, one packed clip
+// serves several engine rows, and the locomotion rows are SAMPLED so their length is
+// not free. firstFrame/lastFrame -1 = the whole clip; targetFrames 0 = keep length.
+// Cached by path AND parameters. Skijer's NEI
+PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeaderInPlaceRange(const char* animPath, uint8_t stripY,
+                                                                      int16_t firstFrame, int16_t lastFrame,
+                                                                      int16_t targetFrames);
+PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeaderInPlaceResampled(const char* animPath, uint8_t stripY,
+                                                                          int16_t targetFrames);
+PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeaderInPlace(const char* animPath, uint8_t stripY);
 AnimationHeaderCommon* ResourceMgr_LoadAnimByName(const char* path);
 char* ResourceMgr_GetNameByCRC(uint64_t crc, char* alloc);
 Gfx* ResourceMgr_LoadGfxByCRC(uint64_t crc);
@@ -168,7 +185,6 @@ void Controller_UnblockGameInput();
 void Overlay_DisplayText(float duration, const char* text);
 void Overlay_DisplayText_Seconds(int seconds, const char* text);
 uint32_t Ship_GetInterpolationFPS();
-uint32_t Ship_GetInterpolationFrameCount();
 
 void Gfx_RegisterBlendedTexture(const char* name, u8* mask, u8* replacement);
 void Gfx_UnregisterBlendedTexture(const char* name);
@@ -186,6 +202,10 @@ extern "C" {
 #endif
 uint64_t GetUnixTimestamp();
 void CrashHandler_PrintExt(char* buffer, size_t* pos);
+
+// The NEI asset folder for THIS game ("nei", or "nei/2ship" in ComboShip, where both games share one
+// Ship directory and their packs collide by name). Build every nei/ path from this, never a literal.
+const char* Nei_AssetDir(void);
 #ifdef __cplusplus
 };
 #endif

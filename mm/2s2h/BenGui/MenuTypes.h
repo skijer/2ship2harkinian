@@ -2,6 +2,7 @@
 #define MENUTYPES_H
 
 #include "UIWidgets.hpp"
+#include <fast/Fast3dWindow.h>
 
 #include <fast/Fast3dWindow.h>
 

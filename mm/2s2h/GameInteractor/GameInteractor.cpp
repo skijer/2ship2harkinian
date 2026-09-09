@@ -5,6 +5,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
+#include "2s2h/Enhancements/Ocarina/MicOcarina.h"
 
 extern "C" {
 #include "z64actor.h"
@@ -473,6 +474,10 @@ uint32_t GameInteractor_CustomOcarinaControls(Input* input) {
     return result;
 }
 
+void GameInteractor_MicOcarina(void) {
+    MicOcarina_Update();
+}
+
 void ProcessEvents(Actor* actor) {
     Player* player = GET_PLAYER(gPlayState);
 
@@ -586,6 +591,13 @@ void ProcessEvents(Actor* actor) {
 
     GameInteractor::Instance->events.erase(GameInteractor::Instance->events.begin());
 }
+
+// On MSVC this is defined inline in the header instead; see the declaration for why.
+#ifndef _MSC_VER
+void GameInteractor::RemoveAllQueuedHooks() {
+#include "GameInteractor_RemoveAllQueuedHooks.inc"
+}
+#endif
 
 void GameInteractor::RegisterOwnHooks() {
     // Cleanup all hooks at the start of each frame

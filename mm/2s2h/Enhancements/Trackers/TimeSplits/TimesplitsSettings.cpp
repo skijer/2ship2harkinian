@@ -1,5 +1,6 @@
 
 #include "TimesplitsSettings.h"
+#include "2s2h/ShipUtils.h"
 #include "Timesplits.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <ship/Context.h>
@@ -228,7 +229,7 @@ std::vector<TimesplitObject> splitObjectList = {
     { ITEM_SONG_LULLABY_INTRO, 	"Goron Lullaby Intro" },
     { ITEM_SWORD_RAZOR, 	    "Razor Sword" },
     { ITEM_SWORD_GILDED, 	    "Gilded Sword" },
-    { ITEM_SHIELD_MIRROR, 	    "Mirror Shield" },
+    { ITEM_SHIELD_MIRROR, 	    "Shield of Ikana" }, // display rename (MM's vanilla Mirror Shield)
     { ITEM_WALLET_GIANT, 	    "Giant Wallet" },
     { SPLIT_DOUBLE_MAGIC,       "Double Magic" },
 
@@ -561,9 +562,7 @@ void DrawEntranceList() {
                 SplitsPushImageButtonStyle();
 
                 if (ImGui::ImageButton(std::to_string(sceneObjectList[i].splitId).c_str(),
-                                       std::dynamic_pointer_cast<Fast::Fast3dGui>(
-                                           Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                                           ->GetTextureByName(gPauseUnusedCursorTex),
+                                       Ship_GetFast3dGui()->GetTextureByName(gPauseUnusedCursorTex),
                                        ImVec2(32.0f, 32.0f))) {
                     AddSplitEntryBySceneId(sceneObjectList[i].splitId);
                 };
@@ -586,12 +585,10 @@ void DrawItemList(const char* tableName, IndexRangeObject range, uint32_t tableS
         for (int i = range.startIndex; i <= range.endIndex; i++) {
             ImGui::TableNextColumn();
             SplitsPushImageButtonStyle();
-            if (ImGui::ImageButton(
-                    std::to_string(splitObjectList[i].splitId).c_str(),
-                    std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                        ->GetTextureByName(GetItemImageById(splitObjectList[i].splitId)),
-                    GetItemImageSizeById(splitObjectList[i].splitId) * 1.5f, ImVec2(0, 0), ImVec2(1, 1),
-                    ImVec4(0, 0, 0, 0), Ship_GetItemColorTint(splitObjectList[i].splitId))) {
+            if (ImGui::ImageButton(std::to_string(splitObjectList[i].splitId).c_str(),
+                                   Ship_GetFast3dGui()->GetTextureByName(GetItemImageById(splitObjectList[i].splitId)),
+                                   GetItemImageSizeById(splitObjectList[i].splitId) * 1.5f, ImVec2(0, 0), ImVec2(1, 1),
+                                   ImVec4(0, 0, 0, 0), Ship_GetItemColorTint(splitObjectList[i].splitId))) {
                 if (itemSubMenuList.contains(splitObjectList[i].splitId)) {
                     shouldPopUpOpen = true;
                     popupItem = splitObjectList[i].splitId;
@@ -649,11 +646,9 @@ void TimesplitsSettingsWindow::DrawElement() {
                     SplitsPushImageButtonStyle();
                     if (ImGui::ImageButton(
                             std::to_string(i).c_str(),
-                            std::dynamic_pointer_cast<Fast::Fast3dGui>(
-                                Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                                ->GetTextureByName(splitList[i].splitType == SPLIT_TYPE_NORMAL
-                                                       ? GetItemImageById(splitList[i].splitId)
-                                                       : gPauseUnusedCursorTex),
+                            Ship_GetFast3dGui()->GetTextureByName(splitList[i].splitType == SPLIT_TYPE_NORMAL
+                                                                      ? GetItemImageById(splitList[i].splitId)
+                                                                      : gPauseUnusedCursorTex),
                             splitList[i].splitType == SPLIT_TYPE_NORMAL ? GetItemImageSizeById(splitList[i].splitId)
                                                                         : ImVec2(32.0f, 32.0f),
                             ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0),

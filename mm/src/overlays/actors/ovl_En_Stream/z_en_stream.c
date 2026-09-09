@@ -86,6 +86,13 @@ void EnStream_SuckPlayer(EnStream* this, PlayState* play) {
     f32 xzDist;
     f32 yDistWithOffset;
     s32 pad30[2];
+    // Skijer's NEI: OoT Iron Boots ignore water vortices entirely (Bg_Mizu_Uzu disables the whirlpool
+    // pull when currentBoots == PLAYER_BOOTS_IRON) — the iron-booted human is too heavy to be sucked.
+    extern u8 VanillaTB_IsIronBoots(void);
+
+    if (VanillaTB_IsIronBoots() && (player->transformation == PLAYER_FORM_HUMAN)) {
+        return;
+    }
 
     if (EnStream_PlayerIsInRange(&this->actor.world.pos, &player->actor.world.pos, &posDifference,
                                  this->actor.scale.y) != EN_STREAM_PLAYER_OUTSIDE_RANGE) {
@@ -140,8 +147,8 @@ void EnStream_Draw(Actor* thisx, PlayState* play) {
     MATRIX_FINALIZE_AND_LOAD(&gfx[0], play->state.gfxCtx);
     multipliedFrames = frames * 20;
     gSPSegment(&gfx[1], 0x08,
-               Gfx_TwoTexScroll(play->state.gfxCtx, 0, frames * 30, -multipliedFrames, 64, 64, 1, multipliedFrames,
-                                -multipliedFrames, 64, 64));
+               Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, frames * 30, -multipliedFrames, 64, 64, 1, multipliedFrames,
+                                  -multipliedFrames, 64, 64, 30, -20, 20, -20));
     gSPDisplayList(&gfx[2], gWaterVortexDL);
     POLY_XLU_DISP = &gfx[3];
 
