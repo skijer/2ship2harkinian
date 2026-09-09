@@ -4865,7 +4865,9 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList1, G
         // so the native branch below stays inert while a remains is on).
         {
             extern void BossRemains_DrawWornMask(PlayState * play, Player * player);
+            extern void CustomForms_DrawTransformMask(PlayState * play, Player * player);
             BossRemains_DrawWornMask(play, player);
+            CustomForms_DrawTransformMask(play, player);
         }
         if (((*dList1 != NULL) && ((u32)player->currentMask != PLAYER_MASK_NONE)) &&
             (((player->transformation == PLAYER_FORM_HUMAN) &&

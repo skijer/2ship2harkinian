@@ -33,6 +33,11 @@
 #include "functions.h"
 #include <math.h>
 
+// Declared through API_EXPORT for the same reason sm64_mario.c does it: a plain extern
+// is a linkage mismatch against LUS's dllexport'd real declaration.
+#include <ship/Api.h>
+API_EXPORT void lusprintf(const char* file, int32_t line, int32_t logLevel, const char* fmt, ...);
+
 #define SM64_LIB_FN
 #include "expansions/sm64/libsm64.h"
 
@@ -196,39 +201,51 @@ static void Sm64Render_UpdateSceneLight(PlayState* play) {
     }
     Sm64Render_ReadDirLight(&play->envCtx.dirLight1, sSceneLight.dir[0], sSceneLight.color[0]);
     Sm64Render_ReadDirLight(&play->envCtx.dirLight2, sSceneLight.dir[1], sSceneLight.color[1]);
+
+    if (CVarGetInteger("gSm64SceneLightingDebug", 0)) {
+        static u32 sLogFrames = 0;
+        if ((sLogFrames++ % 60) == 0) {
+            lusprintf(__FILE__, __LINE__, 2,
+                      "[SM64Light] strength=%.2f ambient=(%.0f,%.0f,%.0f) L1=(%.0f,%.0f,%.0f) dir1=(%.2f,%.2f,%.2f) "
+                      "L2=(%.0f,%.0f,%.0f) dir2=(%.2f,%.2f,%.2f)",
+                      sSceneLight.strength, sSceneLight.ambient[0], sSceneLight.ambient[1], sSceneLight.ambient[2],
+                      sSceneLight.color[0][0], sSceneLight.color[0][1], sSceneLight.color[0][2], sSceneLight.dir[0][0],
+                      sSceneLight.dir[0][1], sSceneLight.dir[0][2], sSceneLight.color[1][0], sSceneLight.color[1][1],
+                      sSceneLight.color[1][2], sSceneLight.dir[1][0], sSceneLight.dir[1][1], sSceneLight.dir[1][2]);
+        }
+    }
 }
 
-// Modulate one vertex color by the scene light for the vertex's normal.
-static void Sm64Render_ApplySceneLight(const f32* normal, u32* r, u32* g, u32* b) {
+// The frame's light as one color, fed to ENVIRONMENT and multiplied over the whole
+// model in the combiner's second cycle. Evaluated at half diffuse on both lights,
+// which is what a surface facing across them receives.
+static void Sm64Render_GetFlatLight(u8* outR, u8* outG, u8* outB) {
     f32 lit[3];
     s32 i;
     s32 c;
+    u8* out[3] = { outR, outG, outB };
 
     if (sSceneLight.strength <= 0.0f) {
+        *outR = 255;
+        *outG = 255;
+        *outB = 255;
         return;
     }
     for (c = 0; c < 3; c++) {
         lit[c] = sSceneLight.ambient[c];
     }
     for (i = 0; i < 2; i++) {
-        f32 diffuse = normal[0] * sSceneLight.dir[i][0] + normal[1] * sSceneLight.dir[i][1] +
-                      normal[2] * sSceneLight.dir[i][2];
-        if (diffuse <= 0.0f) {
-            continue;
-        }
         for (c = 0; c < 3; c++) {
-            lit[c] += sSceneLight.color[i][c] * diffuse;
+            lit[c] += sSceneLight.color[i][c] * 0.5f;
         }
     }
-
-    u32* channel[3] = { r, g, b };
     for (c = 0; c < 3; c++) {
         f32 scale;
         if (lit[c] > 255.0f) {
             lit[c] = 255.0f;
         }
         scale = 1.0f + (lit[c] / 255.0f - 1.0f) * sSceneLight.strength;
-        *channel[c] = (u32)((f32)*channel[c] * scale);
+        *out[c] = (u8)(255.0f * scale);
     }
 }
 
@@ -283,13 +300,9 @@ static void emitTrisSingle(PlayState* play, struct SM64MarioGeometryBuffers* buf
             if (metalActive && nrm != NULL && sSm64MetalTexBuilt) {
                 u8 cr, cg, cb;
                 Sm64Render_SampleChrome(&nrm[vIdx], &cr, &cg, &cb);
-                u32 r = cr;
-                u32 g = cg;
-                u32 b = cb;
-                Sm64Render_ApplySceneLight(&nrm[vIdx], &r, &g, &b);
-                vtx[vCount].v.cn[0] = (u8)r;
-                vtx[vCount].v.cn[1] = (u8)g;
-                vtx[vCount].v.cn[2] = (u8)b;
+                vtx[vCount].v.cn[0] = cr;
+                vtx[vCount].v.cn[1] = cg;
+                vtx[vCount].v.cn[2] = cb;
             } else {
                 u32 r = (u32)(col[vIdx + 0] * 255.0f);
                 u32 g = (u32)(col[vIdx + 1] * 255.0f);
@@ -325,9 +338,6 @@ static void emitTrisSingle(PlayState* play, struct SM64MarioGeometryBuffers* buf
                 u32 ar = (r * SM64_BODY_BRIGHTNESS_NUM / SM64_BODY_BRIGHTNESS_DEN);
                 u32 ag = (g * SM64_BODY_BRIGHTNESS_NUM / SM64_BODY_BRIGHTNESS_DEN);
                 u32 ab = (b * SM64_BODY_BRIGHTNESS_NUM / SM64_BODY_BRIGHTNESS_DEN);
-                if (nrm != NULL) {
-                    Sm64Render_ApplySceneLight(&nrm[vIdx], &ar, &ag, &ab);
-                }
                 vtx[vCount].v.cn[0] = (u8)ar;
                 vtx[vCount].v.cn[1] = (u8)ag;
                 vtx[vCount].v.cn[2] = (u8)ab;
@@ -408,7 +418,7 @@ void Sm64Render_DrawMarioMesh(PlayState* play, struct SM64MarioGeometryBuffers* 
     // actor left behind (fixed the Zora's Fountain ImportTextureI4 crash,
     // where Destructible Wall's tile leaked into our draw).
     gDPPipeSync((*dispList)++);
-    gDPSetCycleType((*dispList)++, G_CYC_1CYCLE);
+    gDPSetCycleType((*dispList)++, G_CYC_2CYCLE);
 
     if (translucent) {
         gDPSetRenderMode((*dispList)++, G_RM_AA_ZB_XLU_SURF, G_RM_AA_ZB_XLU_SURF2);
@@ -442,21 +452,33 @@ void Sm64Render_DrawMarioMesh(PlayState* play, struct SM64MarioGeometryBuffers* 
     gDPLoadSync((*dispList)++);
     gDPLoadTile((*dispList)++, G_TX_LOADTILE, 0, 0, (SM64_TEXTURE_WIDTH - 1) << 2, (SM64_TEXTURE_HEIGHT - 1) << 2);
 
-    // Combiner.
-    //   Translucent (vanish): mix(SHADE, TEXEL0, T0_A) with SHADE alpha.
+    // Combiner. Cycle 1 is the combiner this always had — mix(SHADE, TEXEL0, T0_A):
+    //   Translucent (vanish): with SHADE alpha.
     //   Wing cap: alpha-aware — output alpha = clamp(TEXEL0_A + SHADE_A).
-    //   Default + metal: vanilla mix(SHADE, TEXEL0, T0_A). For metal,
-    //     emitTrisSingle has set SHADE = sphere-mapped envmap pixel.
+    //   Default + metal: for metal, emitTrisSingle has set SHADE = envmap pixel.
+    // Cycle 2 then multiplies the whole result by ENVIRONMENT, the scene's light. That is the
+    // only way the eyes, the cap's M and the buttons get lit: their texels carry alpha 255, so
+    // cycle 1 hands back TEXEL0 untouched and nothing per-vertex can ever reach them.
+    //
+    // Cycle 2 deliberately touches NO texel. In the second cycle the texel names shift a slot —
+    // TEXEL0 there means tile 1, which nothing loads — and Fast3D emulates that shift faithfully
+    // (interpreter.cpp, "Set the opposite texture when reading from the second cycle"). Reading a
+    // texel in cycle 2 is what turned Mario into a black silhouette; COMBINED and ENVIRONMENT
+    // have no such aliasing.
+    {
+        u8 lightR, lightG, lightB;
+        Sm64Render_GetFlatLight(&lightR, &lightG, &lightB);
+        gDPSetEnvColor((*dispList)++, lightR, lightG, lightB, 255);
+    }
     if (translucent) {
-        gDPSetCombineLERP((*dispList)++, TEXEL0, SHADE, TEXEL0_ALPHA, SHADE, 0, 0, 0, SHADE, TEXEL0, SHADE,
-                          TEXEL0_ALPHA, SHADE, 0, 0, 0, SHADE);
+        gDPSetCombineLERP((*dispList)++, TEXEL0, SHADE, TEXEL0_ALPHA, SHADE, 0, 0, 0, SHADE, COMBINED, 0, ENVIRONMENT,
+                          0, 0, 0, 0, COMBINED);
     } else if (wingCap) {
-        gDPSetEnvColor((*dispList)++, 0, 0, 0, 255);
-        gDPSetCombineLERP((*dispList)++, TEXEL0, SHADE, TEXEL0_ALPHA, SHADE, TEXEL0, 0, ENVIRONMENT, SHADE, TEXEL0,
-                          SHADE, TEXEL0_ALPHA, SHADE, TEXEL0, 0, ENVIRONMENT, SHADE);
+        gDPSetCombineLERP((*dispList)++, TEXEL0, SHADE, TEXEL0_ALPHA, SHADE, TEXEL0, 0, ENVIRONMENT, SHADE, COMBINED, 0,
+                          ENVIRONMENT, 0, 0, 0, 0, COMBINED);
     } else {
-        gDPSetCombineLERP((*dispList)++, TEXEL0, SHADE, TEXEL0_ALPHA, SHADE, 0, 0, 0, 1, TEXEL0, SHADE, TEXEL0_ALPHA,
-                          SHADE, 0, 0, 0, 1);
+        gDPSetCombineLERP((*dispList)++, TEXEL0, SHADE, TEXEL0_ALPHA, SHADE, 0, 0, 0, 1, COMBINED, 0, ENVIRONMENT, 0, 0,
+                          0, 0, COMBINED);
     }
 
     CLOSE_DISPS(play->state.gfxCtx);

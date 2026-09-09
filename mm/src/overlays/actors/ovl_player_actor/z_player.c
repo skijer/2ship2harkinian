@@ -8538,6 +8538,12 @@ s32 Player_ActionHandler_13(Player* this, PlayState* play) {
                 if ((this->itemAction >= PLAYER_IA_MASK_MIN) && (this->itemAction <= PLAYER_IA_MASK_MAX)) {
                     PlayerMask maskId = GET_MASK_FROM_IA(this->itemAction);
 
+                    // Skijer's NEI: a custom-form mask transforms here instead of taking the short
+                    // wear anim below, and owns currentMask so no vanilla mask is equipped under it.
+                    if (CustomForms_StartMaskTransform(play, this, maskId)) {
+                        return true;
+                    }
+
                     this->prevMask = this->currentMask;
                     if ((u32)(maskId == this->currentMask) || (this->itemAction < PLAYER_IA_MASK_GIANT) ||
                         ((this->itemAction == PLAYER_IA_MASK_GIANT) && (this->transformation != PLAYER_FORM_HUMAN))) {
@@ -20404,7 +20410,11 @@ void Player_Action_86(Player* this, PlayState* play) {
             // WEEKEVENTREG_16_02 and WEEKEVENTREG_16_08
             // WEEKEVENTREG_16_02 corresponds to showing a text ID from the Gorman Brothers on the 3rd day
             // if the player has saved the farm, so this bug would prevent that text from displaying
-            SET_WEEKEVENTREG(D_8085D908[GET_PLAYER_FORM]);
+            // Skijer's NEI: a custom form overrides the Human slot, so this covered frame is where its
+            // toggle lands — and it must not stamp the OOB flag above on every transformation.
+            if (!CustomForms_ApplyPendingTransform()) {
+                SET_WEEKEVENTREG(D_8085D908[GET_PLAYER_FORM]);
+            }
         }
     } else if ((this->av1.actionVar1++ > ((this->transformation == PLAYER_FORM_HUMAN) ? 0x53 : 0x37)) ||
                ((this->av1.actionVar1 >= 5) &&

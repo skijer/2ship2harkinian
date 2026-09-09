@@ -1402,6 +1402,7 @@ void BenInputEditorWindow::DrawPortTabContents(uint8_t portIndex) {
                            "but otherwise have no use on their own.");
         DrawButtonLine("M1", portIndex, BTN_CUSTOM_MODIFIER1);
         DrawButtonLine("M2", portIndex, BTN_CUSTOM_MODIFIER2);
+        DrawButtonLine("M3", portIndex, BTN_CUSTOM_MODIFIER3);
     }
 
     if (ImGui::CollapsingHeader("Analog Stick", NULL, ImGuiTreeNodeFlags_DefaultOpen)) {

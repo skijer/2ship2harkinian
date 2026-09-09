@@ -22,7 +22,20 @@ extern "C" {
 #include "message_data_static.h"
 #include "mods/extended_inventory.h" // Sw97_* / Wand_* (Skijer's NEI)
 #include "mods/extended_equipment.h" // ITEM_EXT_* ids for the equipment-page table
+
+// Cane_GetActiveSkill (mods/items/logic/item_cane_of_somaria.c). Forward-declared rather than
+// including item_cane_of_somaria.h, the way CaneWheelHud.cpp does, so this TU does not pull in
+// custom_items.h and its z_player-side dependencies.
+u8 Cane_GetActiveSkill(void);
 }
+
+// Mirrors item_cane_of_somaria.h CANE_SKILL_*. Kept local for the same reason as the forward decl above.
+#define NEI_CANE_SKILL_SOMARIA_STATUE 0
+#define NEI_CANE_SKILL_SOMARIA_BLOCK 1
+#define NEI_CANE_SKILL_SOMARIA_PLATFORM 2
+#define NEI_CANE_SKILL_PACCI_FLIP 3
+#define NEI_CANE_SKILL_PACCI_STONE 4
+#define NEI_CANE_SKILL_PACCI_ULTRAHAND 5
 
 // ---------------------------------------------------------------------------
 // Description table
@@ -60,8 +73,8 @@ static const ItemDescEntry sCustomItemDescs[] = {
       "Heavy thrown weapon. Breaks ice walls\nand heavy objects. Hold C to charge.\nC-Up to aim." },
     { ITEM_WHIP, "Grapple from any bar surface. Swing\nwith joystick. Release for momentum\nlaunch." },
     { ITEM_SPINNER, "Hold C to charge, release to ride.\nRelease while Z-targeting for a\nhoming dash. Breaks rocks." },
-    { ITEM_CANE_OF_SOMARIA,
-      "Four canes on one cell. A here cycles\nthe cane; C draws it, then casts.\nL and R step the summon." },
+    // No ITEM_CANE_OF_SOMARIA row: this table is searched before the skill-keyed block below, so a
+    // generic row here would shadow all six of sCaneSkillDescs.
     { ITEM_DOMINION_ROD, "Fire orb to possess Beamos, Armos\nor Anubis. Control them with analog+C." },
     { ITEM_TIME_GATE, "Travel through time. Swap between\nyoung and adult Link. Costs 48 magic." },
     { ITEM_BOMB_ARROWS,
@@ -113,12 +126,33 @@ static const char* kBombBulletsDesc =
 
 // The six rods share one item id, so their descriptions key off the active mode.
 static const ItemDescEntry sWandModeDescs[] = {
-    { WAND_MODE_SAND, "Sand Rod. Unlocked by the Spirit\nMedallion." },
-    { WAND_MODE_TORNADO, "Tornado Rod. Unlocked by the Forest\nMedallion." },
-    { WAND_MODE_WATER, "Water Rod. Unlocked by the Water\nMedallion." },
-    { WAND_MODE_METEOR, "Meteor Rod. Unlocked by the Fire\nMedallion." },
-    { WAND_MODE_STORM, "Storm Rod. Unlocked by the Light\nMedallion." },
-    { WAND_MODE_SCEPTER, "Shadow Scepter. Unlocked by the\nShadow Medallion." },
+    { WAND_MODE_SAND, "\xA1 lays a slab ahead, even over\ngaps. Crumbles once you stand\non it. Hold \xA1 to lay a path. 2 MP." },
+    { WAND_MODE_TORNADO,
+      "\xA1 toggles tornadoes at your feet.\nDrains magic while lit; boosts\nevery jump. Hold \xA1 to hover." },
+    { WAND_MODE_WATER,
+      "\xA1 raises a water column you can\nstand on. Press again to lower\nit, or raise it back up. 2 MP." },
+    { WAND_MODE_METEOR,
+      "\xA1 throws a red bomb that skips\nalong the ground like a stone.\nDetonates near foes or walls. 3 MP." },
+    { WAND_MODE_STORM,
+      "No lock-on: \xA1 calls rain and\nthunder over the area. Locked\non: \xA1 fires a lightning bolt. 6 MP." },
+    { WAND_MODE_SCEPTER,
+      "\xA1 throws a bolt that homes onto\nthe nearest foe and stuns it on\ncontact. One bolt at a time. 3 MP." },
+};
+
+// The Dual Cane's six skills share one item id, so their descriptions key off the active skill.
+static const ItemDescEntry sCaneSkillDescs[] = {
+    { NEI_CANE_SKILL_SOMARIA_STATUE,
+      "\xA1 drops an Elegy shell at your\nfeet, matching your current form.\nNot liftable; presses switches." },
+    { NEI_CANE_SKILL_SOMARIA_BLOCK,
+      "\xA1 casts where the aim ghost\nshows blue; red blocks the cast.\nSpawns a solid, pushable block." },
+    { NEI_CANE_SKILL_SOMARIA_PLATFORM,
+      "\xA1 casts a floating platform\nwherever you aim it. No ground\nor geometry needed." },
+    { NEI_CANE_SKILL_PACCI_FLIP,
+      "Tap \xA1 flips it onto its back,\nhelpless. Hold to lift; release\nthrows it at your \xA4-target, if any." },
+    { NEI_CANE_SKILL_PACCI_STONE,
+      "\xA1 petrifies the aimed enemy.\nCarry and throw it like a rock\nto shatter it for a drop." },
+    { NEI_CANE_SKILL_PACCI_ULTRAHAND,
+      "\xA1 opens a grab mode instead of\ncasting. A grabs, welds or\ndrops; B always leaves." },
 };
 
 // The eight OoT page-0 items, which live on MM sentinel ids. Without these the fallback would hand
@@ -252,6 +286,16 @@ extern "C" const char* PauseItemDesc_Get(u16 itemId, s32 pageIndex) {
         for (size_t i = 0; i < ARRAY_COUNT(sWandModeDescs); i++) {
             if (sWandModeDescs[i].itemId == mode) {
                 return sWandModeDescs[i].desc;
+            }
+        }
+    }
+
+    // Dual Cane: one id, six descriptions — follow the active skill.
+    if (itemId == ITEM_CANE_OF_SOMARIA) {
+        u8 skill = Cane_GetActiveSkill();
+        for (size_t i = 0; i < ARRAY_COUNT(sCaneSkillDescs); i++) {
+            if (sCaneSkillDescs[i].itemId == skill) {
+                return sCaneSkillDescs[i].desc;
             }
         }
     }

@@ -19,13 +19,6 @@
 #include <string>
 #include <variant>
 #include <vector>
-#ifdef __APPLE__
-#include <SDL_scancode.h>
-#include <SDL_gamecontroller.h>
-#else
-#include <SDL2/SDL_scancode.h>
-#include <SDL2/SDL_gamecontroller.h>
-#endif
 #include <ship/utils/StringHelper.h>
 #include <spdlog/fmt/fmt.h>
 #include "variables.h"
@@ -1209,24 +1202,6 @@ void BenMenu::AddEnhancements() {
             "volume. Default 0.8 to blend with MM's BGM.\n\n"
             "Place your SM64 US Z64 ROM as `sm64.z64` next to 2ship.exe to "
             "enable Mario Mode."));
-    AddWidget(path, "Mario Scene Lighting", WIDGET_CVAR_SLIDER_FLOAT)
-        .CVar("gSm64SceneLighting")
-        .Options(FloatSliderOptions().Min(0.0f).Max(1.0f).DefaultValue(1.0f).Step(0.05f).Format("%.2f").Tooltip(
-            "How much the scene's own light affects Mario. libsm64 ships its own baked shading, so "
-            "at 0 Mario looks the same at noon, at midnight and inside a cave.\n\n"
-            "1 lights him like any other actor: ambient plus the two directional scene lights."));
-    AddWidget(path, "Mario Collision Updates", WIDGET_CVAR_COMBOBOX)
-        .CVar("gSm64SurfaceRefresh")
-        .Options(ComboboxOptions()
-                     .DefaultIndex(2)
-                     .Tooltip("How often Mario's collision is rebuilt from the live world. Rebuilding is the "
-                              "most expensive part of Mario Mode, so lower it on weaker machines.\n\n"
-                              " - Off: collision is frozen at scene load. Cheapest, but moving platforms, "
-                              "doors and props stay where they were when the scene loaded.\n"
-                              " - Low / Medium / High: rebuild at most every 8 / 4 / 2 frames, and only "
-                              "when something actually moved. A completely static room costs nothing at "
-                              "any of these settings.")
-                     .ComboVec(&sm64SurfaceRefreshModes));
     AddWidget(path, "Other", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Milk Run Reward Options", WIDGET_CVAR_COMBOBOX)
         .CVar("gEnhancements.Minigames.CremiaHugs")
@@ -3101,35 +3076,40 @@ void BenMenu::AddNEI() {
             "(see 'Include Mario Mask' / 'Include Pikachu Pokeball' in the rando item pool).\n"
             "Pikachu has no transformation in 2Ship yet — the form selects but Link does not change."));
 
-    // Quick transform. The pad button is read straight from SDL (CrossoverHotkey_Tick in
-    // BenPort.cpp) because Back/Select has no N64 button to map it onto.
-    static std::unordered_map<int32_t, const char*> quickTransformKeyOptions = {
-        { SDL_SCANCODE_0, "0 (default)" }, { SDL_SCANCODE_1, "1" }, { SDL_SCANCODE_2, "2" }, { SDL_SCANCODE_3, "3" },
-        { SDL_SCANCODE_4, "4" },           { SDL_SCANCODE_5, "5" }, { SDL_SCANCODE_6, "6" }, { SDL_SCANCODE_7, "7" },
-        { SDL_SCANCODE_8, "8" },           { SDL_SCANCODE_9, "9" }, { SDL_SCANCODE_T, "T" }, { SDL_SCANCODE_G, "G" },
-        { SDL_SCANCODE_V, "V" },
-    };
-    static std::unordered_map<int32_t, const char*> quickTransformPadOptions = {
-        { SDL_CONTROLLER_BUTTON_BACK, "Back / Select (default)" },
-        { SDL_CONTROLLER_BUTTON_GUIDE, "Guide / Home" },
-        { SDL_CONTROLLER_BUTTON_LEFTSTICK, "Left stick click" },
-        { SDL_CONTROLLER_BUTTON_RIGHTSTICK, "Right stick click" },
-    };
+    AddWidget(modesPath, "Quick Transform Button Combination:", WIDGET_CVAR_BTN_SELECTOR)
+        .CVar("gCrossover.Hotkey.Btn")
+        .Options(BtnSelectorOptions().DefaultValue(BTN_CUSTOM_MODIFIER3).Tooltip(
+            "Turns you into the form equipped on the Crossover Items sub-page and back into Link,\n"
+            "without opening the pause menu.\n"
+            "Defaults to Modifier 3, which exists for this control and starts unbound: map it to any\n"
+            "physical button or key (Back / Select, the 0 key...) in Settings > Controls > Bindings."));
 
-    AddWidget(modesPath, "Quick Transform", WIDGET_CVAR_CHECKBOX)
-        .CVar("gCrossover.Hotkey.Enabled")
-        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
-            "One key/button turns you into the form equipped on the Crossover Items sub-page and\n"
-            "back into Link, without opening the pause menu.\n"
-            "Ignored while the pause menu or this menu is open."));
-    AddWidget(modesPath, "Quick Transform Key", WIDGET_CVAR_COMBOBOX)
-        .CVar("gCrossover.Hotkey.Key")
-        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gCrossover.Hotkey.Enabled", 1); })
-        .Options(ComboboxOptions().ComboMap(&quickTransformKeyOptions).DefaultIndex(SDL_SCANCODE_0));
-    AddWidget(modesPath, "Quick Transform Button", WIDGET_CVAR_COMBOBOX)
-        .CVar("gCrossover.Hotkey.Pad")
-        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gCrossover.Hotkey.Enabled", 1); })
-        .Options(ComboboxOptions().ComboMap(&quickTransformPadOptions).DefaultIndex(SDL_CONTROLLER_BUTTON_BACK));
+    // Mario Mode tuning. The mode's own toggle stays in Enhancements > Gameplay (it is a 2ship
+    // enhancement, not a NEI item); what lives here is what a player actually retunes.
+    AddWidget(modesPath, "Mario Mode", WIDGET_SEPARATOR_TEXT);
+    AddWidget(modesPath, "Scene Lighting", WIDGET_CVAR_SLIDER_FLOAT)
+        .CVar("gSm64SceneLighting")
+        .Options(FloatSliderOptions().Min(0.0f).Max(1.0f).DefaultValue(1.0f).Step(0.05f).Format("%.2f").Tooltip(
+            "How much the scene's own light affects Mario. libsm64 ships its own baked shading, so at 0\n"
+            "Mario looks the same at noon, at midnight and inside a cave.\n"
+            "1 lights him like any other actor: ambient plus the two directional scene lights."));
+    AddWidget(modesPath, "Log Scene Lighting", WIDGET_CVAR_CHECKBOX)
+        .CVar("gSm64SceneLightingDebug")
+        .Options(CheckboxOptions().Tooltip(
+            "Prints the scene's ambient and both directional lights to the log once a second.\n"
+            "Turn this on to tell 'the lighting is saturated in this room' apart from 'the slider\n"
+            "is not reaching the renderer'."));
+    AddWidget(modesPath, "Collision Updates", WIDGET_CVAR_COMBOBOX)
+        .CVar("gSm64SurfaceRefresh")
+        .Options(ComboboxOptions()
+                     .DefaultIndex(2)
+                     .Tooltip("How often Mario's collision is rebuilt from the live world. Rebuilding is the\n"
+                              "most expensive part of Mario Mode, so lower it on weaker machines.\n"
+                              " - Off: collision is frozen at scene load. Cheapest, but moving platforms,\n"
+                              "   doors and props stay where they were when the scene loaded.\n"
+                              " - Low / Medium / High: rebuild at most every 8 / 4 / 2 frames, and only\n"
+                              "   when something actually moved. A static room costs nothing at any of them.")
+                     .ComboVec(&sm64SurfaceRefreshModes));
 
     // ===================== Tab: Randomizer =====================
     // The Fleet Ship Combo block is this tab's only content, so the sidebar entry follows it.

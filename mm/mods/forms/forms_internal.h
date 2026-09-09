@@ -43,6 +43,7 @@ void func_80834DB8(Player* player, PlayerAnimationHeader* anim, f32 speed, PlayS
 void func_80836B3C(PlayState* play, Player* player, f32 arg2);
 void func_80839E74(Player* player, PlayState* play);
 void func_8082DC38(Player* player);
+void func_8082E1F0(Player* player, u16 sfxId);
 void func_8082FA5C(PlayState* play, Player* player, PlayerMeleeWeaponState meleeWeaponState);
 void Player_Anim_PlayOnceAdjusted(PlayState* play, Player* player, PlayerAnimationHeader* anim);
 bool Player_IsZTargeting(Player* player);

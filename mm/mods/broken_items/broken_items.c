@@ -16,6 +16,7 @@
 #define dgPikaIconPikachuTex "__OTR__textures/pikachu/gPikaIconPikachuTex"
 static const ALIGN_ASSET(2) char gPikaIconPikachuTex[] = dgPikaIconPikachuTex;
 #include "soh/_nei_compat_core.h" // 2ship port: Audio_PlaySoundGeneral -> AudioSfx_PlaySfx alias
+#include "2s2h/BenPort.h"         // BTN_CUSTOM_MODIFIER1 (quick-transform default binding)
 #include "broken_items.h"
 
 #define CVAR_BROKEN_ITEMS_ENABLED "gBrokenItems.Enabled"
@@ -32,6 +33,9 @@ static const ALIGN_ASSET(2) char gPikaIconPikachuTex[] = dgPikaIconPikachuTex;
 // once you turn back into Link the mode CVars are both 0 and there is nothing left to toggle
 // back into. The quick-transform hotkey needs that memory.
 #define CVAR_EQUIPPED_FORM "gCrossover.EquippedForm"
+
+// N64 button mask for the quick transform, set by the menu's button selector.
+#define CVAR_HOTKEY_BTN "gCrossover.Hotkey.Btn"
 
 // ---------------------------------------------------------------------------
 // Mode + control-map data (English on purpose). Keep action strings short.
@@ -135,14 +139,11 @@ s32 BrokenItems_GetEquippedForm(void) {
     return BrokenItems_FormUnlocked(form) ? form : BROKEN_MODE_LINK;
 }
 
-// The quick-transform hotkey: worn form -> Link, Link -> the equipped form. With nothing
-// equipped (or the form no longer earned) it beeps rather than silently doing nothing.
-void BrokenItems_ToggleEquippedForm(void) {
-    if (!BrokenItems_Enabled()) {
-        return;
-    }
+// Worn form -> Link, Link -> the equipped form. With nothing equipped (or the form no longer
+// earned) it beeps rather than silently doing nothing.
+void BrokenItems_ToggleEquippedForm(PlayState* play) {
     if (BrokenItems_CurrentEquipped() != BROKEN_MODE_LINK) {
-        BrokenItems_Equip(NULL, BROKEN_MODE_LINK);
+        BrokenItems_Equip(play, BROKEN_MODE_LINK);
         return;
     }
 
@@ -151,7 +152,28 @@ void BrokenItems_ToggleEquippedForm(void) {
         BrokenItems_PlaySfx(NA_SE_SY_ERROR);
         return;
     }
-    BrokenItems_Equip(NULL, form);
+    BrokenItems_Equip(play, form);
+}
+
+// The quick-transform button combo (gCrossover.Hotkey.Btn, an N64 button mask from the menu's
+// button selector). Both custom modifier bits are unmapped by default, so the combo does nothing
+// until the player binds one in the input editor — where Back or a keyboard key are equally valid.
+void BrokenItems_HotkeyTick(PlayState* play) {
+    static u8 sHeld = 0;
+
+    s32 mask = CVarGetInteger(CVAR_HOTKEY_BTN, BTN_CUSTOM_MODIFIER3);
+    if (!BrokenItems_Enabled() || (mask == 0)) {
+        sHeld = 0;
+        return;
+    }
+
+    u8 pressed = CHECK_BTN_ALL(play->state.input[0].cur.button, mask) != 0;
+    // The pause screen has its own selector, and the combo's modifier bits are shared with other
+    // features that read them while paused.
+    if (pressed && !sHeld && (play->pauseCtx.state == 0)) {
+        BrokenItems_ToggleEquippedForm(play);
+    }
+    sHeld = pressed;
 }
 
 // Forward decl — the icon resolver is defined in the Drawing section below, but

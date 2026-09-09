@@ -1319,6 +1319,7 @@ std::map<std::string, int32_t> buttonMap = {
     { "C-Right", BTN_CRIGHT },
     { "Modifier 1", BTN_CUSTOM_MODIFIER1 },
     { "Modifier 2", BTN_CUSTOM_MODIFIER2 },
+    { "Modifier 3", BTN_CUSTOM_MODIFIER3 },
 };
 bool BtnSelector(const char* label, int32_t* value, const BtnSelectorOptions& options) {
     bool dirty = false;

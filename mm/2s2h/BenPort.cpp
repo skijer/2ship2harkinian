@@ -35,15 +35,10 @@
 
 #ifdef __APPLE__
 #include <SDL_scancode.h>
-#include <SDL_keyboard.h>
-#include <SDL_gamecontroller.h>
 #else
 #include <SDL2/SDL_scancode.h>
-#include <SDL2/SDL_keyboard.h>
-#include <SDL2/SDL_gamecontroller.h>
 #endif
 #include "Extractor/Extract.h"
-#include "mods/broken_items/broken_items.h"
 // OTRTODO
 // #include <functions.h>
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
@@ -177,6 +172,7 @@ OTRGlobals::OTRGlobals() {
     auto controlDeck = std::make_shared<LUS::ControlDeck>(std::vector<CONTROLLERBUTTONS_T>({
         BTN_CUSTOM_MODIFIER1,
         BTN_CUSTOM_MODIFIER2,
+        BTN_CUSTOM_MODIFIER3,
         BTN_CUSTOM_OCARINA_NOTE_D4,
         BTN_CUSTOM_OCARINA_NOTE_F4,
         BTN_CUSTOM_OCARINA_NOTE_A4,
@@ -1297,47 +1293,9 @@ extern "C" uint64_t GetUnixTimestamp() {
     return now;
 }
 
-// Crossover Items quick transform. The Back/Select button is not an N64 button, so the pad is
-// read straight from SDL — through the handle LUS already opened for that joystick, never a
-// second one of our own. Skijer's NEI
-static void CrossoverHotkey_Tick() {
-    static bool sHeld = false;
-
-    if (!CVarGetInteger("gCrossover.Hotkey.Enabled", 1) || !BrokenItems_Enabled()) {
-        sHeld = false;
-        return;
-    }
-
-    const Uint8* keys = SDL_GetKeyboardState(NULL);
-    int32_t key = CVarGetInteger("gCrossover.Hotkey.Key", SDL_SCANCODE_0);
-    bool pressed = (keys != NULL) && (key > SDL_SCANCODE_UNKNOWN) && (key < SDL_NUM_SCANCODES) && keys[key];
-
-    int32_t padBtn = CVarGetInteger("gCrossover.Hotkey.Pad", SDL_CONTROLLER_BUTTON_BACK);
-    for (int i = 0; !pressed && (i < SDL_NumJoysticks()); i++) {
-        SDL_GameController* pad = SDL_GameControllerFromInstanceID(SDL_JoystickGetDeviceInstanceID(i));
-        if (pad != NULL) {
-            pressed = SDL_GameControllerGetButton(pad, (SDL_GameControllerButton)padBtn) != 0;
-        }
-    }
-
-    if (pressed && !sHeld) {
-        auto gui = Ship::Context::GetRawInstance()->GetWindow()->GetGui();
-        auto menu = gui ? gui->GetMenu() : nullptr;
-        bool menuOpen = (menu != nullptr) && menu->IsVisible();
-        // Pausing already has its own selector, and a transform mid-menu would fight the CVar edit.
-        if (!menuOpen && (gPlayState != NULL) && (gPlayState->pauseCtx.state == 0)) {
-            BrokenItems_ToggleEquippedForm();
-        }
-    }
-    sHeld = pressed;
-}
-
 extern "C" void Graph_StartFrame() {
 #ifndef __WIIU__
     using Ship::KbScancode;
-
-    CrossoverHotkey_Tick();
-
     int32_t dwScancode = OTRGlobals::Instance->context->GetWindow()->GetLastScancode();
     OTRGlobals::Instance->context->GetWindow()->SetLastScancode(-1);
 

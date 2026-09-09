@@ -9,7 +9,6 @@
 extern "C" {
 #include "mods/nei_save.h"
 #include "mods/extended_inventory.h"
-void func_8082E1F0(Player* player, u16 sfxId);
 }
 
 #define OOT_MASK_WHEEL_GERUDO 6
@@ -66,8 +65,7 @@ extern "C" s32 CustomForms_ActiveForm(void) {
     if (forced >= 0 && forced < CUSTOM_FORM_MAX) {
         return forced;
     }
-    s32 worn = (s32)Nei_Save()->activeCustomForm - 1;
-    return (worn >= 0 && worn < CUSTOM_FORM_MAX) ? worn : CUSTOM_FORM_NONE;
+    return CustomForms_WornForm();
 }
 
 extern "C" const char* CustomForms_BasePath(void) {
@@ -103,21 +101,31 @@ extern "C" f32 CustomForms_RootDropAfter(void) {
     return CVarGetFloat("gForms.KeatonRootDrop", KEATON_ROOT_DROP);
 }
 
+extern "C" s32 CustomForms_WornForm(void) {
+    s32 worn = (s32)Nei_Save()->activeCustomForm - 1;
+    return (worn >= 0 && worn < CUSTOM_FORM_MAX) ? worn : CUSTOM_FORM_NONE;
+}
+
+extern "C" void CustomForms_SetActive(s32 formId) {
+    uint8_t worn = (formId > CUSTOM_FORM_NONE && formId < CUSTOM_FORM_MAX) ? (uint8_t)(formId + 1) : 0;
+
+    if (Nei_Save()->activeCustomForm == worn) {
+        return;
+    }
+    Nei_Save()->activeCustomForm = worn;
+    SPDLOG_INFO("[CustomForms] active -> {}", worn ? sForms[formId].name : "none");
+    AdultLink_OnFormChanged();
+}
+
 extern "C" void CustomForms_Toggle(s32 formId) {
     if (formId < 0 || formId >= CUSTOM_FORM_MAX) {
         return;
     }
-    uint8_t* worn = &Nei_Save()->activeCustomForm;
-    *worn = (*worn == (uint8_t)(formId + 1)) ? 0 : (uint8_t)(formId + 1);
-    SPDLOG_INFO("[CustomForms] {} -> {}", sForms[formId].name, *worn ? "ON" : "OFF");
-    AdultLink_OnFormChanged();
+    CustomForms_SetActive((CustomForms_WornForm() == formId) ? CUSTOM_FORM_NONE : formId);
 }
 
 extern "C" void CustomForms_Deactivate(void) {
-    if (Nei_Save()->activeCustomForm != 0) {
-        Nei_Save()->activeCustomForm = 0;
-        AdultLink_OnFormChanged();
-    }
+    CustomForms_SetActive(CUSTOM_FORM_NONE);
 }
 
 // ---- shared helpers -------------------------------------------------------------------------------
@@ -308,6 +316,9 @@ extern "C" void CustomForms_Update(Player* player, PlayState* play) {
     s32 form = CustomForms_ActiveForm();
     u8 dead = (player->stateFlags1 & PLAYER_STATE1_DEAD) != 0;
 
+    // Before the early returns below: a pending transformation runs with no form active either way.
+    CustomForms_TickTransform(player, play);
+
     if (form != CUSTOM_FORM_NONE && dead && !sWasDead) {
         CustomForms_OnDeath(player, play);
     }
@@ -437,8 +448,9 @@ extern "C" u8 CustomForms_UseItem(Player* player, ItemId item) {
     if (!CVarGetInteger(sForms[CUSTOM_FORM_GERUDO].cvarName, sForms[CUSTOM_FORM_GERUDO].cvarDefault)) {
         return 0;
     }
-    CustomForms_Toggle(CUSTOM_FORM_GERUDO);
-    func_8082E1F0(player, NA_SE_PL_CHANGE_ARMS);
+    s32 worn = CustomForms_WornForm();
+    CustomForms_StartFormTransform(gPlayState, player,
+                                   (worn == CUSTOM_FORM_GERUDO) ? CUSTOM_FORM_NONE : CUSTOM_FORM_GERUDO);
     return 1;
 }
 
@@ -544,9 +556,9 @@ extern "C" void CustomForms_GaroPostLimb(PlayState* play, s32 limbIndex, Gfx** d
 }
 
 // ---- hooks ----------------------------------------------------------------------------------------
-static s32 FormForMask(PlayerMask maskId) {
+extern "C" s32 CustomForms_FormForMask(s32 maskId) {
     for (s32 i = 0; i < CUSTOM_FORM_MAX; i++) {
-        if (sForms[i].playerMask == (s32)maskId && CVarGetInteger(sForms[i].cvarName, sForms[i].cvarDefault)) {
+        if (sForms[i].playerMask == maskId && CVarGetInteger(sForms[i].cvarName, sForms[i].cvarDefault)) {
             return i;
         }
     }
@@ -554,15 +566,13 @@ static s32 FormForMask(PlayerMask maskId) {
 }
 
 void RegisterCustomForms() {
-    // Wearing a form mask cancels the vanilla equip and toggles the form instead (PersistentMasks pattern;
-    // the vanilla toggle fires this same VB on re-wear, so removal comes for free).
-    COND_VB_SHOULD(VB_USE_ITEM_EQUIP_MASK, true, {
-        PlayerMask* maskId = va_arg(args, PlayerMask*);
-        s32 form = FormForMask(*maskId);
-        if (form != CUSTOM_FORM_NONE) {
+    // A form mask must take MM's TRANSFORMATION path, not the short wear anim: the answer to "is Link
+    // human" is what routes a mask between the two (Player_UseItem's var_v1), so deny it for ours.
+    COND_VB_SHOULD(VB_USE_ITEM_CONSIDER_LINK_HUMAN, true, {
+        PlayerItemAction* itemAction = va_arg(args, PlayerItemAction*);
+        if ((*itemAction >= PLAYER_IA_MASK_MIN) && (*itemAction <= PLAYER_IA_MASK_MAX) &&
+            (CustomForms_FormForMask(GET_MASK_FROM_IA(*itemAction)) != CUSTOM_FORM_NONE)) {
             *should = false;
-            CustomForms_Toggle(form);
-            func_8082E1F0(GET_PLAYER(gPlayState), NA_SE_PL_CHANGE_ARMS);
         }
     });
     COND_VB_SHOULD(VB_SHIELD_FROM_BUTTON_HOLD, true, {

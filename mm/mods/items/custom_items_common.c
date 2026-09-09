@@ -385,6 +385,11 @@ void CustomItems_Update(Player* p, PlayState* play) {
     (void)&FleetWarp_Tick; // keep the (now unused) static referenced -> no -Wunused-function
     // FleetWarp_Tick(p, play);  // <- do NOT re-enable in MM
 
+    {
+        extern void BrokenItems_HotkeyTick(PlayState * play);
+        BrokenItems_HotkeyTick(play);
+    }
+
     // Shared world-time arbiter (Champion's Tunic slow-mo, Zonai Permafrost stop, Phantom
     // Hourglass scrub) runs ALWAYS: it is a no-op with no active claim, it re-applies the
     // freeze to actors that spawned mid-effect, and it self-restores on scene change so a

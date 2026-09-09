@@ -43,7 +43,9 @@ void BrokenItems_EquipForm(PlayState* play, s32 i); // equip form i (refuses + e
 // equipped one is no longer earned.
 s32 BrokenItems_GetEquippedForm(void);
 // Worn form -> Link, Link -> the equipped form.
-void BrokenItems_ToggleEquippedForm(void);
+void BrokenItems_ToggleEquippedForm(PlayState* play);
+// Per-frame edge detection on the configured button combo. Call from the gameplay update.
+void BrokenItems_HotkeyTick(PlayState* play);
 
 #ifdef __cplusplus
 }

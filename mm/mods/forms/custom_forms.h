@@ -37,10 +37,23 @@ typedef struct CustomFormProps {
 } CustomFormProps;
 
 s32 CustomForms_ActiveForm(void);
+// The saved form, ignoring the gForms.ForceForm debug override CustomForms_ActiveForm honours.
+s32 CustomForms_WornForm(void);
 const char* CustomForms_BasePath(void);
+void CustomForms_SetActive(s32 formId);
 void CustomForms_Toggle(s32 formId);
 void CustomForms_Deactivate(void);
 const CustomFormProps* CustomForms_Props(void);
+
+s32 CustomForms_FormForMask(s32 maskId);
+
+// MM's transformation cutscene, form_transform_cs.cpp.
+u8 CustomForms_StartMaskTransform(PlayState* play, Player* player, s32 maskId);
+void CustomForms_StartFormTransform(PlayState* play, Player* player, s32 targetForm);
+u8 CustomForms_ApplyPendingTransform(void);
+void CustomForms_TickTransform(Player* player, PlayState* play);
+u8 CustomForms_TransformCsActive(void);
+void CustomForms_DrawTransformMask(PlayState* play, Player* player);
 
 // Placement of the animation root (soh MmForm_OverrideLimbDraw root branch): drop BEFORE the scale
 // (Gerudo 200), multiply (Keaton 0.335 adult / 0.476 child, Gerudo child 0.71), drop AFTER (Keaton 500).

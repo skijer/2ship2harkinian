@@ -2265,6 +2265,9 @@ void AudioOcarina_ReadControllerInput(void) {
 
     // 2S2H [Enhancement] Apply custom ocarina controls via GameInteractor
     sOcarinaInputButtonCur |= GameInteractor_CustomOcarinaControls(input);
+
+    // 2S2H [Enhancement] Recognise hummed songs via GameInteractor
+    GameInteractor_MicOcarina();
 }
 
 /**

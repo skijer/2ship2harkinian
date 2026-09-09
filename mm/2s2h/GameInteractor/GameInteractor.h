@@ -586,6 +586,7 @@ int GameInteractor_InvertControl(GIInvertType type);
 uint32_t GameInteractor_Dpad(GIDpadType type, uint32_t buttonCombo);
 uint32_t GameInteractor_RightStickOcarina(Input* input);
 uint32_t GameInteractor_CustomOcarinaControls(Input* input);
+void GameInteractor_MicOcarina(void);
 
 #ifdef __cplusplus
 }

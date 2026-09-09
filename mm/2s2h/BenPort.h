@@ -5,6 +5,9 @@
 
 #define BTN_CUSTOM_MODIFIER1 0x0040
 #define BTN_CUSTOM_MODIFIER2 0x0080
+// 0x0040 and 0x0080 are the only free bits below 0x10000; everything from 0x10000 to 0x800000 is
+// LUS stick/vstick, so a third modifier has to start above them. Skijer's NEI
+#define BTN_CUSTOM_MODIFIER3 ((CONTROLLERBUTTONS_T)0x01000000)
 
 // Ocarina custom controls (using bits beyond standard 16-bit N64 buttons)
 #define BTN_CUSTOM_OCARINA_NOTE_D4 ((CONTROLLERBUTTONS_T)0x00010000)

@@ -5,6 +5,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
+#include "2s2h/Enhancements/Ocarina/MicOcarina.h"
 
 extern "C" {
 #include "z64actor.h"
@@ -471,6 +472,10 @@ uint32_t GameInteractor_CustomOcarinaControls(Input* input) {
     }
 
     return result;
+}
+
+void GameInteractor_MicOcarina(void) {
+    MicOcarina_Update();
 }
 
 void ProcessEvents(Actor* actor) {
