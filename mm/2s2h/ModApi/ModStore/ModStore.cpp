@@ -286,7 +286,7 @@ std::optional<StoreRelease> FetchNewerRelease(const std::string& skippedVersion)
         return std::nullopt;
     }
     auto release = ModStore_ParseRelease(*payload);
-    const bool wanted = release && ModStore_CompareVersions(release->version, gBuildVersion) > 0 &&
+    const bool wanted = release && ModStore_CompareVersions(release->version, gBuildForkVersion) > 0 &&
                         release->version != skippedVersion;
     return wanted ? release : std::nullopt;
 }

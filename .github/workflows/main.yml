@@ -1,22 +1,62 @@
 name: generate-builds
+# 2S2H [Unbound] Builds run by hand (Actions > generate-builds > Run workflow) or from a release tag, never on
+# every push. A pushed "*unbound*" tag builds nothing itself: a tag ref cannot read the branch's caches, so it
+# starts this workflow on the tag's branch with the tag as input, which checks the tag out, builds and publishes
+# the release. Without a tag input a manual run only builds; publish-release.yml can release it later.
 on:
-  # Builds run by hand or from a release tag, never on every push.
   push:
     tags:
       - '*unbound*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build and publish (already pushed, on this branch); empty = build only
+        default: ''
+        type: string
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
 
+  dispatch-release:
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+    - name: Git Checkout
+      uses: actions/checkout@v6
+    - name: Start the release run
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ github.ref_name }}
+      run: |
+        BRANCH=$(.github/workflows/release-product.sh "$TAG" | sed -n 's/^branch=//p')
+        gh workflow run main.yml -R "$GITHUB_REPOSITORY" --ref "$BRANCH" -f tag="$TAG"
+        echo "Release run for ${TAG} started on ${BRANCH}"
+
   generate-2ship-otr:
+    if: github.ref_type != 'tag'
     runs-on: ubuntu-22.04
     steps:
     - name: Git Checkout
       uses: actions/checkout@v6
       with:
         submodules: true
+        ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || '' }}
+    - name: Check the release tag
+      if: inputs.tag
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+      run: |
+        BRANCH=$(.github/workflows/release-product.sh "$TAG" | sed -n 's/^branch=//p')
+        if [ "$BRANCH" != "$GITHUB_REF_NAME" ]; then
+          echo "::error::${TAG} is released from ${BRANCH}; this run is on ${GITHUB_REF_NAME}"
+          exit 1
+        fi
     - name: Configure ccache
       uses: hendrikmuhs/ccache-action@v1.2.22
       with:
@@ -75,7 +115,7 @@ jobs:
       with:
         name: 2ship.o2r
         path: 2ship.o2r
-        retention-days: 3
+        retention-days: 1
 
   build-macos:
     needs: generate-2ship-otr
@@ -85,6 +125,7 @@ jobs:
       uses: actions/checkout@v6
       with:
         submodules: recursive
+        ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || '' }}
     - name: Setup Macports
       uses: melusina-org/setup-macports@v1
       with:
@@ -107,6 +148,8 @@ jobs:
       run: |
         cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DCMAKE_C_FLAGS="-Xclang -fno-pch-timestamp" -DCMAKE_CXX_FLAGS="-Xclang -fno-pch-timestamp"
         cmake --build build-cmake -j
+        # Spotlight indexing the new disk image keeps hdiutil from unmounting it ("Resource busy").
+        sudo mdutil -a -i off || true
         (cd build-cmake && cpack)
 
         mv _packages/*.dmg 2Ship.dmg
@@ -118,6 +161,22 @@ jobs:
         path: |
           2Ship.dmg
           readme.txt
+    - name: Build the unsafe mods edition
+      env:
+        CCACHE_SLOPPINESS: pch_defines,time_macros
+      run: |
+        cp readme.txt README.md
+        cmake --no-warn-unused-cli -H. -Bbuild-cmake -DS2H_MOD_POLICY=ask
+        cmake --build build-cmake -j
+        (cd build-cmake && cpack)
+        mv _packages/*.dmg 2Ship-unbound-unsafe.dmg
+    - name: Upload the unsafe mods edition
+      uses: actions/upload-artifact@v7
+      with:
+        name: 2ship-unbound-unsafe-mac
+        path: |
+          2Ship-unbound-unsafe.dmg
+          readme.txt
 
   build-linux:
     needs: generate-2ship-otr
@@ -127,6 +186,7 @@ jobs:
       uses: actions/checkout@v6
       with:
         submodules: true
+        ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || '' }}
     - name: Install dependencies
       run: |
         sudo apt-get update
@@ -214,6 +274,22 @@ jobs:
         path: |
           2ship.appimage
           readme.txt
+    - name: Build the unsafe mods edition
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        cp readme.txt README.md
+        cmake --no-warn-unused-cli -H. -Bbuild-cmake -DS2H_MOD_POLICY=ask
+        cmake --build build-cmake --config Release -j3
+        (cd build-cmake && cpack -G External)
+        mv build-cmake/*.appimage 2ship-unbound-unsafe.appimage
+      env:
+        CC: gcc-12
+        CXX: g++-12
+    - name: Upload the unsafe mods edition
+      uses: actions/upload-artifact@v7
+      with:
+        name: 2ship-unbound-unsafe-linux
+        path: 2ship-unbound-unsafe.appimage
     - name: Save Cache deps folder
       if: ${{ github.ref_name == github.event.repository.default_branch }}
       uses: actions/cache/save@v5
@@ -233,6 +309,7 @@ jobs:
       uses: actions/checkout@v6
       with:
         submodules: true
+        ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || '' }}
     - name: Configure sccache
       uses: hendrikmuhs/ccache-action@v1.2.22
       with:
@@ -271,16 +348,104 @@ jobs:
         (cd build-windows && cpack)
         cd ..
         mv _packages/*.zip _packages/2ship-windows.zip
+    # Mods link against 2ship.lib, the import library of 2ship.exe; it ships next to the exe and as its own artifact.
+    - name: Find the mod import library
+      run: |
+        $lib = Get-ChildItem -Path build-windows -Recurse -Filter 2ship.lib | Select-Object -First 1
+        if (-not $lib) { Write-Error "2ship.lib was not built"; exit 1 }
+        New-Item -ItemType Directory -Force -Path mod-sdk-lib | Out-Null
+        Copy-Item -Path $lib.FullName -Destination mod-sdk-lib/2ship.lib
+    - name: Upload mod SDK import library
+      uses: actions/upload-artifact@v7
+      with:
+        name: unbound-mod-sdk-windows
+        if-no-files-found: error
+        path: mod-sdk-lib/2ship.lib
     - name: Unzip package
-      run: Expand-Archive -Path _packages/2ship-windows.zip -DestinationPath 2ship-windows
+      run: |
+        Expand-Archive -Path _packages/2ship-windows.zip -DestinationPath 2ship-windows
+        Copy-Item -Path mod-sdk-lib/2ship.lib -Destination 2ship-windows/2ship.lib
     - name: Upload build
       uses: actions/upload-artifact@v7
       with:
         name: 2ship-windows
         path: 2ship-windows
+    # The mod developers' edition asks before loading each unsigned mod; only ModLoader.cpp and the link rebuild.
+    - name: Build the unsafe mods edition
+      env:
+        VCPKG_ROOT: ${{github.workspace}}/vcpkg
+      run: |
+        Remove-Item -Path _packages/*.zip -Force
+        cmake -S . -B build-windows -DS2H_MOD_POLICY=ask
+        cmake --build build-windows --config Release --parallel 10
+        (cd build-windows && cpack)
+        cd ..
+        mv _packages/*.zip _packages/2ship-unbound-unsafe-windows.zip
+        Expand-Archive -Path _packages/2ship-unbound-unsafe-windows.zip -DestinationPath 2ship-unbound-unsafe-windows
+        Copy-Item -Path mod-sdk-lib/2ship.lib -Destination 2ship-unbound-unsafe-windows/2ship.lib
+    - name: Upload the unsafe mods edition
+      uses: actions/upload-artifact@v7
+      with:
+        name: 2ship-unbound-unsafe-windows
+        path: 2ship-unbound-unsafe-windows
     - name: Save Cache VCPKG folder
       if: ${{ github.ref_name == github.event.repository.default_branch }}
       uses: actions/cache/save@v5
       with:
         key: ${{ steps.restore-cache-vcpkg.outputs.cache-primary-key }}
         path: vcpkg
+
+  # A run with a tag input publishes its GitHub Release.
+  release:
+    needs: [build-macos, build-linux, build-windows]
+    if: inputs.tag
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+    - name: Git Checkout
+      uses: actions/checkout@v6
+      with:
+        ref: refs/tags/${{ inputs.tag }}
+        fetch-depth: 0
+    - name: Identify product
+      id: product
+      shell: bash
+      run: |
+        FACTS=$(.github/workflows/release-product.sh "$TAG")
+        echo "$FACTS" >> "$GITHUB_OUTPUT"
+        PRODUCT=$(sed -n 's/^product=//p' <<< "$FACTS")
+        # Notes start at the previous tag of the same product, never at a pipeline test tag.
+        PREV=$(git tag --sort=-creatordate | grep -- "$PRODUCT" | grep -v -- '-test$' | grep -vx -- "$TAG" | head -n 1 || true)
+        echo "prev=$PREV" >> "$GITHUB_OUTPUT"
+    - name: Download the builds
+      uses: actions/download-artifact@v7
+      with:
+        pattern: 2ship-*
+        path: rel
+    - name: Package release assets
+      run: |
+        mkdir -p dist
+        cp "rel/2ship-mac/2Ship.dmg" "dist/2Ship-${TAG}-Mac.dmg"
+        cp "rel/2ship-linux/2ship.appimage" "dist/2Ship-${TAG}-Linux.appimage"
+        (cd rel/2ship-windows && zip -r "../../dist/2Ship-${TAG}-Win64.zip" .)
+        cp "rel/2ship-windows/2ship.lib" "dist/2ship.lib"
+        cp "rel/2ship-unbound-unsafe-mac/2Ship-unbound-unsafe.dmg" "dist/2Ship-${TAG}-Mac-unsafe-mods.dmg"
+        cp "rel/2ship-unbound-unsafe-linux/2ship-unbound-unsafe.appimage" "dist/2Ship-${TAG}-Linux-unsafe-mods.appimage"
+        (cd rel/2ship-unbound-unsafe-windows && zip -r "../../dist/2Ship-${TAG}-Win64-unsafe-mods.zip" .)
+    - name: Publish GitHub Release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PRODUCT: ${{ steps.product.outputs.product }}
+        TITLE: ${{ steps.product.outputs.title }}
+        PREV: ${{ steps.product.outputs.prev }}
+        DRAFT: ${{ steps.product.outputs.draft }}
+      run: |
+        NOTES_FILE=".github/release-notes/${PRODUCT}.md"
+        ARGS=(--title "$TITLE" --generate-notes)
+        [ -n "$PREV" ] && ARGS+=(--notes-start-tag "$PREV")
+        [ -f "$NOTES_FILE" ] && ARGS+=(--notes-file "$NOTES_FILE")
+        [ "$DRAFT" = true ] && ARGS+=(--draft)
+        gh release create "$TAG" dist/* "${ARGS[@]}"

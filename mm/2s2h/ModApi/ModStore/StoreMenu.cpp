@@ -284,7 +284,7 @@ void DrawReleaseBanner(const StoreView& view, Actions& actions) {
     }
     const StoreRelease& release = *view.newerRelease;
     ImGui::TextColored(UIWidgets::ColorValues.at(UIWidgets::Colors::Yellow), "Unbound %s is available (you have %s).",
-                       release.version.c_str(), gBuildVersion);
+                       release.version.c_str(), gBuildForkVersion);
 
     int installed = 0;
     int ready = 0;

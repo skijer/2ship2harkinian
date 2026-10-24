@@ -230,7 +230,7 @@ def main():
         print(open_document(args.document.read_text(encoding="utf-8"), args.kind, read_trusted_key(key_header)))
     else:
         settings = KEYS[args.kind]
-        public = generate_key(args.private_key_output, args.key_header, kind=args.kind)
+        public = generate_key(args.private_key_output, kind=args.kind)
         print(f"Public key {public.hex()} written to {settings['header']}")
         print(f"Private key written to {args.private_key_output}: store it as the {settings['environment']} "
               "secret of the mod-signing environment, then delete the file")
