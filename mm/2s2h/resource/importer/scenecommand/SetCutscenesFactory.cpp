@@ -23,6 +23,7 @@ std::shared_ptr<Ship::IResource> SetCutsceneFactoryMM::ReadResource(std::shared_
                          Ship::Context::GetRawInstance()->GetResourceManager()->LoadResourceProcess(path.c_str()))
                          ->GetPointer();
         setCutscenes->entries.emplace_back(entry);
+        setCutscenes->scriptPaths.push_back(path);
     }
 
     return setCutscenes;

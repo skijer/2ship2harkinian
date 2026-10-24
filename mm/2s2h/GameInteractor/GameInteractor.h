@@ -15,6 +15,8 @@ extern "C" {
 
 #include "GameInteractor_VanillaBehavior.h"
 
+struct S2HGetItemEntry;
+
 typedef enum {
     FLAG_NONE,
     FLAG_WEEK_EVENT_REG,
@@ -156,7 +158,7 @@ struct GIEventSpawnActor {
 };
 
 struct GIEventTransition {
-    u16 entrance;
+    u32 entrance;
     u16 cutsceneIndex;
     s8 transitionTrigger;
     u8 transitionType;
@@ -489,6 +491,8 @@ extern "C" {
 #endif // __cplusplus
 
 void GameInteractor_ExecuteOnGameStateMainStart();
+void GameInteractor_ExecuteAfterOwlSave();
+void GameInteractor_ExecuteOnPlayerSfx(u16 sfxId);
 void GameInteractor_ExecuteOnGameStateMainFinish();
 void GameInteractor_ExecuteOnGameStateDrawFinish();
 void GameInteractor_ExecuteOnGameStateUpdate();
@@ -508,8 +512,8 @@ void GameInteractor_ExecuteBeforeInterfaceClockDraw();
 void GameInteractor_ExecuteOnGameCompletion();
 
 void GameInteractor_ExecuteOnSceneInit(s16 sceneId, s8 spawnNum);
-void GameInteractor_ExecuteOnRoomInit(s16 sceneId, s8 roomNum);
-void GameInteractor_ExecuteAfterRoomSceneCommands(s16 sceneId, s8 roomNum);
+void GameInteractor_ExecuteOnRoomInit(s16 sceneId, s16 roomNum);
+void GameInteractor_ExecuteAfterRoomSceneCommands(s16 sceneId, s16 roomNum);
 void GameInteractor_ExecuteOnPlayDrawWorldEnd();
 void GameInteractor_ExecuteOnPlayDestroy();
 
@@ -591,5 +595,7 @@ uint32_t GameInteractor_CustomOcarinaControls(Input* input);
 }
 
 #endif
+
+#include "GameInteractor_ModHooks.h"
 
 #endif // GAME_INTERACTOR_H

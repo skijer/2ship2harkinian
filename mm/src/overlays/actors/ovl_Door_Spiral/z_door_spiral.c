@@ -129,7 +129,7 @@ u8 func_809A2BF8(PlayState* play) {
 void DoorSpiral_Init(Actor* thisx, PlayState* play) {
     DoorSpiral* this = (DoorSpiral*)thisx;
     s32 transitionId = DOOR_GET_TRANSITION_ID(thisx);
-    s8 objectSlot;
+    s16 objectSlot;
 
     if (this->actor.room != play->transitionActors.list[transitionId].sides[0].room) {
         Actor_Kill(&this->actor);

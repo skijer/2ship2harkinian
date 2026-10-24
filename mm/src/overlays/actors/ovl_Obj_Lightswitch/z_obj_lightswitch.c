@@ -6,6 +6,7 @@
 
 #include "z_obj_lightswitch.h"
 #include "objects/object_lightswitch/object_lightswitch.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED)
 
@@ -266,12 +267,12 @@ void ObjLightSwitch_Enabled(ObjLightswitch* this, PlayState* play) {
             ObjLightSwitch_SetupDisabled(this);
         }
     } else if (actorType == LIGHTSWITCH_TYPE_FLIP) {
-        if (this->hitState >= 10) {
+        if (GameInteractor_Should(VB_LIGHTSWITCH_OFF, this->hitState >= 10, this)) {
             this->hitState = 0;
             ObjLightswitch_SetAction(this, ObjLightSwitch_SetupDisabled, 0);
         }
     } else if (this->hitState == 0) {
-        if (this->colorShiftTimer >= 13) {
+        if (GameInteractor_Should(VB_LIGHTSWITCH_OFF, this->colorShiftTimer >= 13, this)) {
             ObjLightswitch_UpdateSwitchFlags(this, play, 0);
             ObjLightSwitch_SetupDisabled(this);
         } else {

@@ -9,6 +9,10 @@ extern f32 sNESFontWidths[160];
 
 CustomMessage::Entry activeCustomMessage;
 
+extern "C" const char* CustomMessage_GetActiveIconPath(void) {
+    return activeCustomMessage.iconPath.empty() ? nullptr : activeCustomMessage.iconPath.c_str();
+}
+
 std::string CustomMessage::RemoveColorCodes(const std::string& input) {
     std::string output = input;
     const std::vector<std::string> codes = { "%r", "%w", "%y", "%g", "%b", "%p" };
@@ -54,9 +58,9 @@ void CustomMessage::ReplaceColorChars(std::string* msg) {
     CustomMessage::Replace(msg, "%p", "\x06");
 }
 
-void CustomMessage::AddLineBreaks(std::string* msg) {
-    const float MAX_TEXTBOX_WIDTH = 300.0f;
-    const int MAX_LINES_PER_PAGE = 4;
+void CustomMessage::AddLineBreaks(std::string* msg, float maxWidth) {
+    const float MAX_TEXTBOX_WIDTH = maxWidth;
+    const int MAX_LINES_PER_PAGE = 3;
 
     float currentLineWidth = 0.0f;
     int currentLineCount = 0;
@@ -70,6 +74,10 @@ void CustomMessage::AddLineBreaks(std::string* msg) {
             currentLineWidth = 0.0f;
             lastSpaceIndex = std::string::npos;
             ++currentLineCount;
+            if (currentLineCount >= MAX_LINES_PER_PAGE) {
+                (*msg)[i] = 0x10;
+                currentLineCount = 0;
+            }
             continue;
         }
 
@@ -94,7 +102,9 @@ void CustomMessage::AddLineBreaks(std::string* msg) {
 
         // Check if adding this character would exceed width
         if (currentLineWidth + charWidth > MAX_TEXTBOX_WIDTH) {
+            size_t breakPosition;
             if (lastSpaceIndex != std::string::npos) {
+                breakPosition = lastSpaceIndex;
                 // Break at the last space
                 (*msg)[lastSpaceIndex] = 0x11;
 
@@ -111,6 +121,7 @@ void CustomMessage::AddLineBreaks(std::string* msg) {
 
                 lastSpaceIndex = std::string::npos;
             } else {
+                breakPosition = i;
                 // No space found, force break before current character
                 msg->insert(i, 1, 0x11);
                 currentLineWidth = charWidth; // Current char is now first on new line
@@ -121,8 +132,7 @@ void CustomMessage::AddLineBreaks(std::string* msg) {
 
             if (currentLineCount >= MAX_LINES_PER_PAGE) {
                 // Find the newline we just added and replace it with box break
-                size_t newlinePos = (lastSpaceIndex != std::string::npos) ? lastSpaceIndex : i - 1;
-                (*msg)[newlinePos] = 0x10;
+                (*msg)[breakPosition] = 0x10;
                 currentLineCount = 0;
                 lastSpaceIndex = std::string::npos;
             }
@@ -135,7 +145,7 @@ void CustomMessage::AddLineBreaks(std::string* msg) {
 
 // Ensure that the message ends with the message end character
 void CustomMessage::EnsureMessageEnd(std::string* msg) {
-    if ((unsigned char)msg->back() != 0xBF) {
+    if (msg->empty() || (unsigned char)msg->back() != 0xBF) {
         msg->push_back(0xBF);
     }
 }
@@ -167,7 +177,7 @@ void CustomMessage::LoadCustomMessageIntoFont(CustomMessage::Entry entry) {
     MessageContext* msgCtx = &gPlayState->msgCtx;
     Font* font = &msgCtx->font;
 
-    char buff[1280] = { 0 };
+    char buff[BUFFER_SIZE] = { 0 };
 
     // Copy message header
     buff[0] = entry.textboxType;
@@ -185,7 +195,9 @@ void CustomMessage::LoadCustomMessageIntoFont(CustomMessage::Entry entry) {
     if (entry.autoFormat) {
         CustomMessage::ReplaceColorChars(&entry.msg);
         CustomMessage::Replace(&entry.msg, "\n", "\x11");
-        CustomMessage::AddLineBreaks(&entry.msg);
+        CustomMessage::Replace(&entry.msg, "&", "\x11");
+        CustomMessage::Replace(&entry.msg, "^", "\x10");
+        CustomMessage::AddLineBreaks(&entry.msg, entry.icon == 0xFE ? 300.0f : 260.0f);
         CustomMessage::EnsureMessageEnd(&entry.msg);
     }
 

@@ -13,7 +13,7 @@ void RegisterNoRandomDrops() {
         u32 item = va_arg(args, u32) & 0xFF;
 
         s16 scene = gPlayState->sceneId;
-        s8 room = gPlayState->roomCtx.curRoom.num;
+        s16 room = gPlayState->roomCtx.curRoom.num;
 
         // Gekko mini-boss in Woodfall Temple and Poe Sisters fight should allow arrow drops
         if (((scene == SCENE_MITURIN && room == 8) || scene == SCENE_TOUGITES) && item == ITEM00_ARROWS_10) {

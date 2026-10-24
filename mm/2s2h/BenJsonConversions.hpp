@@ -70,7 +70,9 @@ inline void from_json(const json& j, RandoSaveInfo& rando) {
     j.at("finalSeed").get_to(rando.finalSeed);
     j.at("randoSaveOptions").get_to(rando.randoSaveOptions);
     j.at("randoStartingItems").get_to(rando.randoStartingItems);
-    j.at("foundDungeonKeys").get_to(rando.foundDungeonKeys);
+    for (size_t i = 0; i < ARRAY_COUNT(rando.foundDungeonKeys); i++) {
+        rando.foundDungeonKeys[i] = i < j.at("foundDungeonKeys").size() ? j.at("foundDungeonKeys")[i].get<s8>() : -1;
+    }
     j.at("foundTriforcePieces").get_to(rando.foundTriforcePieces);
     j.at("sariaHintsAvailable").get_to(rando.sariaHintsAvailable);
     j.at("sariaPriorityItems").get_to(rando.sariaPriorityItems);
@@ -198,7 +200,9 @@ inline void from_json(const json& j, Inventory& inventory) {
     j.at("upgrades").get_to(inventory.upgrades);
     j.at("questItems").get_to(inventory.questItems);
     j.at("dungeonItems").get_to(inventory.dungeonItems);
-    j.at("dungeonKeys").get_to(inventory.dungeonKeys);
+    for (size_t i = 0; i < ARRAY_COUNT(inventory.dungeonKeys); i++) {
+        inventory.dungeonKeys[i] = i < j.at("dungeonKeys").size() ? j.at("dungeonKeys")[i].get<s8>() : -1;
+    }
     j.at("defenseHearts").get_to(inventory.defenseHearts);
     j.at("strayFairies").get_to(inventory.strayFairies);
     // dekuPlaygroundPlayerName is an array of arrays, so we need to manually parse it
@@ -280,6 +284,20 @@ inline void from_json(const json& j, SavePlayerData& savePlayerData) {
     j.at("savedSceneId").get_to(savePlayerData.savedSceneId);
 }
 
+inline void from_json(const json& j, Color_RGB8& color) {
+    j.at("r").get_to(color.r);
+    j.at("g").get_to(color.g);
+    j.at("b").get_to(color.b);
+}
+
+inline void to_json(json& j, const Color_RGB8& color) {
+    j = json{
+        {"r", color.r},
+        {"g", color.g},
+        {"b", color.b}
+    };
+}
+
 inline void to_json(json& j, const Vec3s& vec) {
     j = json{
         { "x", vec.x },
@@ -292,6 +310,18 @@ inline void from_json(const json& j, Vec3s& vec) {
     j.at("x").get_to(vec.x);
     j.at("y").get_to(vec.y);
     j.at("z").get_to(vec.z);
+}
+
+inline void to_json(json& j, const PosRot& posRot) {
+    j = json{
+        {"pos", posRot.pos},
+        {"rot", posRot.rot}
+    };
+}
+
+inline void from_json(const json& j, PosRot& posRot) {
+    j.at("pos").get_to(posRot.pos);
+    j.at("rot").get_to(posRot.rot);
 }
 
 inline void to_json(json& j, const HorseData& horseData) {

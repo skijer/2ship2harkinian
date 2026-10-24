@@ -219,7 +219,7 @@ void func_80B77770(ObjUm* this, PlayState* play) {
 s32 ObjUm_InitBandits(ObjUm* this, PlayState* play) {
     Path* path = &play->setupPathList[this->pathIndex];
     s16 pad;
-    Vec3s* spawnPoints;
+    Vec3f* spawnPoints;
     EnHorse* bandit1;
     EnHorse* bandit2;
 
@@ -354,7 +354,7 @@ s32 func_80B781DC(ObjUm* this, EnHorse* bandit1, EnHorse* bandit2, PlayState* pl
 s32 func_80B783E0(ObjUm* this, PlayState* play, s32 banditIndex, EnHorse* bandit) {
     Path* path = &play->setupPathList[this->pathIndex];
     s32 sp68;
-    Vec3s* sp64;
+    Vec3f* sp64;
     f32 phi_f12;
     s32 phi_v1_2;
     Vec3f sp50;
@@ -384,7 +384,7 @@ s32 func_80B783E0(ObjUm* this, PlayState* play, s32 banditIndex, EnHorse* bandit
         bandit->unk_564 = 1;
     }
 
-    Math_Vec3s_ToVec3f(&sp50, &sp64[bandit->curRaceWaypoint]);
+    Math_Vec3f_Copy(&sp50, &sp64[bandit->curRaceWaypoint]);
 
     if (bandit->curRaceWaypoint == 0) {
         phi_f12 = sp64[1].x - sp64[0].x;
@@ -405,7 +405,7 @@ s32 func_80B783E0(ObjUm* this, PlayState* play, s32 banditIndex, EnHorse* bandit
         if (bandit->curRaceWaypoint >= sp68) {
             bandit->curRaceWaypoint = 0;
         }
-        Math_Vec3s_ToVec3f(&sp50, &sp64[bandit->curRaceWaypoint]);
+        Math_Vec3f_Copy(&sp50, &sp64[bandit->curRaceWaypoint]);
     }
 
     bandit->actor.world.rot.y = Math_Vec3f_Yaw(&bandit->actor.world.pos, &sp50);
@@ -1039,7 +1039,7 @@ typedef enum ObjUmPathState {
 ObjUmPathState ObjUm_UpdatePath(ObjUm* this, PlayState* play) {
     Path* path = &play->setupPathList[this->pathIndex];
     s32 pathCount;
-    Vec3s* pathPoints;
+    Vec3f* pathPoints;
     f32 xDiff;
     f32 zDiff;
     Vec3f sp50;
@@ -1058,7 +1058,7 @@ ObjUmPathState ObjUm_UpdatePath(ObjUm* this, PlayState* play) {
         return 0;
     }
 
-    Math_Vec3s_ToVec3f(&sp50, &pathPoints[this->pointIndex]);
+    Math_Vec3f_Copy(&sp50, &pathPoints[this->pointIndex]);
 
     if (this->pointIndex == 0) {
         xDiff = pathPoints[1].x - pathPoints[0].x;
@@ -1091,7 +1091,7 @@ ObjUmPathState ObjUm_UpdatePath(ObjUm* this, PlayState* play) {
             sp3C = OBJUM_PATH_STATE_FINISH;
         }
 
-        Math_Vec3s_ToVec3f(&sp50, &pathPoints[this->pointIndex]);
+        Math_Vec3f_Copy(&sp50, &pathPoints[this->pointIndex]);
     }
 
     if (this->donkey != NULL) {

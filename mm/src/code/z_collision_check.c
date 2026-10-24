@@ -963,7 +963,7 @@ s32 Collider_QuadSetNearestAC(struct PlayState* play, ColliderQuad* quad, Vec3f*
     if (!(quad->elem.atElemFlags & ATELEM_NEAREST)) {
         return 1;
     }
-    Math_Vec3s_ToVec3f(&dcMid, &quad->dim.dcMid);
+    Math_Vec3f_Copy(&dcMid, &quad->dim.dcMid);
     acDist = Math3D_Vec3fDistSq(&dcMid, hitPos);
 
     if (acDist < quad->dim.acDist) {
@@ -1249,6 +1249,7 @@ s32 CollisionCheck_SetAC(struct PlayState* play, CollisionCheckContext* colChkCt
     }
     index = colChkCtx->colACCount;
     colChkCtx->colAC[colChkCtx->colACCount++] = col;
+    GameInteractor_ExecuteOnCollisionRegisterAC(col);
 
     return index;
 }
@@ -1780,8 +1781,8 @@ void CollisionCheck_AC_JntSphVsJntSph(struct PlayState* play, CollisionCheckCont
                     Vec3f atPos;
                     Vec3f acPos;
 
-                    Math_Vec3s_ToVec3f(&atPos, &atJntSphElem->dim.worldSphere.center);
-                    Math_Vec3s_ToVec3f(&acPos, &acJntSphElem->dim.worldSphere.center);
+                    Math_Vec3f_Copy(&atPos, &atJntSphElem->dim.worldSphere.center);
+                    Math_Vec3f_Copy(&acPos, &acJntSphElem->dim.worldSphere.center);
 
                     if (!IS_ZERO(centerDist)) {
                         acToHit = acJntSphElem->dim.worldSphere.radius / centerDist;
@@ -1832,8 +1833,8 @@ void CollisionCheck_AC_JntSphVsCyl(struct PlayState* play, CollisionCheckContext
                 Vec3f acPos;
                 f32 acToHit;
 
-                Math_Vec3s_ToVec3f(&atPos, &atJntSphElem->dim.worldSphere.center);
-                Math_Vec3s_ToVec3f(&acPos, &acCyl->dim.pos);
+                Math_Vec3f_Copy(&atPos, &atJntSphElem->dim.worldSphere.center);
+                Math_Vec3f_Copy(&acPos, &acCyl->dim.pos);
                 if (!IS_ZERO(centerDist)) {
                     acToHit = acCyl->dim.radius / centerDist;
                     if (acToHit <= 1.0f) {
@@ -1881,7 +1882,7 @@ void CollisionCheck_AC_JntSphVsTris(struct PlayState* play, CollisionCheckContex
                     Vec3f atPos;
                     Vec3f acPos;
 
-                    Math_Vec3s_ToVec3f(&atPos, &atJntSphElem->dim.worldSphere.center);
+                    Math_Vec3f_Copy(&atPos, &atJntSphElem->dim.worldSphere.center);
                     CollisionCheck_TrisAvgPoint(acTrisElem, &acPos);
                     CollisionCheck_SetATvsAC(play, &atJntSph->base, &atJntSphElem->base, &atPos, &acTris->base,
                                              &acTrisElem->base, &acPos, &hitPos);
@@ -1921,7 +1922,7 @@ void CollisionCheck_AC_JntSphVsQuad(struct PlayState* play, CollisionCheckContex
                 Vec3f atPos;
                 Vec3f acPos;
 
-                Math_Vec3s_ToVec3f(&atPos, &atJntSphElem->dim.worldSphere.center);
+                Math_Vec3f_Copy(&atPos, &atJntSphElem->dim.worldSphere.center);
                 CollisionCheck_QuadAvgPoint(acQuad, &acPos);
                 CollisionCheck_SetATvsAC(play, &atJntSph->base, &atJntSphElem->base, &atPos, &acQuad->base,
                                          &acQuad->elem, &acPos, &hitPos);
@@ -1960,8 +1961,8 @@ void CollisionCheck_AC_JntSphVsSphere(struct PlayState* play, CollisionCheckCont
                 Vec3f atPos;
                 Vec3f acPos;
 
-                Math_Vec3s_ToVec3f(&atPos, &atJntSphElem->dim.worldSphere.center);
-                Math_Vec3s_ToVec3f(&acPos, &acSph->dim.worldSphere.center);
+                Math_Vec3f_Copy(&atPos, &atJntSphElem->dim.worldSphere.center);
+                Math_Vec3f_Copy(&acPos, &acSph->dim.worldSphere.center);
                 if (!IS_ZERO(centerDist)) {
                     acToHit = acSph->dim.worldSphere.radius / centerDist;
                     hitPos.x = ((atPos.x - acPos.x) * acToHit) + acPos.x;
@@ -2006,8 +2007,8 @@ void CollisionCheck_AC_CylVsJntSph(struct PlayState* play, CollisionCheckContext
                 Vec3f acPos;
                 f32 acToHit;
 
-                Math_Vec3s_ToVec3f(&atPos, &atCyl->dim.pos);
-                Math_Vec3s_ToVec3f(&acPos, &acJntSphElem->dim.worldSphere.center);
+                Math_Vec3f_Copy(&atPos, &atCyl->dim.pos);
+                Math_Vec3f_Copy(&acPos, &acJntSphElem->dim.worldSphere.center);
                 if (!IS_ZERO(centerDist)) {
                     acToHit = acJntSphElem->dim.worldSphere.radius / centerDist;
                     if (acToHit <= 1.0f) {
@@ -2056,8 +2057,8 @@ void CollisionCheck_AC_CylVsCyl(struct PlayState* play, CollisionCheckContext* c
             Vec3f atPos;
             Vec3f acPos;
 
-            Math_Vec3s_ToVec3f(&atPos, &atCyl->dim.pos);
-            Math_Vec3s_ToVec3f(&acPos, &acCyl->dim.pos);
+            Math_Vec3f_Copy(&atPos, &atCyl->dim.pos);
+            Math_Vec3f_Copy(&acPos, &acCyl->dim.pos);
             if (!IS_ZERO(centerDist)) {
                 f32 acToHit = acCyl->dim.radius / centerDist;
                 f32 height;
@@ -2076,7 +2077,7 @@ void CollisionCheck_AC_CylVsCyl(struct PlayState* play, CollisionCheckContext* c
                 hitPos.x = ((f32)atCyl->dim.pos.x - acCyl->dim.pos.x) * acToHit + acCyl->dim.pos.x;
                 hitPos.z = ((f32)atCyl->dim.pos.z - acCyl->dim.pos.z) * acToHit + acCyl->dim.pos.z;
             } else {
-                Math_Vec3s_ToVec3f(&hitPos, &acCyl->dim.pos);
+                Math_Vec3f_Copy(&hitPos, &acCyl->dim.pos);
             }
             CollisionCheck_SetATvsAC(play, &atCyl->base, &atCyl->elem, &atPos, &acCyl->base, &acCyl->elem, &acPos,
                                      &hitPos);
@@ -2111,7 +2112,7 @@ void CollisionCheck_AC_CylVsTris(struct PlayState* play, CollisionCheckContext* 
                 Vec3f atPos;
                 Vec3f acPos;
 
-                Math_Vec3s_ToVec3f(&atPos, &atCyl->dim.pos);
+                Math_Vec3f_Copy(&atPos, &atCyl->dim.pos);
                 CollisionCheck_TrisAvgPoint(acTrisElem, &acPos);
                 CollisionCheck_SetATvsAC(play, &atCyl->base, &atCyl->elem, &atPos, &acTris->base, &acTrisElem->base,
                                          &acPos, &hitPos);
@@ -2146,7 +2147,7 @@ void CollisionCheck_AC_CylVsQuad(struct PlayState* play, CollisionCheckContext* 
             Vec3f atPos;
             Vec3f acPos;
 
-            Math_Vec3s_ToVec3f(&atPos, &atCyl->dim.pos);
+            Math_Vec3f_Copy(&atPos, &atCyl->dim.pos);
             CollisionCheck_QuadAvgPoint(acQuad, &acPos);
             CollisionCheck_SetATvsAC(play, &atCyl->base, &atCyl->elem, &atPos, &acQuad->base, &acQuad->elem, &acPos,
                                      &D_801EDE00);
@@ -2154,7 +2155,7 @@ void CollisionCheck_AC_CylVsQuad(struct PlayState* play, CollisionCheckContext* 
             Vec3f atPos;
             Vec3f acPos;
 
-            Math_Vec3s_ToVec3f(&atPos, &atCyl->dim.pos);
+            Math_Vec3f_Copy(&atPos, &atCyl->dim.pos);
             CollisionCheck_QuadAvgPoint(acQuad, &acPos);
             CollisionCheck_SetATvsAC(play, &atCyl->base, &atCyl->elem, &atPos, &acQuad->base, &acQuad->elem, &acPos,
                                      &D_801EDE00);
@@ -2189,8 +2190,8 @@ void CollisionCheck_AC_CylVsSphere(struct PlayState* play, CollisionCheckContext
             Vec3f acPos;
             f32 acToHit;
 
-            Math_Vec3s_ToVec3f(&atPos, &atCyl->dim.pos);
-            Math_Vec3s_ToVec3f(&acPos, &acSph->dim.worldSphere.center);
+            Math_Vec3f_Copy(&atPos, &atCyl->dim.pos);
+            Math_Vec3f_Copy(&acPos, &acSph->dim.worldSphere.center);
 
             if (!IS_ZERO(centerDist)) {
                 acToHit = acSph->dim.worldSphere.radius / centerDist;
@@ -2237,7 +2238,7 @@ void CollisionCheck_AC_TrisVsJntSph(struct PlayState* play, CollisionCheckContex
                     Vec3f atPos;
                     Vec3f acPos;
 
-                    Math_Vec3s_ToVec3f(&acPos, &acJntSphElem->dim.worldSphere.center);
+                    Math_Vec3f_Copy(&acPos, &acJntSphElem->dim.worldSphere.center);
                     CollisionCheck_TrisAvgPoint(atTrisElem, &atPos);
                     CollisionCheck_SetATvsAC(play, &atTris->base, &atTrisElem->base, &atPos, &acJntSph->base,
                                              &acJntSphElem->base, &acPos, &hitPos);
@@ -2276,7 +2277,7 @@ void CollisionCheck_AC_TrisVsCyl(struct PlayState* play, CollisionCheckContext* 
                 Vec3f acPos;
 
                 CollisionCheck_TrisAvgPoint(atTrisElem, &atPos);
-                Math_Vec3s_ToVec3f(&acPos, &acCyl->dim.pos);
+                Math_Vec3f_Copy(&acPos, &acCyl->dim.pos);
                 CollisionCheck_SetATvsAC(play, &atTris->base, &atTrisElem->base, &atPos, &acCyl->base, &acCyl->elem,
                                          &acPos, &D_801EDE10);
                 return;
@@ -2386,7 +2387,7 @@ void CollisionCheck_AC_TrisVsSphere(struct PlayState* play, CollisionCheckContex
                 Vec3f atPos;
                 Vec3f acPos;
 
-                Math_Vec3s_ToVec3f(&acPos, &acSph->dim.worldSphere.center);
+                Math_Vec3f_Copy(&acPos, &acSph->dim.worldSphere.center);
                 CollisionCheck_TrisAvgPoint(atTrisElem, &atPos);
                 CollisionCheck_SetATvsAC(play, &atTris->base, &atTrisElem->base, &atPos, &acSph->base, &acSph->elem,
                                          &acPos, &hitPos);
@@ -2427,7 +2428,7 @@ void CollisionCheck_AC_QuadVsJntSph(struct PlayState* play, CollisionCheckContex
                 if (!Collider_QuadSetNearestAC(play, atQuad, &hitPos)) {
                     continue;
                 }
-                Math_Vec3s_ToVec3f(&acPos, &acJntSphElem->dim.worldSphere.center);
+                Math_Vec3f_Copy(&acPos, &acJntSphElem->dim.worldSphere.center);
                 CollisionCheck_QuadAvgPoint(atQuad, &atPos);
                 CollisionCheck_SetATvsAC(play, &atQuad->base, &atQuad->elem, &atPos, &acJntSph->base,
                                          &acJntSphElem->base, &acPos, &hitPos);
@@ -2468,7 +2469,7 @@ void CollisionCheck_AC_QuadVsCyl(struct PlayState* play, CollisionCheckContext* 
                 Vec3f acPos;
 
                 CollisionCheck_QuadAvgPoint(atQuad, &atPos);
-                Math_Vec3s_ToVec3f(&acPos, &acCyl->dim.pos);
+                Math_Vec3f_Copy(&acPos, &acCyl->dim.pos);
                 CollisionCheck_SetATvsAC(play, &atQuad->base, &atQuad->elem, &atPos, &acCyl->base, &acCyl->elem, &acPos,
                                          &D_801EDFE0);
                 return;
@@ -2480,7 +2481,7 @@ void CollisionCheck_AC_QuadVsCyl(struct PlayState* play, CollisionCheckContext* 
                 Vec3f acPos;
 
                 CollisionCheck_QuadAvgPoint(atQuad, &atPos);
-                Math_Vec3s_ToVec3f(&acPos, &acCyl->dim.pos);
+                Math_Vec3f_Copy(&acPos, &acCyl->dim.pos);
                 CollisionCheck_SetATvsAC(play, &atQuad->base, &atQuad->elem, &atPos, &acCyl->base, &acCyl->elem, &acPos,
                                          &D_801EDFE0);
             }
@@ -2597,7 +2598,7 @@ void CollisionCheck_AC_QuadVsSphere(struct PlayState* play, CollisionCheckContex
             Vec3f atPos;
             Vec3f acPos;
 
-            Math_Vec3s_ToVec3f(&acPos, &acSph->dim.worldSphere.center);
+            Math_Vec3f_Copy(&acPos, &acSph->dim.worldSphere.center);
             CollisionCheck_QuadAvgPoint(atQuad, &atPos);
             CollisionCheck_SetATvsAC(play, &atQuad->base, &atQuad->elem, &atPos, &acSph->base, &acSph->elem, &acPos,
                                      &hitPos);
@@ -2636,8 +2637,8 @@ void CollisionCheck_AC_SphereVsJntSph(struct PlayState* play, CollisionCheckCont
                 Vec3f atPos;
                 Vec3f acPos;
 
-                Math_Vec3s_ToVec3f(&atPos, &atSph->dim.worldSphere.center);
-                Math_Vec3s_ToVec3f(&acPos, &acJntSphElem->dim.worldSphere.center);
+                Math_Vec3f_Copy(&atPos, &atSph->dim.worldSphere.center);
+                Math_Vec3f_Copy(&acPos, &acJntSphElem->dim.worldSphere.center);
                 if (!IS_ZERO(centerDist)) {
                     acToHit = acJntSphElem->dim.worldSphere.radius / centerDist;
                     hitPos.x = (atPos.x - acPos.x) * acToHit + acPos.x;
@@ -2678,8 +2679,8 @@ void CollisionCheck_AC_SphereVsCylinder(struct PlayState* play, CollisionCheckCo
         Vec3f atPos;
         Vec3f acPos;
 
-        Math_Vec3s_ToVec3f(&atPos, &atSph->dim.worldSphere.center);
-        Math_Vec3s_ToVec3f(&acPos, &acCyl->dim.pos);
+        Math_Vec3f_Copy(&atPos, &atSph->dim.worldSphere.center);
+        Math_Vec3f_Copy(&acPos, &acCyl->dim.pos);
 
         if (!IS_ZERO(centerDist)) {
             f32 acToHit = acCyl->dim.radius / centerDist;
@@ -2725,7 +2726,7 @@ void CollisionCheck_AC_SphereVsTris(struct PlayState* play, CollisionCheckContex
             Vec3f atPos;
             Vec3f acPos;
 
-            Math_Vec3s_ToVec3f(&atPos, &atSph->dim.worldSphere.center);
+            Math_Vec3f_Copy(&atPos, &atSph->dim.worldSphere.center);
             CollisionCheck_TrisAvgPoint(acTrisElem, &acPos);
             CollisionCheck_SetATvsAC(play, &atSph->base, &atSph->elem, &atPos, &acTris->base, &acTrisElem->base, &acPos,
                                      &hitPos);
@@ -2758,7 +2759,7 @@ void CollisionCheck_AC_SphereVsQuad(struct PlayState* play, CollisionCheckContex
         Vec3f atPos;
         Vec3f acPos;
 
-        Math_Vec3s_ToVec3f(&atPos, &atSph->dim.worldSphere.center);
+        Math_Vec3f_Copy(&atPos, &atSph->dim.worldSphere.center);
         CollisionCheck_QuadAvgPoint(acQuad, &acPos);
         CollisionCheck_SetATvsAC(play, &atSph->base, &atSph->elem, &atPos, &acQuad->base, &acQuad->elem, &acPos,
                                  &hitPos);
@@ -2791,8 +2792,8 @@ void CollisionCheck_AC_SphereVsSphere(struct PlayState* play, CollisionCheckCont
         Vec3f atPos;
         Vec3f acPos;
 
-        Math_Vec3s_ToVec3f(&atPos, &atSph->dim.worldSphere.center);
-        Math_Vec3s_ToVec3f(&acPos, &acSph->dim.worldSphere.center);
+        Math_Vec3f_Copy(&atPos, &atSph->dim.worldSphere.center);
+        Math_Vec3f_Copy(&acPos, &acSph->dim.worldSphere.center);
         if (!IS_ZERO(centerDist)) {
             acToHit = acSph->dim.worldSphere.radius / centerDist;
             hitPos.x = (atPos.x - acPos.x) * acToHit + acPos.x;
@@ -3158,8 +3159,8 @@ void CollisionCheck_OC_JntSphVsJntSph(struct PlayState* play, CollisionCheckCont
                     Vec3f leftPos;
                     Vec3f rightPos;
 
-                    Math_Vec3s_ToVec3f(&leftPos, &leftJntSphElem->dim.worldSphere.center);
-                    Math_Vec3s_ToVec3f(&rightPos, &rightJntSphElem->dim.worldSphere.center);
+                    Math_Vec3f_Copy(&leftPos, &leftJntSphElem->dim.worldSphere.center);
+                    Math_Vec3f_Copy(&rightPos, &rightJntSphElem->dim.worldSphere.center);
                     CollisionCheck_SetOCvsOC(play, &leftJntSph->base, &leftJntSphElem->base, &leftPos,
                                              &rightJntSph->base, &rightJntSphElem->base, &rightPos, overlapSize);
                 }
@@ -3190,8 +3191,8 @@ void CollisionCheck_OC_JntSphVsCyl(struct PlayState* play, CollisionCheckContext
                 Vec3f leftPos;
                 Vec3f rightPos;
 
-                Math_Vec3s_ToVec3f(&leftPos, &leftJntSphElem->dim.worldSphere.center);
-                Math_Vec3s_ToVec3f(&rightPos, &rightCyl->dim.pos);
+                Math_Vec3f_Copy(&leftPos, &leftJntSphElem->dim.worldSphere.center);
+                Math_Vec3f_Copy(&rightPos, &rightCyl->dim.pos);
                 CollisionCheck_SetOCvsOC(play, &leftJntSph->base, &leftJntSphElem->base, &leftPos, &rightCyl->base,
                                          &rightCyl->elem, &rightPos, overlapSize);
             }
@@ -3221,8 +3222,8 @@ void CollisionCheck_OC_JntSphVsSphere(struct PlayState* play, CollisionCheckCont
                 Vec3f leftPos;
                 Vec3f rightPos;
 
-                Math_Vec3s_ToVec3f(&leftPos, &leftJntSphElem->dim.worldSphere.center);
-                Math_Vec3s_ToVec3f(&rightPos, &rightSph->dim.worldSphere.center);
+                Math_Vec3f_Copy(&leftPos, &leftJntSphElem->dim.worldSphere.center);
+                Math_Vec3f_Copy(&rightPos, &rightSph->dim.worldSphere.center);
                 CollisionCheck_SetOCvsOC(play, &leftJntSph->base, &leftJntSphElem->base, &leftPos, &rightSph->base,
                                          &rightSph->elem, &rightPos, overlapSize);
             }
@@ -3253,8 +3254,8 @@ void CollisionCheck_OC_CylVsCyl(struct PlayState* play, CollisionCheckContext* c
             Vec3f leftPos;
             Vec3f rightPos;
 
-            Math_Vec3s_ToVec3f(&leftPos, &leftCyl->dim.pos);
-            Math_Vec3s_ToVec3f(&rightPos, &rightCyl->dim.pos);
+            Math_Vec3f_Copy(&leftPos, &leftCyl->dim.pos);
+            Math_Vec3f_Copy(&rightPos, &rightCyl->dim.pos);
             CollisionCheck_SetOCvsOC(play, &leftCyl->base, &leftCyl->elem, &leftPos, &rightCyl->base, &rightCyl->elem,
                                      &rightPos, overlapSize);
         }
@@ -3276,8 +3277,8 @@ void CollisionCheck_OC_CylVsSphere(struct PlayState* play, CollisionCheckContext
             Vec3f leftPos;
             Vec3f rightPos;
 
-            Math_Vec3s_ToVec3f(&leftPos, &leftCyl->dim.pos);
-            Math_Vec3s_ToVec3f(&rightPos, &rightSph->dim.worldSphere.center);
+            Math_Vec3f_Copy(&leftPos, &leftCyl->dim.pos);
+            Math_Vec3f_Copy(&rightPos, &rightSph->dim.worldSphere.center);
             CollisionCheck_SetOCvsOC(play, &leftCyl->base, &leftCyl->elem, &leftPos, &rightSph->base, &rightSph->elem,
                                      &rightPos, overlapSize);
         }
@@ -3315,8 +3316,8 @@ void CollisionCheck_OC_SphereVsSphere(struct PlayState* play, CollisionCheckCont
             Vec3f leftPos;
             Vec3f rightPos;
 
-            Math_Vec3s_ToVec3f(&leftPos, &leftSph->dim.worldSphere.center);
-            Math_Vec3s_ToVec3f(&rightPos, &rightSph->dim.worldSphere.center);
+            Math_Vec3f_Copy(&leftPos, &leftSph->dim.worldSphere.center);
+            Math_Vec3f_Copy(&rightPos, &rightSph->dim.worldSphere.center);
             CollisionCheck_SetOCvsOC(play, &leftSph->base, &leftSph->elem, &leftPos, &rightSph->base, &rightSph->elem,
                                      &rightPos, overlapSize);
         }
@@ -3526,6 +3527,12 @@ void CollisionCheck_ApplyDamage(struct PlayState* play, CollisionCheckContext* c
                 }
             }
         }
+        if (atElem->atDmgInfo.dmgFlags & (DMG_DEKU_STICK | DMG_SWORD | DMG_SPIN_ATTACK | DMG_SWORD_BEAM)) {
+            u8 swordDamage = finalDamage;
+            GameInteractor_ExecuteOnResolveSwordDamage(play, atElem->atDmgInfo.dmgFlags, &swordDamage);
+            finalDamage = swordDamage;
+        }
+        GameInteractor_ExecuteOnCollisionResolveDamage(col->actor, atElem, &finalDamage);
         if (col->actor->colChkInfo.damageTable != NULL) {
             col->actor->colChkInfo.damageEffect = effect;
         }

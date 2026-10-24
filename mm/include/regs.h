@@ -25,7 +25,7 @@ typedef struct RegEditor {
 
 void Regs_Init(void);
 
-extern RegEditor* gRegEditor;
+extern HOST_DATA RegEditor* gRegEditor;
 
 #define BASE_REG(n, r) (gRegEditor->data[n * REG_PER_GROUP + r])
 

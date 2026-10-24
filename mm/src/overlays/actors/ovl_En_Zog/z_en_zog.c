@@ -173,11 +173,11 @@ void func_80B93310(Actor* thisx, Lights* mapper, PlayState* play) {
 }
 
 void func_80B93468(EnZog* this, PlayState* play) {
-    Vec3s* points;
+    Vec3f* points;
 
     this->path = &play->setupPathList[ENZOG_GET_PATH_INDEX(&this->actor)];
     if (this->path != NULL) {
-        points = &((Vec3s*)Lib_SegmentedToVirtual(this->path->points))[this->unk_2EC];
+        points = &((Vec3f*)Lib_SegmentedToVirtual(this->path->points))[this->unk_2EC];
         points++;
 
         this->actor.world.pos.x = points[-1].x;
@@ -369,13 +369,13 @@ void func_80B93BA8(EnZog* this, s16 csIdIndex) {
 s32 func_80B93BE0(EnZog* this, PlayState* play) {
     Path* path = this->path;
     s16 temp_v0;
-    Vec3s* points;
+    Vec3f* points;
 
     if (this->path == NULL) {
         return false;
     }
 
-    points = &((Vec3s*)Lib_SegmentedToVirtual(path->points))[this->unk_2EC];
+    points = &((Vec3f*)Lib_SegmentedToVirtual(path->points))[this->unk_2EC];
 
     if (this->unk_30A & 1) {
         this->actor.world.pos.x = points->x;

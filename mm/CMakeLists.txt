@@ -72,6 +72,8 @@ if (NOT TARGET ZAPDLib)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ZAPDTR/ZAPD ${CMAKE_BINARY_DIR}/ZAPD)
 endif()
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/2s2h/ModApi/O2rExtractor/ZapdRomFormat.cmake)
+
 set(PROJECT_NAME 2ship)
 
 ################################################################################
@@ -178,18 +180,63 @@ set(ALL_FILES
 ################################################################################
 add_executable(${PROJECT_NAME} ${ALL_FILES})
 
+################################################################################
+# Mod API: native mods link against the executable's own symbols
+################################################################################
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    ENABLE_EXPORTS ON
+    C_VISIBILITY_PRESET default
+    CXX_VISIBILITY_PRESET default
+    VISIBILITY_INLINES_HIDDEN OFF
+)
+
+if (MSVC)
+    set(S2H_WINDOWS_EXPORTS "${CMAKE_CURRENT_BINARY_DIR}/WindowsExports.def")
+    if(NOT EXISTS "${S2H_WINDOWS_EXPORTS}")
+        file(WRITE "${S2H_WINDOWS_EXPORTS}" "EXPORTS\n")
+    endif()
+    target_sources(${PROJECT_NAME} PRIVATE "${S2H_WINDOWS_EXPORTS}")
+    find_package(Python3 COMPONENTS Interpreter)
+    if(CMAKE_GENERATOR MATCHES "Visual Studio")
+        set(S2H_OBJECT_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.dir/$<CONFIG>")
+        set(S2H_LIBULTRASHIP_OBJECT_DIR "${CMAKE_BINARY_DIR}/libultraship/src/libultraship.dir/$<CONFIG>")
+    else()
+        set(S2H_OBJECT_DIR "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${PROJECT_NAME}.dir")
+        set(S2H_LIBULTRASHIP_OBJECT_DIR "${CMAKE_BINARY_DIR}/libultraship/src/CMakeFiles/libultraship.dir")
+    endif()
+    add_custom_command(TARGET ${PROJECT_NAME} PRE_LINK
+        COMMAND ${CMAKE_COMMAND}
+            -DOBJECT_DIR=${S2H_OBJECT_DIR}
+            -DLIBULTRASHIP_OBJECT_DIR=${S2H_LIBULTRASHIP_OBJECT_DIR}
+            -DOUTPUT=${S2H_WINDOWS_EXPORTS}
+            -DPYTHON=${Python3_EXECUTABLE}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/2s2h/ModApi/GenerateWindowsExports.cmake
+        VERBATIM
+    )
+endif()
+
+# "open" until a mod-signing key ships; then releases use "signed" and mod authors "ask".
+set(S2H_MOD_POLICY "open" CACHE STRING
+    "Native mods: open (load all), ask (unsigned ones need the player's yes), signed (only signed ones)")
+set_property(CACHE S2H_MOD_POLICY PROPERTY STRINGS open ask signed)
+if(S2H_MOD_POLICY STREQUAL "ask")
+    set_source_files_properties(2s2h/ModApi/ModLoader.cpp PROPERTIES COMPILE_DEFINITIONS S2H_MOD_POLICY_ASK)
+elseif(S2H_MOD_POLICY STREQUAL "signed")
+    set_source_files_properties(2s2h/ModApi/ModLoader.cpp PROPERTIES COMPILE_DEFINITIONS S2H_MOD_POLICY_SIGNED)
+elseif(NOT S2H_MOD_POLICY STREQUAL "open")
+    message(FATAL_ERROR "S2H_MOD_POLICY must be open, ask or signed")
+endif()
+
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 use_props(${PROJECT_NAME} "${CMAKE_CONFIGURATION_TYPES}" "${DEFAULT_CXX_PROPS}")
 endif()
 
 set(ROOT_NAMESPACE 2s2h)
 
+# No INTERPROCEDURAL_OPTIMIZATION on Windows: /GL objects are compiler IL, which the export generation cannot read.
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 	set_target_properties(${PROJECT_NAME} PROPERTIES
 		VS_GLOBAL_KEYWORD "Win32Proj"
-	)
-	set_target_properties(${PROJECT_NAME} PROPERTIES
-		INTERPROCEDURAL_OPTIMIZATION_RELEASE "TRUE"
 	)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -223,10 +270,8 @@ endif()
 find_package(SDL2)
 set(SDL2-INCLUDE ${SDL2_INCLUDE_DIRS})
 
-if (BUILD_CROWD_CONTROL)
-    find_package(SDL2_net)
-    set(SDL2-NET-INCLUDE ${SDL_NET_INCLUDE_DIRS})
-endif()
+find_package(SDL2_net 2.2.0 REQUIRED)
+set(SDL2-NET-INCLUDE ${SDL_NET_INCLUDE_DIRS})
 
 target_include_directories(${PROJECT_NAME} PRIVATE assets
 	${CMAKE_CURRENT_SOURCE_DIR}/include/
@@ -306,6 +351,7 @@ endif()
 ################################################################################
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE
+        /bigobj;
         $<$<CONFIG:Debug>:
             /w;
             /Od
@@ -324,7 +370,7 @@ if(MSVC)
 		/wd4244 #conversion from [a] to [b]. Used to warn when copying to smaller type without a cast.
         /sdl-;
         /permissive-;
-        /MP;
+        /MP2;
         ${DEFAULT_CXX_DEBUG_INFORMATION_FORMAT};
         ${DEFAULT_CXX_EXCEPTION_HANDLING}
     )
@@ -341,7 +387,6 @@ if(MSVC)
             /OPT:REF;
             /OPT:ICF;
             /INCREMENTAL:NO;
-            /FORCE:MULTIPLE
         >
         /MANIFEST:NO;
         /DEBUG;
@@ -377,6 +422,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
 
         target_link_options(${PROJECT_NAME} PRIVATE
             -pthread
+            -Wl,-export_dynamic
         )
     elseif (CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
         target_compile_options(${PROJECT_NAME} PRIVATE
@@ -560,7 +606,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 		"glu32;"
 		"SDL2::SDL2;"
 		"SDL2::SDL2main;"
-        #"$<$<BOOL:${BUILD_CROWD_CONTROL}>:SDL2_net::SDL2_net-static>"
+        SDL2_net::SDL2_net-static
 		"glfw;"
 		"winmm;"
 		"imm32;"
@@ -613,7 +659,7 @@ else()
         "Opus::opus"
         "Opusfile::Opusfile"
 		SDL2::SDL2
- #       "$<$<BOOL:${BUILD_CROWD_CONTROL}>:SDL2_net::SDL2_net>"
+         SDL2_net::SDL2_net
 		${CMAKE_DL_LIBS}
 		Threads::Threads
 	)

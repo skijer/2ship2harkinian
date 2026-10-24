@@ -2547,6 +2547,153 @@ typedef enum {
     // #### `args`
     // - `*f32` (speed)
     VB_ZTARGET_SPEED_CHECK,
+
+    // Appended on purpose: compiled mods bake these values in, so never insert above this line.
+    // Names and argument order match Shipwright's behaviors of the same name.
+
+    // #### `result`
+    // ```c
+    // !(this->stateFlags3 & PLAYER_STATE3_4)
+    // ```
+    // #### `args`
+    // - `*Player`
+    // - `*Input`
+    VB_EXECUTE_PLAYER_ACTION_FUNC,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*Player`
+    VB_SET_STATIC_FLOOR_TYPE,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*Player`
+    VB_RECIEVE_FALL_DAMAGE,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*s32` (stick x, rel)
+    // - `*s32` (stick y, rel)
+    VB_CLIMB,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `s32` (item)
+    VB_CHANGE_HELD_ITEM_AND_USE_ITEM,
+
+    // #### `result`
+    // ```c
+    // (this->stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR) && (this->heldActor != NULL) &&
+    //     CHECK_BTN_ANY(sPlayerControlInput->press.button, BTN_CRIGHT | BTN_CLEFT | BTN_CDOWN | BTN_B | BTN_A | BTN_DPAD_EQUIP)
+    // ```
+    // #### `args`
+    // - `*Input`
+    VB_THROW_OR_PUT_DOWN_HELD_ITEM,
+
+    // #### `result`
+    // ```c
+    // !(this->stateFlags3 & PLAYER_STATE3_1) && (this->actor.scale.y >= 0.0f) &&
+    //     !(this->stateFlags1 & PLAYER_STATE1_DEAD) && !play->soaringCsOrSoTCsPlaying
+    // ```
+    // #### `args`
+    // - `*Player`
+    VB_PLAYER_ADJUST_LEGS_TO_FLOOR,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - None
+    VB_OPEN_PAUSE_MENU,
+
+    // #### `result`
+    // ```c
+    // (respawnFlag == 1) || (respawnFlag == -1)
+    // ```
+    // #### `args`
+    // - `s32` (respawnFlag)
+    VB_INFLICT_VOID_DAMAGE,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `s32` (button)
+    // - `s32` (item)
+    VB_UPDATE_BOTTLE_ITEM,
+
+    // The slot starts as the form's vanilla strength; a mod may overwrite it. The result is ignored.
+    // #### `args`
+    // - `*s32` (strength)
+    VB_USE_STRENGTH_UPGRADE,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*Player`
+    // - `s32` (magicArrowType, ARROW_MAGIC_*)
+    // - `*s32` (arrowType)
+    VB_PLAYER_ARROW_MAGIC_CONSUMPTION,
+
+    // #### `result`
+    // ```c
+    // false
+    // ```
+    // #### `args`
+    // - `*Player`
+    VB_PLAYER_ALLOW_MIDAIR_AIM,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*EnRr`
+    VB_LIKE_LIKE_GRAB_PLAYER,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*EnRd`
+    VB_REDEAD_GIBDO_FREEZE_LINK,
+
+    // #### `result`
+    // ```c
+    // this->hitState >= 10 (flip) or this->colorShiftTimer >= 13 (timed)
+    // ```
+    // #### `args`
+    // - `*ObjLightswitch`
+    VB_LIGHTSWITCH_OFF,
+
+    // args: Player*, Color_RGB8*. Mods may replace the human tunic tint.
+    VB_APPLY_TUNIC_COLOR,
+
+    // #### `result`
+    // ```c
+    // whether the current form has the ability (Goron: heat, Zora: swim and breathing; the rest: false)
+    // ```
+    // #### `args`
+    // - `*Player`
+    // - `SOHPlayerAbility`
+    VB_PLAYER_USE_FORM_ABILITY,
 } GIVanillaBehavior;
 
 #endif

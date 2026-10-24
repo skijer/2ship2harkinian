@@ -79,8 +79,8 @@ static AnimationInfoS sAnimationInfo[DMGM_ANIM_MAX] = {
 };
 
 s32 DmGm_UpdateSkelAnime(DmGm* this, PlayState* play) {
-    s8 objectSlot = this->actor.objectSlot;
-    s8 objectIndex2;
+    s16 objectSlot = this->actor.objectSlot;
+    s16 objectIndex2;
     s32 isAnimFinished = false;
 
     if (this->animIndex < DMGM_ANIMOBJ_AN4) {
@@ -99,8 +99,8 @@ s32 DmGm_UpdateSkelAnime(DmGm* this, PlayState* play) {
 }
 
 s32 DmGm_ChangeAnim(DmGm* this, PlayState* play, DmGmAnimation animIndex) {
-    s8 objectSlot = this->actor.objectSlot;
-    s8 objectIndex2;
+    s16 objectSlot = this->actor.objectSlot;
+    s16 objectIndex2;
     s32 didAnimChange = false;
 
     if (animIndex < DMGM_ANIMOBJ_AN4) {
@@ -336,8 +336,8 @@ void DmGm_Update(Actor* thisx, PlayState* play) {
 void DmGm_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, Actor* thisx) {
     s32 pad[2];
     DmGm* this = (DmGm*)thisx;
-    s8 objectSlot = this->actor.objectSlot;
-    s8 msmoObjectSlot = this->msmoObjectSlot;
+    s16 objectSlot = this->actor.objectSlot;
+    s16 msmoObjectSlot = this->msmoObjectSlot;
 
     if ((limbIndex == ANJU1_LIMB_LEFT_HAND) && this->didAnimChangeInCs) {
         static Vec3f D_80C25218 = { 450.0f, 700.0f, -760.0f };

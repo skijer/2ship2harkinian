@@ -1,6 +1,10 @@
 #include "global.h"
+#include <stdlib.h>
+#include <stdint.h>
+#include "fault.h"
 #include "PR/gs2dex.h"
 #include "debug.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 
 #include <libultraship/bridge/gfxbridge.h>
 
@@ -63,12 +67,11 @@ typedef struct RoomShapeCullableEntryLinked {
     /* 0xC */ struct RoomShapeCullableEntryLinked* next;
 } RoomShapeCullableEntryLinked; // size = 0x10
 
-#define ROOM_SHAPE_CULLABLE_MAX_ENTRIES 128
 
 void Room_DrawCullable(PlayState* play, Room* room, u32 flags) {
     RoomShapeCullable* roomShape;
     RoomShapeCullableEntry* roomShapeCullableEntry;
-    RoomShapeCullableEntryLinked linkedEntriesBuffer[ROOM_SHAPE_CULLABLE_MAX_ENTRIES];
+    RoomShapeCullableEntryLinked* linkedEntriesBuffer;
     RoomShapeCullableEntryLinked* head = NULL;
     RoomShapeCullableEntryLinked* tail = NULL;
     RoomShapeCullableEntryLinked* iter;
@@ -110,6 +113,15 @@ void Room_DrawCullable(PlayState* play, Room* room, u32 flags) {
 
     roomShape = &room->roomShape->cullable;
     roomShapeCullableEntry = Lib_SegmentedToVirtual(roomShape->entries);
+    if (roomShape->numEntries > SIZE_MAX / sizeof(*linkedEntriesBuffer)) {
+        Fault_AddHungupAndCrash("Unbound room mesh allocation overflow", 0);
+        abort();
+    }
+    linkedEntriesBuffer = malloc((roomShape->numEntries ? roomShape->numEntries : 1) * sizeof(*linkedEntriesBuffer));
+    if (linkedEntriesBuffer == NULL) {
+        Fault_AddHungupAndCrash("Unbound room mesh allocation failed", 0);
+        abort();
+    }
     insert = linkedEntriesBuffer;
 
     roomShapeCullableEntries = roomShapeCullableEntry;
@@ -152,6 +164,7 @@ void Room_DrawCullable(PlayState* play, Room* room, u32 flags) {
         }
     } else {
         f32 var_fa1 = 1.0f / play->projectionMtxFDiagonal.z;
+        f32 cullDistance = play->lightCtx.hasWorldFog ? play->lightCtx.worldFog.drawDistance : play->lightCtx.zFar;
         f32 var_fv1;
         s32 var_a1;
 
@@ -175,7 +188,7 @@ void Room_DrawCullable(PlayState* play, Room* room, u32 flags) {
                 entryBoundsNearZ = projectedPos.z - var_fv1;
 
                 // If the entry bounding sphere isn't fully beyond the rendered depth range
-                if (entryBoundsNearZ < play->lightCtx.zFar) {
+                if (entryBoundsNearZ < cullDistance) {
 
                     // This entry will be rendered
                     insert->entry = roomShapeCullableEntry;
@@ -289,6 +302,7 @@ void Room_DrawCullable(PlayState* play, Room* room, u32 flags) {
         R_ROOM_CULL_USED_ENTRIES = i - 1;
     }
 
+    free(linkedEntriesBuffer);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
@@ -653,7 +667,31 @@ RoomDrawHandler sRoomDrawHandlers[] = {
 void Room_Draw(PlayState* play, Room* room, u32 flags) {
     if (room->segment != NULL) {
         gSegments[3] = OS_K0_TO_PHYSICAL(room->segment);
+
+        Color_RGBA8 grayscale = { 0, 0, 0, 0 };
+
+        GameInteractor_ExecuteOnRoomResolveGrayscale(play, room, &grayscale);
+        bool isGrayscale = grayscale.a != 0;
+
+        OPEN_DISPS(play->state.gfxCtx);
+        if (isGrayscale) {
+            gDPPipeSync(POLY_OPA_DISP++);
+            gDPSetGrayscaleColor(POLY_OPA_DISP++, grayscale.r, grayscale.g, grayscale.b, grayscale.a);
+            gSPGrayscale(POLY_OPA_DISP++, true);
+            gDPPipeSync(POLY_XLU_DISP++);
+            gDPSetGrayscaleColor(POLY_XLU_DISP++, grayscale.r, grayscale.g, grayscale.b, grayscale.a);
+            gSPGrayscale(POLY_XLU_DISP++, true);
+        }
+        CLOSE_DISPS(play->state.gfxCtx);
+
         sRoomDrawHandlers[room->roomShape->base.type](play, room, flags);
+
+        OPEN_DISPS(play->state.gfxCtx);
+        if (isGrayscale) {
+            gSPGrayscale(POLY_OPA_DISP++, false);
+            gSPGrayscale(POLY_XLU_DISP++, false);
+        }
+        CLOSE_DISPS(play->state.gfxCtx);
     }
     return;
 }

@@ -18,7 +18,7 @@ typedef struct DoorSpiral {
     /* 0x146 */ u8 direction; // represents a staircase up or down
     /* 0x147 */ u8 unk147;
     /* 0x148 */ u8 unk148;
-    /* 0x149 */ s8 objectSlot;
+    /* 0x149 */ s16 objectSlot;
     /* 0x14A */ s8 unk14A;
     /* 0x14C */ DoorSpiralActionFunc actionFunc;
 } DoorSpiral; // size = 0x150

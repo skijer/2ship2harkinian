@@ -1185,5 +1185,5 @@ void EnThiefbird_Draw(Actor* thisx, PlayState* play) {
     func_80C13354(this, play);
     Actor_DrawDamageEffects(play, &this->actor, this->bodyPartsPos, EN_THIEFBIRD_BODYPART_MAX, this->drawDmgEffScale,
                             this->drawDmgEffFrozenSteamScale, this->drawDmgEffAlpha, this->drawDmgEffType);
-    Math_Vec3s_ToVec3f(&this->actor.focus.pos, &this->collider.elements[1].dim.worldSphere.center);
+    Math_Vec3f_Copy(&this->actor.focus.pos, &this->collider.elements[1].dim.worldSphere.center);
 }

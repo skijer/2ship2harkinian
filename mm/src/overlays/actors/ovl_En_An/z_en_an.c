@@ -1529,8 +1529,8 @@ static AnimationInfoS sAnimationInfo[ENAN_ANIM_MAX] = {
 };
 
 s32 EnAn_UpdateSkelAnime(EnAn* this, PlayState* play) {
-    s8 originalObjectSlot = this->actor.objectSlot;
-    s8 otherObjectSlot = OBJECT_SLOT_NONE;
+    s16 originalObjectSlot = this->actor.objectSlot;
+    s16 otherObjectSlot = OBJECT_SLOT_NONE;
     s32 ret = false;
 
     if ((this->animIndex >= ENAN_ANIMOBJ_AN4) && (this->an4ObjectSlot > OBJECT_SLOT_NONE)) {
@@ -1558,8 +1558,8 @@ s32 EnAn_UpdateSkelAnime(EnAn* this, PlayState* play) {
 }
 
 s32 EnAn_ChangeAnim(EnAn* this, PlayState* play, EnAnAnimation animIndex) {
-    s8 originalObjectSlot = this->actor.objectSlot;
-    s8 otherObjectSlot = OBJECT_SLOT_NONE;
+    s16 originalObjectSlot = this->actor.objectSlot;
+    s16 otherObjectSlot = OBJECT_SLOT_NONE;
     s32 changeAnim = false;
     s32 didAnimChange = false;
 
@@ -1627,7 +1627,7 @@ void EnAn_UpdateCollider(EnAn* this, PlayState* play) {
 
         Lib_Vec3f_TranslateAndRotateY(&this->actor.world.pos, this->actor.shape.rot.y, &D_80B58E34, &sp24);
         this->collider.dim.radius = 20;
-        Math_Vec3f_ToVec3s(&this->collider.dim.pos, &sp24);
+        Math_Vec3f_Copy(&this->collider.dim.pos, &sp24);
     } else {
         Collider_UpdateCylinder(&this->actor, &this->collider);
     }
@@ -1750,8 +1750,8 @@ typedef enum EnAnAccessory {
 
 void EnAn_DrawAccessory(EnAn* this, PlayState* play, EnAnAccessory accessoryId) {
     s32 pad;
-    s8 originalObjectSlot = this->actor.objectSlot;
-    s8 otherObjectSlot;
+    s16 originalObjectSlot = this->actor.objectSlot;
+    s16 otherObjectSlot;
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -2759,7 +2759,7 @@ Actor* EnAn_FindLookAtActor(EnAn* this, PlayState* play) {
 // Known uses: looks for En_Ig, En_Nb, En_Pm
 s32 func_80B55D98(EnAn* this, PlayState* play, ScheduleOutput* scheduleOutput, u8 actorCategory, s16 actorId) {
     u8 pathIndex = ENAN_GET_PATH_INDEX(&this->actor);
-    Vec3s* points;
+    Vec3f* points;
     Vec3f sp3C;
     Vec3f sp30;
     Actor* actor;
@@ -2777,8 +2777,8 @@ s32 func_80B55D98(EnAn* this, PlayState* play, ScheduleOutput* scheduleOutput, u
     if ((actor != NULL) && (actor->update != NULL)) {
         if (this->timePath != NULL) {
             points = Lib_SegmentedToVirtual(this->timePath->points);
-            Math_Vec3s_ToVec3f(&sp3C, &points[this->timePath->count - 2]);
-            Math_Vec3s_ToVec3f(&sp30, &points[this->timePath->count - 1]);
+            Math_Vec3f_Copy(&sp3C, &points[this->timePath->count - 2]);
+            Math_Vec3f_Copy(&sp30, &points[this->timePath->count - 1]);
             this->actor.shape.shadowDraw = NULL;
             this->actor.world.rot.y = Math_Vec3f_Yaw(&sp3C, &sp30);
             Math_Vec3f_Copy(&this->actor.world.pos, &sp30);
@@ -2869,7 +2869,7 @@ s32 EnAn_ProcessSchedule_Door(EnAn* this, PlayState* play, ScheduleOutput* sched
     u16 now = SCRIPT_TIME_NOW;
     u8 pathIndex = ENAN_GET_PATH_INDEX(&this->actor);
     EnDoor* door;
-    Vec3s* points;
+    Vec3f* points;
     Vec3f firstPos;
     Vec3f secondPos;
     s32 limit;
@@ -2886,8 +2886,8 @@ s32 EnAn_ProcessSchedule_Door(EnAn* this, PlayState* play, ScheduleOutput* sched
     if ((door != NULL) && (door->knobDoor.dyna.actor.update != NULL)) {
         if (this->timePath != NULL) {
             points = Lib_SegmentedToVirtual(this->timePath->points);
-            Math_Vec3s_ToVec3f(&firstPos, &points[0]);
-            Math_Vec3s_ToVec3f(&secondPos, &points[1]);
+            Math_Vec3f_Copy(&firstPos, &points[0]);
+            Math_Vec3f_Copy(&secondPos, &points[1]);
 
             Math_Vec3f_Copy(&this->doorEntrancePos, &firstPos);
             Math_Vec3f_Copy(&this->doorExitPos, &secondPos);
@@ -3080,7 +3080,7 @@ s32 EnAn_ProcessSchedule_Sweeping(EnAn* this, PlayState* play, ScheduleOutput* s
     u8 pathIndex = ENAN_GET_PATH_INDEX(&this->actor);
     Vec3f firstPos;
     Vec3f secondPos;
-    Vec3s* points;
+    Vec3f* points;
     s32 limit;
     s32 ret = false;
 
@@ -3093,8 +3093,8 @@ s32 EnAn_ProcessSchedule_Sweeping(EnAn* this, PlayState* play, ScheduleOutput* s
 
     if ((this->timePath != NULL) && (this->timePath->count >= 2)) {
         points = Lib_SegmentedToVirtual(this->timePath->points);
-        Math_Vec3s_ToVec3f(&firstPos, &points[0]);
-        Math_Vec3s_ToVec3f(&secondPos, &points[1]);
+        Math_Vec3f_Copy(&firstPos, &points[0]);
+        Math_Vec3f_Copy(&secondPos, &points[1]);
 
         this->actor.world.rot.y = Math_Vec3f_Yaw(&firstPos, &secondPos);
         Math_Vec3s_Copy(&this->actor.shape.rot, &this->actor.world.rot);
@@ -3119,7 +3119,7 @@ s32 EnAn_ProcessSchedule_80B56880(EnAn* this, PlayState* play, ScheduleOutput* s
     u8 pathIndex = ENAN_GET_PATH_INDEX(&this->actor);
     Vec3f lastPos;
     Vec3f penultimatePos;
-    Vec3s* points;
+    Vec3f* points;
     s32 limit;
     s32 ret = false;
 
@@ -3131,8 +3131,8 @@ s32 EnAn_ProcessSchedule_80B56880(EnAn* this, PlayState* play, ScheduleOutput* s
 
     if ((this->timePath != NULL) && (this->timePath->count >= 2)) {
         points = Lib_SegmentedToVirtual(this->timePath->points);
-        Math_Vec3s_ToVec3f(&lastPos, &points[this->timePath->count - 1]);
-        Math_Vec3s_ToVec3f(&penultimatePos, &points[this->timePath->count - 2]);
+        Math_Vec3f_Copy(&lastPos, &points[this->timePath->count - 1]);
+        Math_Vec3f_Copy(&penultimatePos, &points[this->timePath->count - 2]);
 
         this->actor.world.rot.y = Math_Vec3f_Yaw(&penultimatePos, &lastPos);
 

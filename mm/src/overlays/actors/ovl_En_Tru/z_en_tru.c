@@ -786,7 +786,7 @@ s32 func_80A873B8(EnTru* this) {
 }
 
 s32 func_80A87400(EnTru* this, PlayState* play) {
-    Vec3s* sp4C;
+    Vec3f* sp4C;
     Vec3f sp40;
     Vec3f sp34;
     s16 phi_a1;
@@ -807,7 +807,7 @@ s32 func_80A87400(EnTru* this, PlayState* play) {
             }
             this->unk_384++;
         }
-        Math_Vec3s_ToVec3f(&sp34, &sp4C[this->unk_384]);
+        Math_Vec3f_Copy(&sp34, &sp4C[this->unk_384]);
         Math_Vec3f_Copy(&sp40, &this->actor.world.pos);
         phi_a1 = Math_Vec3f_Yaw(&sp40, &sp34);
     } else {
@@ -1252,7 +1252,7 @@ s32 EnTru_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* p
 
     if (limbIndex == KOUME_LIMB_HEAD) {
         Matrix_MultZero(&this->actor.focus.pos);
-        Math_Vec3f_ToVec3s(&this->collider.dim.worldSphere.center, &this->actor.focus.pos);
+        Math_Vec3f_Copy(&this->collider.dim.worldSphere.center, &this->actor.focus.pos);
         this->actor.focus.pos.x = (this->actor.focus.pos.x / 10.0f) * 10.0f;
         this->actor.focus.pos.y = ((this->actor.focus.pos.y + 10.0f) / 10.0f) * 10.0f;
         this->actor.focus.pos.z = (this->actor.focus.pos.z / 10.0f) * 10.0f;

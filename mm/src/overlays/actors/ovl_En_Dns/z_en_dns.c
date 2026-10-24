@@ -323,7 +323,7 @@ s32 func_8092CC68(PlayState* play) {
     Player* player = GET_PLAYER(play);
     s32 pad[2];
     s32 ret = false;
-    s16 bgId;
+    s32 bgId;
 
     if (!Play_InCsMode(play) && (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) &&
         (player->transformation != PLAYER_FORM_DEKU)) {

@@ -1,4 +1,5 @@
 #include "global.h"
+#include "2s2h/Unbound/SceneDB.h"
 
 #if 0
 #define DEFINE_SCENE(name, _enumValue, textId, drawConfig, _restrictionFlags, _persistentCycleFlags) \
@@ -2690,8 +2691,12 @@ SceneEntranceTableEntry sSceneEntranceTable[] = {
 /**
  * Returns a pointer to an entrance table from a given entrance index.
  */
-EntranceTableEntry* Entrance_GetTableEntry(u16 entrance) {
+EntranceTableEntry* Entrance_GetTableEntry(u32 entrance) {
+    entrance = DungeonRegistry_ResolveEntrance(entrance);
     u32 entranceIndex = entrance;
+    if ((entranceIndex >> 9) >= ENTR_SCENE_MAX) {
+        return SceneDB_GetCustomEntrance(entranceIndex);
+    }
     EntranceTableEntry** tableEntryP = sSceneEntranceTable[entranceIndex >> 9].table;
     EntranceTableEntry* tableEntry = tableEntryP[(entranceIndex >> 4) & 0x1F];
 
@@ -2701,7 +2706,7 @@ EntranceTableEntry* Entrance_GetTableEntry(u16 entrance) {
 /**
  * Returns the scene index from a given entrance index.
  */
-s32 Entrance_GetSceneId(u16 entrance) {
+s32 Entrance_GetSceneId(u32 entrance) {
     EntranceTableEntry* tableEntry = Entrance_GetTableEntry(entrance);
 
     return tableEntry->sceneId;
@@ -2710,7 +2715,7 @@ s32 Entrance_GetSceneId(u16 entrance) {
 /**
  * Returns the absolute value scene index (since for some reason some of them are negative) from a given entrance index.
  */
-s32 Entrance_GetSceneIdAbsolute(u16 entrance) {
+s32 Entrance_GetSceneIdAbsolute(u32 entrance) {
     EntranceTableEntry* tableEntry = Entrance_GetTableEntry(entrance);
 
     return ABS_ALT(tableEntry->sceneId);
@@ -2719,7 +2724,7 @@ s32 Entrance_GetSceneIdAbsolute(u16 entrance) {
 /**
  * Returns the spawn index from a given entrance index.
  */
-s32 Entrance_GetSpawnNum(u16 entrance) {
+s32 Entrance_GetSpawnNum(u32 entrance) {
     EntranceTableEntry* tableEntry = Entrance_GetTableEntry(entrance);
 
     return tableEntry->spawnNum;
@@ -2728,7 +2733,7 @@ s32 Entrance_GetSpawnNum(u16 entrance) {
 /**
  * Returns the transition effect flags from a given entrance index.
  */
-s32 Entrance_GetTransitionFlags(u16 entrance) {
+s32 Entrance_GetTransitionFlags(u32 entrance) {
     EntranceTableEntry* tableEntry = Entrance_GetTableEntry(entrance);
 
     return tableEntry->flags;

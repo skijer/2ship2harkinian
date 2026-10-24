@@ -737,7 +737,7 @@ void EnItem00_Draw(Actor* thisx, PlayState* play) {
             case ITEM00_RECOVERY_HEART:
                 if (this->unk152 < 0) {
                     if (this->unk152 == -1) {
-                        s8 objectSlot = Object_GetSlot(&play->objectCtx, OBJECT_GI_HEART);
+                        s16 objectSlot = Object_GetSlot(&play->objectCtx, OBJECT_GI_HEART);
 
                         if (Object_IsLoaded(&play->objectCtx, objectSlot)) {
                             this->actor.objectSlot = objectSlot;

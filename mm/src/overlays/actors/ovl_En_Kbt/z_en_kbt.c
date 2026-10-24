@@ -125,12 +125,12 @@ void EnKbt_Reset(void) {
 }
 
 s32 func_80B33E64(PlayState* play) {
-    return gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 & 1;
+    return SceneFlags_GetPermanent(play->sceneId)->unk_14 & 1;
 }
 
 s32 func_80B33E8C(PlayState* play) {
     if ((CURRENT_DAY == 3) ||
-        ((CURRENT_DAY == 2) && (gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 & 2))) {
+        ((CURRENT_DAY == 2) && (SceneFlags_GetPermanent(play->sceneId)->unk_14 & 2))) {
         return true;
     }
     return false;

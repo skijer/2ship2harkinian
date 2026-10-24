@@ -597,7 +597,7 @@ void func_80BAB4F0(EnSuttari* this, PlayState* play) {
 }
 
 s16 EnSuttari_GetDistSqAndOrient(Path* path, s32 index, Vec3f* pos, f32* distSq) {
-    Vec3s* points;
+    Vec3f* points;
     f32 diffX;
     f32 diffZ;
 
@@ -616,7 +616,7 @@ s16 EnSuttari_GetDistSqAndOrient(Path* path, s32 index, Vec3f* pos, f32* distSq)
 }
 
 s32 EnSuttari_HasReachedPointForward(EnSuttari* this, Path* path, s32 pointIndex) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     s32 count = path->count;
     s32 index = pointIndex;
     s32 reached = false;
@@ -627,7 +627,7 @@ s32 EnSuttari_HasReachedPointForward(EnSuttari* this, Path* path, s32 pointIndex
     f32 d;
     Vec3f point;
 
-    Math_Vec3s_ToVec3f(&point, &points[index]);
+    Math_Vec3f_Copy(&point, &points[index]);
 
     if (index == 0) {
         diffX = points[1].x - points[0].x;
@@ -649,7 +649,7 @@ s32 EnSuttari_HasReachedPointForward(EnSuttari* this, Path* path, s32 pointIndex
 }
 
 s32 EnSuttari_HasReachedPointReverse(EnSuttari* this, Path* path, s32 pointIndex) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     s32 count = path->count;
     s32 index = pointIndex;
     s32 reached = false;
@@ -660,7 +660,7 @@ s32 EnSuttari_HasReachedPointReverse(EnSuttari* this, Path* path, s32 pointIndex
     f32 d;
     Vec3f point;
 
-    Math_Vec3s_ToVec3f(&point, &points[index]);
+    Math_Vec3f_Copy(&point, &points[index]);
 
     if (index == 0) {
         diffX = points[0].x - points[1].x;
@@ -770,7 +770,7 @@ s32 func_80BABDD8(EnSuttari* this, PlayState* play, ScheduleOutput* scheduleOutp
     u16 sp44 = SCRIPT_TIME_NOW;
     Vec3f sp38;
     Vec3f sp2C;
-    Vec3s* sp28;
+    Vec3f* sp28;
     s32 sp24;
 
     if ((this->scheduleResult == 10) || (this->scheduleResult == 11) || (this->scheduleResult == 2)) {
@@ -785,8 +785,8 @@ s32 func_80BABDD8(EnSuttari* this, PlayState* play, ScheduleOutput* scheduleOutp
         return false;
     }
     sp28 = Lib_SegmentedToVirtual(this->timePath->points);
-    Math_Vec3s_ToVec3f(&sp38, &sp28[0]);
-    Math_Vec3s_ToVec3f(&sp2C, &sp28[1]);
+    Math_Vec3f_Copy(&sp38, &sp28[0]);
+    Math_Vec3f_Copy(&sp2C, &sp28[1]);
     this->unk434 = sp44 - scheduleOutput->time0;
     this->unk436 = scheduleOutput->time1 - scheduleOutput->time0;
     if ((scheduleOutput->result != 10) && (scheduleOutput->result != 11)) {

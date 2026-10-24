@@ -1308,6 +1308,68 @@ s32 Environment_IsSceneUpsideDown(PlayState* play) {
     return ret;
 }
 
+// 2S2H [Unbound] Vanilla fogNear is a point on the N64 fog scale, u = 1000 * (1 - zNear / distance) with zNear 10
+f32 Environment_GetLegacyFogStart(s16 fogNear, s16 zFar) {
+    if (fogNear >= 1000) {
+        return zFar;
+    }
+    return 10000.0f / (1000.0f - CLAMP_MAX(fogNear, ENV_FOGNEAR_MAX));
+}
+
+static s16 Environment_GetLegacyFogNear(f32 fogStart) {
+    return CLAMP(1000.0f - 10000.0f / CLAMP_MIN(fogStart, 10.0f), 0, ENV_FOGNEAR_MAX);
+}
+
+static WorldFog Environment_GetWorldFog(EnvLightSettings* settings) {
+    WorldFog legacy;
+
+    if (settings->hasWorldFog) {
+        return settings->worldFog;
+    }
+    legacy.fogStart =
+        Environment_GetLegacyFogStart(ENV_LIGHT_SETTINGS_FOG_NEAR(settings->blendRateAndFogNear), settings->zFar);
+    legacy.fogEnd = settings->zFar;
+    legacy.drawDistance = settings->zFar;
+    legacy.nearPlane = 0.0f;
+    return legacy;
+}
+
+static WorldFog Environment_LerpWorldFog(WorldFog from, WorldFog to, f32 weight) {
+    WorldFog result;
+
+    result.fogStart = LERPIMP(from.fogStart, to.fogStart, weight);
+    result.fogEnd = LERPIMP(from.fogEnd, to.fogEnd, weight);
+    result.drawDistance = LERPIMP(from.drawDistance, to.drawDistance, weight);
+    result.nearPlane = LERPIMP(from.nearPlane, to.nearPlane, weight);
+    return result;
+}
+
+static void Environment_BlendWorldFog(CurrentEnvLightSettings* dest, EnvLightSettings* from, EnvLightSettings* to,
+                                      f32 weight) {
+    dest->hasWorldFog = from->hasWorldFog || to->hasWorldFog;
+    dest->worldFog = Environment_LerpWorldFog(Environment_GetWorldFog(from), Environment_GetWorldFog(to), weight);
+}
+
+// Effects that pull the fog in (Nayru's Love, fairies, game over) speak the 0-1000 scale through adjLightSettings,
+// and the skybox and weather keep reading lightCtx->fogNear/zFar, so both get the vanilla equivalent.
+static void Environment_ApplyWorldFog(EnvironmentContext* envCtx, LightContext* lightCtx) {
+    WorldFog* fog = &lightCtx->worldFog;
+    s16 adjustedNear;
+
+    lightCtx->hasWorldFog = envCtx->lightSettings.hasWorldFog;
+    if (!lightCtx->hasWorldFog) {
+        return;
+    }
+    *fog = envCtx->lightSettings.worldFog;
+    fog->drawDistance = CLAMP_MIN(fog->drawDistance + envCtx->adjLightSettings.zFar, 100.0f);
+    if (envCtx->adjLightSettings.fogNear != 0) {
+        adjustedNear = Environment_GetLegacyFogNear(fog->fogStart) + envCtx->adjLightSettings.fogNear;
+        fog->fogStart = Environment_GetLegacyFogStart(adjustedNear, CLAMP_MAX(fog->drawDistance, SHT_MAX));
+    }
+    lightCtx->fogNear = Environment_GetLegacyFogNear(fog->fogStart);
+    lightCtx->zFar = CLAMP_MAX(fog->drawDistance, SHT_MAX);
+}
+
 void Environment_UpdateLights(PlayState* play, EnvironmentContext* envCtx, LightContext* lightCtx) {
     EnvLightSettings* lightSettingsList;
     f32 var_fs3;
@@ -1466,6 +1528,18 @@ void Environment_UpdateLights(PlayState* play, EnvironmentContext* envCtx, Light
                         S16_LERP(lightSettingsList[(s32)sp96].zFar, lightSettingsList[(s32)sp94].zFar, temp_fv0);
                     envCtx->lightSettings.zFar = LERPIMP_ALT(blend16[0], blend16[1], var_fs3);
 
+                    {
+                        CurrentEnvLightSettings nextConfig;
+
+                        Environment_BlendWorldFog(&envCtx->lightSettings, &lightSettingsList[(s32)sp97],
+                                                  &lightSettingsList[(s32)sp95], temp_fv0);
+                        Environment_BlendWorldFog(&nextConfig, &lightSettingsList[(s32)sp96],
+                                                  &lightSettingsList[(s32)sp94], temp_fv0);
+                        envCtx->lightSettings.hasWorldFog |= nextConfig.hasWorldFog;
+                        envCtx->lightSettings.worldFog =
+                            Environment_LerpWorldFog(envCtx->lightSettings.worldFog, nextConfig.worldFog, var_fs3);
+                    }
+
                     break;
                 }
             }
@@ -1491,6 +1565,8 @@ void Environment_UpdateLights(PlayState* play, EnvironmentContext* envCtx, Light
                 envCtx->lightSettings.fogNear =
                     ENV_LIGHT_SETTINGS_FOG_NEAR(lightSettingsList[(s32)lightSetting].blendRateAndFogNear);
                 envCtx->lightSettings.zFar = lightSettingsList[(s32)lightSetting].zFar;
+                Environment_BlendWorldFog(&envCtx->lightSettings, &lightSettingsList[(s32)lightSetting],
+                                          &lightSettingsList[(s32)lightSetting], 0.0f);
                 envCtx->lightBlend = 1.0f;
             } else {
                 var_v0_3 =
@@ -1541,6 +1617,8 @@ void Environment_UpdateLights(PlayState* play, EnvironmentContext* envCtx, Light
 
                 envCtx->lightSettings.zFar = LERPIMP_ALT(lightSettingsList[(s32)envCtx->prevLightSetting].zFar,
                                                          lightSettingsList[(s32)lightSetting].zFar, envCtx->lightBlend);
+                Environment_BlendWorldFog(&envCtx->lightSettings, &lightSettingsList[(s32)envCtx->prevLightSetting],
+                                          &lightSettingsList[(s32)lightSetting], envCtx->lightBlend);
             }
         }
     }
@@ -1609,6 +1687,8 @@ void Environment_UpdateLights(PlayState* play, EnvironmentContext* envCtx, Light
     } else {
         lightCtx->zFar = ENV_ZFAR_MAX;
     }
+
+    Environment_ApplyWorldFog(envCtx, lightCtx);
 
     if ((envCtx->dirLight1.params.dir.x == 0) && (envCtx->dirLight1.params.dir.y == 0) &&
         (envCtx->dirLight1.params.dir.z == 0)) {

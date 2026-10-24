@@ -85,7 +85,7 @@ typedef struct ObjMine {
     /* 0x01A8 */ f32 pathSpeed;
     /* 0x01AC */ s32 waypointCount;
     /* 0x01B0 */ s32 waypointIndex;
-    /* 0x01B4 */ Vec3s* waypoints;
+    /* 0x01B4 */ Vec3f* waypoints;
     /* 0x01B8 */ union { 
                      ObjMineAirChain air;
                      ObjMineWaterChain water;

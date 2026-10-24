@@ -2,6 +2,7 @@
 #define PR_ULTRATYPES_H
 
 #include <libultraship/libultra/types.h>
+#include "attributes.h"
 
 #if 0
 typedef signed char            s8;

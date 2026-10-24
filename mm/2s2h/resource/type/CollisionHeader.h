@@ -11,33 +11,35 @@ namespace SOH {
 typedef struct {
     /* 0x00 */ u16 type;
     union {
-        u16 vtxData[3];
+        u32 vtxData[3];
         struct {
-            /* 0x02 */ u16 flags_vIA; // 0xE000 is poly exclusion flags (xpFlags), 0x1FFF is vtxId
-            /* 0x04 */ u16 flags_vIB; // 0xE000 is flags, 0x1FFF is vtxId
-                                      // 0x2000 = poly IsConveyor surface
-            /* 0x06 */ u16 vIC;
+            /* 0x02 */ u32 flags_vIA; // upper three bits are exclusion flags
+            /* 0x04 */ u32 flags_vIB; // upper three bits are flags
+                                      // bit 29 = conveyor surface
+            /* 0x06 */ u32 vIC;
         };
     };
     /* 0x08 */ Vec3s normal; // Unit normal vector
                              // Value ranges from -0x7FFF to 0x7FFF, representing -1.0 to 1.0; 0x8000 is invalid
 
-    /* 0x0E */ s16 dist; // Plane distance from origin along the normal
-} CollisionPoly;         // size = 0x10
+    // 2S2H [Unbound] s32 (world extent); every mirror here must match z64bgcheck.h (static_asserts in the factory)
+    /* 0x10 */ s32 dist; // Plane distance from origin along the normal
+} CollisionPoly;         // size = 0x14
 
 typedef struct {
-    /* 0x00 */ s16 xMin;
-    /* 0x02 */ s16 ySurface;
-    /* 0x04 */ s16 zMin;
-    /* 0x06 */ s16 xLength;
-    /* 0x08 */ s16 zLength;
-    /* 0x0C */ u32 properties;
+    /* 0x00 */ s32 xMin;
+    /* 0x04 */ s32 ySurface;
+    /* 0x08 */ s32 zMin;
+    /* 0x0C */ s32 xLength;
+    /* 0x10 */ s32 zLength;
+    /* 0x14 */ u32 properties;
+    s32 room; // -1 applies to every room
 
     // 0x0008_0000 = ?
     // 0x0007_E000 = Room Index, 0x3F = all rooms
     // 0x0000_1F00 = Lighting Settings Index
     // 0x0000_00FF = CamData index
-} WaterBox; // size = 0x10
+} WaterBox; // size = 0x18
 
 typedef struct {
     /* 0x00 */ u16 cameraSType;
@@ -53,15 +55,15 @@ typedef struct {
 } SurfaceType;
 
 typedef struct {
-    /* 0x00 */ Vec3s minBounds; // minimum coordinates of poly bounding box
-    /* 0x06 */ Vec3s maxBounds; // maximum coordinates of poly bounding box
-    /* 0x0C */ u16 numVertices;
-    /* 0x10 */ Vec3s* vtxList;
-    /* 0x14 */ u16 numPolygons;
+    /* 0x00 */ Vec3i minBounds; // minimum coordinates of poly bounding box
+    /* 0x0C */ Vec3i maxBounds; // maximum coordinates of poly bounding box
+    /* 0x18 */ u32 numVertices;
+    /* 0x1C */ Vec3i* vtxList;
+    /* 0x14 */ u32 numPolygons;
     /* 0x18 */ CollisionPoly* polyList;
     /* 0x1C */ SurfaceType* surfaceTypeList;
     /* 0x20 */ CamData* cameraDataList;
-    /* 0x24 */ u16 numWaterBoxes;
+    /* 0x24 */ u32 numWaterBoxes;
     /* 0x28 */ WaterBox* waterBoxes;
     size_t cameraDataListLen; // OTRTODO: Added to allow for bounds checking the cameraDataList.
 } CollisionHeaderData;        // original name: BGDataInfo
@@ -78,7 +80,7 @@ class CollisionHeader : public Ship::Resource<CollisionHeaderData> {
 
     CollisionHeaderData collisionHeaderData;
 
-    std::vector<Vec3s> vertices;
+    std::vector<Vec3i> vertices;
 
     std::vector<CollisionPoly> polygons;
 

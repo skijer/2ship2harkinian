@@ -565,7 +565,7 @@ void EnMnk_StartNextPath(EnMnk* this, PlayState* play) {
 
 s32 EnMnk_FollowPath(EnMnk* this, u16 flags) {
     Path* path;
-    Vec3s* destPoint;
+    Vec3f* destPoint;
     f32 dx;
     f32 dz;
     f32 distSq;
@@ -576,7 +576,7 @@ s32 EnMnk_FollowPath(EnMnk* this, u16 flags) {
     }
 
     path = this->path;
-    destPoint = &((Vec3s*)Lib_SegmentedToVirtual(path->points))[this->destPointIndex];
+    destPoint = &((Vec3f*)Lib_SegmentedToVirtual(path->points))[this->destPointIndex];
     dx = destPoint->x - this->picto.actor.world.pos.x;
     dz = destPoint->z - this->picto.actor.world.pos.z;
     arcTan = Math_Atan2S_XY(dz, dx);

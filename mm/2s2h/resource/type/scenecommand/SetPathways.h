@@ -15,6 +15,7 @@ class SetPathwaysMM : public SceneCommand<PathDataMM*> {
 
     uint32_t numPaths;
     std::vector<PathDataMM*> paths;
+    std::vector<std::string> fileNames;
 };
 
 }; // namespace SOH

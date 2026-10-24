@@ -70,7 +70,7 @@ typedef struct Legacy_RespawnData {
     /* 0x0C */ s16 yaw;
     /* 0x0E */ s16 playerParams;
     /* 0x10 */ u16 entrance;
-    /* 0x12 */ u8 roomIndex;
+    /* 0x12 */ s16 roomIndex;
     /* 0x13 */ s8 data;
     /* 0x14 */ u32 tempSwitchFlags;
     /* 0x18 */ u32 unk_18;
@@ -554,7 +554,7 @@ void BinarySaveConverter_ReadBufferToSave(Legacy_SaveContext* saveContext, std::
     for (int i = 0; i < ARRAY_COUNT(saveContext->save.saveInfo.inventory.dungeonItems); i++) {
         saveContext->save.saveInfo.inventory.dungeonItems[i] = reader->ReadUByte();
     }
-    for (int i = 0; i < ARRAY_COUNT(saveContext->save.saveInfo.inventory.dungeonKeys); i++) {
+    for (int i = 0; i < 9; i++) {
         saveContext->save.saveInfo.inventory.dungeonKeys[i] = reader->ReadInt8();
     }
     saveContext->save.saveInfo.inventory.defenseHearts = reader->ReadInt8();

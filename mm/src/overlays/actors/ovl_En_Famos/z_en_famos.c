@@ -367,7 +367,7 @@ void EnFamos_SetupPathingIdle(EnFamos* this) {
         this->isCalm = true;
     }
 
-    Math_Vec3s_ToVec3f(&this->targetDest, &this->pathPoints[this->waypointIndex]);
+    Math_Vec3f_Copy(&this->targetDest, &this->pathPoints[this->waypointIndex]);
     this->targetYaw = Actor_WorldYawTowardPoint(&this->actor, &this->targetDest);
     this->actionFunc = EnFamos_PathingIdle;
     this->actor.speed = 0.0f;

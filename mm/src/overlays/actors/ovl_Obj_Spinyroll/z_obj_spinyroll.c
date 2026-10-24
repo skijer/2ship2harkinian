@@ -451,9 +451,9 @@ void ObjSpinyroll_Init(Actor* thisx, PlayState* play) {
     f32 sp44;
     Path* path;
     s32 pad2;
-    Vec3s* points;
-    Vec3s* sp34;
-    Vec3s* sp30;
+    Vec3f* points;
+    Vec3f* sp34;
+    Vec3f* sp30;
 
     sp44 = D_80A1F1B8[OBJSPINYROLL_GET_C000(&this->dyna.actor)];
     Actor_ProcessInitChain(&this->dyna.actor, sInitChain);
@@ -489,8 +489,8 @@ void ObjSpinyroll_Init(Actor* thisx, PlayState* play) {
     sp34 = &points[0];
     sp30 = &points[1];
 
-    Math_Vec3s_ToVec3f(&this->unk_4AC[0], sp34);
-    Math_Vec3s_ToVec3f(&this->unk_4AC[1], sp30);
+    Math_Vec3f_Copy(&this->unk_4AC[0], sp34);
+    Math_Vec3f_Copy(&this->unk_4AC[1], sp30);
     Math_Vec3f_Copy(&this->dyna.actor.world.pos, &this->unk_4AC[0]);
 
     if ((sp34->x == sp30->x) && (sp34->y != sp30->y) && (sp34->z == sp30->z)) {

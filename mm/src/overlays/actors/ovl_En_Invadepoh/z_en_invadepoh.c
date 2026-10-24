@@ -503,8 +503,8 @@ void EnInvadepoh_Romani_PathUpdate(EnInvadepoh* this, s8* currentPoint, Vec3f* p
     s32 endPoint = this->endPoint;
     s32 i;
     Vec3f currentToNext;
-    Vec3s* currentPathPoint = &this->pathPoints[0];
-    Vec3s* nextPathPoint = currentPathPoint + 1;
+    Vec3f* currentPathPoint = &this->pathPoints[0];
+    Vec3f* nextPathPoint = currentPathPoint + 1;
     f32 nextCheckpoint;
     f32 distanceToNext;
     f32 segmentProgress;
@@ -546,14 +546,14 @@ void EnInvadepoh_Romani_PathUpdate(EnInvadepoh* this, s8* currentPoint, Vec3f* p
  */
 void EnInvadepoh_Alien_StepYawAlongPath(EnInvadepoh* this, s16 step, s16 offset) {
     s32 pad;
-    Vec3s* currentPathPoint = &this->pathPoints[this->currentPoint];
-    Vec3s* nextPathPoint = currentPathPoint + 1;
+    Vec3f* currentPathPoint = &this->pathPoints[this->currentPoint];
+    Vec3f* nextPathPoint = currentPathPoint + 1;
     Vec3f currentPathPointPos;
     Vec3f nextPathPointPos;
 
     if (this->currentPoint != this->endPoint) {
-        Math_Vec3s_ToVec3f(&currentPathPointPos, currentPathPoint);
-        Math_Vec3s_ToVec3f(&nextPathPointPos, nextPathPoint);
+        Math_Vec3f_Copy(&currentPathPointPos, currentPathPoint);
+        Math_Vec3f_Copy(&nextPathPointPos, nextPathPoint);
         Math_ScaledStepToS(&this->actor.shape.rot.y, Math_Vec3f_Yaw(&currentPathPointPos, &nextPathPointPos) + offset,
                            step);
     }
@@ -565,14 +565,14 @@ void EnInvadepoh_Alien_StepYawAlongPath(EnInvadepoh* this, s16 step, s16 offset)
  */
 void EnInvadepoh_Romani_StepYawAlongPath(EnInvadepoh* this, s16 scale, s16 step, s16 minStep) {
     s32 pad;
-    Vec3s* currentPathPoint = &this->pathPoints[this->currentPoint];
-    Vec3s* nextPathPoint = currentPathPoint + 1;
+    Vec3f* currentPathPoint = &this->pathPoints[this->currentPoint];
+    Vec3f* nextPathPoint = currentPathPoint + 1;
     Vec3f currentPathPointPos;
     Vec3f nextPathPointPos;
 
     if (this->currentPoint != this->endPoint) {
-        Math_Vec3s_ToVec3f(&currentPathPointPos, currentPathPoint);
-        Math_Vec3s_ToVec3f(&nextPathPointPos, nextPathPoint);
+        Math_Vec3f_Copy(&currentPathPointPos, currentPathPoint);
+        Math_Vec3f_Copy(&nextPathPointPos, nextPathPoint);
         Math_SmoothStepToS(&this->actor.shape.rot.y, Math_Vec3f_Yaw(&currentPathPointPos, &nextPathPointPos), scale,
                            step, minStep);
     }
@@ -583,13 +583,13 @@ void EnInvadepoh_Romani_StepYawAlongPath(EnInvadepoh* this, s16 scale, s16 step,
  */
 void EnInvadepoh_SetYawAlongPath(EnInvadepoh* this) {
     s32 pad;
-    Vec3s* currentPathPoint = &this->pathPoints[this->currentPoint];
-    Vec3s* nextPathPoint = currentPathPoint + 1;
+    Vec3f* currentPathPoint = &this->pathPoints[this->currentPoint];
+    Vec3f* nextPathPoint = currentPathPoint + 1;
     Vec3f currentPathPointPos;
     Vec3f nextPathPointPos;
 
-    Math_Vec3s_ToVec3f(&currentPathPointPos, currentPathPoint);
-    Math_Vec3s_ToVec3f(&nextPathPointPos, nextPathPoint);
+    Math_Vec3f_Copy(&currentPathPointPos, currentPathPoint);
+    Math_Vec3f_Copy(&nextPathPointPos, nextPathPoint);
     this->actor.shape.rot.y = Math_Vec3f_Yaw(&currentPathPointPos, &nextPathPointPos);
 }
 
@@ -598,15 +598,15 @@ f32 EnInvadepoh_GetTotalPathDistance(EnInvadepoh* this) {
     s32 i;
     Vec3f previousPathPointPos;
     Vec3f currentPathPointPos;
-    Vec3s* currentPathPoint = &this->pathPoints[0];
+    Vec3f* currentPathPoint = &this->pathPoints[0];
     f32 totalPathDistance = 0.0f;
 
-    Math_Vec3s_ToVec3f(&currentPathPointPos, currentPathPoint);
+    Math_Vec3f_Copy(&currentPathPointPos, currentPathPoint);
     currentPathPoint++;
 
     for (i = 1; i < pointCount; currentPathPoint++, i++) {
         Math_Vec3f_Copy(&previousPathPointPos, &currentPathPointPos);
-        Math_Vec3s_ToVec3f(&currentPathPointPos, currentPathPoint);
+        Math_Vec3f_Copy(&currentPathPointPos, currentPathPoint);
         totalPathDistance += Math3D_Vec3f_DistXYZ(&previousPathPointPos, &currentPathPointPos);
     }
 
@@ -624,7 +624,7 @@ void EnInvadepoh_InitPath(EnInvadepoh* this, PlayState* play) {
  * Sets the actor's current position to be the same as the point along with the path with the index of `point`.
  */
 void EnInvadepoh_SetPosToPathPoint(EnInvadepoh* this, s32 point) {
-    Math_Vec3s_ToVec3f(&this->actor.world.pos, &this->pathPoints[point]);
+    Math_Vec3f_Copy(&this->actor.world.pos, &this->pathPoints[point]);
 }
 
 /**
@@ -648,8 +648,8 @@ s32 EnInvadepoh_Dog_IsCloseToPath(EnInvadepoh* this, f32 a, f32 b) {
     //! if the dog is on point N, then point N+1 is the next point in the counterclockwise direction, and point N-1 is
     //! the next point in the clockwise direction. Using `pathStep` instead of hardcoding +1 here would fix the bug.
     //! Because of this bug, the dog is never considered to be "close enough" to the path when running clockwise.
-    Vec3s* nextPathPoint = &this->pathPoints[this->currentPoint] + 1;
-    Vec3s* currentPathPoint = &this->pathPoints[this->currentPoint];
+    Vec3f* nextPathPoint = &this->pathPoints[this->currentPoint] + 1;
+    Vec3f* currentPathPoint = &this->pathPoints[this->currentPoint];
     s32 pad;
     f32 diffX;
     f32 diffZ;
@@ -704,14 +704,14 @@ s32 EnInvadepoh_Dog_IsCloseToPath(EnInvadepoh* this, f32 a, f32 b) {
 s32 EnInvadepoh_Dog_FindClosestPointToTarget(EnInvadepoh* this, Vec3f* target) {
     s32 point;
     s32 endPoint = this->endPoint;
-    Vec3s* pathPoint;
+    Vec3f* pathPoint;
     Vec3f pointPos;
     f32 minDistSqToTarget = FLT_MAX;
     f32 distSqToTarget;
     s32 closestPoint = 0;
 
     for (point = 0, pathPoint = this->pathPoints; point < endPoint; point++, pathPoint++) {
-        Math_Vec3s_ToVec3f(&pointPos, pathPoint);
+        Math_Vec3f_Copy(&pointPos, pathPoint);
         distSqToTarget = Math3D_Vec3fDistSq(&pointPos, target);
 
         if (distSqToTarget < minDistSqToTarget) {
@@ -759,17 +759,17 @@ void EnInvadepoh_Alien_SetCheckpoints(EnInvadepoh* this) {
     s32 i;
     Vec3f previousPathPointPos;
     Vec3f currentPathPointPos;
-    Vec3s* currentPathPoint = &this->pathPoints[0];
+    Vec3f* currentPathPoint = &this->pathPoints[0];
     f32 pathSegmentDistance = 0.0f;
     f32* pathCheckpoint;
 
-    Math_Vec3s_ToVec3f(&currentPathPointPos, currentPathPoint);
+    Math_Vec3f_Copy(&currentPathPointPos, currentPathPoint);
     currentPathPoint++;
     pathCheckpoint = &this->pathCheckpoints[0];
 
     for (i = 1; i < endPoint; i++, currentPathPoint++, pathCheckpoint++) {
         Math_Vec3f_Copy(&previousPathPointPos, &currentPathPointPos);
-        Math_Vec3s_ToVec3f(&currentPathPointPos, currentPathPoint);
+        Math_Vec3f_Copy(&currentPathPointPos, currentPathPoint);
         pathSegmentDistance += Math3D_Vec3f_DistXYZ(&previousPathPointPos, &currentPathPointPos);
         *pathCheckpoint = pathSegmentDistance * invTotalPathDistance;
 
@@ -873,8 +873,8 @@ void EnInvadepoh_Night3Romani_PathComputeProgress(EnInvadepoh* this) {
  */
 void EnInvadepoh_Alien_PathUpdate(EnInvadepoh* this, PlayState* play) {
     s32 pad;
-    Vec3s* currentPathPoint;
-    Vec3s* nextPathPoint;
+    Vec3f* currentPathPoint;
+    Vec3f* nextPathPoint;
     Vec3f currentPathPointPos;
     Vec3f nextPathPointPos;
     f32 tempPosY = this->actor.world.pos.y;
@@ -887,15 +887,15 @@ void EnInvadepoh_Alien_PathUpdate(EnInvadepoh* this, PlayState* play) {
     nextCheckpoint = (this->currentPoint < (this->endPoint - 1)) ? this->pathCheckpoints[this->currentPoint] : 1.0f;
 
     if (nextCheckpoint - currentCheckpoint < 0.001f) {
-        Math_Vec3s_ToVec3f(&this->currentPos, currentPathPoint);
+        Math_Vec3f_Copy(&this->currentPos, currentPathPoint);
     } else {
         f32 nextWeight = this->pathProgress - currentCheckpoint;
         f32 currentWeight = nextCheckpoint - this->pathProgress;
         f32 invCheckpointDistance = 1.0f / (nextCheckpoint - currentCheckpoint);
         s32 pad2;
 
-        Math_Vec3s_ToVec3f(&currentPathPointPos, currentPathPoint);
-        Math_Vec3s_ToVec3f(&nextPathPointPos, nextPathPoint);
+        Math_Vec3f_Copy(&currentPathPointPos, currentPathPoint);
+        Math_Vec3f_Copy(&nextPathPointPos, nextPathPoint);
         this->currentPos.x =
             ((currentPathPointPos.x * currentWeight) + (nextPathPointPos.x * nextWeight)) * invCheckpointDistance;
         this->currentPos.y =
@@ -969,7 +969,7 @@ void EnInvadepoh_Alien_DoNothing(EnInvadepoh* this) {
  */
 s32 EnInvadepoh_Romani_MoveAlongPath(EnInvadepoh* this, PlayState* play, f32 speed, f32 height) {
     s32 pad;
-    Vec3s* nextPathPoint = &this->pathPoints[this->currentPoint + 1];
+    Vec3f* nextPathPoint = &this->pathPoints[this->currentPoint + 1];
     s32 reachedNextPoint = EnInvadepoh_StepToXZ(&this->actor.world.pos.x, &this->actor.world.pos.z, nextPathPoint->x,
                                                 nextPathPoint->z, speed);
 
@@ -995,8 +995,8 @@ void EnInvadepoh_Night1Romani_MoveAlongTimePath(EnInvadepoh* this, PlayState* pl
  */
 s32 EnInvadepoh_Dog_MoveAlongPath(EnInvadepoh* this, PlayState* play) {
     s32 pad;
-    Vec3s* currentPathPoint = &this->pathPoints[this->currentPoint];
-    Vec3s* nextPathPoint;
+    Vec3f* currentPathPoint = &this->pathPoints[this->currentPoint];
+    Vec3f* nextPathPoint;
     s32 nextPoint;
     f32 nextPathPointX;
     f32 nextPathPointZ;
@@ -3818,7 +3818,7 @@ void EnInvadepoh_BarnRomani_Idle(EnInvadepoh* this, PlayState* play) {
         Vec3f initialPoint;
         s16 yawToDoor;
 
-        Math_Vec3s_ToVec3f(&initialPoint, &this->pathPoints[0]);
+        Math_Vec3f_Copy(&initialPoint, &this->pathPoints[0]);
         yawToDoor = Math_Vec3f_Yaw(&this->actor.world.pos, &initialPoint);
         this->angle = Rand_S16Offset(-0x1F40, 0x3E80) + yawToDoor;
         this->shapeAngularVelocityY = 0;
@@ -4291,7 +4291,7 @@ void EnInvadepoh_Dog_Run(EnInvadepoh* this, PlayState* play) {
         f32 distToTarget;
         Vec3f targetPathPoint;
 
-        Math_Vec3s_ToVec3f(&targetPathPoint, &this->pathPoints[this->dogTargetPoint]);
+        Math_Vec3f_Copy(&targetPathPoint, &this->pathPoints[this->dogTargetPoint]);
         distToTarget = Math3D_Vec3fDistSq(&this->actor.world.pos, &targetPathPoint);
         if (distToTarget < SQ(80.0f)) {
             this->actor.speed *= 0.85f;
@@ -4755,8 +4755,8 @@ void EnInvadepoh_Night3Romani_Walk(EnInvadepoh* this, PlayState* play) {
 
     currentPoint = (this->currentPoint < this->endPoint) ? this->currentPoint : this->endPoint - 1;
 
-    Math_Vec3s_ToVec3f(&currentPathPointPos, &this->pathPoints[currentPoint]);
-    Math_Vec3s_ToVec3f(&nextPathPointPos, &this->pathPoints[currentPoint + 1]);
+    Math_Vec3f_Copy(&currentPathPointPos, &this->pathPoints[currentPoint]);
+    Math_Vec3f_Copy(&nextPathPointPos, &this->pathPoints[currentPoint + 1]);
     Math_SmoothStepToS(&this->actor.world.rot.y, Math_Vec3f_Yaw(&currentPathPointPos, &nextPathPointPos), 5, 0x7D0,
                        100);
 

@@ -48,7 +48,7 @@ static InitChainEntry sInitChain[] = {
 static CollisionHeader* sColHeaders[] = { &object_raillift_Colheader_004FF8, &object_raillift_Colheader_0048D0 };
 
 void ObjRaillift_UpdatePosition(ObjRaillift* this, s32 index) {
-    Math_Vec3s_ToVec3f(&this->dyna.actor.world.pos, &this->pathPoints[index]);
+    Math_Vec3f_Copy(&this->dyna.actor.world.pos, &this->pathPoints[index]);
 }
 
 void ObjRaillift_Init(Actor* thisx, PlayState* play) {
@@ -115,7 +115,7 @@ void ObjRaillift_Move(ObjRaillift* this, PlayState* play) {
     f32 step;
     s32 isTeleporting;
     s32 isPosUpdated;
-    Vec3s* endPoint;
+    Vec3f* endPoint;
 
     if (OBJRAILLIFT_HAS_FLAG(thisx)) {
         if (!Flags_GetSwitch(play, OBJRAILLIFT_GET_SWITCH_FLAG(thisx))) {
@@ -128,7 +128,7 @@ void ObjRaillift_Move(ObjRaillift* this, PlayState* play) {
         }
     }
 
-    Math_Vec3s_ToVec3f(&nextPoint, this->pathPoints + this->curPoint + this->direction);
+    Math_Vec3f_Copy(&nextPoint, this->pathPoints + this->curPoint + this->direction);
     Math_Vec3f_Diff(&nextPoint, &thisx->world.pos, &thisx->velocity);
     speed = Math3D_Vec3fMagnitude(&thisx->velocity);
     if ((speed < (this->speed * 8.0f)) && (this->speed > 2.0f)) {

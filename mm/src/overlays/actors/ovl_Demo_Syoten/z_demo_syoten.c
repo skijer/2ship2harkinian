@@ -137,7 +137,7 @@ void DemoSyoten_Destroy(Actor* thisx, PlayState* play) {
 
 void func_80C16760(DemoSyoten* this, PlayState* play) {
     s32 pad;
-    Vec3s* points;
+    Vec3f* points;
     Vec3f sp2C;
 
     this->unk_3EC = 0;
@@ -145,10 +145,10 @@ void func_80C16760(DemoSyoten* this, PlayState* play) {
         this->path = &play->setupPathList[DEMOSYOTEN_GET_PATH_INDEX(&this->actor)];
         if (this->path != NULL) {
             points = Lib_SegmentedToVirtual(this->path->points);
-            Math_Vec3s_ToVec3f(&this->actor.world.pos, &points[0]);
+            Math_Vec3f_Copy(&this->actor.world.pos, &points[0]);
             this->unk_3EC++;
             points++;
-            Math_Vec3s_ToVec3f(&sp2C, points);
+            Math_Vec3f_Copy(&sp2C, points);
             this->actor.world.rot.y = Math_Vec3f_Yaw(&this->actor.world.pos, &sp2C);
             this->actor.world.rot.x = Math_Vec3f_Pitch(&this->actor.world.pos, &sp2C);
         }
@@ -160,7 +160,7 @@ void func_80C16760(DemoSyoten* this, PlayState* play) {
 s32 func_80C16818(DemoSyoten* this) {
     s32 pad;
     Path* path = this->path;
-    Vec3s* points;
+    Vec3f* points;
     Vec3f sp28;
 
     if (path == NULL) {
@@ -169,7 +169,7 @@ s32 func_80C16818(DemoSyoten* this) {
 
     points = Lib_SegmentedToVirtual(this->path->points);
     points += this->unk_3EC;
-    Math_Vec3s_ToVec3f(&sp28, points);
+    Math_Vec3f_Copy(&sp28, points);
     this->actor.world.rot.y = Math_Vec3f_Yaw(&this->actor.world.pos, &sp28);
     this->actor.world.rot.x = Math_Vec3f_Pitch(&this->actor.world.pos, &sp28);
     Actor_MoveWithoutGravityReverse(&this->actor);
@@ -182,7 +182,7 @@ s32 func_80C16818(DemoSyoten* this) {
 void func_80C168D0(DemoSyoten* this, PlayState* play) {
     s32 pad;
     Path* path = this->path;
-    Vec3s* points;
+    Vec3f* points;
     Vec3f worldPos;
     Vec3f projectedPos;
     f32 invW;
@@ -190,7 +190,7 @@ void func_80C168D0(DemoSyoten* this, PlayState* play) {
     if (path != NULL) {
         points = Lib_SegmentedToVirtual(this->path->points);
         points += this->unk_3EC;
-        Math_Vec3s_ToVec3f(&worldPos, points);
+        Math_Vec3f_Copy(&worldPos, points);
         Actor_GetProjectedPos(play, &worldPos, &projectedPos, &invW);
         Math_Vec3f_Copy(&worldPos, &this->actor.projectedPos);
         worldPos.z = worldPos.y;

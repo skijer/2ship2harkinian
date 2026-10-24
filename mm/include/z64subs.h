@@ -76,7 +76,7 @@ typedef s32 (*ActorPathingUpdateFunc)(struct PlayState*, struct ActorPathing*);
 typedef struct ActorPathing {
     /* 0x00 */ Path* setupPathList;
     /* 0x04 */ s32 pathIndex;
-    /* 0x08 */ Vec3s* points;
+    /* 0x08 */ Vec3f* points;
     /* 0x0C */ s32 count;
     /* 0x10 */ s32 curPointIndex;
     /* 0x14 */ s32 begPointIndex;
@@ -111,7 +111,7 @@ void SubS_SetOfferMode(u16* flags, u16 offerMode, u16 mask);
 void SubS_TimePathing_FillKnots(f32 knots[], s32 order, s32 numPoints);
 s32 SubS_TimePathing_ComputeProgress(f32* progress, s32 elapsedTime, s32 waypointTime, s32 totalTime, s32 pathCount, s32 order, f32 knots[]);
 void SubS_TimePathing_ComputeWeights(s32 order, f32 progress, s32 waypoint, f32 knots[], f32 weights[]);
-void SubS_TimePathing_ComputeTargetPosXZ(f32* x, f32* z, f32 progress, s32 order, s32 waypoint, Vec3s points[], f32 knots[]);
+void SubS_TimePathing_ComputeTargetPosXZ(f32* x, f32* z, f32 progress, s32 order, s32 waypoint, Vec3f points[], f32 knots[]);
 s32 SubS_TimePathing_Update(Path* path, f32* progress, s32* elapsedTime, s32 waypointTime, s32 totalTime, s32* waypoint, f32 knots[], Vec3f* targetPos, s32 timeSpeed);
 void SubS_TimePathing_ComputeInitialY(struct PlayState* play, Path* path, s32 waypoint, Vec3f* targetPos);
 
@@ -147,8 +147,8 @@ s16 SubS_GetDistSqAndOrientPoints(Vec3f* vecA, Vec3f* vecB, f32* distSq);
 s32 SubS_MoveActorToPoint(Actor* actor, Vec3f* point, s16 rotStep);
 s16 SubS_GetDistSqAndOrientPath(Path* path, s32 pointIndex, Vec3f* pos, f32* distSq);
 
-s8 SubS_IsObjectLoaded(s8 objectSlot, struct PlayState* play);
-s8 SubS_GetObjectSlot(s16 objectId, struct PlayState* play);
+s8 SubS_IsObjectLoaded(s16 objectSlot, struct PlayState* play);
+s16 SubS_GetObjectSlot(s16 objectId, struct PlayState* play);
 
 Actor* SubS_FindActor(struct PlayState* play, Actor* actorListStart, u8 actorCategory, s16 actorId);
 

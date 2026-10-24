@@ -1,7 +1,10 @@
+#include "2s2h/Network/Anchor/Anchor.h"
+#include "2s2h/ModApi/ProgressiveItems/ProgressiveItems.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/MiscBehavior.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
 
 extern "C" {
 #include "variables.h"
@@ -9,6 +12,17 @@ extern "C" {
 }
 
 void Rando::GiveItem(RandoItemId randoItemId) {
+    if (Anchor::Instance != nullptr && RandoInfCustom_GetActiveBank() == S2H_RANDO_INF_SAVE &&
+        !RandoItems_IsModItem(randoItemId) && !ProgressiveItems_IsSource(randoItemId)) {
+        Anchor::Instance->SendPacket_GiveItem(0, randoItemId);
+    }
+    if (ProgressiveItems_ChangeRando(randoItemId, true)) return;
+    if (DungeonRegistry_GrantItem(randoItemId)) { return; }
+    if (RandoItems_IsModItem(randoItemId)) {
+        RandoItems_Give(randoItemId);
+        return;
+    }
+
     switch (randoItemId) {
         case RI_CLOCK_TOWN_STRAY_FAIRY:
             SET_WEEKEVENTREG(WEEKEVENTREG_08_80);

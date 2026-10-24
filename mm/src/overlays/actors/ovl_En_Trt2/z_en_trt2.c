@@ -565,7 +565,7 @@ void func_80AD46F8(EnTrt2* this) {
 }
 
 s32 EnTrt2_HasReachedPoint(EnTrt2* this, Path* path, s32 pointIndex) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     s32 count = path->count;
     s32 index = pointIndex;
     s32 reached = false;
@@ -576,7 +576,7 @@ s32 EnTrt2_HasReachedPoint(EnTrt2* this, Path* path, s32 pointIndex) {
     f32 d;
     Vec3f point;
 
-    Math_Vec3s_ToVec3f(&point, &points[index]);
+    Math_Vec3f_Copy(&point, &points[index]);
 
     if (index == 0) {
         diffX = points[1].x - points[0].x;
@@ -599,7 +599,7 @@ s32 EnTrt2_HasReachedPoint(EnTrt2* this, Path* path, s32 pointIndex) {
 }
 
 s16 func_80AD48F8(Path* path, s32 arg1, Vec3f* arg2, f32* arg3) {
-    Vec3s* points;
+    Vec3f* points;
     f32 phi_f14;
     f32 phi_f12;
 
@@ -619,7 +619,7 @@ s16 func_80AD48F8(Path* path, s32 arg1, Vec3f* arg2, f32* arg3) {
 f32 func_80AD49B8(Path* path, s32 arg1, Vec3f* arg2, Vec3s* arg3) {
     s32 pad;
     Vec3f sp20;
-    Vec3s* points;
+    Vec3f* points;
 
     if (path != NULL) {
         points = Lib_SegmentedToVirtual(path->points);

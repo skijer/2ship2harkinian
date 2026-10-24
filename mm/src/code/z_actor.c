@@ -26,6 +26,8 @@
 #include <string.h>
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/ActorTable/CustomActorTable.h"
+#include "2s2h/Unbound/SceneDB.h"
 #include "2s2h/BenPort.h"
 #include "2s2h/ShipUtils.h"
 #include "2s2h/ObjectExtension/ObjectExtension.h"
@@ -865,6 +867,8 @@ s32 Flags_GetAllTreasure(PlayState* play) {
  * Tests if a current scene clear flag is set.
  */
 s32 Flags_GetClear(PlayState* play, s32 roomNumber) {
+    if (roomNumber < 0) { return false; }
+    if (roomNumber >= 32) { return SceneFlags_GetRoomClear(play->sceneId, roomNumber, 0); }
     return play->actorCtx.sceneFlags.clearedRoom & (1 << roomNumber);
 }
 
@@ -872,6 +876,15 @@ s32 Flags_GetClear(PlayState* play, s32 roomNumber) {
  * Sets a current scene clear flag.
  */
 void Flags_SetClear(PlayState* play, s32 roomNumber) {
+    if (roomNumber < 0) { return; }
+    if (roomNumber >= 32) {
+        s32 previous = SceneFlags_GetRoomClear(play->sceneId, roomNumber, 0);
+        SceneFlags_SetRoomClear(play->sceneId, roomNumber, 0, 1);
+        if (previous != 1) {
+            GameInteractor_ExecuteOnSceneFlagSet(play->sceneId, FLAG_CYCL_SCENE_CLEARED_ROOM, roomNumber);
+        }
+        return;
+    }
     u8 previouslyOff = !Flags_GetClear(play, roomNumber);
     play->actorCtx.sceneFlags.clearedRoom |= (1 << roomNumber);
     if (previouslyOff) {
@@ -883,6 +896,15 @@ void Flags_SetClear(PlayState* play, s32 roomNumber) {
  * Unsets a current scene clear flag.
  */
 void Flags_UnsetClear(PlayState* play, s32 roomNumber) {
+    if (roomNumber < 0) { return; }
+    if (roomNumber >= 32) {
+        s32 previous = SceneFlags_GetRoomClear(play->sceneId, roomNumber, 0);
+        SceneFlags_SetRoomClear(play->sceneId, roomNumber, 0, 0);
+        if (previous != 0) {
+            GameInteractor_ExecuteOnSceneFlagUnset(play->sceneId, FLAG_CYCL_SCENE_CLEARED_ROOM, roomNumber);
+        }
+        return;
+    }
     u8 previouslyOn = Flags_GetClear(play, roomNumber);
     play->actorCtx.sceneFlags.clearedRoom &= ~(1 << roomNumber);
     if (previouslyOn) {
@@ -894,6 +916,8 @@ void Flags_UnsetClear(PlayState* play, s32 roomNumber) {
  * Tests if a current scene temp clear flag is set.
  */
 s32 Flags_GetClearTemp(PlayState* play, s32 roomNumber) {
+    if (roomNumber < 0) { return false; }
+    if (roomNumber >= 32) { return SceneFlags_GetRoomClear(play->sceneId, roomNumber, 1); }
     return play->actorCtx.sceneFlags.clearedRoomTemp & (1 << roomNumber);
 }
 
@@ -901,6 +925,11 @@ s32 Flags_GetClearTemp(PlayState* play, s32 roomNumber) {
  * Sets a current scene temp clear flag.
  */
 void Flags_SetClearTemp(PlayState* play, s32 roomNumber) {
+    if (roomNumber < 0) { return; }
+    if (roomNumber >= 32) {
+        SceneFlags_SetRoomClear(play->sceneId, roomNumber, 1, 1);
+        return;
+    }
     play->actorCtx.sceneFlags.clearedRoomTemp |= (1 << roomNumber);
 }
 
@@ -908,6 +937,11 @@ void Flags_SetClearTemp(PlayState* play, s32 roomNumber) {
  * Unsets a current scene temp clear flag.
  */
 void Flags_UnsetClearTemp(PlayState* play, s32 roomNumber) {
+    if (roomNumber < 0) { return; }
+    if (roomNumber >= 32) {
+        SceneFlags_SetRoomClear(play->sceneId, roomNumber, 1, 0);
+        return;
+    }
     play->actorCtx.sceneFlags.clearedRoomTemp &= ~(1 << roomNumber);
 }
 
@@ -1314,7 +1348,9 @@ void Actor_SetMovementScale(s32 scale) {
  * Update actor position using velocity and any push from z_collision_check.
  */
 void Actor_UpdatePos(Actor* actor) {
-    f32 speedRate = sActorMovementScale;
+    f32 motionScale = 1.0f;
+    GameInteractor_ExecuteOnActorResolveMotionScale(actor, &motionScale);
+    f32 speedRate = sActorMovementScale * motionScale;
 
     actor->world.pos.x += (actor->velocity.x * speedRate) + actor->colChkInfo.displacement.x;
     actor->world.pos.y += (actor->velocity.y * speedRate) + actor->colChkInfo.displacement.y;
@@ -1496,32 +1532,37 @@ void Actor_SetControlStickData(PlayState* play, Input* input, f32 controlStickMa
     input->rel.stick_y = input->cur.stick_y;
 }
 
-f32 Player_GetHeight(Player* player) {
-    f32 extraHeight;
-
-    if (player->stateFlags1 & PLAYER_STATE1_800000) {
-        extraHeight = 32.0f;
-    } else {
-        extraHeight = 0.0f;
-    }
-
+static f32 Player_GetFormHeight(Player* player) {
     switch (player->transformation) {
         default:
         case PLAYER_FORM_FIERCE_DEITY:
-            return extraHeight + 124.0f;
+            return 124.0f;
 
         case PLAYER_FORM_GORON:
-            return extraHeight + ((player->stateFlags3 & PLAYER_STATE3_1000) ? 34.0f : 80.0f);
+            return (player->stateFlags3 & PLAYER_STATE3_1000) ? 34.0f : 80.0f;
 
         case PLAYER_FORM_ZORA:
-            return extraHeight + 68.0f;
+            return 68.0f;
 
         case PLAYER_FORM_DEKU:
-            return extraHeight + 36.0f;
+            return 36.0f;
 
         case PLAYER_FORM_HUMAN:
-            return extraHeight + 44.0f;
+            return 44.0f;
     }
+}
+
+f32 Player_GetHeight(Player* player) {
+    f32 extraHeight = (player->stateFlags1 & PLAYER_STATE1_800000) ? 32.0f : 0.0f;
+    f32 formHeight = Player_GetFormHeight(player);
+    f32 height = formHeight;
+
+    GameInteractor_ExecuteOnPlayerResolveHeight(player, &height);
+    if (height <= 0.0f) {
+        height = formHeight;
+    }
+
+    return extraHeight + height;
 }
 
 f32 Player_GetRunSpeedLimit(Player* player) {
@@ -1804,6 +1845,8 @@ void Actor_UpdateBgCheckInfo(PlayState* play, Actor* actor, f32 wallCheckHeight,
     f32 sp94 = actor->world.pos.y - actor->prevPos.y;
     s32 pad;
     Vec3f pos;
+
+    GameInteractor_ExecuteOnActorResolveBgCheckFlags(actor, (s32*)&updBgCheckInfoFlags);
 
     if ((actor->floorBgId != BGCHECK_SCENE) && (actor->bgCheckFlags & BGCHECKFLAG_GROUND)) {
         DynaPolyActor_TransformCarriedActor(&play->colCtx, actor->floorBgId, actor);
@@ -2128,7 +2171,7 @@ s16 D_801AED48[] = {
 s32 Actor_TalkOfferAccepted(Actor* actor, GameState* gameState) {
     if (actor->flags & ACTOR_FLAG_TALK) {
         actor->flags &= ~ACTOR_FLAG_TALK;
-        return true;
+        return GameInteractor_ExecuteOnActorTalk(actor, (PlayState*)gameState);
     }
 
     return false;
@@ -2484,6 +2527,10 @@ void func_800B8E1C(PlayState* play, Actor* actor, f32 arg2, s16 arg3, f32 arg4) 
  * Play a sound effect at the player's position
  */
 void Player_PlaySfx(Player* player, u16 sfxId) {
+    if (GameInteractor_ExecuteOnActorPlaySfx(&player->actor, SOH_ACTOR_SFX_GENERIC, &sfxId)) {
+        return;
+    }
+
     if (player->currentMask == PLAYER_MASK_GIANT) {
         Audio_PlaySfx_AtPosWithPresetLowFreqAndHighReverb(&player->actor.projectedPos, sfxId);
     } else {
@@ -2492,12 +2539,17 @@ void Player_PlaySfx(Player* player, u16 sfxId) {
                              &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
     }
+    if (player->actor.id == ACTOR_PLAYER) GameInteractor_ExecuteOnPlayerSfx(sfxId);
 }
 
 /**
  * Play a sound effect at the actor's position
  */
 void Actor_PlaySfx(Actor* actor, u16 sfxId) {
+    if (GameInteractor_ExecuteOnActorPlaySfx(actor, SOH_ACTOR_SFX_GENERIC, &sfxId)) {
+        return;
+    }
+
     Audio_PlaySfx_AtPos(&actor->projectedPos, sfxId);
 }
 
@@ -2609,25 +2661,26 @@ void Actor_InitContext(PlayState* play, ActorContext* actorCtx, ActorEntry* acto
     s32 i;
 
     SET_WEEKEVENTREG(WEEKEVENTREG_92_80);
-    cycleFlags = &gSaveContext.cycleSceneFlags[Play_GetOriginalSceneId(play->sceneId)];
+    cycleFlags = SceneFlags_GetCycle(Play_GetOriginalSceneId(play->sceneId));
 
     memset(actorCtx, 0, sizeof(ActorContext));
     ActorOverlayTable_Init();
     Matrix_MtxFCopy(&play->billboardMtxF, &gIdentityMtxF);
     Matrix_MtxFCopy(&play->viewProjectionMtxF, &gIdentityMtxF);
 
-    overlayEntry = gActorOverlayTable;
-    for (i = 0; i < ARRAY_COUNT(gActorOverlayTable); i++) {
-        overlayEntry->loadedRamAddr = NULL;
-        overlayEntry->numLoaded = 0;
-        overlayEntry++;
+    for (i = 0; i < ActorOverlayTable_GetCount(); i++) {
+        overlayEntry = ActorOverlayTable_Get(i);
+        if (overlayEntry != NULL) {
+            overlayEntry->loadedRamAddr = NULL;
+            overlayEntry->numLoaded = 0;
+        }
     }
 
     actorCtx->sceneFlags.chest = cycleFlags->chest;
     actorCtx->sceneFlags.switches[0] = cycleFlags->switch0;
     actorCtx->sceneFlags.switches[1] = cycleFlags->switch1;
     if (play->sceneId == SCENE_INISIE_R) {
-        cycleFlags = &gSaveContext.cycleSceneFlags[play->sceneId];
+        cycleFlags = SceneFlags_GetCycle(play->sceneId);
     }
     actorCtx->sceneFlags.collectible[0] = cycleFlags->collectible;
     actorCtx->sceneFlags.clearedRoom = cycleFlags->clearedRoom;
@@ -2684,6 +2737,7 @@ void Actor_SpawnSetupActors(PlayState* play, ActorContext* actorCtx) {
 
         // Prevents re-spawning the setup actors
         play->numSetupActors = -play->numSetupActors;
+        GameInteractor_ExecuteOnSceneSpawnActors();
     }
 }
 
@@ -2744,9 +2798,10 @@ Actor* Actor_UpdateActor(UpdateActor_Params* params) {
             Math_Vec3f_Copy(&actor->prevPos, &actor->world.pos);
             actor->xzDistToPlayer = Actor_WorldDistXZToActor(actor, &params->player->actor);
             actor->playerHeightRel = Actor_HeightDiff(actor, &params->player->actor);
-            actor->xyzDistToPlayerSq = SQ(actor->xzDistToPlayer) + SQ(actor->playerHeightRel);
-
             actor->yawTowardsPlayer = Actor_WorldYawTowardActor(actor, &params->player->actor);
+            GameInteractor_ExecuteOnActorResolvePlayerRelation(actor, &actor->xzDistToPlayer,
+                                                               &actor->playerHeightRel, &actor->yawTowardsPlayer);
+            actor->xyzDistToPlayerSq = SQ(actor->xzDistToPlayer) + SQ(actor->playerHeightRel);
             actor->flags &= ~ACTOR_FLAG_SFX_FOR_PLAYER_BODY_HIT;
 
             if ((DECR(actor->freezeTimer) == 0) && (actor->flags & params->updateActorFlagsMask)) {
@@ -2983,10 +3038,29 @@ void Actor_Draw(PlayState* play, Actor* actor) {
         }
     }
 
+    Color_RGBA8 grayscale = { 0, 0, 0, 0 };
+
+    GameInteractor_ExecuteOnActorResolveGrayscale(actor, play, &grayscale);
+    bool isGrayscale = grayscale.a != 0;
+
+    if (isGrayscale) {
+        gDPSetGrayscaleColor(POLY_OPA_DISP++, grayscale.r, grayscale.g, grayscale.b, grayscale.a);
+        gSPGrayscale(POLY_OPA_DISP++, true);
+        gDPSetGrayscaleColor(POLY_XLU_DISP++, grayscale.r, grayscale.g, grayscale.b, grayscale.a);
+        gSPGrayscale(POLY_XLU_DISP++, true);
+    }
+
     if (GameInteractor_ShouldActorDraw(actor)) {
+        GameInteractor_ExecuteOnActorDrawBegin(actor, play);
         actor->draw(actor, play);
         GameInteractor_ExecuteOnActorDraw(actor);
     }
+
+    if (isGrayscale) {
+        gSPGrayscale(POLY_OPA_DISP++, false);
+        gSPGrayscale(POLY_XLU_DISP++, false);
+    }
+    GameInteractor_ExecuteOnActorDrawEnd(actor, play);
 
     if (actor->colorFilterTimer != 0) {
         if (actor->colorFilterParams & COLORFILTER_BUFFLAG_XLU) {
@@ -3006,9 +3080,11 @@ void Actor_Draw(PlayState* play, Actor* actor) {
 }
 
 void Actor_UpdateFlaggedAudio(Actor* actor) {
-    s32 sfxId = actor->sfxId;
+    u16 sfxId = actor->sfxId;
+    bool isSfxHandled =
+        (sfxId != NA_SE_NONE) && GameInteractor_ExecuteOnActorPlaySfx(actor, SOH_ACTOR_SFX_FLAGGED, &sfxId);
 
-    if (sfxId != NA_SE_NONE) {
+    if ((sfxId != NA_SE_NONE) && !isSfxHandled) {
         if (actor->audioFlags & ACTOR_AUDIO_FLAG_SFX_ACTOR_POS_2) {
             AudioSfx_PlaySfx(sfxId, &actor->projectedPos, 4, &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
                              &gSfxDefaultReverb);
@@ -3310,8 +3386,12 @@ s32 Ship_CalcShouldDrawAndUpdate(PlayState* play, Actor* actor, Vec3f* projected
         return true;
     }
 
-    s32 distMultiplier = CVarGetInteger("gEnhancements.Graphics.IncreaseActorDrawDistance", 1);
-    distMultiplier = MAX(distMultiplier, 1);
+    f32 distMultiplier = MAX(CVarGetInteger("gEnhancements.Graphics.IncreaseActorDrawDistance", 1), 1);
+
+    // 2S2H [Unbound] uncull zones were tuned to the 12800 far plane; a scene drawing further keeps actors in step
+    if (play->lightCtx.hasWorldFog && (play->lightCtx.worldFog.drawDistance > 12800.0f)) {
+        distMultiplier *= play->lightCtx.worldFog.drawDistance / 12800.0f;
+    }
 
     // Apply distance scale to forward cullzone check
     bool isWithingForwardCullZone =
@@ -3686,8 +3766,12 @@ Actor* Actor_Spawn(ActorContext* actorCtx, PlayState* play, s16 actorId, f32 pos
 
 ActorProfile* Actor_LoadOverlay(ActorContext* actorCtx, s16 index) {
     size_t overlaySize;
-    ActorOverlay* overlayEntry = &gActorOverlayTable[index];
+    ActorOverlay* overlayEntry = ActorOverlayTable_Get(index);
     ActorProfile* profile;
+
+    if (overlayEntry == NULL) {
+        return NULL;
+    }
 
     overlaySize = (uintptr_t)overlayEntry->vramEnd - (uintptr_t)overlayEntry->vramStart;
 
@@ -3700,11 +3784,11 @@ ActorProfile* Actor_LoadOverlay(ActorContext* actorCtx, s16 index) {
                 if (actorCtx->absoluteSpace == NULL) {
                     actorCtx->absoluteSpace = ZeldaArena_MallocR(0xFFFFFF);
                 }
-                gActorOverlayTable[index].loadedRamAddr = actorCtx->absoluteSpace;
+                overlayEntry->loadedRamAddr = actorCtx->absoluteSpace;
             } else if (overlayEntry->allocType & ALLOCTYPE_PERMANENT) {
-                gActorOverlayTable[index].loadedRamAddr = ZeldaArena_MallocR(overlaySize);
+                overlayEntry->loadedRamAddr = ZeldaArena_MallocR(overlaySize);
             } else {
-                gActorOverlayTable[index].loadedRamAddr = ZeldaArena_Malloc(overlaySize);
+                overlayEntry->loadedRamAddr = ZeldaArena_Malloc(overlaySize);
             }
 
             if (overlayEntry->loadedRamAddr == NULL) {
@@ -3726,6 +3810,9 @@ ActorProfile* Actor_LoadOverlay(ActorContext* actorCtx, s16 index) {
     return profile;
 }
 
+// Set only around the spawn in Actor_SpawnTransitionActors, so the index is known before the actor's init runs
+static s16 sSpawningTransitionIndex = -1;
+
 Actor* Actor_SpawnAsChildAndCutscene(ActorContext* actorCtx, PlayState* play, s16 index, f32 x, f32 y, f32 z, s16 rotX,
                                      s16 rotY, s16 rotZ, s32 params, u32 csId, u32 halfDaysBits, Actor* parent) {
     s32 pad;
@@ -3734,7 +3821,7 @@ Actor* Actor_SpawnAsChildAndCutscene(ActorContext* actorCtx, PlayState* play, s1
     s32 objectSlot;
     ActorOverlay* overlayEntry;
 
-    if (actorCtx->totalLoadedActors >= 255) {
+    if (actorCtx->totalLoadedActors >= ACTOR_LOADED_MAX) {
         return NULL;
     }
 
@@ -3742,18 +3829,19 @@ Actor* Actor_SpawnAsChildAndCutscene(ActorContext* actorCtx, PlayState* play, s1
     if (profile == NULL) {
         return NULL;
     }
+    overlayEntry = ActorOverlayTable_Get(index);
 
     objectSlot = Object_GetSlot(&play->objectCtx, profile->objectId);
     if ((objectSlot <= OBJECT_SLOT_NONE) ||
         ((profile->type == ACTORCAT_ENEMY) && Flags_GetClear(play, play->roomCtx.curRoom.num) &&
          (profile->id != ACTOR_BOSS_05))) {
-        Actor_FreeOverlay(&gActorOverlayTable[index]);
+        Actor_FreeOverlay(overlayEntry);
         return NULL;
     }
 
     actor = ZeldaArena_Malloc(profile->instanceSize);
     if (actor == NULL) {
-        Actor_FreeOverlay(&gActorOverlayTable[index]);
+        Actor_FreeOverlay(overlayEntry);
         return NULL;
     }
 
@@ -3762,7 +3850,6 @@ Actor* Actor_SpawnAsChildAndCutscene(ActorContext* actorCtx, PlayState* play, s1
     currentActorListIndex = -1;
     // #endregion
 
-    overlayEntry = &gActorOverlayTable[index];
     // #region 2S2H [Port] Our actors are always loaded and have no vramStart
     // but we want to simulate them being unloaded to execute our actor reset funcs
     // for static variable cleanup
@@ -3804,6 +3891,7 @@ Actor* Actor_SpawnAsChildAndCutscene(ActorContext* actorCtx, PlayState* play, s1
     actor->home.rot.y = rotY;
     actor->home.rot.z = rotZ;
     actor->params = params & 0xFFFF;
+    actor->transitionIndex = sSpawningTransitionIndex;
     actor->csId = csId & 0x7F;
 
     if (actor->csId == 0x7F) {
@@ -3837,7 +3925,7 @@ Actor* Actor_SpawnAsChild(ActorContext* actorCtx, Actor* parent, PlayState* play
 void Actor_SpawnTransitionActors(PlayState* play, ActorContext* actorCtx) {
     TransitionActorEntry* transitionActorList = play->transitionActors.list;
     s32 i;
-    s16 numTransitionActors = play->transitionActors.count;
+    s32 numTransitionActors = play->transitionActors.count;
 
     for (i = 0; i < numTransitionActors; transitionActorList++, i++) {
         if (transitionActorList->id >= 0) {
@@ -3848,12 +3936,16 @@ void Actor_SpawnTransitionActors(PlayState* play, ActorContext* actorCtx) {
                  ((play->roomCtx.curRoom.num == transitionActorList->sides[1].room) ||
                   (play->roomCtx.prevRoom.num == transitionActorList->sides[1].room)))) {
                 s16 rotY = DEG_TO_BINANG((transitionActorList->rotY >> 7) & 0x1FF);
+                Actor* transitionActor;
 
-                if (Actor_SpawnAsChildAndCutscene(actorCtx, play, transitionActorList->id & 0x1FFF,
-                                                  transitionActorList->pos.x, transitionActorList->pos.y,
-                                                  transitionActorList->pos.z, 0, rotY, 0,
-                                                  TRANSITION_ACTOR_PARAMS(i, transitionActorList->params),
-                                                  transitionActorList->rotY & 0x7F, HALFDAYBIT_ALL, 0) != NULL) {
+                sSpawningTransitionIndex = i;
+                transitionActor = Actor_SpawnAsChildAndCutscene(
+                    actorCtx, play, transitionActorList->id & 0x1FFF, transitionActorList->pos.x,
+                    transitionActorList->pos.y, transitionActorList->pos.z, 0, rotY, 0,
+                    TRANSITION_ACTOR_PARAMS(i & 0x3F, transitionActorList->params), transitionActorList->rotY & 0x7F,
+                    HALFDAYBIT_ALL, 0);
+                sSpawningTransitionIndex = -1;
+                if (transitionActor != NULL) {
                     transitionActorList->id = -transitionActorList->id;
                 }
                 numTransitionActors = play->transitionActors.count;
@@ -4591,7 +4683,7 @@ Hilite* func_800BCC68(Vec3f* arg0, PlayState* play) {
  * Calculates the closest position `dstPos` to the input position `srcPos` along the path given by `points`/`numPoints`
  * Whether the points provided forms a closed-loop path is indicated by `isPathLoop`
  */
-void Actor_GetClosestPosOnPath(Vec3s* points, s32 numPoints, Vec3f* srcPos, Vec3f* dstPos, s32 isPathLoop) {
+void Actor_GetClosestPosOnPath(Vec3f* points, s32 numPoints, Vec3f* srcPos, Vec3f* dstPos, s32 isPathLoop) {
     s32 pointIndex;
     s32 closestPointIndex;
     s32 useAdjacentLines[2] = {

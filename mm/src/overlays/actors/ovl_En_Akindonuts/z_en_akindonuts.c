@@ -184,7 +184,7 @@ void func_80BECC7C(EnAkindonuts* this, PlayState* play) {
 }
 
 s32 EnAkindonuts_HasReachedPoint(EnAkindonuts* this, Path* path, s32 pointIndex) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     s32 count = path->count;
     s32 index = pointIndex;
     s32 reached = false;
@@ -195,7 +195,7 @@ s32 EnAkindonuts_HasReachedPoint(EnAkindonuts* this, Path* path, s32 pointIndex)
     f32 d;
     Vec3f point;
 
-    Math_Vec3s_ToVec3f(&point, &points[index]);
+    Math_Vec3f_Copy(&point, &points[index]);
 
     if (index == 0) {
         diffX = points[1].x - points[0].x;
@@ -217,9 +217,9 @@ s32 EnAkindonuts_HasReachedPoint(EnAkindonuts* this, Path* path, s32 pointIndex)
 }
 
 f32 func_80BECEAC(Path* path, s32 arg1, Vec3f* pos, Vec3s* arg3) {
-    Vec3s* points;
+    Vec3f* points;
     Vec3f sp20;
-    Vec3s* point;
+    Vec3f* point;
 
     if (path != NULL) {
         points = Lib_SegmentedToVirtual(path->points);
@@ -237,12 +237,12 @@ f32 func_80BECEAC(Path* path, s32 arg1, Vec3f* pos, Vec3s* arg3) {
 }
 
 s16 func_80BECF6C(Path* path) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     Vec3f sp28;
     Vec3f sp1C;
 
-    Math_Vec3s_ToVec3f(&sp28, &points[0]);
-    Math_Vec3s_ToVec3f(&sp1C, &points[1]);
+    Math_Vec3f_Copy(&sp28, &points[0]);
+    Math_Vec3f_Copy(&sp1C, &points[1]);
 
     return Math_Vec3f_Yaw(&sp28, &sp1C);
 }

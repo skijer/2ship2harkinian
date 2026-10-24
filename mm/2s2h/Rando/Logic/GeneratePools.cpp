@@ -1,5 +1,7 @@
+#include "2s2h/ModApi/ProgressiveItems/ProgressiveItems.h"
 #include "Logic.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 extern "C" {
@@ -43,11 +45,12 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     // First loop through all regions and add checks/items to the pool
     for (auto& [randoRegionId, randoRegion] : Rando::Logic::Regions) {
         for (auto& [randoCheckId, _] : randoRegion.checks) {
+            if (DungeonRegistry_AddCheckToPool(saveInfo, randoCheckId, checkPool, itemPool)) { continue; }
             auto& randoStaticCheck = Rando::StaticData::Checks[randoCheckId];
 
             // Initialize the check with it's vanilla item
             if (randoStaticCheck.randoCheckId != RC_UNKNOWN) {
-                saveInfo.randoSaveChecks[randoCheckId].randoItemId = randoStaticCheck.randoItemId;
+                DungeonRegistry_SaveCheck(saveInfo, randoCheckId).randoItemId = randoStaticCheck.randoItemId;
             }
 
             // Skip checks that are already in the pool
@@ -66,7 +69,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
                 }
 
                 if (vanillaSkulltulas.contains(randoCheckId)) {
-                    saveInfo.randoSaveChecks[randoCheckId].shuffled = true;
+                    DungeonRegistry_SaveCheck(saveInfo, randoCheckId).shuffled = true;
                     continue;
                 }
             }
@@ -151,7 +154,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
                 continue;
             } else {
                 int price = Ship_Random(0, 200);
-                saveInfo.randoSaveChecks[randoCheckId].price = price;
+                DungeonRegistry_SaveCheck(saveInfo, randoCheckId).price = price;
             }
 
             if (randoStaticCheck.randoCheckType == RCTYPE_SHOP) {
@@ -165,7 +168,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
                     // We may come up with a better solution for this in the future, but for now we choose a
                     // random price ahead of time, logic will account for whatever price we choose
                     int price = Ship_Random(0, 200);
-                    saveInfo.randoSaveChecks[randoCheckId].price = price;
+                    DungeonRegistry_SaveCheck(saveInfo, randoCheckId).price = price;
                 }
             }
 
@@ -179,9 +182,9 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
                     if (Rando::StaticData::Items[randoStaticCheck.randoItemId].randoItemType != RITYPE_JUNK) {
                         itemPool.push_back(randoStaticCheck.randoItemId);
 
-                        saveInfo.randoSaveChecks[randoCheckId].shuffled = true;
-                        saveInfo.randoSaveChecks[randoCheckId].randoItemId = RI_JUNK;
-                        saveInfo.randoSaveChecks[randoCheckId].skipped = true;
+                        DungeonRegistry_SaveCheck(saveInfo, randoCheckId).shuffled = true;
+                        DungeonRegistry_SaveCheck(saveInfo, randoCheckId).randoItemId = RI_JUNK;
+                        DungeonRegistry_SaveCheck(saveInfo, randoCheckId).skipped = true;
                     }
                     continue;
                 }
@@ -191,6 +194,8 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             itemPool.push_back(randoStaticCheck.randoItemId);
         }
     }
+
+    DungeonRegistry_AdjustPool(itemPool);
 
     // Add sword and shield to the pool because they don't have a vanilla location, if you are starting with
     // them they will be removed from the pool in the next step
@@ -392,6 +397,9 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             trapsToShuffle--;
         }
     }
+
+    RandoItems_AddToPool(itemPool);
+    ProgressiveItems_ConfigurePool(itemPool);
 }
 
 } // namespace Logic

@@ -4,8 +4,16 @@
 // Not really sure what the best ID is for this, but it needs to be between 0-255
 // because it's used as a u8 somewhere in the chain
 #define CUSTOM_MESSAGE_ID 0x004B
-#define BUFFER_SIZE 1280
+#define BUFFER_SIZE 8192
 #define MESSAGE_HEADER_SIZE 11
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+const char* CustomMessage_GetActiveIconPath(void);
+#ifdef __cplusplus
+}
+#endif
 
 #ifdef __cplusplus
 
@@ -25,6 +33,7 @@ struct Entry {
     uint16_t secondItemCost = 0xFFFF;
     bool autoFormat = true;
     std::string msg = "";
+    std::string iconPath;
 };
 
 void RegisterHooks();
@@ -34,7 +43,7 @@ void SetActiveCustomMessage(std::string msg, Entry options = {});
 // Helpers
 std::string RemoveColorCodes(const std::string& input);
 void Replace(std::string* msg, const std::string& placeholder, const std::string& value);
-void AddLineBreaks(std::string* msg);
+void AddLineBreaks(std::string* msg, float maxWidth = 300.0f);
 void ReplaceColorChars(std::string* msg);
 void EnsureMessageEnd(std::string* msg);
 Entry LoadVanillaMessageTableEntry(u16 textId);

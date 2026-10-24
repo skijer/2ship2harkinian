@@ -227,7 +227,7 @@ void func_80BF3DC4(EnRg* this, PlayState* play) {
 }
 
 void func_80BF3E88(EnRg* this, PlayState* play) {
-    Math_Vec3f_ToVec3s(&this->collider1.dim.pos, &this->actor.world.pos);
+    Math_Vec3f_Copy(&this->collider1.dim.pos, &this->actor.world.pos);
     CollisionCheck_SetOC(play, &play->colChkCtx, &this->collider1.base);
 }
 
@@ -494,7 +494,7 @@ void func_80BF4934(EnRg* this) {
 }
 
 void func_80BF4964(EnRg* this) {
-    Vec3s* sp3C;
+    Vec3f* sp3C;
     Vec3f sp30;
 
     if (this->path != NULL) {
@@ -523,7 +523,7 @@ void func_80BF4964(EnRg* this) {
         if (!(this->unk_310 & 0x400) && !(this->unk_310 & 0x1000) && (this->unk_322 == 0) && (this->unk_324 == 0) &&
             (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
             if (this->unk_18C == NULL) {
-                Math_Vec3s_ToVec3f(&sp30, &sp3C[this->unk_33C]);
+                Math_Vec3f_Copy(&sp30, &sp3C[this->unk_33C]);
             } else {
                 Math_Vec3f_Copy(&sp30, &this->unk_18C->world.pos);
             }

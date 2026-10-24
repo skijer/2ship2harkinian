@@ -600,8 +600,8 @@ void func_80A3F114(EnTest3* this, PlayState* play) {
 s32 func_80A3F15C(EnTest3* this, PlayState* play, struct_80A41828* arg2) {
     s32 limit;
     Path* path;
-    Vec3s* curPathPoint;
-    Vec3s* nextPathPoint;
+    Vec3f* curPathPoint;
+    Vec3f* nextPathPoint;
     Vec3f curPathPos;
     Vec3f nextPathPos;
 
@@ -617,8 +617,8 @@ s32 func_80A3F15C(EnTest3* this, PlayState* play, struct_80A41828* arg2) {
             curPathPoint += path->count - 1;
             nextPathPoint = curPathPoint - 1;
         }
-        Math_Vec3s_ToVec3f(&curPathPos, curPathPoint);
-        Math_Vec3s_ToVec3f(&nextPathPos, nextPathPoint);
+        Math_Vec3f_Copy(&curPathPos, curPathPoint);
+        Math_Vec3f_Copy(&nextPathPos, nextPathPoint);
         if (Math_Vec3f_DistXZ(&this->player.actor.world.pos, &curPathPos) > 10.0f) {
             Math_Vec3f_Copy(&this->player.actor.world.pos, &curPathPos);
             Math_Vec3f_Copy(&this->player.actor.home.pos, &curPathPos);

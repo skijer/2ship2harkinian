@@ -1,5 +1,7 @@
 #ifndef Z64MESSAGE_H
 #define Z64MESSAGE_H
+#define MESSAGE_BUF_SIZE 8192
+#define MESSAGE_DECODED_BUF_SIZE 1024
 
 #include "PR/ultratypes.h"
 #include "z64view.h"
@@ -184,7 +186,7 @@ typedef enum TextState {
 // Font textures are loaded into here
 typedef struct {
     /* 0x00000 */ union {
-        u8 charBuf[2][FONT_CHAR_TEX_SIZE * 120];
+        u8 charBuf[2][FONT_CHAR_TEX_SIZE * MESSAGE_DECODED_BUF_SIZE];
         u64 force_structure_alignment_charTex;
     };
     /* 0x07800 */ union {
@@ -196,8 +198,8 @@ typedef struct {
         u64 force_structure_alignment_font;
     };
     /* 0x11880 */ union {
-        unsigned char schar[1280]; // msgBuf
-        u16 wchar[640];   // msgBufWide
+        unsigned char schar[MESSAGE_BUF_SIZE]; // msgBuf
+        u16 wchar[MESSAGE_BUF_SIZE / 2];   // msgBufWide
         u64 force_structure_alignment_msg;
     } msgBuf;
     /* 0x11D80 */ uintptr_t messageStart;
@@ -234,8 +236,8 @@ typedef struct MessageContext {
     /* 0x11F22 */ u8 msgMode;
     /* 0x11F23 */ UNK_TYPE1 unk11F23;
     /* 0x11F24 */ union {
-        char schar[200];
-        u16 wchar[100];
+        char schar[MESSAGE_DECODED_BUF_SIZE];
+        u16 wchar[MESSAGE_DECODED_BUF_SIZE / 2];
     } decodedBuffer;
     /* 0x11FEC */ u16 msgBufPos;
     /* 0x11FEE */ u16 textDrawPos;
@@ -354,8 +356,8 @@ void Message_FindCreditsMessage(struct PlayState* play, u16 textId);
 void Message_DrawTextCredits(struct PlayState* play, Gfx** gfxP);
 void Message_DecodeCredits(struct PlayState* play);
 
-extern u8 gPageSwitchNextButtonStatus[6][5];
-extern u16 gBombersNotebookWeekEventFlags[BOMBERS_NOTEBOOK_EVENT_MAX];
-extern s16 gOcarinaSongItemMap[];
+extern HOST_DATA u8 gPageSwitchNextButtonStatus[6][5];
+extern HOST_DATA u16 gBombersNotebookWeekEventFlags[BOMBERS_NOTEBOOK_EVENT_MAX];
+extern HOST_DATA s16 gOcarinaSongItemMap[];
 
 #endif

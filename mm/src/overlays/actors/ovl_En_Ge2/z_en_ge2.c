@@ -203,7 +203,7 @@ s32 EnGe2_SetupPath(EnGe2* this, PlayState* play) {
         this->path = &play->setupPathList[GERUDO_PURPLE_GET_PATH_INDEX(&this->picto.actor)];
         if (this->path != NULL) {
             Path* path = this->path;
-            Vec3s* points = Lib_SegmentedToVirtual(path->points);
+            Vec3f* points = Lib_SegmentedToVirtual(path->points);
             f32 diffX = points[0].x - this->picto.actor.world.pos.x;
             f32 diffZ = points[0].z - this->picto.actor.world.pos.z;
 
@@ -226,7 +226,7 @@ s32 EnGe2_SetupPath(EnGe2* this, PlayState* play) {
 void EnGe2_GetNextPath(EnGe2* this, PlayState* play) {
     Path* curPath;
     Path* nextPath;
-    Vec3s* points;
+    Vec3f* points;
     u8 nextPathIndex;
 
     this->curPointIndex = 0;
@@ -246,7 +246,7 @@ void EnGe2_GetNextPath(EnGe2* this, PlayState* play) {
 
 void EnGe2_SetupBlownAwayPath(EnGe2* this, PlayState* play) {
     s32 pad;
-    Vec3s* points;
+    Vec3f* points;
     Vec3f nextPoint;
 
     this->curPointIndex = 0;
@@ -255,10 +255,10 @@ void EnGe2_SetupBlownAwayPath(EnGe2* this, PlayState* play) {
         this->path = &play->setupPathList[GERUDO_PURPLE_GET_PATH_INDEX(&this->picto.actor)];
         if (this->path != NULL) {
             points = Lib_SegmentedToVirtual(this->path->points);
-            Math_Vec3s_ToVec3f(&this->picto.actor.world.pos, points);
+            Math_Vec3f_Copy(&this->picto.actor.world.pos, points);
             this->curPointIndex++;
             points++;
-            Math_Vec3s_ToVec3f(&nextPoint, points);
+            Math_Vec3f_Copy(&nextPoint, points);
 
             this->picto.actor.world.rot.y = Math_Vec3f_Yaw(&this->picto.actor.world.pos, &nextPoint);
             this->picto.actor.world.rot.x = Math_Vec3f_Pitch(&this->picto.actor.world.pos, &nextPoint);
@@ -271,7 +271,7 @@ void EnGe2_SetupBlownAwayPath(EnGe2* this, PlayState* play) {
 
 GerudoPurplePathStatus EnGe2_FollowPath(EnGe2* this) {
     Path* path = this->path;
-    Vec3s* curPoint;
+    Vec3f* curPoint;
     f32 diffX;
     f32 diffZ;
 
@@ -279,7 +279,7 @@ GerudoPurplePathStatus EnGe2_FollowPath(EnGe2* this) {
         return GERUDO_PURPLE_PATHSTATUS_AT_POINT;
     }
 
-    curPoint = (Vec3s*)Lib_SegmentedToVirtual(path->points);
+    curPoint = (Vec3f*)Lib_SegmentedToVirtual(path->points);
     curPoint += this->curPointIndex;
     diffX = curPoint->x - this->picto.actor.world.pos.x;
     diffZ = curPoint->z - this->picto.actor.world.pos.z;
@@ -309,7 +309,7 @@ GerudoPurplePathStatus EnGe2_FollowPath(EnGe2* this) {
  */
 s32 EnGe2_FollowPathWithoutGravity(EnGe2* this) {
     s32 pad;
-    Vec3s* curPoint;
+    Vec3f* curPoint;
     Path* path = this->path;
     Vec3f point;
     s16 yawTarget;
@@ -322,7 +322,7 @@ s32 EnGe2_FollowPathWithoutGravity(EnGe2* this) {
     curPoint = Lib_SegmentedToVirtual(path->points);
     curPoint += this->curPointIndex;
 
-    Math_Vec3s_ToVec3f(&point, curPoint);
+    Math_Vec3f_Copy(&point, curPoint);
     yawTarget = Math_Vec3f_Yaw(&this->picto.actor.world.pos, &point);
     pitchTarget = Math_Vec3f_Pitch(&this->picto.actor.world.pos, &point);
     Math_SmoothStepToS(&this->picto.actor.world.rot.y, yawTarget, 0xA, 0x3E8, 0x64);

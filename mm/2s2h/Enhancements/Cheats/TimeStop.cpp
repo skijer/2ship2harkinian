@@ -11,7 +11,7 @@ extern "C" {
 #define CVAR CVarGetInteger(CVAR_NAME, TIME_STOP_OFF)
 
 void RegisterTimeStopInTemples() {
-    COND_HOOK(AfterRoomSceneCommands, CVAR != TIME_STOP_OFF, [](s16 sceneId, s8 roomNum) {
+    COND_HOOK(AfterRoomSceneCommands, CVAR != TIME_STOP_OFF, [](s16 sceneId, s16 roomNum) {
         uint8_t selectedOption = CVarGetInteger("gCheats.TempleTimeStop", TIME_STOP_OFF);
 
         switch (selectedOption) {

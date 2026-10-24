@@ -20,6 +20,11 @@ f32 sNESFontWidths[160] = {
 };
 
 void Message_FindMessageNES(PlayState* play, u16 textId) {
+    MessageTableEntry* found = OTRMessage_Find(play->msgCtx.messageTableNES, textId);
+    if (found != NULL) {
+        play->msgCtx.font.messageStart = (uintptr_t)found;
+        return;
+    }
     MessageContext* msgCtx = &play->msgCtx;
     Font* font = &msgCtx->font;
     MessageTableEntry* msgEntry = msgCtx->messageTableNES;
@@ -434,7 +439,7 @@ void Message_DrawTextNES(PlayState* play, Gfx** gfxP, u16 textDrawPos) {
     u16 i;
     u16 j;
     Font* font = &msgCtx->font;
-    u16 charTexIndex;
+    u32 charTexIndex;
     u16 stateTimerHi;
     Gfx* gfx = *gfxP;
     u16 character;
@@ -1066,8 +1071,15 @@ void Message_DecodeNES(PlayState* play) {
     Message_DecodeHeader(play);
 
     while (true) {
-        curChar = font->msgBuf.schar[msgCtx->msgBufPos];
-        msgCtx->decodedBuffer.schar[decodedBufPos] = font->msgBuf.schar[msgCtx->msgBufPos];
+        curChar = msgCtx->msgBufPos < msgCtx->msgLength ? font->msgBuf.schar[msgCtx->msgBufPos] : MESSAGE_END;
+        msgCtx->decodedBuffer.schar[decodedBufPos] = curChar;
+        if (decodedBufPos >= MESSAGE_DECODED_BUF_SIZE - 64 ||
+            (curChar == MESSAGE_NEWLINE && spC6 >= ARRAY_COUNT(msgCtx->unk11F1A) - 1) ||
+            charTexIndex >= FONT_CHAR_TEX_SIZE * (MESSAGE_DECODED_BUF_SIZE - 64) ||
+            msgCtx->msgBufPos + 8 >= MESSAGE_BUF_SIZE) {
+            curChar = MESSAGE_END;
+            msgCtx->decodedBuffer.schar[decodedBufPos] = MESSAGE_END;
+        }
 
         if ((curChar == MESSAGE_BOX_BREAK) || (curChar == MESSAGE_BOX_BREAK2) ||
             (curChar == MESSAGE_BOX_BREAK_DELAYED) || (curChar == MESSAGE_FADE) ||

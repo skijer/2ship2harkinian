@@ -44,7 +44,7 @@ typedef struct EnRiverSound {
     /* 0x144 */ u8 playSound; // Unused remnant of OoT
     /* 0x145 */ u8 soundFreqIndex;
     /* 0x146 */ u8 numPoints;
-    /* 0x148 */ Vec3s* pathPoints;
+    /* 0x148 */ Vec3f* pathPoints;
 } EnRiverSound; // size = 0x14C
 
 #endif // Z_EN_RIVER_SOUND_H

@@ -1,0 +1,30 @@
+{
+  "missing_mm_services": [],
+  "mm_only_services": [
+    "ExtractRom",
+    "ExtractRomToModsFolder",
+    "GetHostGame",
+    "GetModApiMajor",
+    "HasModArchiveFile",
+    "HasVanillaBehavior",
+    "IsCustomItemFormAllowed",
+    "RegisterVBByName",
+    "SetCustomItemIconPath"
+  ],
+  "unbound_ship_services": [],
+  "unbound_mm_services": [],
+  "ship_service_count": 159,
+  "mm_service_count": 168,
+  "status": "table_coverage_complete_functional_parity_incomplete",
+  "anchor_upstream_commit": "3820c56b44e8b94e99deb3a3648a8e2286d26348",
+  "native_build_run": true,
+  "native_syntax_checks_run": true,
+  "in_game_validation_run": false,
+  "combo_module_runtime_implemented": false,
+  "native_link_passed": true,
+  "build_configuration": "Release x64",
+  "build_date": "2026-10-23",
+  "mod_content_audited": true,
+  "mod_content_parity_complete": false,
+  "store_publication_configured": false
+}

@@ -46,6 +46,7 @@ u8 sMotionBlurStatus;
 #include "2s2h/Enhancements/Graphics/Graphics.h"
 #include "2s2h/DeveloperTools/CollisionViewer.h"
 #include "2s2h/framebuffer_effects.h"
+#include "2s2h/Unbound/SceneDB.h"
 #include <string.h>
 
 s32 gDbgCamEnabled = false;
@@ -401,9 +402,48 @@ void Play_ClearTransition(PlayState* this) {
     this->transitionCtx.transitionType = -1;
 }
 
-Gfx* Play_SetFog(PlayState* this, Gfx* gfx) {
-    s32 fogFar = this->lightCtx.zFar * (5.0f / 64.0f);
+// 2S2H [Unbound] N64 fog coordinate of an eye distance under the projection: u = 1000 * f / (f - n) * (1 - n / d)
+static f32 Play_GetFogCoordinate(f32 distance, f32 zNear, f32 zFar) {
+    return 1000.0f * (zFar / (zFar - zNear)) * (1.0f - zNear / CLAMP_MIN(distance, zNear));
+}
 
+static f32 Play_GetZNear(PlayState* this) {
+    if (this->lightCtx.hasWorldFog && (this->lightCtx.worldFog.nearPlane > 0.0f)) {
+        return this->lightCtx.worldFog.nearPlane;
+    }
+    return this->view.zNear;
+}
+
+static f32 Play_GetZFar(PlayState* this) {
+    if (this->lightCtx.hasWorldFog) {
+        return this->lightCtx.worldFog.drawDistance;
+    }
+    return CLAMP_MAX(this->lightCtx.zFar, 12800.0f);
+}
+
+// The interpreter computes fog = ndcZ * mul + offset with u = 500 * (ndcZ + 1): gSPFogPosition's formula in float
+static Gfx* Play_SetWorldFog(PlayState* this, Gfx* gfx) {
+    f32* factor = GRAPH_ALLOC(this->state.gfxCtx, 2 * sizeof(f32));
+    f32 zNear = Play_GetZNear(this);
+    f32 zFar = Play_GetZFar(this);
+    f32 fogStartU = Play_GetFogCoordinate(this->lightCtx.worldFog.fogStart, zNear, zFar);
+    f32 fogRangeU = CLAMP_MIN(Play_GetFogCoordinate(this->lightCtx.worldFog.fogEnd, zNear, zFar) - fogStartU, 0.0001f);
+
+    factor[0] = 128000.0f / fogRangeU;
+    factor[1] = (500.0f - fogStartU) * 256.0f / fogRangeU;
+    gDPPipeSync(gfx++);
+    gDPSetFogColor(gfx++, this->lightCtx.fogColor[0], this->lightCtx.fogColor[1], this->lightCtx.fogColor[2], 0);
+    gSPFogFactorF(gfx++, factor);
+    return gfx;
+}
+
+Gfx* Play_SetFog(PlayState* this, Gfx* gfx) {
+    s32 fogFar;
+
+    if (this->lightCtx.hasWorldFog) {
+        return Play_SetWorldFog(this, gfx);
+    }
+    fogFar = this->lightCtx.zFar * (5.0f / 64.0f);
     return Gfx_SetFogWithSync(gfx, this->lightCtx.fogColor[0], this->lightCtx.fogColor[1], this->lightCtx.fogColor[2],
                               0, this->lightCtx.fogNear, ((fogFar <= 1000) ? 1000 : fogFar));
 }
@@ -476,6 +516,7 @@ void Play_Destroy(GameState* thisx) {
     ZeldaArena_Cleanup();
 
     GameInteractor_ExecuteOnPlayDestroy();
+    BgCheck_Destroy(&this->colCtx);
 
     // #region 2S2H [General] Making gPlayState available
     gPlayState = NULL;
@@ -1245,15 +1286,14 @@ void Play_DrawMain(PlayState* this) {
     if (1) {
         ShrinkWindow_Draw(gfxCtx);
 
+        GameInteractor_ExecuteOnPlayDrawBegin();
+
         POLY_OPA_DISP = Play_SetFog(this, POLY_OPA_DISP);
         POLY_XLU_DISP = Play_SetFog(this, POLY_XLU_DISP);
 
-        zFar = this->lightCtx.zFar;
-        if (zFar > 12800.0f) {
-            zFar = 12800.0f;
-        }
+        zFar = Play_GetZFar(this);
 
-        View_SetPerspective(&this->view, this->view.fovy, this->view.zNear, zFar);
+        View_SetPerspective(&this->view, this->view.fovy, Play_GetZNear(this), zFar);
 
         View_Apply(&this->view, 0xF);
 
@@ -1540,6 +1580,7 @@ void Play_DrawMain(PlayState* this) {
             // Draw Enhancements that need to be placed in the world. This happens before the PostWorldDraw
             // so that they aren't drawn when the pause menu is up (e.g. collision viewer, actor name tags)
             GameInteractor_ExecuteOnPlayDrawWorldEnd();
+            GameInteractor_ExecuteOnPlayDrawEnd();
 
         PostWorldDraw:
             if (1) {
@@ -2017,20 +2058,20 @@ s16 Play_GetOriginalSceneId(s16 sceneId) {
 void Play_SaveCycleSceneFlags(PlayState* this) {
     CycleSceneFlags* cycleSceneFlags;
 
-    cycleSceneFlags = &gSaveContext.cycleSceneFlags[Play_GetOriginalSceneId(this->sceneId)];
+    cycleSceneFlags = SceneFlags_GetCycle(Play_GetOriginalSceneId(this->sceneId));
     cycleSceneFlags->chest = this->actorCtx.sceneFlags.chest;
     cycleSceneFlags->switch0 = this->actorCtx.sceneFlags.switches[0];
     cycleSceneFlags->switch1 = this->actorCtx.sceneFlags.switches[1];
 
     if (this->sceneId == SCENE_INISIE_R) { // Inverted Stone Tower Temple
-        cycleSceneFlags = &gSaveContext.cycleSceneFlags[this->sceneId];
+        cycleSceneFlags = SceneFlags_GetCycle(this->sceneId);
     }
 
     cycleSceneFlags->collectible = this->actorCtx.sceneFlags.collectible[0];
     cycleSceneFlags->clearedRoom = this->actorCtx.sceneFlags.clearedRoom;
 }
 
-void Play_SetRespawnData(PlayState* this, s32 respawnMode, u16 entrance, s32 roomIndex, s32 playerParams, Vec3f* pos,
+void Play_SetRespawnData(PlayState* this, s32 respawnMode, u32 entrance, s32 roomIndex, s32 playerParams, Vec3f* pos,
                          s16 yaw) {
 
     gSaveContext.respawn[respawnMode].entrance = Entrance_Create(entrance >> 9, 0, entrance & 0xF);
@@ -2108,13 +2149,13 @@ s32 FrameAdvance_IsEnabled(PlayState* this) {
  */
 s32 func_8016A02C(PlayState* this, Actor* actor, s16* yaw) {
     TransitionActorEntry* transitionActor;
-    s8 frontRoom;
+    s16 frontRoom;
 
     if (actor->category != ACTORCAT_DOOR) {
         return false;
     }
 
-    transitionActor = &this->transitionActors.list[(u16)actor->params >> 10];
+    transitionActor = &this->transitionActors.list[TRANSITION_ACTOR_INDEX(actor)];
     frontRoom = transitionActor->sides[0].room;
     if (frontRoom == transitionActor->sides[1].room) {
         return false;
@@ -2225,6 +2266,8 @@ void Play_Init(GameState* thisx) {
     s32 scene;
     u8 sceneLayer;
     s32 pad2;
+
+    memset(&this->colCtx, 0, sizeof(this->colCtx));
 
     if ((gSaveContext.respawnFlag == -4) || (gSaveContext.respawnFlag == -0x63)) {
         if (CHECK_EVENTINF(EVENTINF_TRIGGER_DAYTELOP)) {

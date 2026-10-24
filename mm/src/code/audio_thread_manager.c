@@ -1,3 +1,5 @@
+#include "2s2h/Unbound/UnboundAudio.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "global.h"
 #include "audiomgr.h"
 #include <string.h>
@@ -128,6 +130,8 @@ void AudioMgr_Init(AudioMgr* audioMgr, void* stack, OSPri pri, OSId id, SchedCon
     AudioSeq_SetPortVolumeScale(SEQ_PLAYER_SFX, CVarGetFloat("gSettings.Audio.SoundEffectsVolume", 1.0f));
     AudioSeq_SetPortVolumeScale(SEQ_PLAYER_FANFARE, CVarGetFloat("gSettings.Audio.FanfareVolume", 1.0f));
     AudioSeq_SetPortVolumeScale(SEQ_PLAYER_AMBIENCE, CVarGetFloat("gSettings.Audio.AmbienceVolume", 1.0f));
+    ModApi_InitializeRuntime();
+    GameInteractor_ExecuteOnAudioTablesReady();
 
     // osCreateThread(&audioMgr->thread, id, AudioMgr_ThreadEntry, audioMgr, stack, pri);
     // osStartThread(&audioMgr->thread);

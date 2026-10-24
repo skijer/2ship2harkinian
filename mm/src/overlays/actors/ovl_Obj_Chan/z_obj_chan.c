@@ -258,7 +258,7 @@ void ObjChan_ChandelierAction(ObjChan* this, PlayState* play) {
             Math_Vec3f_Copy(&pot->actor.world.pos, &sp60);
             Math_Vec3s_Copy(&pot->actor.shape.rot, &thisx->shape.rot);
             pot->actor.shape.rot.y = this->rotation;
-            Math_Vec3f_ToVec3s(&pot->collider.dim.pos, &pot->actor.world.pos);
+            Math_Vec3f_Copy(&pot->collider.dim.pos, &pot->actor.world.pos);
         }
     }
     if ((this->collider.base.acFlags & AC_HIT) && (this->collider.elem.acHitElem->atDmgInfo.dmgFlags & 0x800)) {

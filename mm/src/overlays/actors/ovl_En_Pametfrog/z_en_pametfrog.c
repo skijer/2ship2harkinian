@@ -1411,7 +1411,7 @@ static s8 sLimbToBodyParts[GEKKO_LIMB_MAX] = {
 void EnPametfrog_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, Actor* thisx) {
     EnPametfrog* this = (EnPametfrog*)thisx;
     Vec3f vec;
-    Vec3s* center;
+    Vec3f* center;
     s8 bodyPartIndex;
 
     if (limbIndex == GEKKO_LIMB_HEAD) {

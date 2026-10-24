@@ -1,3 +1,4 @@
+#include "2s2h/Network/Anchor/Anchor.h"
 #include "BenGui.hpp"
 
 #include <spdlog/spdlog.h>
@@ -38,6 +39,7 @@
 #include "DeveloperTools/MessageViewer.h"
 
 namespace BenGui {
+std::shared_ptr<AnchorRoomWindow> mAnchorRoomWindow;
 // MARK: - Delegates
 
 std::shared_ptr<BenMenuBar> mBenMenuBar;
@@ -182,6 +184,8 @@ void SetupGuiElements() {
     mInputViewerSettings = std::make_shared<InputViewerSettingsWindow>("gWindows.InputViewerSettings",
                                                                        "Input Viewer Settings", ImVec2(500, 525));
     gui->AddGuiWindow(mInputViewerSettings);
+    mAnchorRoomWindow = std::make_shared<AnchorRoomWindow>("gWindows.AnchorRoom", "Anchor Room");
+    gui->AddGuiWindow(mAnchorRoomWindow);
 }
 
 void Destroy() {
@@ -213,6 +217,7 @@ void Destroy() {
     mItemTrackerWindow = nullptr;
     mItemTrackerSettingsWindow = nullptr;
     mInputViewer = nullptr;
+    mAnchorRoomWindow = nullptr;
     mInputViewerSettings = nullptr;
 }
 

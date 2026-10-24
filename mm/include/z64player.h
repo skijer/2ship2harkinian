@@ -190,7 +190,8 @@ typedef enum PlayerItemAction {
     /* 0x51 */ PLAYER_IA_MASK_DEKU,
     /* 0x51 */ PLAYER_IA_MASK_MAX = PLAYER_IA_MASK_DEKU,
     /* 0x52 */ PLAYER_IA_LENS_OF_TRUTH,
-    /* 0x53 */ PLAYER_IA_MAX
+    /* 0x53 */ PLAYER_IA_CUSTOM, // Every registered mod item shares this action
+    /* 0x54 */ PLAYER_IA_MAX
 } PlayerItemAction;
 
 // Relies on B swords related item actions to be contiguous
@@ -1120,6 +1121,7 @@ typedef enum PlayerUnkAA5 {
 
 typedef void (*PlayerActionFunc)(struct Player* this, struct PlayState* play);
 typedef s32 (*PlayerUpperActionFunc)(struct Player* this, struct PlayState* play);
+typedef void (*PlayerItemActionInitFunc)(struct PlayState* play, struct Player* this);
 typedef void (*AfterPutAwayFunc)(struct PlayState* play, struct Player* this);
 
 #define UNKAA6_ROT_FOCUS_X (1 << 0)

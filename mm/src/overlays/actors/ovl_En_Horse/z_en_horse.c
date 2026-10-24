@@ -313,7 +313,7 @@ void EnHorse_RotateToPoint(EnHorse* this, PlayState* play, Vec3f* pos, s16 turnY
 
 void func_8087B7C0(EnHorse* this, PlayState* play, Path* path) {
     s32 spA4;
-    Vec3s* pathPoints;
+    Vec3f* pathPoints;
     f32 phi_f12;
     f32 phi_f14;
     Vec3f sp8C;
@@ -331,7 +331,7 @@ void func_8087B7C0(EnHorse* this, PlayState* play, Path* path) {
 
     spA4 = path->count;
     pathPoints = Lib_SegmentedToVirtual(path->points);
-    Math_Vec3s_ToVec3f(&sp8C, &pathPoints[this->curRaceWaypoint]);
+    Math_Vec3f_Copy(&sp8C, &pathPoints[this->curRaceWaypoint]);
 
     if (this->curRaceWaypoint == 0) {
         phi_f12 = pathPoints[1].x - pathPoints[0].x;
@@ -351,13 +351,13 @@ void func_8087B7C0(EnHorse* this, PlayState* play, Path* path) {
         if (this->curRaceWaypoint >= spA4) {
             this->curRaceWaypoint = spA4 - 1;
         }
-        Math_Vec3s_ToVec3f(&sp8C, &pathPoints[this->curRaceWaypoint]);
+        Math_Vec3f_Copy(&sp8C, &pathPoints[this->curRaceWaypoint]);
     }
 
     if (this->curRaceWaypoint == 0) {
-        Math_Vec3s_ToVec3f(&sp80, &pathPoints[1]);
+        Math_Vec3f_Copy(&sp80, &pathPoints[1]);
     } else {
-        Math_Vec3s_ToVec3f(&sp80, &pathPoints[this->curRaceWaypoint - 1]);
+        Math_Vec3f_Copy(&sp80, &pathPoints[this->curRaceWaypoint - 1]);
     }
 
     Math3D_PointDistSqToLine2D(this->actor.world.pos.x, this->actor.world.pos.z, sp80.x, sp80.z, sp8C.x, sp8C.z, &sp70);
@@ -402,7 +402,7 @@ void func_8087B7C0(EnHorse* this, PlayState* play, Path* path) {
     }
 
     for (i = sp68; i < sp60; i++) {
-        Math_Vec3s_ToVec3f(&sp50, &pathPoints[i]);
+        Math_Vec3f_Copy(&sp50, &pathPoints[i]);
         temp_f0 = Math3D_Vec3f_DistXYZ(&this->actor.world.pos, &sp50);
         if (temp_f0 < sp64) {
             sp64 = temp_f0;
@@ -615,7 +615,7 @@ s32 EnHorse_Spawn(EnHorse* this, PlayState* play) {
     Vec3f spawnPos;
     s32 pathIndex = Horse_GetJumpingFencePathIndex(play);
     s32 pathCount;
-    Vec3s* pathPoints;
+    Vec3f* pathPoints;
 
     if (pathIndex == PATH_INDEX_NONE) {
         return false;

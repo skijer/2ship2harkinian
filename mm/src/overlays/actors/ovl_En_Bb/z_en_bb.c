@@ -575,7 +575,7 @@ void EnBb_Update(Actor* thisx, PlayState* play) {
         this->collider.dim.worldSphere.radius = this->flameScaleX * 30.0f;
         this->collider.dim.worldSphere.radius = CLAMP_MIN(this->collider.dim.worldSphere.radius, 20);
 
-        Math_Vec3s_ToVec3f(&this->actor.focus.pos, &this->collider.dim.worldSphere.center);
+        Math_Vec3f_Copy(&this->actor.focus.pos, &this->collider.dim.worldSphere.center);
 
         if (this->collider.base.atFlags & AT_ON) {
             this->actor.flags |= ACTOR_FLAG_SFX_FOR_PLAYER_BODY_HIT;

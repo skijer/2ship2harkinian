@@ -1307,7 +1307,7 @@ void EnSob1_UpdateStickDirectionPromptAnim(EnSob1* this) {
 }
 
 s16 EnSob1_GetDistSqAndOrient(Path* path, s32 pointIndex, Vec3f* pos, f32* distSq) {
-    Vec3s* points;
+    Vec3f* points;
     f32 diffX;
     f32 diffZ;
 

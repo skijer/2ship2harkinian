@@ -2557,7 +2557,7 @@ static ExplosionLimbHideInfo sExplosionLimbHideInfo[] = {
  */
 void BossHakugin_DeathCutsceneCrushedByRocks(BossHakugin* this, PlayState* play) {
     EnBom* bomb;
-    Vec3s* pos;
+    Vec3f* pos;
     Camera* subCam = Play_GetCamera(play, this->subCamId);
     Vec3f eyeTarget;
     s16 eyeTargetAngle;
@@ -3184,8 +3184,8 @@ void BossHakugin_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s
     if (bodyPartIndex > BODYPART_NONE) {
         for (i = 0; i < GOHT_COLLIDER_BODYPART_MAX; i++) {
             if (this->bodyCollider.elements[i].dim.limb == limbIndex) {
-                Math_Vec3s_ToVec3f(&this->bodyPartsPos[bodyPartIndex],
-                                   &this->bodyCollider.elements[i].dim.worldSphere.center);
+                Math_Vec3f_Copy(&this->bodyPartsPos[bodyPartIndex],
+                                &this->bodyCollider.elements[i].dim.worldSphere.center);
                 break;
             }
         }

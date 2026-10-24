@@ -285,11 +285,11 @@ void EnInvadepohDemo_Alien_Idle(EnInvadepohDemo* this, PlayState* play) {
 void EnInvadepohDemo_Alien_FollowPath(EnInvadepohDemo* this, PlayState* play) {
     Path* path = &play->setupPathList[this->pathIndex];
     s32 pathCount = path->count;
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     Vec3f point;
 
     if (pathCount != 0) {
-        Math_Vec3s_ToVec3f(&point, &points[this->pointIndex]);
+        Math_Vec3f_Copy(&point, &points[this->pointIndex]);
         if (Math_Vec3f_StepTo(&this->actor.world.pos, &point, this->speed) < this->speed) {
             this->pointIndex++;
             if (this->pointIndex >= pathCount) {
@@ -308,11 +308,11 @@ void EnInvadepohDemo_Romani_Idle(EnInvadepohDemo* this, PlayState* play) {
 void EnInvadepohDemo_Romani_FollowPath(EnInvadepohDemo* this, PlayState* play) {
     Path* path = &play->setupPathList[this->pathIndex];
     s32 pathCount = path->count;
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     Vec3f point;
 
     if (pathCount != 0) {
-        Math_Vec3s_ToVec3f(&point, &points[this->pointIndex]);
+        Math_Vec3f_Copy(&point, &points[this->pointIndex]);
         if (Math_Vec3f_StepTo(&this->actor.world.pos, &point, this->speed) < this->speed) {
             this->pointIndex++;
             if (this->pointIndex >= pathCount) {
@@ -355,7 +355,7 @@ void EnInvadepohDemo_Cow_Idle(EnInvadepohDemo* this, PlayState* play) {
 void EnInvadepohDemo_Cow_FollowPath(EnInvadepohDemo* this, PlayState* play) {
     Path* path = &play->setupPathList[this->pathIndex];
     s32 pathCount = path->count;
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     Vec3f point;
 
     if (pathCount != 0) {
@@ -365,7 +365,7 @@ void EnInvadepohDemo_Cow_FollowPath(EnInvadepohDemo* this, PlayState* play) {
             Actor_PlaySfx(&this->actor, NA_SE_EV_COW_CRY);
         }
 
-        Math_Vec3s_ToVec3f(&point, &points[this->pointIndex]);
+        Math_Vec3f_Copy(&point, &points[this->pointIndex]);
         if (Math_Vec3f_StepTo(&this->actor.world.pos, &point, this->speed) < this->speed) {
             this->pointIndex++;
             if (this->pointIndex >= pathCount) {
@@ -385,12 +385,12 @@ void EnInvadepohDemo_Ufo_Idle(EnInvadepohDemo* this, PlayState* play) {
 void EnInvadepohDemo_Ufo_FollowPath(EnInvadepohDemo* this, PlayState* play) {
     Path* path = &play->setupPathList[this->pathIndex];
     s32 pathCount = path->count;
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     Vec3f point;
 
     if (pathCount != 0) {
         this->ufoRotZ += 0x258;
-        Math_Vec3s_ToVec3f(&point, &points[this->pointIndex]);
+        Math_Vec3f_Copy(&point, &points[this->pointIndex]);
         if (Math_Vec3f_StepTo(&this->actor.world.pos, &point, this->speed) < this->speed) {
             this->pointIndex++;
             if (this->pointIndex >= pathCount) {

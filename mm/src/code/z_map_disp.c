@@ -197,7 +197,7 @@ void func_80102ED0(u32 flag) {
 
 s32 MapDisp_CurRoomHasMapI(PlayState* play) {
     MapDataRoom* mapDataRoom;
-    s8 curRoom;
+    s16 curRoom;
 
     if (Map_IsInBossScene(play) == true) {
         return true;
@@ -731,7 +731,7 @@ void MapDisp_Init(PlayState* play) {
     sMapDisp.swapAnimTimer = 0;
 
     if (!Map_IsInBossScene(play)) {
-        sSceneNumRooms = play->roomList.count;
+        sSceneNumRooms = MIN(play->roomList.count, ROOM_MAX);
     }
     sMapDisp.texBuff0 = THA_AllocTailAlign16(&play->state.tha, 0x4000);
     sMapDisp.texBuff1 = THA_AllocTailAlign16(&play->state.tha, 0x4000);
@@ -905,12 +905,17 @@ void MapDisp_InitBossRoomStorey(PlayState* play) {
  * @param segmentAddress
  */
 void MapDisp_InitMapData(PlayState* play, void* segmentAddress) {
+    if (play->roomList.count > ROOM_MAX) {
+        sMapDisp.mapDataScene = NULL;
+        sSceneNumRooms = 0;
+        return;
+    }
     MapDataScene* mapDataScene;
     MapDataRoom* mapDataRooms;
     s32 i;
 
     if (!Map_IsInBossScene(play)) {
-        sSceneNumRooms = play->roomList.count;
+        sSceneNumRooms = MIN(play->roomList.count, ROOM_MAX);
         mapDataScene = Lib_SegmentedToVirtual(segmentAddress);
         sMapDataScene = *mapDataScene;
         mapDataRooms = Lib_SegmentedToVirtual(mapDataScene->rooms);
@@ -1570,15 +1575,15 @@ void MapDisp_DrawRooms(PlayState* play, s32 viewX, s32 viewY, s32 viewWidth, s32
     // 2S2H [Port] The palettes are stored pre-split into big-endian byte pairs (see SPLIT) because
     // Fast3D reads TLUT entries as big-endian u16 regardless of host endianness.
     // clang-format off
-    static u8 sUnvisitedRoomPal[0x10 * 2] = {
+    static s16 sUnvisitedRoomPal[0x10 * 2] = {
         SPLIT(0x0000), SPLIT(0x0000), SPLIT(0xFFC1), SPLIT(0x07C1), SPLIT(0x07FF), SPLIT(0x003F), SPLIT(0xFB3F), SPLIT(0xF305),
         SPLIT(0x0453), SPLIT(0x0577), SPLIT(0x0095), SPLIT(0x82E5), SPLIT(0xFD27), SPLIT(0x7A49), SPLIT(0x94A5), SPLIT(0x0001),
     }; // palette 0
-    static u8 sVisitedRoomPal[0x10 * 2] = {
+    static s16 sVisitedRoomPal[0x10 * 2] = {
         SPLIT(0x0000), SPLIT(0x027F), SPLIT(0xFFC1), SPLIT(0x07C1), SPLIT(0x07FF), SPLIT(0x003F), SPLIT(0xFB3F), SPLIT(0xF305),
         SPLIT(0x0453), SPLIT(0x0577), SPLIT(0x0095), SPLIT(0x82E5), SPLIT(0xFD27), SPLIT(0x7A49), SPLIT(0x94A5), SPLIT(0x0001),
     }; // palette 1
-    static u8 sCurrentRoomPal[0x10 * 2] = {
+    static s16 sCurrentRoomPal[0x10 * 2] = {
         SPLIT(0x0000), SPLIT(0x0623), SPLIT(0xFFC1), SPLIT(0x07C1), SPLIT(0x07FF), SPLIT(0x003F), SPLIT(0xFB3F), SPLIT(0xF305),
         SPLIT(0x0453), SPLIT(0x0577), SPLIT(0x0095), SPLIT(0x82E5), SPLIT(0xFD27), SPLIT(0x7A49), SPLIT(0x94A5), SPLIT(0x0001),
     }; // palette 2
@@ -1828,8 +1833,8 @@ void MapDisp_DrawRoomExits(PlayState* play, s32 viewX, s32 viewY, s32 viewWidth,
     s32 texPosX;
     s32 texPosY;
     s32 i;
-    s8 roomA;
-    s8 roomB;
+    s16 roomA;
+    s16 roomB;
 
     if (transitionActors->count != 0) {
         OPEN_DISPS(play->state.gfxCtx);

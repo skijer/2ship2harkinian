@@ -44,9 +44,9 @@ static InitChainEntry sInitChain[] = {
  */
 s16 ObjBoat_GetNextPoint(ObjBoat* this, Vec3f* nextPoint) {
     s16 yaw;
-    Vec3s* curPoint = &this->pathPoints[(s32)this->curPointIndex];
+    Vec3f* curPoint = &this->pathPoints[(s32)this->curPointIndex];
 
-    Math_Vec3s_ToVec3f(nextPoint, &curPoint[this->direction]);
+    Math_Vec3f_Copy(nextPoint, &curPoint[this->direction]);
     yaw = Math_Vec3f_Yaw(&this->dyna.actor.world.pos, nextPoint);
 
     return ((this->direction > 0) ? yaw : yaw + 0x8000);
@@ -164,7 +164,7 @@ void ObjBoat_UpdateCutscene(Actor* thisx, PlayState* play2) {
                 // 2S2H [Port] Opting to fix this to keep it in bounds
                 this->maxPointIndex = path->count - 1;
                 this->pathPoints = Lib_SegmentedToVirtual(path->points);
-                Math_Vec3s_ToVec3f(&this->dyna.actor.world.pos, this->pathPoints);
+                Math_Vec3f_Copy(&this->dyna.actor.world.pos, this->pathPoints);
                 this->dyna.actor.speed = cue->rot.z * (45.0f / 0x2000);
                 this->pathPoints++;
                 this->curPointIndex = 1;
@@ -176,7 +176,7 @@ void ObjBoat_UpdateCutscene(Actor* thisx, PlayState* play2) {
                 Vec3f posTarget;
                 f32 distRemaining;
 
-                Math_Vec3s_ToVec3f(&posTarget, this->pathPoints);
+                Math_Vec3f_Copy(&posTarget, this->pathPoints);
                 distRemaining = Math_Vec3f_StepTo(&this->dyna.actor.world.pos, &posTarget, this->dyna.actor.speed);
                 if ((this->curPointIndex < this->maxPointIndex) && (distRemaining < this->dyna.actor.speed)) {
                     this->pathPoints++;

@@ -217,7 +217,7 @@ void func_80937268(ObjBean* this, PlayState* play) {
 }
 
 void func_809372A8(ObjBean* this) {
-    Math_Vec3s_ToVec3f(&this->unk_1BC, this->pathPoints);
+    Math_Vec3f_Copy(&this->unk_1BC, this->pathPoints);
 }
 
 void func_809372D0(ObjBean* this) {
@@ -227,7 +227,7 @@ void func_809372D0(ObjBean* this) {
     f32 temp_f2;
     f32 temp_f12;
 
-    Math_Vec3s_ToVec3f(&sp38, &this->pathPoints[this->unk_1DC]);
+    Math_Vec3f_Copy(&sp38, &this->pathPoints[this->unk_1DC]);
     Math_Vec3f_Diff(&sp38, &this->unk_1BC, &actor->velocity);
 
     sp34 = Math3D_Vec3fMagnitude(&actor->velocity);

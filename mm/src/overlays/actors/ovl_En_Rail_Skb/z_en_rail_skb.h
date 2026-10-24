@@ -38,7 +38,7 @@ typedef struct EnRailSkb {
     /* 0x1E4 */ SkelAnime skelAnime;
     /* 0x228 */ EnRailSkbActionFunc actionFunc;
     /* 0x22C */ ObjHakaisi* unk_22C;
-    /* 0x230 */ Vec3s* pathPoints;
+    /* 0x230 */ Vec3f* pathPoints;
     /* 0x234 */ Vec3f bodyPartsPos[ENRAILSKB_BODYPART_MAX];
     /* 0x2DC */ s32 bodyPartsCount;
     /* 0x2E0 */ s32 unk_2E0;

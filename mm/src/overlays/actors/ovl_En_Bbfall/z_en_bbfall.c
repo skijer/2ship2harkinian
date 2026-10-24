@@ -614,7 +614,7 @@ void EnBbfall_Update(Actor* thisx, PlayState* play) {
         this->collider.elements[0].dim.worldSphere.radius =
             CLAMP_MIN(this->collider.elements[0].dim.worldSphere.radius, 20);
 
-        Math_Vec3s_ToVec3f(&this->actor.focus.pos, &this->collider.elements[0].dim.worldSphere.center);
+        Math_Vec3f_Copy(&this->actor.focus.pos, &this->collider.elements[0].dim.worldSphere.center);
 
         if (this->collider.base.atFlags & AT_ON) {
             this->actor.flags |= ACTOR_FLAG_SFX_FOR_PLAYER_BODY_HIT;

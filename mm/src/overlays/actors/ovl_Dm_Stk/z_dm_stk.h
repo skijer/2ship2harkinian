@@ -43,9 +43,9 @@ typedef struct DmStk {
     /* 0x330 */ s32 fadeOutTimer;
     /* 0x334 */ u8 cueId;
     /* 0x335 */ u8 hasBeenHit; // set but never used
-    /* 0x336 */ s8 objectStkObjectSlot;
-    /* 0x337 */ s8 objectStk2ObjectSlot;
-    /* 0x338 */ s8 objectStk3ObjectSlot;
+    /* 0x336 */ s16 objectStkObjectSlot;
+    /* 0x337 */ s16 objectStk2ObjectSlot;
+    /* 0x338 */ s16 objectStk3ObjectSlot;
     /* 0x339 */ u8 deflectCount;
     /* 0x33A */ u8 dekuPipesCutsceneState;
     /* 0x33B */ u8 shouldDraw;

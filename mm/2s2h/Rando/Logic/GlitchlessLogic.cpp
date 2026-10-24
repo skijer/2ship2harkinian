@@ -255,9 +255,9 @@ void ApplyGlitchlessLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std
     }
 
     for (auto& randoCheckId : checksInLogic) {
-        copiedSaveContext.save.shipSaveInfo.rando.randoSaveChecks[randoCheckId].randoItemId =
+        DungeonRegistry_SaveCheck(copiedSaveContext.save.shipSaveInfo.rando, randoCheckId).randoItemId =
             RANDO_SAVE_CHECKS[randoCheckId].randoItemId;
-        copiedSaveContext.save.shipSaveInfo.rando.randoSaveChecks[randoCheckId].shuffled =
+        DungeonRegistry_SaveCheck(copiedSaveContext.save.shipSaveInfo.rando, randoCheckId).shuffled =
             RANDO_SAVE_CHECKS[randoCheckId].shuffled;
     }
 

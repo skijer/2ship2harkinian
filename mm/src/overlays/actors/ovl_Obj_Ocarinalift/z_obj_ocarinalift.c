@@ -50,7 +50,7 @@ static InitChainEntry sInitChain[] = {
 };
 
 void func_80AC94C0(ObjOcarinalift* this, s32 arg1) {
-    Math_Vec3s_ToVec3f(&this->dyna.actor.world.pos, &this->pathPoints[arg1]);
+    Math_Vec3f_Copy(&this->dyna.actor.world.pos, &this->pathPoints[arg1]);
 }
 
 void ObjOcarinalift_Init(Actor* thisx, PlayState* play) {
@@ -110,10 +110,10 @@ void func_80AC96D0(ObjOcarinalift* this, PlayState* play) {
     f32 phi_fa0;
     s32 paramsC;
     s32 sp34;
-    Vec3s* temp_v1_2;
+    Vec3f* temp_v1_2;
 
     Actor_PlaySfx_Flagged(thisx, NA_SE_EV_PLATE_LIFT_LEVEL - SFX_FLAG);
-    Math_Vec3s_ToVec3f(&sp48, this->pathPoints + this->unk168 + this->unk16C);
+    Math_Vec3f_Copy(&sp48, this->pathPoints + this->unk168 + this->unk16C);
     Math_Vec3f_Diff(&sp48, &thisx->world.pos, &thisx->velocity);
     magnitude = Math3D_Vec3fMagnitude(&thisx->velocity);
 

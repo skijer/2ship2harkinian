@@ -1555,7 +1555,7 @@ void Math3D_TriNorm(TriNorm* tri, Vec3f* va, Vec3f* vb, Vec3f* vc) {
  * Determines if point `point` lies within `sphere`
  */
 s32 Math3D_PointInSph(Sphere16* sphere, Vec3f* point) {
-    if (Math3D_DistXYZ16toF(&sphere->center, point) < sphere->radius) {
+    if (Math3D_Vec3f_DistXYZ(&sphere->center, point) < sphere->radius) {
         return true;
     }
 
@@ -2266,12 +2266,12 @@ s32 Math3D_CylVsCylOverlapCenterDist(Cylinder16* ca, Cylinder16* cb, f32* overla
     static Cylinderf sCaf;
     static Cylinderf sCbf;
 
-    Math_Vec3s_ToVec3f(&sCaf.pos, &ca->pos);
+    Math_Vec3f_Copy(&sCaf.pos, &ca->pos);
     sCaf.radius = ca->radius;
     sCaf.yShift = ca->yShift;
     sCaf.height = ca->height;
 
-    Math_Vec3s_ToVec3f(&sCbf.pos, &cb->pos);
+    Math_Vec3f_Copy(&sCbf.pos, &cb->pos);
     sCbf.radius = cb->radius;
     sCbf.yShift = cb->yShift;
     sCbf.height = cb->height;

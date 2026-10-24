@@ -3,6 +3,7 @@
  * @brief Draw get-item models
  */
 #include "global.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "assets/objects/object_gi_arrow/object_gi_arrow.h"
 #include "assets/objects/object_gi_arrowcase/object_gi_arrowcase.h"
 #include "assets/objects/object_gi_bean/object_gi_bean.h"
@@ -380,7 +381,10 @@ static DrawItemTableEntry sDrawItemTable[] = {
  * Calls the corresponding draw function for the given draw ID
  */
 void GetItem_Draw(PlayState* play, s16 drawId) {
-    sDrawItemTable[drawId].drawFunc(play, drawId);
+    if (!GameInteractor_ExecuteOnGetItemDraw(play, &drawId)) {
+        sDrawItemTable[drawId].drawFunc(play, drawId);
+    }
+    GameInteractor_ExecuteOnGetItemDrawPost(play, drawId);
 }
 
 void GetItem_DrawBombchu(PlayState* play, s16 drawId) {
@@ -827,7 +831,7 @@ void GetItem_DrawWallet(PlayState* play, s16 drawId) {
 
 void GetItem_DrawRemains(PlayState* play, s16 drawId) {
     s32 pad;
-    s8 objectSlot;
+    s16 objectSlot;
 
     OPEN_DISPS(play->state.gfxCtx);
 

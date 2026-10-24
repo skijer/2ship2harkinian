@@ -30,6 +30,7 @@ extern ImVec4 Ship_GetRandoItemColorTint(uint32_t randoItemId);
 extern uint32_t Ship_Hash(std::string str);
 extern std::string GetActorDescription(u16 actorNum);
 extern std::string GetActorDebugName(u16 actorNum);
+void RegisterActorNames(u16 actorNum, const std::string& debugName, const std::string& description);
 extern std::string GetActorCategoryName(u8 category);
 
 extern "C" {

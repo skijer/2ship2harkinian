@@ -1,6 +1,7 @@
 #include "ShipUtils.h"
 #include "assets/2s2h_assets.h"
 #include <string>
+#include <deque>
 #include <bit>
 #include <random>
 #include <vector>
@@ -419,6 +420,12 @@ std::string GetActorDescription(u16 actorNum) {
 
 std::string GetActorDebugName(u16 actorNum) {
     return actorDebugNames.contains(actorNum) ? actorDebugNames[actorNum] : "???";
+}
+
+void RegisterActorNames(u16 actorNum, const std::string& debugName, const std::string& description) {
+    static std::deque<std::string> sRegisteredNames;
+    actorDebugNames[actorNum] = sRegisteredNames.emplace_back(debugName).c_str();
+    actorDescriptions[actorNum] = sRegisteredNames.emplace_back(description).c_str();
 }
 
 std::string GetActorCategoryName(u8 category) {

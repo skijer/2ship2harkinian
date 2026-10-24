@@ -68,7 +68,7 @@ typedef struct EnGoroiwa {
     /* 0x1CA */ s16 unk_1CA;
     /* 0x1CC */ s16 unk_1CC;
     /* 0x1CE */ s16 unk_1CE;
-    /* 0x1D0 */ Vec3s* pathPoints;
+    /* 0x1D0 */ Vec3f* pathPoints;
     /* 0x1D4 */ s16 unk_1D4;
     /* 0x1D6 */ s16 unk_1D6;
     /* 0x1D8 */ s16 unk_1D8;

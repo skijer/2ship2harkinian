@@ -317,7 +317,7 @@ void BgIngate_Init(Actor* thisx, PlayState* play2) {
     PlayState* play = play2;
     BgIngate* this = (BgIngate*)thisx;
     s32 phi_a2;
-    Vec3s* sp38;
+    Vec3f* sp38;
     Vec3f sp2C;
     Vec3f sp20;
 
@@ -353,8 +353,8 @@ void BgIngate_Init(Actor* thisx, PlayState* play2) {
         this->timePath = SubS_GetAdditionalPath(play, BGINGATE_GET_PATH_INDEX(&this->dyna.actor), phi_a2);
         if (this->timePath != NULL) {
             sp38 = Lib_SegmentedToVirtual(this->timePath->points);
-            Math_Vec3s_ToVec3f(&sp2C, &sp38[0]);
-            Math_Vec3s_ToVec3f(&sp20, &sp38[1]);
+            Math_Vec3f_Copy(&sp2C, &sp38[0]);
+            Math_Vec3f_Copy(&sp20, &sp38[1]);
             this->dyna.actor.world.rot.y = Math_Vec3f_Yaw(&sp2C, &sp20);
             this->dyna.actor.shape.rot.y = this->dyna.actor.world.rot.y;
             this->dyna.actor.world.pos.x = sp2C.x;

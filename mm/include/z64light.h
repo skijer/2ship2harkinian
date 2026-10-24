@@ -17,14 +17,15 @@ typedef struct AdjLightSettings {
     /* 0x1A */ s16 zFar;
 } AdjLightSettings; // size = 0x1C
 
+// 2S2H [Unbound] position is f32 (world extent); mirrored in 2s2h/resource/type/scenecommand/SetLightList.h
 typedef struct LightPoint {
-    /* 0x0 */ s16 x;
-    /* 0x2 */ s16 y;
-    /* 0x4 */ s16 z;
-    /* 0x6 */ u8 color[3];
-    /* 0x9 */ u8 drawGlow;
-    /* 0xA */ s16 radius;
-} LightPoint; // size = 0xC
+    /* 0x00 */ f32 x;
+    /* 0x04 */ f32 y;
+    /* 0x08 */ f32 z;
+    /* 0x0C */ u8 color[3];
+    /* 0x0F */ u8 drawGlow;
+    /* 0x10 */ s16 radius;
+} LightPoint; // size = 0x14
 
 typedef struct LightDirectional {
     /* 0x0 */ s8 x;
@@ -63,13 +64,24 @@ typedef struct LightsBuffer {
     /* 0x008 */ LightNode lights[LIGHTS_BUFFER_SIZE];
 } LightsBuffer; // size = 0x188
 
+// 2S2H [Unbound] fog and draw distance in world units from the camera; mirrored in SetLightingSettings.h
+typedef struct WorldFog {
+    /* 0x0 */ f32 fogStart;
+    /* 0x4 */ f32 fogEnd;
+    /* 0x8 */ f32 drawDistance;
+    /* 0xC */ f32 nearPlane; // 0 keeps the view's own near plane
+} WorldFog; // size = 0x10
+
 typedef struct LightContext {
-    /* 0x0 */ LightNode* listHead;
-    /* 0x4 */ u8 ambientColor[3];
-    /* 0x7 */ u8 fogColor[3];
-    /* 0xA */ s16 fogNear; // how close until fog starts taking effect. range 0 - 996
-    /* 0xC */ s16 zFar; // draw distance. range 0 - 12800
-} LightContext; // size = 0x10
+    /* 0x00 */ LightNode* listHead;
+    /* 0x04 */ u8 ambientColor[3];
+    /* 0x07 */ u8 fogColor[3];
+    /* 0x0A */ s16 fogNear; // how close until fog starts taking effect. range 0 - 996
+    /* 0x0C */ s16 zFar; // draw distance. range 0 - 12800
+    // 2S2H [Unbound] when set, worldFog drives fog, projection and room culling; fogNear/zFar hold its vanilla equivalent
+    /* 0x0E */ u8 hasWorldFog;
+    /* 0x10 */ WorldFog worldFog;
+} LightContext; // size = 0x20
 
 typedef enum LightType {
     /* 0 */ LIGHT_POINT_NOGLOW,
@@ -77,10 +89,10 @@ typedef enum LightType {
     /* 2 */ LIGHT_POINT_GLOW
 } LightType;
 
-void Lights_PointNoGlowSetInfo(LightInfo* info, s16 x, s16 y, s16 z, u8 r, u8 g, u8 b, s16 radius);
-void Lights_PointGlowSetInfo(LightInfo* info, s16 x, s16 y, s16 z, u8 r, u8 g, u8 b, s16 radius);
+void Lights_PointNoGlowSetInfo(LightInfo* info, f32 x, f32 y, f32 z, u8 r, u8 g, u8 b, s16 radius);
+void Lights_PointGlowSetInfo(LightInfo* info, f32 x, f32 y, f32 z, u8 r, u8 g, u8 b, s16 radius);
 void Lights_PointSetColorAndRadius(LightInfo* info, u8 r, u8 g, u8 b, s16 radius);
-void Lights_PointSetPosition(LightInfo* info, s16 x, s16 y, s16 z);
+void Lights_PointSetPosition(LightInfo* info, f32 x, f32 y, f32 z);
 void Lights_DirectionalSetInfo(LightInfo* info, s8 x, s8 y, s8 z, u8 r, u8 g, u8 b);
 void Lights_Reset(Lights* lights, u8 r, u8 g, u8 b);
 void Lights_Draw(Lights* lights, struct GraphicsContext* gfxCtx);

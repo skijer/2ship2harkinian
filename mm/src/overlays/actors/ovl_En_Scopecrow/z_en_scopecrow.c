@@ -168,7 +168,7 @@ void func_80BCD2BC(EnScopecrow* this, PlayState* play) {
 }
 
 s32 EnScopecrow_HasReachedPoint(EnScopecrow* this, Path* path, s32 pointIndex) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     s32 count = path->count;
     s32 index = pointIndex;
     s32 reached = false;
@@ -179,7 +179,7 @@ s32 EnScopecrow_HasReachedPoint(EnScopecrow* this, Path* path, s32 pointIndex) {
     f32 d;
     Vec3f point;
 
-    Math_Vec3s_ToVec3f(&point, &points[index]);
+    Math_Vec3f_Copy(&point, &points[index]);
 
     if (index == 0) {
         diffX = points[1].x - points[0].x;
@@ -202,9 +202,9 @@ s32 EnScopecrow_HasReachedPoint(EnScopecrow* this, Path* path, s32 pointIndex) {
 }
 
 f32 func_80BCD4D0(Path* path, s32 count, Vec3f* arg2, Vec3s* arg3) {
-    Vec3s* temp;
+    Vec3f* temp;
     Vec3f sp20;
-    Vec3s* points;
+    Vec3f* points;
 
     if (path != NULL) {
         temp = Lib_SegmentedToVirtual(path->points);
@@ -266,9 +266,9 @@ void func_80BCD640(EnScopecrow* this, PlayState* play) {
 
 void EnScopecrow_Init(Actor* thisx, PlayState* play) {
     EnScopecrow* this = (EnScopecrow*)thisx;
-    Vec3s* temp;
+    Vec3f* temp;
     CollisionPoly* sp4C;
-    Vec3s* points;
+    Vec3f* points;
     Vec3f sp3C;
 
     this->unk_260 = ENSCOPECROW_GET_1F(&this->actor);

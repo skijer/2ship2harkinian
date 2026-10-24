@@ -195,11 +195,11 @@ f32 func_8093EB74(EnGoroiwa* this, PlayState* play) {
     Vec3f sp54;
     Vec3f sp48;
 
-    Math_Vec3s_ToVec3f(&sp48, &this->pathPoints[0]);
+    Math_Vec3f_Copy(&sp48, &this->pathPoints[0]);
 
     for (i = 1; i < temp_s4; i++) {
         Math_Vec3f_Copy(&sp54, &sp48);
-        Math_Vec3s_ToVec3f(&sp48, &this->pathPoints[i]);
+        Math_Vec3f_Copy(&sp48, &this->pathPoints[i]);
         temp_f20 += Math3D_Vec3f_DistXYZ(&sp54, &sp48);
     }
 
@@ -207,7 +207,7 @@ f32 func_8093EB74(EnGoroiwa* this, PlayState* play) {
 }
 
 void func_8093EC50(EnGoroiwa* this) {
-    Vec3s* var = &this->pathPoints[this->unk_1D8];
+    Vec3f* var = &this->pathPoints[this->unk_1D8];
     Vec3f sp18;
 
     sp18.x = var->x;
@@ -269,7 +269,7 @@ void func_8093EE18(EnGoroiwa* this, PlayState* play) {
 }
 
 void func_8093EE64(EnGoroiwa* this, s32 arg1) {
-    Vec3s* temp_v0 = &this->pathPoints[arg1];
+    Vec3f* temp_v0 = &this->pathPoints[arg1];
 
     this->actor.world.pos.x = temp_v0->x;
     this->actor.world.pos.y = temp_v0->y;
@@ -283,8 +283,8 @@ void func_8093EEBC(EnGoroiwa* this) {
 }
 
 s32 func_8093EEDC(EnGoroiwa* this) {
-    Vec3s* temp_v1 = &this->pathPoints[this->unk_1D8];
-    Vec3s* temp_v0 = &this->pathPoints[this->unk_1D6];
+    Vec3f* temp_v1 = &this->pathPoints[this->unk_1D8];
+    Vec3f* temp_v0 = &this->pathPoints[this->unk_1D6];
 
     if ((temp_v1->x == temp_v0->x) && (temp_v1->z == temp_v0->z)) {
         if (temp_v0->y < temp_v1->y) {
@@ -352,7 +352,7 @@ void func_8093F198(PlayState* play, Vec3f* arg1, f32 arg2) {
 
 s32 func_8093F34C(EnGoroiwa* this) {
     s32 pad[3];
-    Vec3s* temp_v0;
+    Vec3f* temp_v0;
     f32 tempX;
     f32 tempZ;
     f32 x;
@@ -387,7 +387,7 @@ s32 func_8093F498(EnGoroiwa* this) {
     s32 pad;
     f32 temp_f0;
     Vec3f sp2C;
-    Vec3s* temp_v0 = &this->pathPoints[this->unk_1D8];
+    Vec3f* temp_v0 = &this->pathPoints[this->unk_1D8];
 
     sp2C.x = temp_v0->x;
     sp2C.y = temp_v0->y;
@@ -415,7 +415,7 @@ s32 func_8093F498(EnGoroiwa* this) {
 
 s32 func_8093F5EC(EnGoroiwa* this) {
     s32 pad;
-    Vec3s* sp18 = &this->pathPoints[this->unk_1D8];
+    Vec3f* sp18 = &this->pathPoints[this->unk_1D8];
 
     if (this->actor.velocity.y < 0.0f) {
         this->actor.velocity.y = 0.0f;
@@ -436,7 +436,7 @@ s32 func_8093F5EC(EnGoroiwa* this) {
 
 s32 func_8093F6F8(EnGoroiwa* this, PlayState* play) {
     f32 temp_f14;
-    Vec3s* sp80 = &this->pathPoints[this->unk_1D8];
+    Vec3f* sp80 = &this->pathPoints[this->unk_1D8];
     f32 sp7C = sp80->y;
     f32 sp78;
     f32 temp_f2;

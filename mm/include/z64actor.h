@@ -130,11 +130,11 @@ typedef struct {
 typedef struct Actor {
     /* 0x000 */ s16 id; // Actor ID
     /* 0x002 */ u8 category; // Actor category. Refer to the corresponding enum for values
-    /* 0x003 */ s8 room; // Room number the actor is in. -1 denotes that the actor won't despawn on a room change
+    /* 0x003 */ s16 room; // Room number the actor is in. -1 denotes that the actor won't despawn on a room change
     /* 0x004 */ u32 flags; // Flags used for various purposes
     /* 0x008 */ PosRot home; // Initial position/rotation when spawned. Can be used for other purposes
     /* 0x01C */ s16 params; // Configurable variable set by the actor's spawn data; original name: "args_data"
-    /* 0x01E */ s8 objectSlot; // Object slot (in ObjectContext) corresponding to the actor's object; original name: "bank"
+    /* 0x01E */ s16 objectSlot; // Object slot (in ObjectContext) corresponding to the actor's object; original name: "bank"
     /* 0x01F */ s8 attentionRangeType; // Controls the attention actor range and the lock-on leash range. See `AttentionRangeType`.
     /* 0x020 */ s16 halfDaysBits; // Bitmask indicating which half-days this actor is allowed to not be killed(?) (TODO: not sure how to word this). If the current halfDayBit is not part of this mask then the actor is killed when spawning the setup actors
     /* 0x024 */ PosRot world; // Position/rotation in the world
@@ -150,8 +150,8 @@ typedef struct Actor {
     /* 0x078 */ f32 terminalVelocity; // Sets the lower bounds cap on velocity along the Y axis
     /* 0x07C */ struct CollisionPoly* wallPoly; // Wall polygon the actor is touching
     /* 0x080 */ struct CollisionPoly* floorPoly; // Floor polygon directly below the actor
-    /* 0x084 */ u8 wallBgId; // Bg ID of the wall polygon the actor is touching
-    /* 0x085 */ u8 floorBgId; // Bg ID of the floor polygon directly below the actor
+    /* 0x084 */ s32 wallBgId; // Bg ID of the wall polygon the actor is touching
+    /* 0x085 */ s32 floorBgId; // Bg ID of the floor polygon directly below the actor
     /* 0x086 */ s16 wallYaw; // Y rotation of the wall polygon the actor is touching
     /* 0x088 */ f32 floorHeight; // Y position of the floor polygon directly below the actor
     /* 0x08C */ f32 depthInWater; // Directed distance to the surface of active waterbox. Negative value means water is below.
@@ -186,7 +186,12 @@ typedef struct Actor {
     /* 0x138 */ ActorFunc update; // Update Routine. Called by `Actor_UpdateAll`
     /* 0x13C */ ActorFunc draw; // Draw Routine. Called by `Actor_Draw`
     /* 0x140 */ ActorOverlay* overlayEntry; // Pointer to the overlay table entry for this actor
-} Actor; // size = 0x144
+    // 2S2H [Unbound] index into play->transitionActors.list, -1 unless spawned from it; params only hold 6 bits
+    /* 0x144 */ s16 transitionIndex;
+} Actor; // size = 0x148
+
+#define TRANSITION_ACTOR_INDEX(actor) \
+    (((actor)->transitionIndex >= 0) ? (s32)(actor)->transitionIndex : (s32)((u16)(actor)->params >> 10))
 
 typedef enum {
     /* 0 */ FOOT_LEFT,
@@ -430,6 +435,7 @@ typedef enum {
 } LensMode;
 
 #define LENS_ACTOR_MAX 32
+#define ACTOR_LOADED_MAX 8192
 
 // Target size when activated
 #define LENS_MASK_ACTIVE_SIZE 100
@@ -459,7 +465,7 @@ typedef struct ActorContext {
     /* 0x006 */ UNK_TYPE1 pad6[0x5];
     /* 0x00B */ s8 lensActorsDrawn;
     /* 0x00C */ s16 halfDaysBit; // A single bit indicating the current half-day. It is one of HALFDAYBIT_DAYX_ macro values
-    /* 0x00E */ u8 totalLoadedActors;
+    /* 0x00E */ u16 totalLoadedActors; // 2S2H [Unbound] up to ACTOR_LOADED_MAX instead of 255
     /* 0x00F */ u8 numLensActors;
     /* 0x010 */ ActorListEntry actorLists[ACTORCAT_MAX];
     /* 0x0A0 */ Actor* lensActors[LENS_ACTOR_MAX]; // Draws up to LENS_ACTOR_MAX number of invisible actors
@@ -806,12 +812,12 @@ typedef struct NpcInteractInfo {
     /* 0x24 */ UNK_TYPE1 unk_24[0x4];
 } NpcInteractInfo; // size = 0x28
 
-extern AttentionRangeParams gAttentionRanges[ATTENTION_RANGE_MAX];
-extern s16 D_801AED48[8];
+extern HOST_DATA AttentionRangeParams gAttentionRanges[ATTENTION_RANGE_MAX];
+extern HOST_DATA s16 D_801AED48[8];
 // extern Gfx D_801AEF88[];
 // extern Gfx D_801AEFA0[];
 
-extern Actor* gCameraDriftActor;
+extern HOST_DATA Actor* gCameraDriftActor;
 
 void ActorShape_Init(ActorShape* actorShape, f32 yOffset, ActorShadowFunc shadowDraw, f32 shadowScale);
 void ActorShadow_DrawCircle(Actor* actor, struct Lights* lights, struct PlayState* play);
@@ -972,7 +978,7 @@ void Actor_DrawDoorLock(struct PlayState* play, s32 frame, s32 type);
 void Actor_SetColorFilter(Actor* actor, u16 colorFlag, u16 colorIntensityMax, u16 bufFlag, u16 duration);
 Hilite* func_800BCBF4(Vec3f* arg0, struct PlayState* play);
 Hilite* func_800BCC68(Vec3f* arg0, struct PlayState* play);
-void Actor_GetClosestPosOnPath(Vec3s* points, s32 numPoints, Vec3f* srcPos, Vec3f* dstPos, s32 isPathLoop);
+void Actor_GetClosestPosOnPath(Vec3f* points, s32 numPoints, Vec3f* srcPos, Vec3f* dstPos, s32 isPathLoop);
 s32 Npc_UpdateTalking(struct PlayState* play, Actor* actor, s16* talkState, f32 interactRange,
                       NpcGetTextIdFunc getTextId, NpcUpdateTalkStateFunc updateTalkState);
 void Npc_TrackPoint(Actor* actor, NpcInteractInfo* interactInfo, s16 presetIndex, s16 trackingMode);

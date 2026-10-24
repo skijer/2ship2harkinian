@@ -1592,7 +1592,7 @@ typedef struct Camera {
     /* 0x140 */ s16 status;
     /* 0x142 */ s16 setting;
     /* 0x144 */ s16 mode;
-    /* 0x146 */ s16 bgId;
+    /* 0x146 */ s32 bgId;
     /* 0x148 */ s16 bgCamIndex;
     /* 0x14A */ s16 behaviorFlags;
     /* 0x14C */ s16 stateFlags;
@@ -1601,7 +1601,7 @@ typedef struct Camera {
     /* 0x152 */ s16 unk152;
     /* 0x154 */ s16 prevSetting;
     /* 0x156 */ s16 nextCamSceneDataId;
-    /* 0x158 */ s16 nextBgId;
+    /* 0x158 */ s32 nextBgId;
     /* 0x15A */ s16 roll;
     /* 0x15C */ s16 viewFlags;
     /* 0x15E */ s16 animState; // Determines the current state of the current camera behavior function

@@ -283,7 +283,7 @@ void EnLiftNuts_Init(Actor* thisx, PlayState* play) {
     s32 pad;
     EnLiftNuts* this = (EnLiftNuts*)thisx;
     Path* path;
-    Vec3s* points;
+    Vec3f* points;
 
     ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 35.0f);
     SkelAnime_InitFlex(play, &this->skelAnime, &gBusinessScrubSkel, &gBusinessScrubBurrowAnim, this->jointTable,

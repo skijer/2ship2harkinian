@@ -64,7 +64,7 @@ void RegisterJPGrottos() {
         }
     });
 
-    COND_ID_HOOK(AfterRoomSceneCommands, SCENE_22DEKUCITY, CVAR, [](s8 sceneId, s8 roomNum) {
+    COND_ID_HOOK(AfterRoomSceneCommands, SCENE_22DEKUCITY, CVAR, [](s8 sceneId, s16 roomNum) {
         isSpawningJPGrottos = true;
         bool lightTorches = (CURRENT_TIME > CLOCK_TIME(18, 0)) || (CURRENT_TIME < CLOCK_TIME(6, 0));
         u16 torchParams = lightTorches ? 10367 : 8319;

@@ -222,8 +222,8 @@ void KaleidoManager_Init(struct PlayState* play);
 void KaleidoManager_Destroy(void);
 void* KaleidoManager_GetRamAddr(void* vram);
 
-extern KaleidoMgrOverlay gKaleidoMgrOverlayTable[KALEIDO_OVL_MAX];
-extern KaleidoMgrOverlay* gKaleidoMgrCurOvl;
+extern HOST_DATA KaleidoMgrOverlay gKaleidoMgrOverlayTable[KALEIDO_OVL_MAX];
+extern HOST_DATA KaleidoMgrOverlay* gKaleidoMgrCurOvl;
 
 
 // z_kaleido_scope_call.c

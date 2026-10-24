@@ -21,7 +21,7 @@ typedef struct BgSpdweb {
     /* 0x164 */ f32 unk_164;
     /* 0x168 */ ColliderTris collider;
     /* 0x188 */ ColliderTrisElement colliderElements[4];
-    /* 0x2F8 */ Vec3s* unk_2F8;
+    /* 0x2F8 */ Vec3i* unk_2F8;
 } BgSpdweb; // size = 0x2FC
 
 #endif // Z_BG_SPDWEB_H

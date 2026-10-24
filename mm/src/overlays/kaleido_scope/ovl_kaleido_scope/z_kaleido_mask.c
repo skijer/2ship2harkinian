@@ -8,6 +8,7 @@
 #include "interface/parameter_static/parameter_static.h"
 
 #include "2s2h/BenGui/HudEditor.h"
+#include "2s2h/ModApi/CustomItemRegistry/KaleidoItemManager.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -194,6 +195,8 @@ s16 sMaskMagicArrowEffectsG[] = { 0, 100, 255 };
 s16 sMaskMagicArrowEffectsB[] = { 0, 255, 100 };
 
 void KaleidoScope_DrawMaskSelect(PlayState* play) {
+    if (KaleidoMaskEquipment_Draw(play)) return;
+    ModLayout_ApplyCells(play,UINT16_MAX,play->pauseCtx.maskVtx,MASK_NUM_SLOTS);
     PauseContext* pauseCtx = &play->pauseCtx;
     u16 i;
     u16 j;
@@ -276,12 +279,18 @@ void KaleidoScope_DrawMaskSelect(PlayState* play) {
                     }
                 }
 
+                u8 maskItem = gSaveContext.save.saveInfo.inventory.items[i + ITEM_NUM_SLOTS];
                 gSPVertex(POLY_OPA_DISP++, &pauseCtx->maskVtx[j + 0], 4, 0);
                 KaleidoScope_DrawTexQuadRGBA32(
                     play->state.gfxCtx,
-                    gItemIcons[((void)0, gSaveContext.save.saveInfo.inventory.items[i + ITEM_NUM_SLOTS])], 32, 32, 0);
+                    (TexturePtr)GameInteractor_ExecuteOnKaleidoResolveItemIcon(play, maskItem,
+                                                                               (const char*)gItemIcons[maskItem]),
+                    32, 32, 0);
             }
         }
+        GameInteractor_ExecuteOnKaleidoItemDraw(play, i + ITEM_NUM_SLOTS,
+                                                gSaveContext.save.saveInfo.inventory.items[i + ITEM_NUM_SLOTS],
+                                                &pauseCtx->maskVtx[j]);
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
@@ -308,6 +317,8 @@ void KaleidoScope_UpdateMaskCursor(PlayState* play) {
     s16 oldCursorPoint;
     s16 moveCursorResult;
     s16 pad2;
+
+    if (KaleidoMaskEquipment_Update(play)) return;
 
     pauseCtx->cursorColorSet = PAUSE_CURSOR_COLOR_SET_WHITE;
     pauseCtx->nameColorSet = PAUSE_NAME_COLOR_SET_WHITE;
@@ -555,6 +566,9 @@ void KaleidoScope_UpdateMaskCursor(PlayState* play) {
                 Interface_SetHudVisibility(HUD_VISIBILITY_ALL);
             }
 
+            u16 inventorySlot = cursorSlot + ITEM_NUM_SLOTS;
+            GameInteractor_ExecuteOnKaleidoItemCursor(play, &cursorItem, &inventorySlot);
+            cursorSlot = inventorySlot - ITEM_NUM_SLOTS;
             pauseCtx->cursorItem[PAUSE_MASK] = cursorItem;
             pauseCtx->cursorSlot[PAUSE_MASK] = cursorSlot;
             if (cursorItem != PAUSE_ITEM_NONE) {
@@ -660,7 +674,9 @@ void KaleidoScope_UpdateMaskCursor(PlayState* play) {
                     }
                     // #endregion
 
-                    if (!GameInteractor_Should(VB_KALEIDO_EQUIP_ITEM_TO_BUTTON, true, cursorSlot + ITEM_NUM_SLOTS,
+                    if (GameInteractor_ExecuteOnKaleidoItemEquip(
+                            play, KaleidoItemManager_ToHeldButton(pauseCtx->equipTargetCBtn), cursorItem) ||
+                        !GameInteractor_Should(VB_KALEIDO_EQUIP_ITEM_TO_BUTTON, true, cursorSlot + ITEM_NUM_SLOTS,
                                                cursorItem)) {
                         return;
                     }
@@ -679,7 +695,7 @@ void KaleidoScope_UpdateMaskCursor(PlayState* play) {
                     Audio_PlaySfx(NA_SE_SY_DECIDE);
                 } else if ((pauseCtx->debugEditor == DEBUG_EDITOR_NONE) && (pauseCtx->state == PAUSE_STATE_MAIN) &&
                            (pauseCtx->mainState == PAUSE_MAIN_STATE_IDLE) &&
-                           CHECK_BTN_ALL(input->press.button, BTN_A) && (msgCtx->msgLength == 0)) {
+                           CHECK_BTN_ALL(input->press.button, BTN_CUP) && (msgCtx->msgLength == 0)) {
                     if (GameInteractor_Should(VB_KALEIDO_DISPLAY_ITEM_TEXT, true, &pauseCtx->cursorItem[PAUSE_MASK])) {
                         // Give description on item through a message box
                         pauseCtx->itemDescriptionOn = true;

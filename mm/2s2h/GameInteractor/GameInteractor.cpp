@@ -13,6 +13,7 @@ extern "C" {
 }
 
 void GameInteractor_ExecuteOnGameStateMainStart() {
+    GameInteractor_ExecuteQueuedOcarinaNotes();
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnGameStateMainStart>();
 }
 
@@ -26,6 +27,7 @@ void GameInteractor_ExecuteOnGameStateDrawFinish() {
 
 void GameInteractor_ExecuteOnGameStateUpdate() {
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnGameStateUpdate>();
+    GameInteractor_ExecuteOnGameFrameUpdate();
 }
 
 void GameInteractor_ExecuteOnConsoleLogoUpdate() {
@@ -53,6 +55,8 @@ void GameInteractor_ExecuteOnSaveInit(s16 fileNum) {
 
 void GameInteractor_ExecuteOnSaveLoad(s16 fileNum) {
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveLoad>(fileNum);
+    GameInteractor_ExecuteOnLoadFile(fileNum);
+    GameInteractor_ExecuteOnLoadGame(fileNum);
 }
 
 void GameInteractor_ExecuteOnFileSelectSaveLoad(s16 fileNum, bool isOwlSave, SaveContext* saveContext) {
@@ -94,14 +98,14 @@ void GameInteractor_ExecuteOnSceneInit(s16 sceneId, s8 spawnNum) {
     GameInteractor::Instance->ExecuteHooksForFilter<GameInteractor::OnSceneInit>(sceneId, spawnNum);
 }
 
-void GameInteractor_ExecuteOnRoomInit(s16 sceneId, s8 roomNum) {
+void GameInteractor_ExecuteOnRoomInit(s16 sceneId, s16 roomNum) {
     SPDLOG_DEBUG("OnRoomInit: sceneId: {}, roomNum: {}", sceneId, roomNum);
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnRoomInit>(sceneId, roomNum);
     GameInteractor::Instance->ExecuteHooksForID<GameInteractor::OnRoomInit>(sceneId, sceneId, roomNum);
     GameInteractor::Instance->ExecuteHooksForFilter<GameInteractor::OnRoomInit>(sceneId, roomNum);
 }
 
-void GameInteractor_ExecuteAfterRoomSceneCommands(s16 sceneId, s8 roomNum) {
+void GameInteractor_ExecuteAfterRoomSceneCommands(s16 sceneId, s16 roomNum) {
     SPDLOG_DEBUG("AfterRoomSceneCommands: sceneId: {}, roomNum: {}", sceneId, roomNum);
     GameInteractor::Instance->ExecuteHooks<GameInteractor::AfterRoomSceneCommands>(sceneId, roomNum);
     GameInteractor::Instance->ExecuteHooksForID<GameInteractor::AfterRoomSceneCommands>(sceneId, sceneId, roomNum);
@@ -114,6 +118,10 @@ void GameInteractor_ExecuteOnPlayDrawWorldEnd() {
 
 void GameInteractor_ExecuteOnPlayDestroy() {
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnPlayDestroy>();
+    // A scene change sets Play_Init as the next state; anything else leaves gameplay.
+    if (gPlayState != nullptr && gPlayState->state.init != Play_Init) {
+        GameInteractor::Instance->ExecuteHooks<GameInteractor::OnExitGame>(gSaveContext.fileNum);
+    }
 }
 
 bool GameInteractor_ShouldActorInit(Actor* actor) {
@@ -303,6 +311,8 @@ bool GameInteractor_Should(GIVanillaBehavior flag, uint32_t result, ...) {
     GameInteractor::Instance->ExecuteHooks<GameInteractor::ShouldVanillaBehavior>(flag, &boolResult, args);
     GameInteractor::Instance->ExecuteHooksForID<GameInteractor::ShouldVanillaBehavior>(flag, flag, &boolResult, args);
     GameInteractor::Instance->ExecuteHooksForFilter<GameInteractor::ShouldVanillaBehavior>(flag, &boolResult, args);
+    // Enhancements re-register their VB handlers on every settings apply; mods run after them regardless.
+    GameInteractor::Instance->ExecuteHooksForID<GameInteractor::OnModVanillaBehavior>(flag, flag, &boolResult, args);
 
     va_end(args);
     return boolResult;
@@ -600,4 +610,11 @@ void GameInteractor::RegisterOwnHooks() {
         []() { GameInteractor::Instance->RemoveAllQueuedHooks(); });
 
     GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnActorUpdate>(ACTOR_PLAYER, ProcessEvents);
+}
+
+void GameInteractor_ExecuteAfterOwlSave() {
+    GameInteractor::Instance->ExecuteHooks<GameInteractor::AfterOwlSave>();
+}
+void GameInteractor_ExecuteOnPlayerSfx(u16 sfxId) {
+    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnPlayerSfx>(sfxId);
 }

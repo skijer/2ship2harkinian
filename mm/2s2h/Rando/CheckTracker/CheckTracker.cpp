@@ -1,3 +1,4 @@
+#include "2s2h/Network/Anchor/Anchor.h"
 
 #include "CheckTracker.h"
 #include "2s2h/Rando/Logic/Logic.h"
@@ -470,6 +471,7 @@ void CheckTrackerDrawNonLogicalList() {
                                                                           : IM_COL32(255, 255, 255, 0));
                     if (ImGui::IsItemClicked()) {
                         randoSaveCheck.skipped = !randoSaveCheck.skipped;
+                        if (Anchor::Instance) Anchor::Instance->SendPacket_SetCheckStatus(randoCheckId);
                     }
                     ImGui::TableNextColumn();
                 }

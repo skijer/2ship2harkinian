@@ -263,9 +263,9 @@ void ObjVspinyroll_Init(Actor* thisx, PlayState* play) {
     f32 sp40 = D_80A3D450[params];
     s32 pad2;
     Path* path;
-    Vec3s* points;
-    Vec3s* point1;
-    Vec3s* point2;
+    Vec3f* points;
+    Vec3f* point1;
+    Vec3f* point2;
 
     Actor_ProcessInitChain(&this->dyna.actor, sInitChain);
 
@@ -303,8 +303,8 @@ void ObjVspinyroll_Init(Actor* thisx, PlayState* play) {
     point1 = &points[0];
     point2 = &points[1];
 
-    Math_Vec3s_ToVec3f(&this->unk_39C[0], point1);
-    Math_Vec3s_ToVec3f(&this->unk_39C[1], point2);
+    Math_Vec3f_Copy(&this->unk_39C[0], point1);
+    Math_Vec3f_Copy(&this->unk_39C[1], point2);
 
     Math_Vec3f_Copy(&this->dyna.actor.world.pos, &this->unk_39C[0]);
 

@@ -31,7 +31,7 @@ typedef struct EnSyatekiCrow {
     /* 0x1C0 */ s16 yawTarget;
     /* 0x1C2 */ s16 isActive;
     /* 0x1C4 */ s16 deathTimer;
-    /* 0x1C8 */ Vec3s* pathPoints;
+    /* 0x1C8 */ Vec3f* pathPoints;
     /* 0x1CC */ s16 currentPointIndex;
     /* 0x1CE */ s16 maxPointIndex;
     /* 0x1D0 */ Vec3s jointTable[OBJECT_CROW_LIMB_MAX];

@@ -84,9 +84,9 @@ static InitChainEntry sInitChain[] = {
 static CollisionHeader* sTurtleGreatBayTempleColData;
 static CollisionPoly* sTurtleGreatBayTempleColPolygonsData;
 static CollisionPoly* sTurtleGreatBayTempleColPolygons2Data;
-static Vec3s* sTurtleGreatBayTempleColVerticesOrigData;
-static Vec3s* sTurtleGreatBayTempleColVerticesData;
-static Vec3s* sTurtleGreatBayTempleColVertices2Data;
+static Vec3i* sTurtleGreatBayTempleColVerticesOrigData;
+static Vec3i* sTurtleGreatBayTempleColVerticesData;
+static Vec3i* sTurtleGreatBayTempleColVertices2Data;
 
 void DmChar08_UpdateEyes(DmChar08* this) {
     switch (this->eyeMode) {
@@ -164,8 +164,8 @@ void DmChar08_Init(Actor* thisx, PlayState* play2) {
     if (sTurtleGreatBayTempleColData == NULL) {
         sTurtleGreatBayTempleColData = ResourceMgr_LoadColByName(sTurtleGreatBayTempleCol);
         // These vertex lists need to be manually freed when we are done
-        sTurtleGreatBayTempleColVerticesData = ResourceMgr_LoadArrayByNameAsVec3s(sTurtleGreatBayTempleColVertices);
-        sTurtleGreatBayTempleColVertices2Data = ResourceMgr_LoadArrayByNameAsVec3s(sTurtleGreatBayTempleColVertices2);
+        sTurtleGreatBayTempleColVerticesData = ResourceMgr_LoadArrayByNameAsVec3i(sTurtleGreatBayTempleColVertices);
+        sTurtleGreatBayTempleColVertices2Data = ResourceMgr_LoadArrayByNameAsVec3i(sTurtleGreatBayTempleColVertices2);
 
         // Track the original vtx list and attach the staged pointer
         sTurtleGreatBayTempleColVerticesOrigData = sTurtleGreatBayTempleColData->vtxList;

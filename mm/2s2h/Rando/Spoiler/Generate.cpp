@@ -1,5 +1,8 @@
 #include "Spoiler.h"
+#include "2s2h/ModApi/ModDungeons/BossRegistry.h"
 #include "Rando/Rando.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
+#include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
 
 namespace Rando {
 
@@ -41,8 +44,17 @@ nlohmann::json GenerateFromSaveContext() {
             spoiler["checks"][randoStaticCheck.name] =
                 Rando::StaticData::Items[RANDO_SAVE_CHECKS[randoCheckId].randoItemId].spoilerName;
         }
+        const char* key = RandoItems_GetKey(RANDO_SAVE_CHECKS[randoCheckId].randoItemId);
+        if (const auto* pickup = CustomItemRegistry_GetPickupVariant(key)) {
+            auto& location = spoiler["checks"][randoStaticCheck.name];
+            if (location.is_string()) location = {{"randoItemId", location.get<std::string>()}};
+            location["pickup"] = {{"itemKey", pickup->itemKey}, {"variantKey", pickup->variantKey}, {"key", pickup->key}};
+        }
+
     }
 
+    BossRegistry_WriteSpoiler(spoiler);
+    DungeonRegistry_WriteSpoiler(spoiler);
     return spoiler;
 }
 

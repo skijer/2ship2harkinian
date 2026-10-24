@@ -15,6 +15,7 @@
 #include "interface/icon_item_jpn_static/icon_item_jpn_static.h"
 #include "interface/icon_item_vtx_static/icon_item_vtx_static.h"
 #include "BenPort.h"
+#include "2s2h/ModApi/CustomItemRegistry/KaleidoItemManager.h"
 #include <libultraship/bridge/gfxdebuggerbridge.h>
 #include "archives/item_name_static/item_name_static.h"
 #include "archives/map_name_static/map_name_static.h"
@@ -414,11 +415,15 @@ void Kaleido_LoadItemNameStatic(void** segment, u32 texIndex) {
     };
 
     // 2S2H [Port] Bounds check texture to load to prevent crashes
-    if (texIndex < ARRAY_COUNTU(gItemNameStatics)) {
+    if (texIndex == ITEM_CUSTOM) {
+        const char* modNameTexture = KaleidoItemManager_GetPauseNameTexture();
+        *segment = modNameTexture != NULL ? (void*)modNameTexture : (void*)gEmptyTexture;
+    } else if (texIndex < ARRAY_COUNTU(gItemNameStatics)) {
         *segment = gItemNameStatics[texIndex];
     } else {
         *segment = gEmptyTexture;
     }
+    *segment = (void*)GameInteractor_ExecuteOnKaleidoResolveName(gPlayState, texIndex, (const char*)*segment);
 
     // CmpDma_LoadFile(SEGMENT_ROM_START(item_name_static), texIndex, segment, 0x400);
 }
@@ -801,7 +806,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
 
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
 
-            POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->questPageVtx, sQuestPageBgTextures);
+            POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->questPageVtx, KaleidoQuestManager_GetBackground(sQuestPageBgTextures));
 
             GameInteractor_ExecuteBeforeKaleidoDrawPage(pauseCtx, PAUSE_QUEST);
             KaleidoScope_DrawQuestStatus(play);
@@ -926,7 +931,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
                 MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
 
                 POLY_OPA_DISP =
-                    KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->questPageVtx, sQuestPageBgTextures);
+                    KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->questPageVtx, KaleidoQuestManager_GetBackground(sQuestPageBgTextures));
 
                 GameInteractor_ExecuteBeforeKaleidoDrawPage(pauseCtx, pauseCtx->pageIndex);
                 KaleidoScope_DrawQuestStatus(play);
@@ -2967,6 +2972,15 @@ void KaleidoScope_UpdateCursorSize(PlayState* play) {
                 break;
 
             case PAUSE_QUEST:
+                if (!KaleidoQuestManager_IsVanillaPageShown()) {
+                    S2HLayoutCell cell;
+                    ModLayout_GetCell(KaleidoQuestManager_GetShownPage(), pauseCtx->cursorPoint[PAUSE_QUEST], &cell);
+                    pauseCtx->cursorX = cell.x + cell.width * 0.5f;
+                    pauseCtx->cursorY = cell.y - cell.height * 0.5f + pauseCtx->offsetY;
+                    pauseCtx->cursorWidth = cell.width * 0.5f + 5.0f;
+                    pauseCtx->cursorHeight = cell.height * 0.5f + 5.0f;
+                    break;
+                }
                 if (!R_PAUSE_DBG_QUEST_CURSOR_ON) {
                     pauseCtx->cursorX = sQuestStatusCursorsX[pauseCtx->cursorPoint[PAUSE_QUEST]];
                     pauseCtx->cursorY = sQuestStatusCursorsY[pauseCtx->cursorPoint[PAUSE_QUEST]];
@@ -3042,6 +3056,10 @@ void KaleidoScope_UpdateCursorSize(PlayState* play) {
 void KaleidoScope_DrawCursor(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
     s16 i;
+    const bool extraQuestCursor = pauseCtx->pageIndex == PAUSE_QUEST && pauseCtx->cursorSpecialPos == 0 &&
+                                  !KaleidoQuestManager_IsVanillaPageShown();
+
+    if (extraQuestCursor && pauseCtx->cursorItem[PAUSE_QUEST] == PAUSE_ITEM_NONE) return;
 
     // #region 2S2H [Port] Track cursor position so we can skip interpolation for one frame whenever it moves
     static f32 prevX = 0;
@@ -3069,12 +3087,19 @@ void KaleidoScope_DrawCursor(PlayState* play) {
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, sCursorPrimR, sCursorPrimG, sCursorPrimB, 255);
         gDPSetEnvColor(POLY_OPA_DISP++, sCursorEnvR, sCursorEnvG, sCursorEnvB, 255);
 
-        Matrix_Translate(pauseCtx->cursorX, pauseCtx->cursorY, -50.0f, MTXMODE_NEW);
+        if(extraQuestCursor) {
+            KaleidoScope_SetView(pauseCtx,pauseCtx->eye.x,pauseCtx->eye.y,pauseCtx->eye.z);
+            Matrix_RotateYF(-3.14f, MTXMODE_NEW);
+            Matrix_Translate(0.0f, sPauseMenuVerticalOffset / 100.0f, -93.0f, MTXMODE_APPLY);
+            Matrix_Scale(0.78f,0.78f,0.78f,MTXMODE_APPLY);
+            Matrix_RotateXFApply(-pauseCtx->questPageRoll / 100.0f);
+            Matrix_Translate(pauseCtx->cursorX,pauseCtx->cursorY,0.0f,MTXMODE_APPLY);
+        } else Matrix_Translate(pauseCtx->cursorX, pauseCtx->cursorY, -50.0f, MTXMODE_NEW);
         Matrix_Scale(1.0f, 1.0f, 1.0f, MTXMODE_APPLY);
 
         for (i = 0; i < 4; i++) {
             Matrix_Push();
-            Matrix_Translate(sCursorCirclesX[i], sCursorCirclesY[i], -50.0f, MTXMODE_APPLY);
+            Matrix_Translate(sCursorCirclesX[i], sCursorCirclesY[i], extraQuestCursor ? 0.0f : -50.0f, MTXMODE_APPLY);
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
             gDPPipeSync(POLY_OPA_DISP++);
             gDPLoadTextureBlock(POLY_OPA_DISP++, gPauseMenuCursorTex, G_IM_FMT_IA, G_IM_SIZ_8b, 16, 16, 0,
@@ -3090,6 +3115,7 @@ void KaleidoScope_DrawCursor(PlayState* play) {
         FrameInterpolation_RecordCloseChild();
     }
 
+    if(extraQuestCursor) KaleidoScope_SetView(pauseCtx,0.0f,0.0f,64.0f);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
@@ -3441,6 +3467,9 @@ void KaleidoScope_Update(PlayState* play) {
         case PAUSE_STATE_MAIN:
             switch (pauseCtx->mainState) {
                 case PAUSE_MAIN_STATE_IDLE:
+                    if (GameInteractor_ExecuteOnKaleidoInput(play, input)) {
+                        break;
+                    }
                     if (!pauseCtx->itemDescriptionOn &&
                         (CHECK_BTN_ALL(input->press.button, BTN_START) || CHECK_BTN_ALL(input->press.button, BTN_B))) {
                         Interface_SetAButtonDoAction(play, DO_ACTION_NONE);

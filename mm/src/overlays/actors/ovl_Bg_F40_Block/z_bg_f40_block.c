@@ -49,7 +49,7 @@ static InitChainEntry sInitChain[] = {
 };
 
 s32 func_80BC3980(BgF40Block* this, PlayState* play) {
-    Vec3s* points;
+    Vec3f* points;
 
     this->unk_160 = 0;
     this->unk_164 = 0;
@@ -71,7 +71,7 @@ s32 func_80BC3980(BgF40Block* this, PlayState* play) {
 }
 
 s32 func_80BC3A2C(BgF40Block* this, PlayState* play) {
-    Vec3s* points;
+    Vec3f* points;
 
     this->unk_160 = this->path->count - 1;
     this->unk_164 = this->path->count - 1;
@@ -96,7 +96,7 @@ s32 func_80BC3A2C(BgF40Block* this, PlayState* play) {
 s32 func_80BC3B00(BgF40Block* this) {
     s32 pad;
     Path* path;
-    Vec3s* points;
+    Vec3f* points;
     Vec3f sp28;
     Vec3f sp24;
 

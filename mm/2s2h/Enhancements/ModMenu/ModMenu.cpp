@@ -10,6 +10,9 @@
 #include "2s2h/BenGui/MenuTypes.h"
 #include "2s2h/BenGui/BenMenu.h"
 #include "2s2h/BenGui/BenGui.hpp"
+#include "2s2h/ModApi/ModApi.h"
+#include "2s2h/ModApi/ModStore/ModStore.h"
+#include "2s2h/ModApi/UserFiles/UserFiles.h"
 
 std::vector<std::string> enabledModFiles;
 std::vector<std::string> disabledModFiles;
@@ -138,6 +141,10 @@ void UpdateModFiles(bool init = false, bool reset = false) {
     if (modsPath.length() > 0 && std::filesystem::exists(modsPath)) {
         std::vector<std::filesystem::path> enabledFiles;
         if (std::filesystem::is_directory(modsPath)) {
+            if (init && !archivesAdded) {
+                ModStore_ApplyPending(modsPath);
+                UserFiles_ApplyPending(modsPath);
+            }
             for (const std::filesystem::directory_entry& p : std::filesystem::recursive_directory_iterator(
                      modsPath, std::filesystem::directory_options::follow_directory_symlink)) {
                 if (p.is_directory()) {
@@ -202,9 +209,14 @@ void DisableMod(std::string file) {
     AfterModChange();
 }
 
-void DrawModInfo(std::string file) {
+void DrawModInfo(const std::filesystem::path& path) {
     ImGui::SameLine();
-    ImGui::Text("%s", file.c_str());
+    ImGui::Text("%s", path.filename().generic_string().c_str());
+    const std::string trust = ModLoader_DescribeTrust(path.generic_string());
+    if (!trust.empty()) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("(%s)", trust.c_str());
+    }
 }
 
 void DrawMods(bool enabled) {
@@ -264,7 +276,7 @@ void DrawMods(bool enabled) {
             }
         }
 
-        DrawModInfo(filePaths.at(file).filename().generic_string());
+        DrawModInfo(filePaths.at(file));
         if (enabled) {
             ImGui::EndGroup();
             ModsHandleDragAndDrop(selectedModFiles, i, file);

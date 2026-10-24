@@ -1,4 +1,11 @@
+#include "2s2h/ModApi/Labels/ModLabels.h"
 #include "SaveEditor.h"
+#include "2s2h/BenPort.h"
+#include "2s2h/ModApi/CustomItemRegistry/KaleidoItemManager.h"
+#include "2s2h/ModApi/CustomEquipRegistry/CustomEquipRegistry.h"
+#include <algorithm>
+#include <cstring>
+#include <unordered_set>
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Rando/Rando.h"
@@ -16,6 +23,7 @@
 #include <fast/Fast3dWindow.h>
 
 extern "C" {
+uint8_t ResourceMgr_FileExists(const char* resName);
 #include <z64.h>
 #include <z64save.h>
 #include <macros.h>
@@ -810,13 +818,26 @@ void DrawSlot(InventorySlot slot) {
         }
         UIWidgets::Tooltip("None");
 
-        size_t availableItems = safeMode ? safeItemsForInventorySlot[selectedInventorySlot].size() : ITEM_FISHING_ROD;
-        for (int32_t pickerIndex = 0; pickerIndex < availableItems; pickerIndex++) {
+        std::vector<ItemId> pickerItems;
+        if (safeMode) {
+            for (ItemId id : safeItemsForInventorySlot[selectedInventorySlot]) {
+                bool allowed = true;
+                GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveEditorItemEligibility>(
+                    selectedInventorySlot, id, &allowed);
+                if (allowed) {
+                    pickerItems.push_back(id);
+                }
+            }
+        } else {
+            for (int32_t item = 0; item < ITEM_FISHING_ROD; item++) {
+                pickerItems.push_back(static_cast<ItemId>(item));
+            }
+        }
+        for (size_t pickerIndex = 0; pickerIndex < pickerItems.size(); pickerIndex++) {
             if (((pickerIndex + 1) % 8) != 0) {
                 ImGui::SameLine();
             }
-            ItemId id = safeMode ? safeItemsForInventorySlot[selectedInventorySlot][pickerIndex]
-                                 : static_cast<ItemId>(pickerIndex);
+            ItemId id = pickerItems[pickerIndex];
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
             bool buttonPressed = ImGui::ImageButton(
                 (const char*)gItemIcons[id],
@@ -829,9 +850,11 @@ void DrawSlot(InventorySlot slot) {
                 ImGui::CloseCurrentPopup();
             }
             // TODO: Add names for items
-            // UIWidgets::SetLastItemHoverText(SohUtils::GetItemName(id));
+            if (const char* label = ModLabels_Get(S2H_LABEL_ITEM, gSaveContext.options.language, id)) UIWidgets::Tooltip(label);
         }
         ImGui::PopStyleColor(3);
+        GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveEditorItemPicker>(&gSaveContext,
+                                                                                       selectedInventorySlot, safeMode);
         ImGui::EndPopup();
     }
 
@@ -844,6 +867,7 @@ void DrawSlot(InventorySlot slot) {
 }
 
 void DrawItemsAndMasksTab() {
+    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveEditorInventory>(&gSaveContext);
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 3.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 8.0f));
     // Group left side in a child for a scroll bar
@@ -1000,7 +1024,7 @@ void DrawItemsAndMasksTab() {
                     .param = (int16_t)randoItemId,
                     .giveItem =
                         [](Actor* actor, PlayState* play) {
-                            RandoItemId randoItemId = Rando::ConvertItem((RandoItemId)CUSTOM_ITEM_PARAM);
+                            RandoItemId randoItemId = Rando::ConvertItem((RandoItemId)(u16)CUSTOM_ITEM_PARAM);
                             std::string prefix = "You found";
                             std::string message = Rando::StaticData::GetItemName(randoItemId);
 
@@ -1013,7 +1037,7 @@ void DrawItemsAndMasksTab() {
                             if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                                 CustomMessage::SetActiveCustomMessage(entry.msg, entry);
                             } else if (Rando::StaticData::ShouldShowGetItemCutscene(
-                                           Rando::ConvertItem((RandoItemId)CUSTOM_ITEM_PARAM))) {
+                                           Rando::ConvertItem((RandoItemId)(u16)CUSTOM_ITEM_PARAM))) {
                                 CustomMessage::StartTextbox(entry.msg + "\x1C\x02\x10", entry);
                             } else {
                                 Notification::Emit({
@@ -1032,9 +1056,9 @@ void DrawItemsAndMasksTab() {
                             // If the item has been given, the CUSTOM_ITEM_PARAM is set to the RI, prior to that it's
                             // the RC
                             if (CUSTOM_ITEM_FLAGS & CustomItem::CALLED_ACTION) {
-                                randoItemId = (RandoItemId)CUSTOM_ITEM_PARAM;
+                                randoItemId = (RandoItemId)(u16)CUSTOM_ITEM_PARAM;
                             } else {
-                                randoItemId = Rando::ConvertItem((RandoItemId)CUSTOM_ITEM_PARAM);
+                                randoItemId = Rando::ConvertItem((RandoItemId)(u16)CUSTOM_ITEM_PARAM);
                             }
 
                             Matrix_Scale(30.0f, 30.0f, 30.0f, MTXMODE_APPLY);
@@ -1191,6 +1215,8 @@ void DrawQuestSlot(QuestItem slot) {
     }
 
     ImGui::PopID();
+    if (const char* label = ModLabels_Get(S2H_LABEL_QUEST_ITEM, gSaveContext.options.language, slot)) UIWidgets::Tooltip(label);
+
 }
 
 ImVec2 DrawSong(QuestItem slot) {
@@ -1209,6 +1235,7 @@ ImVec2 DrawSong(QuestItem slot) {
         ImGui::Text("%s", songTooltip);
         ImGui::EndTooltip();
     }
+    if (const char* label = ModLabels_Get(S2H_LABEL_QUEST_ITEM, gSaveContext.options.language, slot)) UIWidgets::Tooltip(label);
     return itemSize;
 }
 
@@ -2414,6 +2441,242 @@ void DrawRandoTab() {
     ImGui::EndChild();
 }
 
+
+static ImTextureID ModEditorPathIcon(const char* path) {
+    if(path==nullptr)return 0;
+    static std::unordered_set<std::string> loaded;
+    std::string name = std::string("ModSaveEditor.") + path;
+    auto gui = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());
+    if (!loaded.contains(name)) {
+        auto texture = std::dynamic_pointer_cast<Fast::Texture>(
+            Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path, true));
+        if (texture == nullptr) return 0;
+        gui->LoadGuiTexture(name, *texture, "", ImVec4(1, 1, 1, 1));
+        loaded.insert(name);
+    }
+    return gui->GetTextureByName(name);
+}
+
+static ImTextureID ModEditorIcon(const S2HCustomItemDefinition* item) {
+    const char* path = CustomItemRegistry_ResolveTexture(item->key, S2H_ITEM_ICON_SAVE_EDITOR);
+    const auto* equip = CustomEquipRegistry_Find(item->key);
+    if (path == nullptr && equip != nullptr) path = equip->iconPath;
+    if (path == nullptr) path = item->iconPath;
+    if (path == nullptr) return 0;
+    return ModEditorPathIcon(path);
+}
+
+static void SetModEditorOwned(const S2HCustomItemDefinition* item, bool owned) {
+    if (CustomEquipRegistry_Find(item->key) != nullptr) CustomEquipRegistry_SetOwned(item->key, owned);
+    else CustomItemRegistry_SetOwned(item->key, owned);
+}
+
+static void DrawModInventoryEditor() {
+    static ImGuiTextFilter filter;
+    static std::string selected;
+    static int screen = 0, pageNumber = 0;
+    filter.Draw("Find mod item");
+    ImGui::TextWrapped("Give/Remove changes the current save. Select an item, then click a grid cell or drag its name "
+                       "to move it. Layout changes are saved in configuration. Shared cells form a wheel.");
+    ImGui::BeginDisabled(gPlayState == nullptr);
+    if (ImGui::Button("Give All Mod Items")) {
+        for (uint32_t i = 0; i < CustomItemRegistry_GetCount(); ++i) SetModEditorOwned(CustomItemRegistry_GetAt(i), true);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Remove All Mod Items")) {
+        for (uint32_t i = 0; i < CustomItemRegistry_GetCount(); ++i) SetModEditorOwned(CustomItemRegistry_GetAt(i), false);
+    }
+    ImGui::EndDisabled();
+    if (CustomItemRegistry_GetCount() == 0) {
+        ImGui::TextUnformatted("No mod items registered. Enable item mods and restart the game.");
+        return;
+    }
+    if (ImGui::BeginChild("ModInventoryList", ImVec2(0, 280), true)) {
+        int columns = std::clamp(static_cast<int>(ImGui::GetContentRegionAvail().x / 240.0f), 1, 4);
+        if (ImGui::BeginTable("ModGiveGrid", columns, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_BordersInnerV)) {
+        for (uint32_t i = 0; i < CustomItemRegistry_GetCount(); ++i) {
+            const auto* item = CustomItemRegistry_GetAt(i);
+            if (!filter.PassFilter(item->key) ||
+                (!CustomItemRegistry_IsEditorVisible(item->key) && CustomEquipRegistry_Find(item->key) == nullptr)) continue;
+            ImGui::TableNextColumn();
+            ImGui::PushID(item->key);
+            ImTextureID icon = ModEditorIcon(item);
+            if (icon) ImGui::Image(icon, ImVec2(40, 40));
+            else ImGui::Dummy(ImVec2(40, 40));
+            ImGui::SameLine();
+            ImGui::BeginGroup();
+            bool owned = CustomItemRegistry_IsOwned(item->key);
+            ImGui::BeginDisabled(gPlayState == nullptr);
+            if (ImGui::Button(owned ? "Remove" : "Give")) SetModEditorOwned(item, !owned);
+            ImGui::EndDisabled();
+            if (ImGui::Selectable(item->key, selected == item->key, 0, ImVec2(0, 24))) {
+                selected = item->key;
+                S2HCustomItemPlacement placement;
+                if (KaleidoItemManager_GetPlacement(item->key, &placement)) {
+                    screen = placement.page >= S2H_ITEM_PAGE_EQUIPMENT_FIRST ? 2 :
+                             CustomItemRegistry_IsQuestPage(placement.page) ? 1 : 0;
+                    pageNumber = screen == 2 ? placement.page - S2H_ITEM_PAGE_EQUIPMENT_FIRST + 1 :
+                                 screen == 1 ? placement.page - S2H_ITEM_PAGE_QUEST_VANILLA :
+                                 placement.page == S2H_ITEM_PAGE_VANILLA ? 0 : placement.page + 1;
+                }
+            }
+            if (ImGui::BeginDragDropSource()) {
+                ImGui::SetDragDropPayload("S2H_MOD_LAYOUT_ITEM", item->key, strlen(item->key) + 1);
+                if (icon) ImGui::Image(icon, ImVec2(40, 40));
+                ImGui::TextUnformatted(item->key);
+                ImGui::EndDragDropSource();
+            }
+            ImGui::EndGroup();
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+        }
+    }
+    ImGui::EndChild();
+    ImGui::Separator();
+    ImGui::TextUnformatted("Pause menu disposition");
+    if (ImGui::Combo("Screen", &screen, "Items\0Collectables\0Masks\0")) pageNumber = 0;
+    const int limit = screen == 1 ? 30 : screen == 0 ? 224 : 65279;
+    std::string pagesCvar = "gEnhancements.CustomItemManager.EditorPages." + std::to_string(screen);
+    int pages = std::max(1, CVarGetInteger(pagesCvar.c_str(), 1));
+    for (uint32_t i = 0; i < CustomItemRegistry_GetCount(); ++i) {
+        S2HCustomItemPlacement placement;
+        if (!KaleidoItemManager_GetPlacement(CustomItemRegistry_GetAt(i)->key, &placement)) continue;
+        if (screen == 0 && placement.page < S2H_ITEM_PAGE_QUEST_VANILLA) pages = std::max(pages, placement.page + 1);
+        if (screen == 1 && CustomItemRegistry_IsQuestPage(placement.page)) pages = std::max(pages, placement.page - S2H_ITEM_PAGE_QUEST_VANILLA);
+        if (screen == 2 && placement.page >= S2H_ITEM_PAGE_EQUIPMENT_FIRST && placement.page < UINT16_MAX)
+            pages = std::max(pages, placement.page - S2H_ITEM_PAGE_EQUIPMENT_FIRST + 1);
+    }
+    pages = std::clamp(pages, 1, limit);
+    pageNumber = std::clamp(pageNumber, 0, pages);
+    std::string pageLabel = pageNumber == 0 ? "Vanilla" : std::to_string(pageNumber);
+    if (ImGui::BeginCombo("Page", pageLabel.c_str())) {
+        for (int number = 0; number <= pages; ++number) {
+            std::string label = number == 0 ? "Vanilla" : std::to_string(number);
+            if (ImGui::Selectable(label.c_str(), pageNumber == number)) pageNumber = number;
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(pages >= limit);
+    if (ImGui::Button("New page")) {
+        pageNumber = pages + 1;
+        CVarSetInteger(pagesCvar.c_str(), pageNumber);
+        Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    }
+    ImGui::EndDisabled();
+    uint16_t page = screen == 2 ? (pageNumber == 0 ? UINT16_MAX : S2H_ITEM_PAGE_EQUIPMENT_FIRST + pageNumber - 1) :
+                    screen == 1 ? S2H_ITEM_PAGE_QUEST_VANILLA + pageNumber :
+                    pageNumber == 0 ? S2H_ITEM_PAGE_VANILLA : pageNumber - 1;
+    if (screen == 2 && pageNumber > 0) ImGui::TextWrapped("Equipment page over the mask menu. L changes pages; A wears/removes equipment.");
+    ImGui::Text("Selected: %s", selected.empty() ? "none" : selected.c_str());
+    if (!selected.empty()) {
+        if (ImGui::Button("Restore selected disposition")) KaleidoItemManager_ResetPlacement(selected.c_str());
+    }
+    bool equipmentGrid = screen == 2 && pageNumber > 0;
+    int cells = screen == 1 ? (pageNumber == 0 ? QUEST_HEART_PIECE + 1 : 25) : ITEM_NUM_SLOTS;
+    if (equipmentGrid) {
+        ImGui::TextUnformatted("Rows: Swords / Shields / Tunics / Boots. C equips a toggle; A equips in pause.");
+    }
+    ImGui::TextWrapped("Click a cell to edit its wheel and coordinates. Drag an item into a cell to place it. "
+                       "These positions are used by the pause menu.");
+    float scale = std::min(3.0f,std::max(1.0f,ImGui::GetContentRegionAvail().x/256.0f));
+    ImVec2 origin=ImGui::GetCursorScreenPos();
+    auto draw=ImGui::GetWindowDrawList();
+    draw->AddRectFilled(origin,ImVec2(origin.x+256*scale,origin.y+168*scale),IM_COL32(12,24,45,180),6);
+    for (int slot=0;slot<cells;++slot) {
+        S2HLayoutCell cell;ModLayout_GetCell(page,slot,&cell);
+        ImVec2 pos(origin.x+(cell.x+128)*scale,origin.y+(80-cell.y)*scale);
+        ImVec2 size(cell.width*scale,cell.height*scale);
+        ImGui::SetCursorScreenPos(pos);ImGui::PushID(slot);
+        if(ImGui::InvisibleButton("Cell",size)) ImGui::OpenPopup("Edit cell wheel");
+        draw->AddRectFilled(pos,ImVec2(pos.x+size.x,pos.y+size.y),ImGui::GetColorU32(ImGuiCol_FrameBg),3);
+        draw->AddRect(pos,ImVec2(pos.x+size.x,pos.y+size.y),ImGui::GetColorU32(ImGuiCol_Border),3);
+        if (!(screen==2 && pageNumber==0) && ImGui::BeginDragDropTarget()) {
+            if(const auto* payload=ImGui::AcceptDragDropPayload("S2H_MOD_LAYOUT_ITEM")) {
+                S2HCustomItemPlacement p={page,static_cast<uint8_t>(slot)};
+                KaleidoItemManager_SetPlacement(static_cast<const char*>(payload->Data),&p);
+            }
+            ImGui::EndDragDropTarget();
+        }
+        std::vector<const S2HCustomItemDefinition*> entries;
+        for(uint32_t i=0;i<CustomItemRegistry_GetCount();++i) {
+            const auto* item=CustomItemRegistry_GetAt(i);S2HCustomItemPlacement p;
+            if(KaleidoItemManager_GetPlacement(item->key,&p)&&p.page==page&&p.slot==slot) entries.push_back(item);
+        }
+        if(!entries.empty()) {
+            const std::string wheelSetting="gEnhancements.CustomItemManager.Wheel."+std::to_string(page)+"."+std::to_string(slot);
+            const char* preferred=CVarGetString(wheelSetting.c_str(),"");
+            const auto* shown=entries.front();
+            for(const auto* entry:entries) if(std::strcmp(entry->key,preferred)==0) shown=entry;
+            auto icon=ModEditorIcon(shown);
+            if(icon) draw->AddImage(icon,ImVec2(pos.x+2,pos.y+2),ImVec2(pos.x+size.x-2,pos.y+size.y-2));
+            if(entries.size()>1) draw->AddText(ImVec2(pos.x+size.x-18,pos.y+2),IM_COL32(255,220,90,255),std::to_string(entries.size()).c_str());
+        } else if(pageNumber==0 || equipmentGrid) {
+            int item=ITEM_NONE;
+            if(screen==1) {
+                auto it=questToItemMap.find(static_cast<QuestItem>(slot));if(it!=questToItemMap.end())item=it->second;
+                if(slot==QUEST_SWORD)item=ITEM_QUIVER_30+std::max(1,(int)GET_CUR_UPG_VALUE(UPG_QUIVER))-1;
+                if(slot==QUEST_SHIELD)item=ITEM_BOMB_BAG_20+std::max(1,(int)GET_CUR_UPG_VALUE(UPG_BOMB_BAG))-1;
+                if(slot==QUEST_QUIVER||slot==QUEST_BOMB_BAG)item=ITEM_NONE;
+            } else if(equipmentGrid) {
+                int sword=CustomEquipRegistry_GetVanillaBase(S2H_EQUIP_SLOT_SWORD),shield=CustomEquipRegistry_GetVanillaBase(S2H_EQUIP_SLOT_SHIELD);
+                if(slot==0 && sword)item=ITEM_SWORD_KOKIRI+sword-1;
+                if(slot==6 && shield)item=ITEM_SHIELD_HERO+shield-1;
+            } else {
+                const int nativeSlot=slot+(screen==2?ITEM_NUM_SLOTS:0);
+                if(nativeSlot<=SLOT_MASK_FIERCE_DEITY && !safeItemsForInventorySlot[nativeSlot].empty())
+                    item=safeItemsForInventorySlot[nativeSlot].front();
+            }
+            if(item!=ITEM_NONE&&item<ITEM_CUSTOM) {
+                auto gui=std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());
+                auto icon=ModEditorPathIcon((const char*)gItemIcons[item]);
+                if(icon)draw->AddImage(icon,ImVec2(pos.x+2,pos.y+2),ImVec2(pos.x+size.x-2,pos.y+size.y-2));
+            }
+        }
+        if(ImGui::BeginPopup("Edit cell wheel")) {
+            ImGui::Text("Cell %d",slot+1);
+            if(!selected.empty()&&!(screen==2&&pageNumber==0)&&ImGui::Button("Place selected item here")) {
+                S2HCustomItemPlacement p={page,static_cast<uint8_t>(slot)};
+                KaleidoItemManager_SetPlacement(selected.c_str(),&p);
+            }
+            int x=cell.x,y=cell.y,w=cell.width,h=cell.height;
+            bool changed=ImGui::InputInt("X",&x);changed|=ImGui::InputInt("Y",&y);
+            changed|=ImGui::InputInt("Width",&w);changed|=ImGui::InputInt("Height",&h);
+            if(changed) {
+                S2HLayoutCell adjusted={static_cast<int16_t>(x),static_cast<int16_t>(y),static_cast<uint16_t>(w),static_cast<uint16_t>(h)};
+                if(!ModLayout_SetCell(page,slot,&adjusted))ImGui::TextUnformatted("Keep the cell inside the pause page (8..64 pixels).");
+            }
+            ImGui::Separator();ImGui::TextUnformatted("Wheel entries (ownership is edited above)");
+            static ImGuiTextFilter wheelFilter;wheelFilter.Draw("Find wheel entry");
+            if(ImGui::BeginChild("WheelEntries",ImVec2(420,240),true)) {
+                for(uint32_t i=0;i<CustomItemRegistry_GetCount();++i) {
+                    const auto* item=CustomItemRegistry_GetAt(i);const auto* equip=CustomEquipRegistry_Find(item->key);
+                    S2HCustomItemPlacement p;bool placed=KaleidoItemManager_GetPlacement(item->key,&p);
+                    bool collectable=(placed&&CustomItemRegistry_IsQuestPage(p.page))||CustomItemRegistry_IsQuestPage(item->preferredPage)||(equip&&equip->slot==S2H_EQUIP_SLOT_UPGRADE);
+                    if(!wheelFilter.PassFilter(item->key))continue;
+                    if(screen==0 && (collectable||equip))continue;
+                    if(screen==1 && !collectable)continue;
+                    if(screen==2 && (!equip||equip->slot==S2H_EQUIP_SLOT_UPGRADE))continue;
+                    ImGui::PushID(item->key);
+                    bool member=placed&&p.page==page&&p.slot==slot;
+                    auto icon=ModEditorIcon(item);if(icon){ImGui::Image(icon,ImVec2(24,24));ImGui::SameLine();}
+                    if(ImGui::Checkbox(item->key,&member)) {
+                        if(member){S2HCustomItemPlacement target={page,static_cast<uint8_t>(slot)};KaleidoItemManager_SetPlacement(item->key,&target);}
+                        else KaleidoItemManager_SetPauseVisible(item->key,false);
+                    }
+                    if(member){ImGui::SameLine();if(ImGui::SmallButton("Default"))KaleidoItemManager_SetWheelSelection(page,slot,item->key);}
+                    ImGui::PopID();
+                }
+            }
+            ImGui::EndChild();ImGui::EndPopup();
+        }
+        ImGui::PopID();
+    }
+    ImGui::SetCursorScreenPos(ImVec2(origin.x,origin.y+168*scale));ImGui::Dummy(ImVec2(256*scale,1));
+
+}
+
 void SaveEditorWindow::DrawElement() {
     UIWidgets::PushStyleTabs(UIWidgets::Colors(CVarGetInteger("gSettings.Menu.Theme", 5)));
     if (ImGui::BeginTabBar("SaveContextTabBar", ImGuiTabBarFlags_NoCloseWithMiddleMouseButton)) {
@@ -2424,6 +2687,11 @@ void SaveEditorWindow::DrawElement() {
 
         if (ImGui::BeginTabItem("Items & Masks")) {
             DrawItemsAndMasksTab();
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Mod Items & Equipment")) {
+            DrawModInventoryEditor();
             ImGui::EndTabItem();
         }
 
@@ -2464,6 +2732,7 @@ void SaveEditorWindow::DrawElement() {
             }
         }
 
+        GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveEditorTabs>(&gSaveContext);
         ImGui::EndTabBar();
     }
     UIWidgets::PopStyleTabs();

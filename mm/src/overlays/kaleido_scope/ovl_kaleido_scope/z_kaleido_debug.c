@@ -6,6 +6,10 @@
 
 #include "z_kaleido_scope.h"
 #include "interface/parameter_static/parameter_static.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
+
+// A mod that draws its own editor also owns its input; set by the draw, read by the next update.
+static bool sIsInventoryEditorTakenOver = false;
 
 s16 sCurSection = 0;
 s16 sCurRow = 0;
@@ -345,6 +349,11 @@ void KaleidoScope_DrawInventoryEditor(PlayState* play) {
     s32 rectLeft;
     s32 rectTop;
 
+    sIsInventoryEditorTakenOver = GameInteractor_ExecuteOnKaleidoDebugEditor(play);
+    if (sIsInventoryEditorTakenOver) {
+        return;
+    }
+
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL39_Opa(play->state.gfxCtx);
@@ -664,6 +673,10 @@ void KaleidoScope_UpdateInventoryEditor(PlayState* play) {
     s16 slot;
     s16 value;
     s32 dBtnInput = input->cur.button & (BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT);
+
+    if (sIsInventoryEditorTakenOver) {
+        return;
+    }
 
     pauseCtx->stickAdjX = input->rel.stick_x;
     pauseCtx->stickAdjY = input->rel.stick_y;

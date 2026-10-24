@@ -8,6 +8,9 @@
 #include "interface/parameter_static/parameter_static.h"
 #include "archives/icon_item_static/icon_item_static_yar.h"
 
+#include "2s2h/ModApi/CustomItemRegistry/KaleidoItemManager.h"
+#include "2s2h/ModApi/CustomEquipRegistry/CustomEquipRegistry.h"
+
 s32 KaleidoScope_UpdateQuestStatusPoint(PauseContext* pauseCtx, s16 point);
 
 s16 sQuestRemainsColorTimerInit[] = { 120, 60, 2, 80 };
@@ -64,6 +67,8 @@ s16 sQuestRemainsEnvBlue[] = {
 extern const char* sCounterTextures[];
 
 void KaleidoScope_DrawQuestStatus(PlayState* play) {
+    if (KaleidoQuestManager_DrawExtra(play)) return;
+    ModLayout_ApplyCells(play,S2H_ITEM_PAGE_QUEST_VANILLA,play->pauseCtx.questVtx,QUEST_HEART_PIECE+1);
     static s16 sQuestRemainsColorTimer = 20;
     static s16 sQuestRemainsColorTimerIndex = 0;
     static s16 sQuestHpPrimRed = 0;
@@ -200,22 +205,8 @@ void KaleidoScope_DrawQuestStatus(PlayState* play) {
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
     gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
 
-    if (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) != EQUIP_VALUE_SHIELD_NONE) {
-        gSPVertex(POLY_OPA_DISP++, &pauseCtx->questVtx[j], 4, 0);
-        KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, gItemIcons[(ITEM_SHIELD_HERO - 1) + GET_CUR_EQUIP_VALUE(1)],
-                                       32, 32, 0);
-    }
-
-    j += 4;
-
-    // Draw Sword
-    if (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) != EQUIP_VALUE_SWORD_NONE) {
-        gSPVertex(POLY_OPA_DISP++, &pauseCtx->questVtx[j], 4, 0);
-        KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, gItemIcons[(ITEM_SWORD_KOKIRI - 1) + GET_CUR_EQUIP_VALUE(0)],
-                                       32, 32, 0);
-    }
-
-    j += 4;
+    // Capacity, strength and scale icons are drawn by the shared quest manager.
+    j += 8;
 
     // Draw Songs
     gDPPipeSync(POLY_OPA_DISP++);
@@ -266,16 +257,8 @@ void KaleidoScope_DrawQuestStatus(PlayState* play) {
     gDPPipeSync(POLY_OPA_DISP++);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
 
-    // Loop over quest item upgrades
-    for (i = 0; i < 2; i++, j += 4) {
-        gSPVertex(POLY_OPA_DISP++, &pauseCtx->questVtx[j], 4, 0);
-        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
-
-        if (GET_CUR_UPG_VALUE(sQuestUpgrades[i]) != 0) {
-            KaleidoScope_DrawTexQuadRGBA32(
-                play->state.gfxCtx, sQuestUpgradeTextures[i][GET_CUR_UPG_VALUE(sQuestUpgrades[i]) - 1], 32, 32, 0);
-        }
-    }
+    // The two remaining upgrade cells use the shared quest manager.
+    j += 8;
 
     // Skip over &pauseCtx->questVtx[84], which should be `QUEST_SKULL_TOKEN`
     j += 4;
@@ -554,6 +537,10 @@ void KaleidoScope_DrawQuestStatus(PlayState* play) {
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
+
+    // 2S2H [Mods] Icons of the custom items claiming points of this page
+    KaleidoQuestManager_DrawPoints(play);
+
 }
 
 typedef enum {
@@ -570,6 +557,7 @@ typedef struct {
 } CursorPointDirection; // size = 0x8
 
 void KaleidoScope_UpdateQuestCursor(PlayState* play) {
+    if (KaleidoQuestManager_UpdateExtra(play)) return;
     static s16 sQuestSongPlaybackDelayTimer = 0;
     static CursorPointDirection sCursorPointLinks[] = {
         { CURSOR_NONE, QUEST_REMAINS_TWINMOLD, QUEST_REMAINS_GYORG, QUEST_REMAINS_GOHT },     // QUEST_REMAINS_ODOLWA
@@ -714,20 +702,9 @@ void KaleidoScope_UpdateQuestCursor(PlayState* play) {
                         cursorItem = PAUSE_ITEM_NONE;
                     }
                 } else if (pauseCtx->cursorPoint[PAUSE_QUEST] == QUEST_SHIELD) {
-                    // Shield
-                    if (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) != EQUIP_VALUE_SHIELD_NONE) {
-                        cursorItem = (ITEM_SHIELD_HERO - EQUIP_TYPE_SHIELD) + GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD);
-                    } else {
-                        cursorItem = PAUSE_ITEM_NONE;
-                    }
+                    cursorItem = GET_CUR_UPG_VALUE(UPG_BOMB_BAG) ? ITEM_BOMB_BAG_20 + GET_CUR_UPG_VALUE(UPG_BOMB_BAG) - 1 : PAUSE_ITEM_NONE;
                 } else if (pauseCtx->cursorPoint[PAUSE_QUEST] == QUEST_SWORD) {
-                    // Sword
-                    if (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) != EQUIP_VALUE_SWORD_NONE) {
-                        cursorItem =
-                            (ITEM_SWORD_KOKIRI - EQUIP_VALUE_SWORD_KOKIRI) + GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD);
-                    } else {
-                        cursorItem = PAUSE_ITEM_NONE;
-                    }
+                    cursorItem = GET_CUR_UPG_VALUE(UPG_QUIVER) ? ITEM_QUIVER_30 + GET_CUR_UPG_VALUE(UPG_QUIVER) - 1 : PAUSE_ITEM_NONE;
                 } else if (pauseCtx->cursorPoint[PAUSE_QUEST] <= QUEST_SONG_SUN) {
                     // Songs
                     if (CHECK_QUEST_ITEM(pauseCtx->cursorPoint[PAUSE_QUEST])) {
@@ -738,20 +715,8 @@ void KaleidoScope_UpdateQuestCursor(PlayState* play) {
                     } else {
                         cursorItem = PAUSE_ITEM_NONE;
                     }
-                } else if (pauseCtx->cursorPoint[PAUSE_QUEST] == QUEST_QUIVER) {
-                    // Quiver Upgrade
-                    if (GET_CUR_UPG_VALUE(UPG_QUIVER) != 0) {
-                        cursorItem = (ITEM_QUIVER_30 - 1) + GET_CUR_UPG_VALUE(UPG_QUIVER);
-                    } else {
-                        cursorItem = PAUSE_ITEM_NONE;
-                    }
-                } else if (pauseCtx->cursorPoint[PAUSE_QUEST] == QUEST_BOMB_BAG) {
-                    // Bomb Bag Upgrade
-                    if (GET_CUR_UPG_VALUE(UPG_BOMB_BAG) != 0) {
-                        cursorItem = (ITEM_BOMB_BAG_20 - 1) + GET_CUR_UPG_VALUE(UPG_BOMB_BAG);
-                    } else {
-                        cursorItem = PAUSE_ITEM_NONE;
-                    }
+                } else if (pauseCtx->cursorPoint[PAUSE_QUEST] == QUEST_QUIVER || pauseCtx->cursorPoint[PAUSE_QUEST] == QUEST_BOMB_BAG) {
+                    cursorItem = PAUSE_ITEM_NONE;
                 } else {
                     cursorItem = PAUSE_ITEM_NONE;
                 }
@@ -764,13 +729,19 @@ void KaleidoScope_UpdateQuestCursor(PlayState* play) {
                 }
             }
 
+            // 2S2H [Mods] A custom item can claim a point of this page
+            cursorItem = KaleidoQuestManager_ResolveCursorItem(pauseCtx->cursorPoint[PAUSE_QUEST], cursorItem);
+            KaleidoQuestManager_Update(play);
+            if (!KaleidoQuestManager_IsVanillaPageShown()) return;
+
+
             cursor = pauseCtx->cursorPoint[PAUSE_QUEST];
             pauseCtx->cursorItem[pauseCtx->pageIndex] = cursorItem;
             pauseCtx->cursorSlot[pauseCtx->pageIndex] = cursor;
 
             if ((pauseCtx->debugEditor == DEBUG_EDITOR_NONE) && (pauseCtx->state == PAUSE_STATE_MAIN) &&
                 (pauseCtx->mainState == PAUSE_MAIN_STATE_IDLE) && (pauseCtx->cursorSpecialPos == 0)) {
-                if ((cursor >= QUEST_SONG_SONATA) && (cursor <= QUEST_SONG_SUN)) {
+                if (cursorItem != ITEM_CUSTOM && (cursor >= QUEST_SONG_SONATA) && (cursor <= QUEST_SONG_SUN)) {
                     // Handle part of the ocarina songs playback
                     if ((CHECK_QUEST_ITEM(pauseCtx->cursorPoint[PAUSE_QUEST]) ||
                          ((cursor == QUEST_SONG_LULLABY) && !CHECK_QUEST_ITEM(pauseCtx->cursorPoint[PAUSE_QUEST]) &&
@@ -851,12 +822,12 @@ void KaleidoScope_UpdateQuestCursor(PlayState* play) {
                             Interface_SetHudVisibility(HUD_VISIBILITY_ALL);
                         }
 
-                        if (CHECK_BTN_ALL(CONTROLLER1(&play->state)->press.button, BTN_A) && (msgCtx->msgLength == 0)) {
-                            if (pauseCtx->cursorPoint[PAUSE_QUEST] == QUEST_BOMBERS_NOTEBOOK) {
+                        if (CHECK_BTN_ANY(CONTROLLER1(&play->state)->press.button, BTN_A | BTN_CUP) && (msgCtx->msgLength == 0)) {
+                            if (cursorItem != ITEM_CUSTOM && pauseCtx->cursorPoint[PAUSE_QUEST] == QUEST_BOMBERS_NOTEBOOK && CHECK_BTN_ALL(CONTROLLER1(&play->state)->press.button,BTN_A)) {
                                 play->pauseCtx.bombersNotebookOpen = true;
                                 pauseCtx->mainState = PAUSE_MAIN_STATE_BOMBERS_NOTEBOOK_OPEN;
                                 Audio_PlaySfx(NA_SE_SY_DECIDE);
-                            } else {
+                            } else if (CHECK_BTN_ALL(CONTROLLER1(&play->state)->press.button, BTN_CUP) && !KaleidoQuestManager_ShowDescription(play)) {
                                 pauseCtx->itemDescriptionOn = true;
                                 if (pauseCtx->cursorYIndex[PAUSE_QUEST] < 2) {
                                     if (pauseCtx->cursorItem[PAUSE_QUEST] < ITEM_REMAINS_ODOLWA) {

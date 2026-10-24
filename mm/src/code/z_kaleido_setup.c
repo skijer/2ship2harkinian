@@ -5,6 +5,7 @@
 #include "z64shrink_window.h"
 
 #include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include <string.h>
 
 s16 sKaleidoSetupRightPageIndex[] = {
@@ -124,7 +125,8 @@ void KaleidoSetup_Update(PlayState* play) {
             return;
         }
 
-        if (!play->actorCtx.isOverrideInputOn && CHECK_BTN_ALL(input->press.button, BTN_START)) {
+        if (!play->actorCtx.isOverrideInputOn && CHECK_BTN_ALL(input->press.button, BTN_START) &&
+            GameInteractor_Should(VB_OPEN_PAUSE_MENU, true)) {
             gSaveContext.prevHudVisibility = gSaveContext.hudVisibility;
             pauseCtx->itemDescriptionOn = false;
             pauseCtx->state = PAUSE_STATE_OPENING_0;

@@ -45,7 +45,7 @@ typedef struct EnFamos {
     /* 0x1E2 */ s16 cratorDespawnTimer;
     /* 0x1E4 */ s16 targetYaw;
     /* 0x1E6 */ s16 flipRot; // is used to detect if the actor has been flipped upside down by light arrows
-    /* 0x1E8 */ Vec3s* pathPoints;
+    /* 0x1E8 */ Vec3f* pathPoints;
     /* 0x1EC */ f32 baseHeight; // because hover can hit the floor, we need to keep track so famos cannot by adjusted/moved by terain
     /* 0x1F0 */ f32 aggroDistance;
     /* 0x1F4 */ Vec3f targetDest;

@@ -129,8 +129,7 @@ void HandleDragAndDrop(size_t i) {
         ImGui::ImageButton(
             std::to_string(splitList[i].splitId).c_str(),
             std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                ->GetTextureByName(splitList[i].splitType == SPLIT_TYPE_NORMAL ? GetItemImageById(splitList[i].splitId)
-                                                                               : gPauseUnusedCursorTex),
+                ->GetTextureByName(GetSplitImage(splitList[i])),
             splitList[i].splitType == SPLIT_TYPE_NORMAL ? GetItemImageSizeById(splitList[i].splitId)
                                                         : ImVec2(32.0f, 32.0f),
             ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0),
@@ -237,7 +236,7 @@ void UpdateSplitStatusById(uint32_t itemId) {
         return;
     }
 
-    if (splitList[activeIndex].splitId == itemId) {
+    if (splitList[activeIndex].splitType == SPLIT_TYPE_NORMAL && splitList[activeIndex].splitId == itemId) {
         splitList[activeIndex].splitCurrentTime =
             ((GetUnixTimestamp() - gSaveContext.save.shipSaveInfo.fileCreatedAt) / 100);
         splitList[activeIndex].splitStatus = SPLIT_COMPLETE;
@@ -251,6 +250,15 @@ void UpdateSplitStatusById(uint32_t itemId) {
 }
 
 void GetSplitByActorId(int16_t actorId, uint32_t specialType = 0) {
+    uint32_t active = GetCurrentActiveSplit(splitList);
+    if (active < splitList.size() && splitList[active].splitType == SPLIT_TYPE_BOSS &&
+        splitList[active].splitId == static_cast<uint32_t>(actorId)) {
+        splitList[active].splitCurrentTime = (GetUnixTimestamp() - gSaveContext.save.shipSaveInfo.fileCreatedAt) / 100;
+        splitList[active].splitStatus = SPLIT_COMPLETE;
+        if (active + 1 < splitList.size()) splitList[active + 1].splitStatus = SPLIT_ACTIVE;
+        else CheckSplitsCompleted(active);
+        return;
+    }
     uint32_t activeIndex = GetCurrentActiveSplit(splitList);
 
     switch (actorId) {

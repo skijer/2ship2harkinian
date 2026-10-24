@@ -348,6 +348,7 @@ typedef enum ItemId {
     /* 0xCA */ ITEM_CA,
     /* 0xCB */ ITEM_CB,
     /* 0xCC */ ITEM_CC,
+    /* 0xCD */ ITEM_CUSTOM, // Stands in for any mod item; the real one is looked up by key in the registry
     /* 0xF0 */ ITEM_F0 = 0xF0, // PLAYER_MASK_BLAST
     /* 0xF1 */ ITEM_F1, // PLAYER_MASK_BREMEN
     /* 0xF2 */ ITEM_F2, // PLAYER_MASK_KAMARO

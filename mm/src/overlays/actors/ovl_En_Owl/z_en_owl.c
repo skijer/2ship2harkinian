@@ -417,7 +417,7 @@ s32 func_8095B06C(EnOwl* this) {
 
 void func_8095B0C8(EnOwl* this) {
     s32 pad;
-    Vec3s* points = Lib_SegmentedToVirtual(this->path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(this->path->points);
 
     points += this->unk_3F8;
     this->unk_3EC = Math_Atan2S_XY(points->z - this->actor.world.pos.z, points->x - this->actor.world.pos.x);
@@ -547,13 +547,13 @@ void func_8095B76C(EnOwl* this, PlayState* play) {
     Actor* thisx = &this->actor;
     s16 sp4A;
     f32 sp44 = Path_OrientAndGetDistSq(thisx, this->path, this->unk_3F8, &sp4A);
-    Vec3s* point;
+    Vec3f* point;
 
     Math_SmoothStepToS(&thisx->world.rot.y, sp4A, 6, 0x800, 0x200);
     thisx->shape.rot.y = thisx->world.rot.y;
     if (sp44 < SQ(thisx->speed)) {
         thisx->speed = 0.0f;
-        point = &((Vec3s*)Lib_SegmentedToVirtual(this->path->points))[this->unk_3F8];
+        point = &((Vec3f*)Lib_SegmentedToVirtual(this->path->points))[this->unk_3F8];
 
         thisx->world.pos.x = point->x;
         thisx->world.pos.z = point->z;

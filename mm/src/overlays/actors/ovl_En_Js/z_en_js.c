@@ -196,7 +196,7 @@ s32 func_80968B8C(EnJs* this, PlayState* play) {
     s32 pathIndex = ENJS_GET_PATH_INDEX(&this->actor);
     s32 i;
     f32 sp18 = 0.0f;
-    Vec3s* points;
+    Vec3f* points;
 
     if (pathIndex != ENJS_PATH_INDEX_NONE) {
         this->path = &play->setupPathList[pathIndex];
@@ -236,14 +236,14 @@ s32 func_80968CB8(EnJs* this) {
     s32 pad;
     f32 temp_fa0;
     f32 temp_fa1;
-    Vec3s* temp_v1;
+    Vec3f* temp_v1;
 
     if (this->path == NULL) {
         return true;
     }
 
     path = this->path;
-    temp_v1 = &((Vec3s*)Lib_SegmentedToVirtual(path->points))[this->unk_2B0];
+    temp_v1 = &((Vec3f*)Lib_SegmentedToVirtual(path->points))[this->unk_2B0];
     temp_fa0 = temp_v1->x - this->actor.world.pos.x;
     temp_fa1 = temp_v1->z - this->actor.world.pos.z;
     this->actor.world.rot.y = Math_Atan2S(temp_fa0, temp_fa1);

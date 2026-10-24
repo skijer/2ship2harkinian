@@ -1194,7 +1194,7 @@ void EnDeath_UpdateDamage(EnDeath* this, PlayState* play) {
             this->coreGuarded = true;
             this->coreVelocity = -1.0f;
             this->coreRotation = this->actor.shape.rot.y;
-            Math_Vec3s_ToVec3f(&this->corePos, &this->coreCollider.dim.worldSphere.center);
+            Math_Vec3f_Copy(&this->corePos, &this->coreCollider.dim.worldSphere.center);
             SoundSource_PlaySfxAtFixedWorldPos(play, &this->corePos, 30, NA_SE_EN_FFLY_DEAD);
 
             if (this->actor.colChkInfo.damageEffect == DMGEFF_LIGHT_ARROW &&

@@ -55,7 +55,7 @@ void ObjMakeoshihiki_SetSwitchFlags(ObjMakeoshihiki* this, PlayState* play, s32 
 
 void ObjMakeoshihiki_Init(Actor* thisx, PlayState* play) {
     ObjMakeoshihiki* this = (ObjMakeoshihiki*)thisx;
-    Vec3s* childPoint;
+    Vec3f* childPoint;
     Path* path;
     s32 childPointIndex;
 
@@ -82,7 +82,7 @@ void ObjMakeoshihiki_Update(Actor* thisx, PlayState* play) {
             this->actor.child = NULL;
         } else {
             for (loopPathIndex = 0; loopPathIndex < this->pathCount; loopPathIndex++) {
-                Math_Vec3s_ToVec3f(&pathPointF, &this->pathPoints[loopPathIndex]);
+                Math_Vec3f_Copy(&pathPointF, &this->pathPoints[loopPathIndex]);
                 if (Math3D_Vec3fDistSq(&this->actor.child->world.pos, &pathPointF) < SQ(0.5f)) {
                     ObjMakeoshihiki_SetSwitchFlags(this, play, loopPathIndex);
                     return;

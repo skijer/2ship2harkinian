@@ -18,5 +18,6 @@ class SetAnimatedMaterialList : public SceneCommand<AnimatedMaterial> {
     size_t GetPointerSize();
 
     AnimatedMaterial* mat;
+    std::string fileName;
 };
 }; // namespace SOH

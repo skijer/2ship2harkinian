@@ -1,7 +1,11 @@
+#include "2s2h/ModApi/Labels/ModLabels.h"
+#include "2s2h/ModApi/ProgressiveItems/ProgressiveItems.h"
+#include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
 #include "StaticData.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/ShipUtils.h"
 #include "2s2h/Rando/Rando.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "2s2h_assets.h"
 
 extern "C" {
@@ -362,6 +366,15 @@ u8 GetIconForZMessage(RandoItemId randoItemId) {
 }
 
 const char* GetIconTexturePath(RandoItemId randoItemId) {
+    if (const char* key = ProgressiveItems_ResolveRando(randoItemId, RandoInfCustom_GetActiveBank()))
+        return CustomItemRegistry_ResolveTexture(key, S2H_ITEM_ICON_INVENTORY);
+    if (DungeonRegistry_FindItem(randoItemId) >= 0) {
+        return (const char*)gItemIcons[Items[randoItemId].itemId];
+    }
+    if (RandoItems_IsModItem(randoItemId)) {
+        return RandoItems_GetIconPath(randoItemId);
+    }
+
     switch (randoItemId) {
         case RI_BOMBCHU:
         case RI_BOMBCHU_5:
@@ -668,6 +681,11 @@ const std::map<RandoItemId, std::vector<std::string>> fakeItemNames = {
 };
 
 std::string GetItemName(RandoItemId randoItemId, bool includeArticle, RandoCheckId randoCheckId) {
+    const auto row = Items.find(randoItemId);
+    if (row != Items.end()) {
+        if (const char* label = ModLabels_Get(S2H_LABEL_ITEM, gSaveContext.options.language, row->second.itemId)) return label;
+    }
+    if (const char* key = ProgressiveItems_ResolveRando(randoItemId, RandoInfCustom_GetActiveBank())) return key;
     std::string result;
 
     if (includeArticle && !Ship_IsCStringEmpty(Rando::StaticData::Items[randoItemId].article)) {

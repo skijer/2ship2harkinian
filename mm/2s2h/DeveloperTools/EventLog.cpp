@@ -45,18 +45,6 @@ const char* flagTypeNames[] = {
     "chest *", "switch *",     "clearedRoom *",  "collectible *", "randoInf",
 };
 
-#define DEFINE_ACTOR(name, _enumValue, _allocType, _debugName, _humanName) { _enumValue, _debugName },
-#define DEFINE_ACTOR_INTERNAL(_name, _enumValue, _allocType, _debugName, _humanName) { _enumValue, _debugName },
-#define DEFINE_ACTOR_UNSET(_enumValue) { _enumValue, "Unset" },
-
-std::unordered_map<s16, const char*> actorNames = {
-#include "tables/actor_table.h"
-};
-
-#undef DEFINE_ACTOR
-#undef DEFINE_ACTOR_INTERNAL
-#undef DEFINE_ACTOR_UNSET
-
 static HOOK_ID onFlagSetHookId = 0;
 static HOOK_ID onFlagUnsetHookId = 0;
 static HOOK_ID onSceneFlagSetHookId = 0;
@@ -199,7 +187,7 @@ void RegisterEventLogHooks() {
                                {
                                    .timestamp = CurrentTime(),
                                    .type = EVENT_LOG_ENTRY_TYPE_ACTOR_INIT,
-                                   .meta = fmt::format("{} {}", actorNames[actor->id], actor->params),
+                                   .meta = fmt::format("{} {}", GetActorDebugName(actor->id), actor->params),
                                });
         TrimEventLog();
     });
@@ -209,7 +197,7 @@ void RegisterEventLogHooks() {
                                {
                                    .timestamp = CurrentTime(),
                                    .type = EVENT_LOG_ENTRY_TYPE_ACTOR_KILL,
-                                   .meta = fmt::format("{} {}", actorNames[actor->id], actor->params),
+                                   .meta = fmt::format("{} {}", GetActorDebugName(actor->id), actor->params),
                                });
         TrimEventLog();
     });
@@ -226,7 +214,7 @@ void RegisterEventLogHooks() {
         });
 
     onRoomInitHookId =
-        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnRoomInit>([](s16 sceneId, s8 roomId) {
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnRoomInit>([](s16 sceneId, s16 roomId) {
             eventLogEntries.insert(eventLogEntries.begin(),
                                    {
                                        .timestamp = CurrentTime(),

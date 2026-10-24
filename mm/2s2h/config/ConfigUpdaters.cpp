@@ -56,7 +56,7 @@ static void MigrateWarpPoints(Ship::Config* conf) {
             auto warpPoints = nlohmann::json::object();
 
             s32 entranceId = CVarGetInteger("gDeveloperTools.WarpPoint.Entrance", 0);
-            s8 roomNum = CVarGetInteger("gDeveloperTools.WarpPoint.Room", 0);
+            s16 roomNum = CVarGetInteger("gDeveloperTools.WarpPoint.Room", 0);
             Vec3f pos = { CVarGetFloat("gDeveloperTools.WarpPoint.X", 0.0f),
                           CVarGetFloat("gDeveloperTools.WarpPoint.Y", 0.0f),
                           CVarGetFloat("gDeveloperTools.WarpPoint.Z", 0.0f) };

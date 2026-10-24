@@ -123,7 +123,7 @@ s32 EnRuppecrow_UpdateCollision(EnRuppecrow* this, PlayState* play) {
 }
 
 s32 EnRuppecrow_HasReachedPointClockwise(EnRuppecrow* this, Path* path, s32 pointIndex) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     s32 count = path->count;
     s32 index = pointIndex;
     s32 reached = false;
@@ -134,7 +134,7 @@ s32 EnRuppecrow_HasReachedPointClockwise(EnRuppecrow* this, Path* path, s32 poin
     f32 d;
     Vec3f point;
 
-    Math_Vec3s_ToVec3f(&point, &points[index]);
+    Math_Vec3f_Copy(&point, &points[index]);
 
     if (index == 0) {
         diffX = points[1].x - points[0].x;
@@ -157,7 +157,7 @@ s32 EnRuppecrow_HasReachedPointClockwise(EnRuppecrow* this, Path* path, s32 poin
 }
 
 s32 EnRuppecrow_HasReachedPointCounterClockwise(EnRuppecrow* this, Path* path, s32 pointIndex) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     s32 count = path->count;
     s32 index = pointIndex;
     s32 reached = false;
@@ -168,7 +168,7 @@ s32 EnRuppecrow_HasReachedPointCounterClockwise(EnRuppecrow* this, Path* path, s
     f32 d;
     Vec3f point;
 
-    Math_Vec3s_ToVec3f(&point, &points[index]);
+    Math_Vec3f_Copy(&point, &points[index]);
 
     if (index == 0) {
         diffX = points[0].x - points[1].x;
@@ -191,7 +191,7 @@ s32 EnRuppecrow_HasReachedPointCounterClockwise(EnRuppecrow* this, Path* path, s
 }
 
 f32 EnRuppecrow_GetPointDirection(Path* path, s32 pointIndex, PosRot* world, Vec3s* direction) {
-    Vec3s* points;
+    Vec3f* points;
     Vec3f point;
 
     if (path != NULL) {

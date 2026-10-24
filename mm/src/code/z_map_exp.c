@@ -175,6 +175,7 @@ void Map_SetAreaEntrypoint(PlayState* play) {
 }
 
 void Map_InitRoomData(PlayState* play, s16 room) {
+    if (room < 0 || room >= ROOM_MAX || play->roomList.count > ROOM_MAX) { return; }
     s32 mapIndex = gSaveContext.mapIndex;
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
 

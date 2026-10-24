@@ -31,8 +31,12 @@ uint64_t gCurrentRegionTime = 0;
 // ENTRANCE(GROTTOS, 31) = RR_ROAD_TO_IKANA_GROTTO
 
 RandoRegionId GetRegionIdFromEntrance(s32 entrance) {
+    entrance = DungeonRegistry_ResolveEntrance(entrance);
     static std::map<s32, RandoRegionId> entranceToRegionId;
-    if (entranceToRegionId.empty()) {
+    static size_t regionCount = 0;
+    if (regionCount != Regions.size()) {
+        entranceToRegionId.clear();
+        regionCount = Regions.size();
         for (auto& [randoRegionId, randoRegion] : Regions) {
             for (auto& [_, regionExit] : randoRegion.exits) {
                 if (regionExit.returnEntrance == ONE_WAY_EXIT) {

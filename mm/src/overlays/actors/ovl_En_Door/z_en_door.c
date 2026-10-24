@@ -166,7 +166,7 @@ u8 sDoorSch_InnGrannys[] = {
     /* 0x0 */ SCHEDULE_CMD_RET_NONE(),
 };
 
-u8 sDoorSch_InnStaffRoom[] = {
+s16 sDoorSch_InnStaffRoom[] = {
     /* 0x0 */ SCHEDULE_CMD_CHECK_NOT_IN_DAY_S(3, 0x9 - 0x4),
     /* 0x4 */ SCHEDULE_CMD_CHECK_BEFORE_TIME_S(18, 0, 0x9 - 0x8),
     /* 0x8 */ SCHEDULE_CMD_RET_NONE(),
@@ -199,7 +199,7 @@ u8 sDoorSch_MayorsResidenceMadameAroma[] = {
     /* 0x0 */ SCHEDULE_CMD_RET_NONE(),
 };
 
-u8 sDoorSch_MayorsResidenceBedroom[] = {
+s16 sDoorSch_MayorsResidenceBedroom[] = {
     /* 0x0 */ SCHEDULE_CMD_RET_NONE(),
 };
 
@@ -235,7 +235,7 @@ u8 sDoorSch_RomaniRanchDoggyRacetrack[] = {
     /* 0x6 */ SCHEDULE_CMD_RET_NONE(),
 };
 
-u8 sDoorSch_RomaniRanchBedroom[] = {
+s16 sDoorSch_RomaniRanchBedroom[] = {
     /* 0x00 */ SCHEDULE_CMD_CHECK_NOT_IN_DAY_S(2, 0x08 - 0x04),
     /* 0x04 */ SCHEDULE_CMD_CHECK_WEEK_EVENT_REG_S(WEEKEVENTREG_99_80, 0x0E - 0x08),
     /* 0x08 */ SCHEDULE_CMD_CHECK_BEFORE_TIME_S(20, 0, 0x14 - 0x0C),

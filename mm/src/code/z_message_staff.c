@@ -4,6 +4,12 @@
 #include "assets/interface/message_texture_static/message_texture_static.h"
 
 void Message_FindCreditsMessage(PlayState* play, u16 textId) {
+    MessageTableEntry* found = OTRMessage_Find(play->msgCtx.messageTableCredits, textId);
+    if (found != NULL) {
+        play->msgCtx.font.messageStart = (uintptr_t)found;
+        play->msgCtx.font.charBuf[play->msgCtx.font.unk_11D88][0] = found->typePos;
+        return;
+    }
     MessageContext* msgCtx = &play->msgCtx;
     Font* font = &msgCtx->font;
     MessageTableEntry* msgEntry = msgCtx->messageTableCredits;
@@ -41,7 +47,7 @@ void Message_DrawTextCredits(PlayState* play, Gfx** gfxP) {
     u16 i;
     u16 sfxHi;
     char character;
-    u16 charTexIndex;
+    u32 charTexIndex;
     Font* font = &msgCtx->font;
     Gfx* gfx = *gfxP;
 
@@ -345,8 +351,11 @@ void Message_DecodeCredits(PlayState* play) {
     msgCtx->nextTextId = 0xFFFF;
 
     while (true) {
-        curChar = font->msgBuf.schar[msgCtx->msgBufPos];
-        msgCtx->decodedBuffer.schar[decodedBufPos] = font->msgBuf.schar[msgCtx->msgBufPos];
+        curChar = msgCtx->msgBufPos < msgCtx->msgLength ? font->msgBuf.schar[msgCtx->msgBufPos] : MESSAGE_END;
+        if (decodedBufPos >= MESSAGE_DECODED_BUF_SIZE - 64 ||
+            charTexIdx >= FONT_CHAR_TEX_SIZE * (MESSAGE_DECODED_BUF_SIZE - 64) ||
+            msgCtx->msgBufPos + 8 >= MESSAGE_BUF_SIZE) { curChar = MESSAGE_END; }
+        msgCtx->decodedBuffer.schar[decodedBufPos] = curChar;
 
         if ((curChar == MESSAGE_BOX_BREAK) || (curChar == MESSAGE_TEXTID) || (curChar == MESSAGE_BOX_BREAK_DELAYED) ||
             (curChar == MESSAGE_EVENT) || (curChar == MESSAGE_END)) {

@@ -1,4 +1,5 @@
 #include "MiscBehavior.h"
+#include "2s2h/ModApi/ModDungeons/BossRegistry.h"
 #include "Rando/Rando.h"
 #include "Rando/Spoiler/Spoiler.h"
 #include "Rando/Logic/Logic.h"
@@ -7,6 +8,7 @@
 #include "ClockShuffle.h"
 #include <spdlog/spdlog.h>
 #include "2s2h/BenGui/Notification.h"
+#include "2s2h/ModApi/RandoLogic/RandoLogic.h"
 
 extern "C" {
 #include "functions.h"
@@ -53,12 +55,16 @@ void Rando::MiscBehavior::OnFileCreate(s16 fileNum) {
                     hadInputSeed = false;
                 }
 
+                RandoSeedGenerationScope modApiScope;
+
                 SPDLOG_INFO("Generating new randomizer with seed: {}", inputSeed);
                 uint32_t finalSeed = Ship_Hash(inputSeed);
                 Ship_Random_Seed(finalSeed);
 
                 // Persist options to the save
                 gSaveContext.save.shipSaveInfo.rando.finalSeed = finalSeed;
+                BossRegistry_AssignForSeed(finalSeed);
+                DungeonRegistry_AssignEntrances(finalSeed);
                 for (auto& [randoOptionId, randoStaticOption] : Rando::StaticData::Options) {
                     RANDO_SAVE_OPTIONS[randoOptionId] =
                         (uint32_t)CVarGetInteger(randoStaticOption.cvar, randoStaticOption.defaultValue);

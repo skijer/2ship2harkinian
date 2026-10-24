@@ -235,7 +235,7 @@ void EnHoll_TransparentIdle(EnHoll* this, PlayState* play) {
             s32 enHollId = EN_HOLL_GET_ID(&this->actor);
             s32 playerSide = (transformedPlayerPos.z < 0.0f) ? EN_HOLL_BEHIND : EN_HOLL_BEFORE;
             TransitionActorEntry* transitionActorEntry = &play->transitionActors.list[enHollId];
-            s8 room = transitionActorEntry->sides[playerSide].room;
+            s16 room = transitionActorEntry->sides[playerSide].room;
 
             this->actor.room = room;
 

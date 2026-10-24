@@ -1,0 +1,6 @@
+{
+    "name": "actor_template",
+    "author": "2Ship",
+    "version": "1.0",
+    "description": "Template actor: a floating red rupee that bursts into rupees when hit. Spawn it with: spawn template.rupee_sprite 0"
+}

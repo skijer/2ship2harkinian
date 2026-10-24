@@ -213,6 +213,49 @@ void FreeLookPitchMinMax() {
 
 using namespace UIWidgets;
 
+bool BenMenu::EnsureModSidebar(const std::string& section, const std::string& sidebar, const char* cvar,
+                               uint32_t columns) {
+    if (!menuEntries.contains(section)) {
+        AddMenuEntry(section, cvar);
+    }
+    auto& entry = menuEntries.at(section);
+    if (!entry.sidebars.contains(sidebar)) {
+        AddSidebarEntry(section, sidebar, columns);
+    }
+    return entry.sidebars.at(sidebar).columnCount >= columns;
+}
+
+bool BenMenu::MoveModWidget(const WidgetPath& path, const std::string& label, const std::string& anchor, bool after) {
+    if (!menuEntries.contains(path.sectionName)) {
+        return false;
+    }
+    auto& sidebars = menuEntries.at(path.sectionName).sidebars;
+    if (!sidebars.contains(path.sidebarName) || sidebars.at(path.sidebarName).columnWidgets.size() <= path.column) {
+        return false;
+    }
+    auto& widgets = sidebars.at(path.sidebarName).columnWidgets.at(path.column);
+    auto isNamed = [](const std::string& name) { return [&name](const WidgetInfo& widget) { return widget.name == name; }; };
+    auto source = std::find_if(widgets.begin(), widgets.end(), isNamed(label));
+    auto target = std::find_if(widgets.begin(), widgets.end(), isNamed(anchor));
+    if (source == widgets.end() || target == widgets.end() || source == target) {
+        return false;
+    }
+    auto moved = std::move(*source);
+    widgets.erase(source);
+    target = std::find_if(widgets.begin(), widgets.end(), isNamed(anchor));
+    widgets.insert(target + (after ? 1 : 0), std::move(moved));
+    return true;
+}
+
+bool BenMenu::HasModWidgetPath(const WidgetPath& path) const {
+    auto section = menuEntries.find(path.sectionName);
+    if (section == menuEntries.end()) {
+        return false;
+    }
+    auto sidebar = section->second.sidebars.find(path.sidebarName);
+    return sidebar != section->second.sidebars.end() && path.column < sidebar->second.columnCount;
+}
+
 void BenMenu::AddSidebarEntry(std::string sectionName, std::string sidebarName, uint32_t columnCount) {
     assert(!sectionName.empty());
     assert(!sidebarName.empty());
@@ -2230,6 +2273,7 @@ void BenMenu::InitElement() {
     for (auto& initFunc : MenuInit::GetInitFuncs()) {
         initFunc();
     }
+    mMenuElementsInitialized = true;
 
     disabledMap = {
         { DISABLE_FOR_CAMERAS_OFF,

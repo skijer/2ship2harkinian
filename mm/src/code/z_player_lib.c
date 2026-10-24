@@ -5,6 +5,7 @@
 
 #include "global.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
 
 #include "objects/gameplay_keep/gameplay_keep.h"
 
@@ -1000,11 +1001,13 @@ u8 sActionModelGroups[PLAYER_IA_MAX] = {
     PLAYER_MODELGROUP_DEFAULT,        // PLAYER_IA_MASK_ZORA
     PLAYER_MODELGROUP_DEFAULT,        // PLAYER_IA_MASK_DEKU
     PLAYER_MODELGROUP_DEFAULT,        // PLAYER_IA_LENS_OF_TRUTH
+    PLAYER_MODELGROUP_DEFAULT,        // PLAYER_IA_CUSTOM
 };
 
 PlayerModelGroup Player_ActionToModelGroup(Player* player, PlayerItemAction itemAction) {
-    PlayerModelGroup modelGroup = sActionModelGroups[itemAction];
+    s32 modelGroup = sActionModelGroups[itemAction];
 
+    GameInteractor_ExecuteOnPlayerResolveModelGroup(player, itemAction, &modelGroup);
     if ((modelGroup == PLAYER_MODELGROUP_ONE_HAND_SWORD) && Player_IsGoronOrDeku(player)) {
         return PLAYER_MODELGROUP_1;
     }
@@ -1674,7 +1677,10 @@ bool Player_IsBurningStickInRange(PlayState* play, Vec3f* pos, f32 xzRange, f32 
 }
 
 u8 Player_GetStrength(void) {
-    return sPlayerStrengths[GET_PLAYER_FORM];
+    s32 strength = sPlayerStrengths[GET_PLAYER_FORM];
+
+    GameInteractor_Should(VB_USE_STRENGTH_UPGRADE, true, &strength);
+    return strength;
 }
 
 PlayerMask Player_GetMask(PlayState* play) {
@@ -1729,7 +1735,8 @@ PlayerBButtonSword Player_GetHeldBButtonSword(Player* player) {
 }
 
 PlayerMeleeWeapon Player_MeleeWeaponFromIA(PlayerItemAction itemAction) {
-    PlayerMeleeWeapon weapon = GET_MELEE_WEAPON_FROM_IA(itemAction);
+    PlayerMeleeWeapon weapon = itemAction == PLAYER_IA_CUSTOM ? CustomItemRegistry_GetActiveMeleeWeapon()
+                                                              : GET_MELEE_WEAPON_FROM_IA(itemAction);
 
     if ((weapon > PLAYER_MELEEWEAPON_NONE) && (weapon < PLAYER_MELEEWEAPON_MAX)) {
         return weapon;
@@ -2087,7 +2094,7 @@ void Player_DrawImpl(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dL
 
     // Only Human, Zora, and Goron will read the eye textures in the head limb display list.
     // Fierce Deity and Deku will point this segment to garbage data, but it will be unread from.
-    gSPSegment(&gfx[0], 0x08, Lib_SegmentedToVirtual(sPlayerEyesTextures[playerForm][eyeIndex]));
+    const char* eyes = sPlayerEyesTextures[playerForm][eyeIndex];
 
     // 2S2H [Port] Hess crash fix
     if (mouthIndex >= PLAYER_MOUTH_MAX) {
@@ -2102,7 +2109,11 @@ void Player_DrawImpl(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dL
 
     // Only Human and Zora will read the mouth textures in the head limb display list.
     // Goron, Fierce Deity, and Deku will point this segment to garbage data, but it will be unread from.
-    gSPSegment(&gfx[1], 0x09, Lib_SegmentedToVirtual(sPlayerMouthTextures[playerForm][mouthIndex]));
+    const char* mouth = sPlayerMouthTextures[playerForm][mouthIndex];
+
+    GameInteractor_ExecuteOnPlayerResolveFaceTextures(&eyes, &mouth);
+    gSPSegment(&gfx[0], 0x08, Lib_SegmentedToVirtual((void*)eyes));
+    gSPSegment(&gfx[1], 0x09, Lib_SegmentedToVirtual((void*)mouth));
 
     POLY_OPA_DISP = &gfx[2];
 
@@ -2169,8 +2180,10 @@ void Player_AdjustSingleLeg(PlayState* play, Player* player, SkelAnime* skelAnim
     f32 sp70;
     f32 sp7C;
 
-    if ((player->stateFlags3 & PLAYER_STATE3_1) || !(player->actor.scale.y >= 0.0f) ||
-        (player->stateFlags1 & PLAYER_STATE1_DEAD) || play->soaringCsOrSoTCsPlaying) {
+    if (!GameInteractor_Should(VB_PLAYER_ADJUST_LEGS_TO_FLOOR,
+                               !(player->stateFlags3 & PLAYER_STATE3_1) && (player->actor.scale.y >= 0.0f) &&
+                                   !(player->stateFlags1 & PLAYER_STATE1_DEAD) && !play->soaringCsOrSoTCsPlaying,
+                               player)) {
         return;
     }
 
@@ -2608,6 +2621,7 @@ void func_80125CE0(Player* player, struct_80124618* arg1, Vec3f* pos, Vec3s* rot
 s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
                                            Actor* actor) {
     Player* player = (Player*)actor;
+    Gfx* limbDList = *dList;
 
     if (!Player_OverrideLimbDrawGameplayCommon(play, limbIndex, dList, pos, rot, &player->actor)) {
         if (limbIndex == PLAYER_LIMB_LEFT_HAND) {
@@ -2731,12 +2745,14 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
         }
     }
 
+    GameInteractor_ExecuteOnPlayerResolveLimbDraw(player, limbIndex, dList, limbDList, pos);
     return false;
 }
 
 s32 Player_OverrideLimbDrawGameplayFirstPerson(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
                                                Actor* actor) {
     Player* player = (Player*)actor;
+    Gfx* limbDList = *dList;
 
     if (!Player_OverrideLimbDrawGameplayCommon(play, limbIndex, dList, pos, rot, actor)) {
         if (player->unk_AA5 != PLAYER_UNKAA5_3) {
@@ -2758,6 +2774,7 @@ s32 Player_OverrideLimbDrawGameplayFirstPerson(PlayState* play, s32 limbIndex, G
         }
     }
 
+    GameInteractor_ExecuteOnPlayerResolveLimbDraw(player, limbIndex, dList, limbDList, pos);
     return false;
 }
 
@@ -3917,6 +3934,9 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList1, G
         }
 
         if (player->actor.scale.y >= 0.0f) {
+            if (player->heldItemAction == PLAYER_IA_CUSTOM) {
+                CustomItemRegistry_DrawHeld(player, play);
+            }
             if (player->rightHandType == PLAYER_MODELTYPE_RH_FF) {
                 Matrix_Get(&player->shieldMf);
             } else if (player->rightHandType == PLAYER_MODELTYPE_RH_SHIELD) {

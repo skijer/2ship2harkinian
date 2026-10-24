@@ -9,8 +9,8 @@
 struct GameState;
 struct PlayState;
 
-#define ROOM_MAX 32 // maximum number of rooms in a scene
-#define ROOM_TRANSITION_MAX 48 // maximum number of transition actors in a scene
+#define ROOM_MAX 32 // native minimap room capacity
+#define ROOM_TRANSITION_MAX 1024 // maximum number of transition actors in a scene (2S2H [Unbound] vanilla 48)
 
 #define SPAWN_ROT_FLAGS(rotation, flags) (((rotation) << 7) | (flags))
 
@@ -243,7 +243,7 @@ typedef struct {
 
 typedef struct {
     /* 0x0 */ RoomShapeBase base;
-    /* 0x1 */ u8 numEntries;
+    /* 0x1 */ u32 numEntries;
     /* 0x4 */ RoomShapeDListsEntry* entries;
     /* 0x8 */ RoomShapeDListsEntry* entriesEnd;
 } RoomShapeNormal; // size = 0xC
@@ -292,16 +292,17 @@ typedef struct {
     /* 0xC */ RoomShapeImageMultiBgEntry* backgrounds;
 } RoomShapeImageMulti; // size = 0x10
 
+// 2S2H [Unbound] positions in this file are f32 (world extent); each struct is mirrored in 2s2h/resource/type
 typedef struct {
-    /* 0x0 */ Vec3s boundsSphereCenter;
-    /* 0x6 */ s16 boundsSphereRadius;
-    /* 0x8 */ Gfx* opa;
-    /* 0xC */ Gfx* xlu;
-} RoomShapeCullableEntry; // size = 0x10
+    /* 0x00 */ Vec3f boundsSphereCenter;
+    /* 0x0C */ s16 boundsSphereRadius;
+    /* 0x10 */ Gfx* opa;
+    /* 0x14 */ Gfx* xlu;
+} RoomShapeCullableEntry; // size = 0x18
 
 typedef struct {
     /* 0x0 */ RoomShapeBase base;
-    /* 0x1 */ u8 numEntries;
+    /* 0x1 */ u32 numEntries;
     /* 0x4 */ RoomShapeCullableEntry* entries;
     /* 0x8 */ RoomShapeCullableEntry* entriesEnd;
 } RoomShapeCullable; // size = 0xC
@@ -337,7 +338,7 @@ typedef enum RoomEnvironmentType {
 } RoomEnvironmentType;
 
 typedef struct {
-    /* 0x00 */ s8 num; // -1 is invalid room
+    /* 0x00 */ s16 num; // -1 is invalid room
     /* 0x01 */ u8 unk1;
     /* 0x02 */ u8 environmentType;
     /* 0x03 */ u8 type;
@@ -366,7 +367,7 @@ typedef struct RoomContext {
 } RoomContext; // size = 0x80
 
 typedef struct RoomList {
-    /* 0x0 */ u8 count;
+    /* 0x0 */ u16 count;
     /* 0x4 */ RomFile* romFiles; // Array of rom addresses for each room in a scene
 } RoomList; // size = 0x8
 
@@ -374,37 +375,38 @@ typedef void(*RoomDrawHandler)(struct PlayState* play, Room* room, u32 flags);
 
 typedef struct TransitionActorEntry {
     struct {
-        s8 room;    // Room to switch to
+        s16 room;    // Room to switch to
         s8 bgCamIndex; // How the camera reacts during the transition. -2 for spiral staircase. -1 for generic door. 0+ will index scene CamData
     } /* 0x0 */ sides[2]; // 0 = front, 1 = back
-    /* 0x4 */ s16 id;
-    /* 0x6 */ Vec3s pos;
-    /* 0xC */ s16 rotY;
-    /* 0xE */ u16 params;
-} TransitionActorEntry; // size = 0x10
+    /* 0x04 */ s16 id;
+    /* 0x08 */ Vec3f pos;
+    /* 0x14 */ s16 rotY;
+    /* 0x16 */ u16 params;
+} TransitionActorEntry; // size = 0x18
 
 typedef struct {
-    /* 0x0 */ u8 count;
+    /* 0x0 */ u16 count;
     /* 0x4 */ TransitionActorEntry* list;
 } TransitionActorList; // size = 0x8
 
 typedef struct ActorEntry {
-    /* 0x0 */ s16 id;
-    /* 0x2 */ Vec3s pos;
-    /* 0x8 */ Vec3s rot;
-    /* 0xE */ s16 params;
-} ActorEntry; // size = 0x10
+    /* 0x00 */ s16 id;
+    /* 0x04 */ Vec3f pos;
+    /* 0x10 */ Vec3s rot;
+    /* 0x16 */ s16 params;
+} ActorEntry; // size = 0x18
 
 typedef struct {
     /* 0x0 */ u8 spawn;
-    /* 0x1 */ u8 room;
+    /* 0x1 */ s16 room;
 } EntranceEntry; // size = 0x2
 
+// 2S2H [Unbound] sceneId is s16: custom scenes are numbered past SCENE_MAX, and the sign still means "no title card"
 typedef struct {
-    /* 0x0 */ s8 sceneId;
-    /* 0x1 */ s8 spawnNum;
-    /* 0x2 */ u16 flags;
-} EntranceTableEntry; // size = 0x4
+    /* 0x0 */ s16 sceneId;
+    /* 0x2 */ s8 spawnNum;
+    /* 0x4 */ u16 flags;
+} EntranceTableEntry;
 
 typedef struct {
     /* 0x0 */ u32 tableCount : 8; // unused
@@ -477,16 +479,18 @@ typedef RoomShapeCullableEntry PolygonDlist2;
 typedef RoomShapeCullable PolygonType2;
 
 #define OBJECT_SLOT_NONE -1
+// 2S2H [Unbound] object slots and their users are 16-bit.
+#define OBJECT_SLOT_CAPACITY 1024
 
 typedef struct {
     /* 0x000 */ void* spaceStart;
     /* 0x004 */ void* spaceEnd;
-    /* 0x008 */ u8 numEntries; // total amount of used entries
-    /* 0x009 */ u8 numPersistentEntries; // amount of entries that won't be reused when loading a new object list (when loading a new room)
-    /* 0x00A */ u8 mainKeepSlot; // "gameplay_keep" slot
-    /* 0x00B */ u8 subKeepSlot; // "gameplay_field_keep" or "gameplay_dangeon_keep" slot
-    /* 0x00C */ ObjectEntry slots[35];
-} ObjectContext; // size = 0x958
+    /* 0x008 */ u16 numEntries; // total amount of used entries
+    /* 0x009 */ u16 numPersistentEntries; // amount of entries that won't be reused when loading a new object list (when loading a new room)
+    /* 0x00A */ s16 mainKeepSlot; // "gameplay_keep" slot
+    /* 0x00B */ s16 subKeepSlot; // "gameplay_field_keep" or "gameplay_dangeon_keep" slot
+    /* 0x00C */ ObjectEntry slots[OBJECT_SLOT_CAPACITY];
+} ObjectContext;
 
 #define PATH_INDEX_NONE -1
 #define ADDITIONAL_PATH_INDEX_NONE (u8)-1
@@ -495,7 +499,7 @@ typedef struct {
     /* 0x0 */ u8 count; // Number of points in the path
     /* 0x1 */ u8 additionalPathIndex;
     /* 0x2 */ s16 customValue; // Path specific to help distinguish different paths
-    /* 0x4 */ Vec3s* points; // Segment Address to the array of points
+    /* 0x4 */ Vec3f* points; // Segment Address to the array of points
 } Path; // size = 0x8
 
 typedef struct {
@@ -957,8 +961,8 @@ void Scene_CommandSetRegionVisitedFlag(struct PlayState* play, SceneCmd* cmd);
 void Scene_CommandAnimatedMaterials(struct PlayState* play, SceneCmd* cmd);
 void Scene_SetExitFade(struct PlayState* play);
 s32 Scene_ExecuteCommands(struct PlayState* play, SceneCmd* sceneCmd);
-u16 Entrance_Create(s32 scene, s32 spawn, s32 layer);
-u16 Entrance_CreateFromSpawn(s32 spawn);
+u32 Entrance_Create(s32 scene, s32 spawn, s32 layer);
+u32 Entrance_CreateFromSpawn(s32 spawn);
 void Scene_Draw(struct PlayState* play);
 void Scene_DrawConfigDefault(struct PlayState* play);
 Gfx* AnimatedMat_TexScroll(struct PlayState* play, AnimatedMatTexScrollParams* params);
@@ -995,10 +999,10 @@ void Scene_SetCullFlag(struct PlayState* play, s32 index, u32 flags);
 void Scene_DrawConfig5(struct PlayState* play);
 void Scene_DrawConfigMatAnimManualStep(struct PlayState* play);
 void Scene_DrawConfigGreatBayTemple(struct PlayState* play);
-EntranceTableEntry* Entrance_GetTableEntry(u16 entrance);
-s32 Entrance_GetSceneId(u16 entrance);
-s32 Entrance_GetSceneIdAbsolute(u16 entrance);
-s32 Entrance_GetSpawnNum(u16 entrance);
-s32 Entrance_GetTransitionFlags(u16 entrance);
+EntranceTableEntry* Entrance_GetTableEntry(u32 entrance);
+s32 Entrance_GetSceneId(u32 entrance);
+s32 Entrance_GetSceneIdAbsolute(u32 entrance);
+s32 Entrance_GetSpawnNum(u32 entrance);
+s32 Entrance_GetTransitionFlags(u32 entrance);
 
 #endif

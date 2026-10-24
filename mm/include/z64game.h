@@ -82,14 +82,14 @@ u32 GameState_IsRunning(GameState* gameState);
 s32 GameState_GetArenaSize(GameState* gameState);
 s32 func_80173B48(GameState* gameState);
 
-extern s32 gFramerateDivisor;
-extern f32 gFramerateDivisorF;
-extern f32 gFramerateDivisorHalf;
-extern f32 gFramerateDivisorThird;
+extern HOST_DATA s32 gFramerateDivisor;
+extern HOST_DATA f32 gFramerateDivisorF;
+extern HOST_DATA f32 gFramerateDivisorHalf;
+extern HOST_DATA f32 gFramerateDivisorThird;
 
 
-extern GameStateOverlay gGameStateOverlayTable[GAMESTATE_ID_MAX];
-extern GameStateId gGraphNumGameStates;
+extern HOST_DATA GameStateOverlay gGameStateOverlayTable[GAMESTATE_ID_MAX];
+extern HOST_DATA GameStateId gGraphNumGameStates;
 
 
 #define CONTROLLER1(gameState) (&(gameState)->input[0])

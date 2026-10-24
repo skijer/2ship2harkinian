@@ -247,7 +247,7 @@ void func_808D8ED0(EnSw* this, PlayState* play) {
 }
 
 void func_808D8FC4(EnSw* this, PlayState* play) {
-    Math_Vec3f_ToVec3s(&this->collider.dim.worldSphere.center, &this->actor.world.pos);
+    Math_Vec3f_Copy(&this->collider.dim.worldSphere.center, &this->actor.world.pos);
     this->collider.dim.worldSphere.radius = this->collider.dim.modelSphere.radius * this->collider.dim.scale;
     if (!(this->unk_410 & 0x10) && (this->actor.colChkInfo.health != 0) && (DECR(this->unk_458) <= 10)) {
         CollisionCheck_SetAC(play, &play->colChkCtx, &this->collider.base);
@@ -906,7 +906,7 @@ void func_808DA89C(EnSw* this, PlayState* play) {
 }
 
 void func_808DAA60(EnSw* this, PlayState* play) {
-    Vec3s* points;
+    Vec3f* points;
     s16 temp_v0;
     s16 sp40;
     Vec3f sp34;
@@ -920,13 +920,13 @@ void func_808DAA60(EnSw* this, PlayState* play) {
             temp_f16 = this->skelAnime.endFrame - this->skelAnime.curFrame;
             sp40 = 80.0f * temp_f16;
             if (this->unk_45E == 0) {
-                Math_Vec3s_ToVec3f(&sp34, &points[this->unk_4A0]);
+                Math_Vec3f_Copy(&sp34, &points[this->unk_4A0]);
                 func_808D9894(this, &sp34);
                 temp_v0 = Math_Atan2S_XY(sp34.z, sp34.x);
                 if (ABS_ALT(temp_v0) < sp40) {
                     this->skelAnime.curFrame = 0.0f;
                     Actor_PlaySfx(&this->actor, NA_SE_EN_STALWALL_DASH);
-                    Math_Vec3s_ToVec3f(&this->unk_374, &points[this->unk_4A0]);
+                    Math_Vec3f_Copy(&this->unk_374, &points[this->unk_4A0]);
                     this->actionFunc = func_808DACF4;
                     this->unk_414 = 0.0f;
                     sp40 = ABS_ALT(temp_v0);

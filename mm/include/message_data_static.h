@@ -9,6 +9,13 @@ typedef struct MessageTableEntry {
     /* 0x4 */ const char* segment;
     u32 msgSize;
 } MessageTableEntry; // size = 0x8;
+#ifdef __cplusplus
+extern "C" {
+#endif
+MessageTableEntry* OTRMessage_Find(MessageTableEntry* table, u16 textId);
+#ifdef __cplusplus
+}
+#endif
 
 #if 0
 #define DEFINE_MESSAGE(textId, typePos, msg) \

@@ -24,7 +24,7 @@ static ActorEntry* GetTingleActorEntry() {
 
 // This hook modifies Tingle's actor entry so he'll always appear in Clock Town, regardless of the time.
 // This modification is permanent, which is why we also need the other hook to revert it.
-static void SetTingleAlwaysInClockTown(s16 sceneId, s8 roomNum) {
+static void SetTingleAlwaysInClockTown(s16 sceneId, s16 roomNum) {
     if (sceneId != SCENE_BACKTOWN) {
         return;
     }

@@ -1,3 +1,4 @@
+#include "2s2h/ModApi/ProgressiveItems/ProgressiveItems.h"
 #include "global.h"
 #include "PR/gs2dex.h"
 #include "sys_cfb.h"
@@ -23,6 +24,7 @@
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "2s2h_assets.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/ModApi/Timers/Timers.h"
 #include <libultraship/bridge/gfxbridge.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -4606,6 +4608,10 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
 
 // #region 2S2H [Enhancements] This is our wrapper around the original Item_Give function for hooking purposes
 u8 Item_Give(PlayState* play, u8 item) {
+    if (GameInteractor_ExecuteOnResolveItemGive(play, &item)) {
+        return ITEM_NONE;
+    }
+    if (ProgressiveItems_GiveVanilla(item)) return ITEM_NONE;
     if (!GameInteractor_ShouldItemGive(item) || item == ITEM_SHIP) {
         return ITEM_NONE;
     }
@@ -4917,7 +4923,9 @@ void Inventory_Dpad_UpdateBottleItem(PlayState* play, u8 item, u8 btn) {
 // #endregion
 
 void Inventory_UpdateBottleItem(PlayState* play, u8 item, u8 btn) {
-    gSaveContext.save.saveInfo.inventory.items[GET_CUR_FORM_BTN_SLOT(btn)] = item;
+    if (GameInteractor_Should(VB_UPDATE_BOTTLE_ITEM, true, btn, item)) {
+        gSaveContext.save.saveInfo.inventory.items[GET_CUR_FORM_BTN_SLOT(btn)] = item;
+    }
     SET_CUR_FORM_BTN_ITEM(btn, item);
 
     Interface_LoadItemIconImpl(play, btn);
@@ -5157,6 +5165,8 @@ s32 Health_ChangeBy(PlayState* play, s16 healthChange) {
         gSaveContext.save.saveInfo.playerData.health = gSaveContext.save.saveInfo.playerData.healthCapacity;
     }
 
+    GameInteractor_ExecuteOnPlayerHealthChange(healthChange);
+
     if (gSaveContext.save.saveInfo.playerData.health <= 0) {
         gSaveContext.save.saveInfo.playerData.health = 0;
         return false;
@@ -5262,6 +5272,8 @@ s32 Magic_Consume(PlayState* play, s16 magicToConsume, s16 type) {
     if (!gSaveContext.save.saveInfo.playerData.isMagicAcquired) {
         return false;
     }
+
+    GameInteractor_ExecuteOnMagicResolveCost(&magicToConsume);
 
     // Not enough magic available to consume
     if ((gSaveContext.save.saveInfo.playerData.magic - magicToConsume) < 0) {
@@ -6109,6 +6121,9 @@ s16 sDpadItemIconTop[] = {
 void Interface_Dpad_DrawItemIconTexture(PlayState* play, TexturePtr texture, s16 button) {
     static s16 sDpadItemIconWidth[] = { 16, 16, 16, 16 };
 
+    texture = (TexturePtr)GameInteractor_ExecuteOnInterfaceResolveButtonIcon(
+        play, DPAD_TO_HELD_ITEM(button), DPAD_GET_CUR_FORM_BTN_ITEM(button), (const char*)texture);
+
     OPEN_DISPS(play->state.gfxCtx);
 
     gDPLoadTextureBlock(OVERLAY_DISP++, texture, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
@@ -6232,6 +6247,9 @@ void Interface_DrawItemIconTexture(PlayState* play, TexturePtr texture, s16 butt
         24, // EQUIP_SLOT_C_DOWN
         24, // EQUIP_SLOT_C_RIGHT
     };
+
+    texture = (TexturePtr)GameInteractor_ExecuteOnInterfaceResolveButtonIcon(play, button, GET_CUR_FORM_BTN_ITEM(button),
+                                                                             (const char*)texture);
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -9002,7 +9020,7 @@ void Interface_Draw(PlayState* play) {
                 Gfx_DrawTexRectIA8(OVERLAY_DISP, gRupeeCounterIconTex, 16, 16, 26, 206, 16, 16, 1 << 10, 1 << 10);
         }
 
-        switch (play->sceneId) {
+        switch (DungeonRegistry_KeyIndex(play->sceneId) >= 0 ? SCENE_MITURIN : play->sceneId) {
             case SCENE_INISIE_N:
             case SCENE_INISIE_R:
             case SCENE_MITURIN:
@@ -9498,6 +9516,10 @@ void Interface_Draw(PlayState* play) {
         }
     }
 
+    CLOSE_DISPS(play->state.gfxCtx);
+    GameInteractor_ExecuteOnInterfaceDrawEnd(play);
+    OPEN_DISPS(play->state.gfxCtx);
+
     // Draw over the entire screen (used in gameover)
     if (interfaceCtx->screenFillAlpha != 0) {
         gDPPipeSync(OVERLAY_DISP++);
@@ -9704,6 +9726,9 @@ void Interface_Update(PlayState* play) {
             sEnvHazard = PLAYER_ENV_HAZARD_NONE;
         }
     }
+    // 2S2H [Mods] Mods can claim the hazard the HUD reacts to
+    sEnvHazard = Timers_ResolveHazard(sEnvHazard);
+    GameInteractor_ExecuteOnResolveEnvHazard(play, &sEnvHazard);
 
     LifeMeter_UpdateColors(play);
 

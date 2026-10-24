@@ -1,6 +1,7 @@
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "2s2h/BenGui/BenGui.hpp"
 #include "CosmeticEditor.h"
+#include "2s2h/ModApi/CustomEquipRegistry/CustomEquipRegistry.h"
 #include "2s2h/ShipInit.hpp"
 #include "2s2h/GameInteractor/GameInteractor.h"
 
@@ -1027,9 +1028,8 @@ Gfx humanTunic[] = {
     gsSPEndDisplayList(),
 };
 
-static RegisterShipInitFunc humanTunicPatch(
-    []() {
-        if (!IsCustomHumanModelActive() && CVarGetInteger(kHumanTunicOption.colorChangedCvar, 0)) {
+static void ApplyHumanTunicPatch() {
+        if (!IsCustomHumanModelActive() && (CVarGetInteger(kHumanTunicOption.colorChangedCvar, 0) || CustomEquipRegistry_GetWorn(S2H_EQUIP_SLOT_TUNIC) != nullptr)) {
             ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanWaistDL", "setPrim", 5,
                                        gsSPDisplayList(humanTunic));
             ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanRightThighDL", "setPrim", 10,
@@ -1065,8 +1065,26 @@ static RegisterShipInitFunc humanTunicPatch(
             ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim2");
             ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanTorsoDL", "setPrim");
         }
-    },
-    { kHumanTunicOption.colorChangedCvar });
+
+}
+static RegisterShipInitFunc humanTunicPatch(ApplyHumanTunicPatch, { kHumanTunicOption.colorChangedCvar });
+static RegisterShipInitFunc customTunicTint([]() {
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawBegin>([]() {
+        if(gPlayState==nullptr)return;
+        static std::string previous;
+        const char* worn=CustomEquipRegistry_GetWorn(S2H_EQUIP_SLOT_TUNIC);
+        std::string current=worn?worn:"";
+        if(current!=previous){ApplyHumanTunicPatch();previous=current;}
+        if(worn) {
+            Color_RGB8 color={30,105,27};
+            GameInteractor_Should(VB_APPLY_TUNIC_COLOR,true,GET_PLAYER(gPlayState),&color);
+            humanTunic[0]=gsDPSetPrimColor(0,0,color.r,color.g,color.b,255);
+        } else {
+            Color_RGBA8 color=CVarGetColor(kHumanTunicOption.colorCvar, {});
+            humanTunic[0]=gsDPSetPrimColor(0,0,color.r,color.g,color.b,255);
+        }
+    });
+}, {});
 
 static RegisterShipInitFunc humanTunicColor(
     []() {

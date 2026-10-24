@@ -1,4 +1,5 @@
 #include "Logic.h"
+#include <stdexcept>
 
 extern "C" {
 #include "variables.h"
@@ -22,8 +23,10 @@ void ApplyNoLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std::vector
         }
 
         RANDO_SAVE_CHECKS[randoCheckId].shuffled = true;
-        RANDO_SAVE_CHECKS[randoCheckId].randoItemId = itemPool.back();
-        itemPool.pop_back();
+        const size_t pick = SelectItemForCheck(itemPool, checkPool, randoCheckId);
+        if (pick >= itemPool.size()) { throw std::runtime_error("No item satisfies the check's placement restrictions"); }
+        RANDO_SAVE_CHECKS[randoCheckId].randoItemId = itemPool[pick];
+        itemPool.erase(itemPool.begin() + pick);
     }
 }
 

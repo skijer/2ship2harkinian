@@ -19,7 +19,7 @@ extern GameState* gGameState;
 
 typedef struct WarpPoint {
     s32 entranceId;
-    s8 roomNum;
+    s16 roomNum;
     Vec3f pos;
     s16 rotY;
     bool bootToPoint;

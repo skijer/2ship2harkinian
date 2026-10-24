@@ -160,6 +160,12 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 ################################################################################
 add_compile_definitions(CONTROLLERBUTTONS_T=uint32_t)
 
+# 2S2H [Unbound] float matrices: world positions past +/-32767 need a Mtx that does not wrap
+set(GBI_FLOAT_MTX ON)
+
+# 2S2H [Unbound] s32 vertex positions: room meshes draw under the identity matrix, so s16 capped one room at 65535 units
+set(GBI_S32_VTX ON)
+
 ################################################################################
 # Sub-projects
 ################################################################################

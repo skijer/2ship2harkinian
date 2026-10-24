@@ -4,6 +4,7 @@
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/ModApi/RandoLogic/RandoLogic.h"
 #include "2s2h/ShipUtils.h"
 
 #include <set>
@@ -178,23 +179,26 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
 #define IS_DEITY (GET_PLAYER_FORM == PLAYER_FORM_FIERCE_DEITY)
 #define IS_GORON (GET_PLAYER_FORM == PLAYER_FORM_GORON)
 #define IS_HUMAN (GET_PLAYER_FORM == PLAYER_FORM_HUMAN)
-#define HAS_ITEM(item) (INV_CONTENT(item) == item)
-#define CAN_BE_DEKU (IS_DEKU || HAS_ITEM(ITEM_MASK_DEKU))
-#define CAN_BE_ZORA (IS_ZORA || HAS_ITEM(ITEM_MASK_ZORA))
-#define CAN_BE_DEITY (IS_DEITY || HAS_ITEM(ITEM_MASK_FIERCE_DEITY))
-#define CAN_BE_GORON (IS_GORON || HAS_ITEM(ITEM_MASK_GORON))
-#define CAN_BE_HUMAN                                                                                        \
-    (IS_HUMAN || (IS_DEITY && HAS_ITEM(ITEM_MASK_FIERCE_DEITY)) || (IS_ZORA && HAS_ITEM(ITEM_MASK_ZORA)) || \
-     (IS_DEKU && HAS_ITEM(ITEM_MASK_DEKU)) || (IS_GORON && HAS_ITEM(ITEM_MASK_GORON)))
+#define HAS_ITEM(item) (RandoLogic_IsNativeItemGranted(item) || INV_CONTENT(item) == item)
+#define CAN_BE_DEKU (LOGIC_GRANTED(CanBeDeku) || IS_DEKU || HAS_ITEM(ITEM_MASK_DEKU))
+#define CAN_BE_ZORA (LOGIC_GRANTED(CanBeZora) || IS_ZORA || HAS_ITEM(ITEM_MASK_ZORA))
+#define CAN_BE_DEITY (LOGIC_GRANTED(CanBeFierceDeity) || IS_DEITY || HAS_ITEM(ITEM_MASK_FIERCE_DEITY))
+#define CAN_BE_GORON (LOGIC_GRANTED(CanBeGoron) || IS_GORON || HAS_ITEM(ITEM_MASK_GORON))
+#define CAN_BE_HUMAN                                                                                           \
+    (LOGIC_GRANTED(CanBeHuman) || IS_HUMAN || (IS_DEITY && HAS_ITEM(ITEM_MASK_FIERCE_DEITY)) ||                \
+     (IS_ZORA && HAS_ITEM(ITEM_MASK_ZORA)) || (IS_DEKU && HAS_ITEM(ITEM_MASK_DEKU)) ||                         \
+     (IS_GORON && HAS_ITEM(ITEM_MASK_GORON)))
 #define CHECK_MAX_HP(TARGET_HP) ((TARGET_HP * 16) <= gSaveContext.save.saveInfo.playerData.healthCapacity)
-#define HAS_MAGIC (gSaveContext.save.saveInfo.playerData.isMagicAcquired)
+#define HAS_MAGIC (LOGIC_GRANTED(HasMagic) || gSaveContext.save.saveInfo.playerData.isMagicAcquired)
 #define CAN_HOOK_SCARECROW \
     (HAS_ITEM(ITEM_OCARINA_OF_TIME) && HAS_ITEM(ITEM_HOOKSHOT) && canPlaySong(OCARINA_SONG_SCARECROW_SPAWN))
-#define CAN_USE_EXPLOSIVE                             \
-    (HAS_ITEM(ITEM_BOMB) || HAS_ITEM(ITEM_BOMBCHU) || \
+#define CAN_USE_EXPLOSIVE                                                                             \
+    (LOGIC_GRANTED(HasExplosives) || HAS_ITEM(ITEM_BOMB) || HAS_ITEM(ITEM_BOMBCHU) ||                 \
      (HAS_ITEM(ITEM_MASK_BLAST) && GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) > EQUIP_VALUE_SHIELD_NONE))
-#define CAN_USE_HUMAN_SWORD (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) >= EQUIP_VALUE_SWORD_KOKIRI)
-#define CAN_USE_SWORD (CAN_USE_HUMAN_SWORD || HAS_ITEM(ITEM_SWORD_GREAT_FAIRY) || CAN_BE_DEITY)
+#define CAN_USE_HUMAN_SWORD \
+    (LOGIC_GRANTED(CanUseHumanSword) || GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) >= EQUIP_VALUE_SWORD_KOKIRI)
+#define CAN_USE_SWORD \
+    (LOGIC_GRANTED(CanUseSword) || CAN_USE_HUMAN_SWORD || HAS_ITEM(ITEM_SWORD_GREAT_FAIRY) || CAN_BE_DEITY)
 #define CAN_FULLY_CUT_KEATON_GRASS                                                      \
     (HAS_MAGIC && (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) >= EQUIP_VALUE_SWORD_RAZOR) && \
      CHECK_WEEKEVENTREG(WEEKEVENTREG_RECEIVED_GREAT_SPIN_ATTACK))
@@ -216,7 +220,9 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
 #define HAS_BOTTLE_ITEM(item) (Inventory_HasItemInBottle(item))
 // TODO: Maybe not reliable because of theif bird stealing bottle
 #define HAS_BOTTLE (INV_CONTENT(ITEM_BOTTLE) != ITEM_NONE)
-#define CAN_USE_PROJECTILE (HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_HOOKSHOT) || (CAN_BE_DEKU && HAS_MAGIC) || CAN_BE_ZORA)
+#define CAN_USE_PROJECTILE                                                                                  \
+    (LOGIC_GRANTED(CanUseProjectile) || HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_HOOKSHOT) ||                   \
+     (CAN_BE_DEKU && HAS_MAGIC) || CAN_BE_ZORA)
 #define CAN_ACCESS(access) (RANDO_EVENTS[RE_ACCESS_##access])
 #define CAN_GROW_BEAN_PLANT        \
     (HAS_ITEM(ITEM_MAGIC_BEANS) && \
@@ -613,6 +619,7 @@ inline bool ClockFilter() {
      AFTER(TIME_NIGHT3_AM_12_00))
 
 inline bool CanKillEnemy(ActorId EnemyId) {
+    if (RandoLogic_IsEnemyGranted(EnemyId)) return true;
     // If enemy souls are shuffled, and the relevant soul is not obtained, we cannot kill that enemy.
     if (RANDO_SAVE_OPTIONS[RO_SHUFFLE_ENEMY_SOULS] && !HaveEnemySoul(EnemyId)) {
         return false;

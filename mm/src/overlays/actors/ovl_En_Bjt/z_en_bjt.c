@@ -178,7 +178,7 @@ void EnBjt_UpdateCollision(EnBjt* this, PlayState* play) {
 
     if (this->stateFlags & (TOILET_HAND_STATE_APPEARING | TOILET_HAND_STATE_VISIBLE)) {
         Lib_Vec3f_TranslateAndRotateY(&this->actor.world.pos, this->actor.shape.rot.y, &sColliderBasePos, &pos);
-        Math_Vec3f_ToVec3s(&this->collider.dim.pos, &pos);
+        Math_Vec3f_Copy(&this->collider.dim.pos, &pos);
         height = this->actor.focus.pos.y - this->actor.world.pos.y;
         this->collider.dim.height = height;
         this->collider.dim.radius = 32;

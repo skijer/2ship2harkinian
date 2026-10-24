@@ -266,7 +266,7 @@ void EnDg_GetFloorRot(EnDg* this, Vec3f* floorRot) {
 }
 
 s32 EnDg_HasReachedPoint(EnDg* this, Path* path, s32 pointIndex) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     s32 count = path->count;
     s32 index = pointIndex;
     s32 reached = false;
@@ -277,7 +277,7 @@ s32 EnDg_HasReachedPoint(EnDg* this, Path* path, s32 pointIndex) {
     f32 d;
     Vec3f point;
 
-    Math_Vec3s_ToVec3f(&point, &points[index]);
+    Math_Vec3f_Copy(&point, &points[index]);
 
     if (index == 0) {
         diffX = points[1].x - points[0].x;
@@ -303,7 +303,7 @@ s32 EnDg_HasReachedPoint(EnDg* this, Path* path, s32 pointIndex) {
  * Returns the Y-rotation the dog should have to move to the next point along its path.
  */
 s16 EnDg_GetYRotation(Path* path, s32 index, Vec3f* pos, f32* distSq) {
-    Vec3s* points;
+    Vec3f* points;
     f32 diffX;
     f32 diffZ;
 

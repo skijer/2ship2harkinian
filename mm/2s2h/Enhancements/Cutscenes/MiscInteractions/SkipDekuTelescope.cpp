@@ -17,7 +17,7 @@ f32 func_80BCC448(Path* path, s32 arg1, Vec3f* arg2, Vec3s* arg3);
 
 // has reached point
 s32 modified_func_80BCC2AC(EnScopenuts* enScopenuts, Path* path, s32 arg2_) {
-    Vec3s* points = path->points;
+    Vec3f* points = path->points;
     s32 count = path->count;
     s32 index = arg2_;
     s32 sp50 = false;
@@ -28,7 +28,7 @@ s32 modified_func_80BCC2AC(EnScopenuts* enScopenuts, Path* path, s32 arg2_) {
     f32 sp3C;
     Vec3f point;
 
-    Math_Vec3s_ToVec3f(&point, &points[index]);
+    Math_Vec3f_Copy(&point, &points[index]);
 
     if (index == 0) {
         phi_f12 = points[1].x - points[0].x;

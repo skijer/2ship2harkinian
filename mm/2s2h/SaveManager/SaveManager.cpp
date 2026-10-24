@@ -1,4 +1,5 @@
 #include "SaveManager.h"
+#include "SaveSections.h"
 
 #include <fstream>
 #include <filesystem>
@@ -446,6 +447,7 @@ extern "C" void SaveManager_SysFlashrom_WriteData(u8* saveBuffer, u32 pageNum, u
                 }
 
                 j["newCycleSave"]["save"] = save;
+                SaveSections_Write(j, false);
                 j["version"] = CURRENT_SAVE_VERSION;
                 j["type"] = "2S2H_SAVE";
 
@@ -485,6 +487,7 @@ extern "C" void SaveManager_SysFlashrom_WriteData(u8* saveBuffer, u32 pageNum, u
 
             if (IS_VALID_FILE(saveContext.save)) {
                 j["owlSave"] = saveContext;
+                SaveSections_Write(j, true);
                 j["version"] = CURRENT_SAVE_VERSION;
                 j["type"] = "2S2H_SAVE";
 
@@ -550,6 +553,8 @@ extern "C" s32 SaveManager_SysFlashrom_ReadData(void* saveBuffer, u32 pageNum, u
         SaveManager_MoveInvalidSaveFile(fileName, "Failed to migrate save file, the original file has been backed up.");
         return -1;
     }
+
+    SaveSections_RememberRead(fileName, j, isOwlSave);
 
     if (isOwlSave) {
         if (!j.contains("owlSave")) {

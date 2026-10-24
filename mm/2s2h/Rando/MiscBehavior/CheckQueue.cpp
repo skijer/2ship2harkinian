@@ -1,3 +1,4 @@
+#include "2s2h/Network/Anchor/Anchor.h"
 #include "MiscBehavior.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -7,6 +8,8 @@
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "2s2h/ShipUtils.h"
 #include "Traps.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
+#include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
 
 extern "C" {
 #include "variables.h"
@@ -78,6 +81,16 @@ void Rando::MiscBehavior::CheckQueue() {
                             .msg = (prefix == "" ? "" : prefix + " ") + message + (randoItemId == RI_TRAP ? "" : "!"),
                         };
 
+                        const char* customKey = RandoItems_GetKey(randoItemId);
+                        if (const auto* item = CustomItemRegistry_Find(customKey)) {
+                            CustomItemRegistry_PrepareAcquisitionMessage(customKey);
+                            if (item->getItemText != nullptr) entry.msg = item->getItemText;
+                            if (item->iconPath != nullptr) {
+                                entry.icon = ITEM_OCARINA_OF_TIME;
+                                entry.iconPath = item->iconPath;
+                            }
+                        }
+
                         if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                             CustomMessage::SetActiveCustomMessage(entry.msg, entry);
                         } else if (Rando::StaticData::ShouldShowGetItemCutscene(randoItemId)) {
@@ -94,6 +107,7 @@ void Rando::MiscBehavior::CheckQueue() {
                         Rando::GiveItem(randoItemId);
                         randoSaveCheck.cycleObtained = true;
                         randoSaveCheck.obtained = true;
+                        if (Anchor::Instance) Anchor::Instance->SendPacket_SetCheckStatus((RandoCheckId)CUSTOM_ITEM_PARAM);
                         randoSaveCheck.eligible = false;
                         queued = false;
                         CUSTOM_ITEM_PARAM = randoItemId;
@@ -104,10 +118,10 @@ void Rando::MiscBehavior::CheckQueue() {
 
                         // If the item has been given, the CUSTOM_ITEM_PARAM is set to the RI, prior to that it's the RC
                         if (CUSTOM_ITEM_FLAGS & CustomItem::CALLED_ACTION) {
-                            if ((RandoItemId)CUSTOM_ITEM_PARAM == RI_TRAP) {
+                            if ((RandoItemId)(u16)CUSTOM_ITEM_PARAM == RI_TRAP) {
                                 randoItemId = RI_MAX_TRAP;
                             } else {
-                                randoItemId = (RandoItemId)CUSTOM_ITEM_PARAM;
+                                randoItemId = (RandoItemId)(u16)CUSTOM_ITEM_PARAM;
                             }
                         } else {
                             auto& randoSaveCheck = RANDO_SAVE_CHECKS[CUSTOM_ITEM_PARAM];

@@ -12,7 +12,7 @@
 
 LightsBuffer sLightsBuffer;
 
-void Lights_PointSetInfo(LightInfo* info, s16 x, s16 y, s16 z, u8 r, u8 g, u8 b, s16 radius, LightType type) {
+void Lights_PointSetInfo(LightInfo* info, f32 x, f32 y, f32 z, u8 r, u8 g, u8 b, s16 radius, LightType type) {
     info->type = type;
     info->params.point.x = x;
     info->params.point.y = y;
@@ -20,11 +20,11 @@ void Lights_PointSetInfo(LightInfo* info, s16 x, s16 y, s16 z, u8 r, u8 g, u8 b,
     Lights_PointSetColorAndRadius(info, r, g, b, radius);
 }
 
-void Lights_PointNoGlowSetInfo(LightInfo* info, s16 x, s16 y, s16 z, u8 r, u8 g, u8 b, s16 radius) {
+void Lights_PointNoGlowSetInfo(LightInfo* info, f32 x, f32 y, f32 z, u8 r, u8 g, u8 b, s16 radius) {
     Lights_PointSetInfo(info, x, y, z, r, g, b, radius, LIGHT_POINT_NOGLOW);
 }
 
-void Lights_PointGlowSetInfo(LightInfo* info, s16 x, s16 y, s16 z, u8 r, u8 g, u8 b, s16 radius) {
+void Lights_PointGlowSetInfo(LightInfo* info, f32 x, f32 y, f32 z, u8 r, u8 g, u8 b, s16 radius) {
     Lights_PointSetInfo(info, x, y, z, r, g, b, radius, LIGHT_POINT_GLOW);
 }
 
@@ -35,7 +35,7 @@ void Lights_PointSetColorAndRadius(LightInfo* info, u8 r, u8 g, u8 b, s16 radius
     info->params.point.radius = radius;
 }
 
-void Lights_PointSetPosition(LightInfo* info, s16 x, s16 y, s16 z) {
+void Lights_PointSetPosition(LightInfo* info, f32 x, f32 y, f32 z) {
     info->params.point.x = x;
     info->params.point.y = y;
     info->params.point.z = z;
@@ -270,6 +270,7 @@ void LightContext_Init(PlayState* play, LightContext* lightCtx) {
     LightContext_InitList(play, lightCtx);
     LightContext_SetAmbientColor(lightCtx, 80, 80, 80);
     LightContext_SetFog(lightCtx, 0, 0, 0, 996, 12800);
+    lightCtx->hasWorldFog = false;
     memset(&sLightsBuffer, 0, sizeof(LightsBuffer));
 }
 

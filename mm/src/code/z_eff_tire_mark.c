@@ -11,7 +11,7 @@ void func_800AE930(CollisionContext* colCtx, EffectTireMark* this, Vec3f* pos, f
     EffectTireMarkElement* spA8;
     u32 spA4;
     u32 spA0;
-    Vec3s* vtxList = colCtx->colHeader->vtxList;
+    Vec3i* vtxList = colCtx->colHeader->vtxList;
 
     if ((bgId != BGCHECK_SCENE) || (this->numElements >= (ARRAY_COUNT(this->elements) - 1)) || (colPoly == NULL)) {
         func_800AEF44(this);

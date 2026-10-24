@@ -21,5 +21,12 @@
 #define FORCE_OPTIMIZE
 #endif
 
+// The executable exports its globals as DATA, which a mod DLL can only reach through an import declaration.
+#if defined(_WIN32) && defined(S2H_MOD)
+#define HOST_DATA __declspec(dllimport)
+#else
+#define HOST_DATA
+#endif
+
 
 #endif

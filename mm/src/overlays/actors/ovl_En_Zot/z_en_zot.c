@@ -93,7 +93,7 @@ void func_80B965D0(EnZot* this, PlayState* play) {
     s32 i;
 
     if ((this->path != NULL) && (this->path->count >= 5)) {
-        Vec3s* points = Lib_SegmentedToVirtual(this->path->points);
+        Vec3f* points = Lib_SegmentedToVirtual(this->path->points);
 
         for (i = 0; i < ARRAY_COUNT(this->unk_2D8); i++, points++) {
             if (this->unk_2D8[i] == NULL) {
@@ -308,7 +308,7 @@ s32 func_80B96DF0(EnZot* this, PlayState* play) {
 
 s32 func_80B96E5C(EnZot* this) {
     Path* path = this->path;
-    Vec3s* points;
+    Vec3f* points;
     f32 temp_f12;
     f32 temp_f14;
     f32 phi_f2;
@@ -317,7 +317,7 @@ s32 func_80B96E5C(EnZot* this) {
         return true;
     }
 
-    points = &((Vec3s*)Lib_SegmentedToVirtual(path->points))[this->unk_2D4];
+    points = &((Vec3f*)Lib_SegmentedToVirtual(path->points))[this->unk_2D4];
     temp_f12 = points->x - this->actor.world.pos.x;
     temp_f14 = points->z - this->actor.world.pos.z;
     this->actor.world.rot.y = Math_Atan2S(temp_f12, temp_f14);
@@ -342,7 +342,7 @@ s32 func_80B96E5C(EnZot* this) {
 
 s32 func_80B96FB0(EnZot* this) {
     Path* path = this->path;
-    Vec3s* points;
+    Vec3f* points;
     f32 temp_f12;
     f32 temp_f14;
 
@@ -350,7 +350,7 @@ s32 func_80B96FB0(EnZot* this) {
         return true;
     }
 
-    points = &((Vec3s*)Lib_SegmentedToVirtual(path->points))[this->unk_2D4];
+    points = &((Vec3f*)Lib_SegmentedToVirtual(path->points))[this->unk_2D4];
     temp_f12 = points->x - this->actor.world.pos.x;
     temp_f14 = points->z - this->actor.world.pos.z;
     this->actor.world.rot.y = Math_Atan2S(temp_f12, temp_f14);

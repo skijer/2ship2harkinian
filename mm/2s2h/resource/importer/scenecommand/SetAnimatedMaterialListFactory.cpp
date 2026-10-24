@@ -19,6 +19,7 @@ SetAnimatedMaterialListFactory::ReadResource(std::shared_ptr<Ship::ResourceInitD
 
     AnimatedMaterial* res = data->GetPointer();
     setAnimatedMat->mat = res;
+    setAnimatedMat->fileName = str;
 
     return setAnimatedMat;
 }

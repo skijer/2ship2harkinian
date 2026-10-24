@@ -42,7 +42,7 @@ typedef struct EnIshi {
     /* 0x190 */ EnIshiActionFunc actionFunc;
     /* 0x194 */ s8 thrownTimer;
     /* 0x195 */ s8 hitTimer;
-    /* 0x196 */ s8 objectSlot;
+    /* 0x196 */ s16 objectSlot;
     /* 0x197 */ u8 flags;
 } EnIshi; // size = 0x198
 

@@ -1,0 +1,335 @@
+{
+  "source_oot": "Shipwright-unbound-mod-nei/mod-sdk/mods",
+  "source_mm": "2ship/2ship-unbound-modapi/mod-sdk/mods",
+  "oot_mod_count": 71,
+  "mm_mod_count": 55,
+  "oot_folders_absent_in_mm": [
+    "anim_viewer",
+    "bomb_arrows",
+    "cucui-ganon",
+    "deku",
+    "easy_equipment",
+    "elemental_mirror_shield",
+    "fierce_deity",
+    "goron",
+    "goron_tunic",
+    "lynel_miniboss",
+    "mm_assets",
+    "mm_collectables",
+    "mm_items",
+    "mm_wearables",
+    "not_enough_bottles",
+    "oot_item_upgrades",
+    "pak_loader",
+    "zora",
+    "zora_tunic"
+  ],
+  "shared_mods_missing_ship_network_integration": [
+    "ball_and_chain",
+    "beetle",
+    "byrna",
+    "cane_pacci",
+    "champion_tunic",
+    "climb_boots",
+    "deku_leaf",
+    "divine_shield",
+    "dominion_rod",
+    "elemental_rods",
+    "elemental_wand",
+    "four_sword",
+    "gust_jar",
+    "ikana_shield",
+    "kite_shield",
+    "lantern",
+    "magic_cape",
+    "magic_tunic",
+    "mogma_mitts",
+    "pegasus_boots",
+    "pendant",
+    "phantom_hourglass",
+    "roc_boots",
+    "sages_tunic",
+    "shovel",
+    "spinner",
+    "switch_hook",
+    "trident",
+    "whip"
+  ],
+  "known_incomplete_mm_mods": {
+    "oot_equipment": "Registers ownership and pause icons only; behavior explicitly deferred in source."
+  },
+  "note": "Folder absence does not imply missing native MM behavior. Presence and matching service names do not prove functional parity.",
+  "mm_registration_review": [
+    {
+      "mod": "ball_and_chain",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "beetle",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "byrna",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "cane_pacci",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "champion_tunic",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "climb_boots",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "deku_leaf",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "demise_destruction",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "divine_shield",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "dominion_rod",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "elemental_rods",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "elemental_wand",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "four_sword",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "garo",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "gerudo",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "gust_jar",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "ikana_shield",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "kafei",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "keaton",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "lantern",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "magic_tunic",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "minish_cap",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "mogma_mitts",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "oot_equipment",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "oot_items",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "pegasus_boots",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "phantom_hourglass",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "rito",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "roc_boots",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "rocs",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "rod_of_seasons",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "sages_tunic",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "sheikah_slate",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "shovel",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "somaria",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "spinner",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "spiritual_stones",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "switch_hook",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "time_gate",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "trident",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "ultrahand",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "useful_medallions",
+      "declares_randomizer_metadata": false,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "whip",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "wolf_link",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    },
+    {
+      "mod": "zonai_permafrost",
+      "declares_randomizer_metadata": true,
+      "declares_logic_extensions": false,
+      "note": "Static source signals only; false is a review target, true is not runtime validation."
+    }
+  ],
+  "target": "Equivalent item and collectable lists, behavior and randomizer integration, with stable identities for future Combo."
+}

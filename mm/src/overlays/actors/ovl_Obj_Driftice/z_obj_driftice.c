@@ -75,7 +75,7 @@ static InitChainEntry sInitChain[] = {
 };
 
 void func_80A66570(ObjDriftice* this, s32 arg1) {
-    Math_Vec3s_ToVec3f(&this->dyna.actor.world.pos, &this->pathPoints[arg1]);
+    Math_Vec3f_Copy(&this->dyna.actor.world.pos, &this->pathPoints[arg1]);
 }
 
 void func_80A665AC(s16* arg0, s16 arg1) {
@@ -339,11 +339,11 @@ void func_80A671E0(ObjDriftice* this, PlayState* play) {
     Vec3f sp40;
     f32 sp3C;
     f32 phi_f12;
-    Vec3s* points;
+    Vec3f* points;
     s32 sp30;
     Actor* thisx = &this->dyna.actor;
 
-    Math_Vec3s_ToVec3f(&sp40, &(&this->pathPoints[this->unk_164])[this->unk_168]);
+    Math_Vec3f_Copy(&sp40, &(&this->pathPoints[this->unk_164])[this->unk_168]);
     Math_Vec3f_Diff(&sp40, &this->dyna.actor.world.pos, &thisx->velocity);
 
     sp3C = Math3D_Vec3fMagnitude(&thisx->velocity);

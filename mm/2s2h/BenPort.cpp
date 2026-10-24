@@ -1,3 +1,8 @@
+#include "2s2h/Unbound/UnboundAudio.h"
+#include "2s2h/Network/Anchor/Anchor.h"
+#include "2s2h/ModApi/ModStore/ModStore.h"
+#include "2s2h/ModApi/ModDungeons/DungeonRegistry.h"
+#include "2s2h/Unbound/ActorRegistry.h"
 #include "BenPort.h"
 #include <iostream>
 #include <algorithm>
@@ -64,6 +69,10 @@ CrowdControl* CrowdControl::Instance;
 #include "2s2h/SaveManager/SaveManager.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/CustomItem/CustomItem.h"
+#include "2s2h/ModApi/ModApi.h"
+#include "2s2h/Unbound/SceneDB.h"
+#include "2s2h/Unbound/UnboundExporter.h"
+#include "2s2h/Unbound/UnboundSceneFactory.h"
 #include "2s2h/BenGui/Notification.h"
 #include "2s2h/ShipUtils.h"
 #include "2s2h/ShipInit.hpp"
@@ -119,6 +128,7 @@ CrowdControl* CrowdControl::Instance;
 OTRGlobals* OTRGlobals::Instance;
 GameInteractor* GameInteractor::Instance;
 AudioCollection* AudioCollection::Instance;
+Anchor* Anchor::Instance = nullptr;
 
 extern "C" char** cameraStrings;
 bool prevAltAssets = false;
@@ -718,6 +728,7 @@ void OTRGlobals::Initialize() {
                                     "KeyFrameAnim", static_cast<uint32_t>(SOH::ResourceType::TSH_CKeyFrameAnim), 0);
     loader->RegisterResourceFactory(std::make_shared<SOH::ResourceFactoryBinaryKeyFrameSkel>(), RESOURCE_FORMAT_BINARY,
                                     "KeyFrameSkel", static_cast<uint32_t>(SOH::ResourceType::TSH_CKeyFrameSkel), 0);
+    S2H::Unbound::RegisterResourceFactories(loader);
 
     // gSaveStateMgr = std::make_shared<SaveStateMgr>();
     // gRandomizer = std::make_shared<Randomizer>();
@@ -960,6 +971,7 @@ bool VerifyArchiveVersion(ArchiveVersion version) {
 }
 
 extern "C" void InitOTR(int argc, char* argv[]) {
+    ModStore_ApplyStagedUpdate();
     OTRGlobals::Instance = new OTRGlobals();
     OTRGlobals::Instance->RunExtract(argc, argv);
 
@@ -972,7 +984,11 @@ extern "C" void InitOTR(int argc, char* argv[]) {
 
     GameInteractor::Instance = new GameInteractor();
     AudioCollection::Instance = new AudioCollection();
+    SDLNet_Init();
+    Anchor::Instance = new Anchor();
+    Anchor::Instance->Init();
     LoadGuiTextures();
+    S2H::Unbound::EnsureBaseArchive();
     ModMenu_LoadArchives();
     BenGui::SetupGuiElements();
     ShipInit::InitAll();
@@ -1021,6 +1037,8 @@ extern "C" void SaveManager_ThreadPoolWait() {
 }
 
 extern "C" void DeinitOTR() {
+    if (Anchor::Instance != nullptr) Anchor::Instance->Disable();
+    SDLNet_Quit();
     SaveManager_ThreadPoolWait();
     OTRAudio_Exit();
 #ifdef ENABLE_CROWD_CONTROL
@@ -1414,6 +1432,11 @@ extern "C" uint8_t ResourceMgr_ResourceIsBackground(char* texPath) {
     return res->GetInitData()->Type == static_cast<uint32_t>(SOH::ResourceType::SOH_Background);
 }
 
+extern "C" uint8_t ResourceMgr_TexIsRaw(const char* texPath) {
+    auto texture = std::static_pointer_cast<Fast::Texture>(GetResourceByName(texPath));
+    return texture != nullptr && (texture->Flags & TEX_FLAG_LOAD_AS_RAW) != 0;
+}
+
 extern "C" char* ResourceMgr_LoadJPEG(char* data, size_t dataSize) {
     static char* finalBuffer = 0;
 
@@ -1484,6 +1507,35 @@ extern "C" char* ResourceMgr_LoadPlayerAnimByName(const char* animPath) {
     auto anim = std::static_pointer_cast<SOH::PlayerAnimation>(GetResourceByName(animPath));
 
     return (char*)&anim->limbRotData[0];
+}
+
+// An OPAM resource is a raw s16 payload, not a PlayerAnimationHeader: casting it would read frame 0 as the header.
+// The wrapper is cached for the session so the returned pointer stays valid.
+extern "C" PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeader(const char* animPath) {
+    constexpr size_t S16PerFrame = 67;
+
+    if (animPath == nullptr) {
+        return nullptr;
+    }
+    auto res = GetResourceByName(animPath);
+    if (res == nullptr || res->GetInitData()->Type != static_cast<uint32_t>(SOH::ResourceType::SOH_PlayerAnimation)) {
+        return nullptr;
+    }
+    auto playerAnim = std::static_pointer_cast<SOH::PlayerAnimation>(res);
+    if (playerAnim->GetPointer() == nullptr || playerAnim->GetPointerSize() == 0) {
+        return nullptr;
+    }
+
+    const size_t frameCount = playerAnim->GetPointerSize() / sizeof(int16_t) / S16PerFrame;
+    if (frameCount == 0) {
+        return nullptr;
+    }
+
+    static std::unordered_map<std::string, PlayerAnimationHeader> sPlayerAnimWrappers;
+    PlayerAnimationHeader& wrapper = sPlayerAnimWrappers[animPath];
+    wrapper.common.frameCount = (s16)frameCount;
+    wrapper.segmentVoid = (void*)playerAnim->GetPointer();
+    return &wrapper;
 }
 
 extern "C" void ResourceMgr_PushCurrentDirectory(char* path) {
@@ -1649,27 +1701,18 @@ extern "C" u8* ResourceMgr_LoadArrayByNameAsU8(const char* path, u8* buffer) {
     return buffer;
 }
 
-// Loads Vec3s data from an Array resource.
+// Widens an s16 vertex Array resource to collision vertices (Vec3i).
 // mallocs a new buffer that must be freed by the caller.
-extern "C" char* ResourceMgr_LoadArrayByNameAsVec3s(const char* path) {
+extern "C" Vec3i* ResourceMgr_LoadArrayByNameAsVec3i(const char* path) {
     auto res = std::static_pointer_cast<SOH::Array>(GetResourceByName(path));
+    Vec3i* data = (Vec3i*)malloc(sizeof(Vec3i) * (res->Scalars.size() / 3));
 
-    // if (res->CachedGameAsset != nullptr)
-    //     return (char*)res->CachedGameAsset;
-    // else
-    // {
-    Vec3s* data = (Vec3s*)malloc(sizeof(Vec3s) * res->Scalars.size());
-
-    for (size_t i = 0; i < res->Scalars.size(); i += 3) {
-        data[(i / 3)].x = res->Scalars[i + 0].s16;
-        data[(i / 3)].y = res->Scalars[i + 1].s16;
-        data[(i / 3)].z = res->Scalars[i + 2].s16;
+    for (size_t i = 0; i + 2 < res->Scalars.size(); i += 3) {
+        data[i / 3].x = res->Scalars[i + 0].s16;
+        data[i / 3].y = res->Scalars[i + 1].s16;
+        data[i / 3].z = res->Scalars[i + 2].s16;
     }
-
-    // res->CachedGameAsset = data;
-
-    return (char*)data;
-    // }
+    return data;
 }
 
 extern "C" AnimatedMaterial* ResourceMgr_LoadAnimatedMatByName(const char* path) {
@@ -1678,6 +1721,10 @@ extern "C" AnimatedMaterial* ResourceMgr_LoadAnimatedMatByName(const char* path)
 
 extern "C" CollisionHeader* ResourceMgr_LoadColByName(const char* path) {
     return (CollisionHeader*)ResourceGetDataByName(path);
+}
+
+extern "C" Sample* ResourceMgr_LoadAudioSample(const char* path) {
+    return (Sample*)ResourceGetDataByName(path);
 }
 
 extern "C" Vtx* ResourceMgr_LoadVtxByName(char* path) {
@@ -2340,4 +2387,22 @@ extern "C" bool Ship_HandleConsoleCrashAsReset() {
     });
 
     return true;
+}
+
+extern "C" bool OTRAudio_LockRegistry(void) {
+    if (audio.thread.get_id() == std::this_thread::get_id()) return false;
+    audio.mutex.lock();
+    return true;
+}
+extern "C" void OTRAudio_UnlockRegistry(void) { audio.mutex.unlock(); }
+
+extern "C" void ModApi_InitializeRuntime(void) {
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+    ModApi_Init();
+    SceneDB_Init();
+    DungeonRegistry_Load();
+    S2H::Unbound::LoadCustomActors();
+    if (CVarGetInteger("gNetwork.Anchor.Enabled", 0)) Anchor::Instance->Enable();
 }

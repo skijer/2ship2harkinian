@@ -1,0 +1,7 @@
+#ifndef OOT_COMPAT_SOH_MODAPI_CUSTOMITEMREGISTRY_CUSTOMITEMREGISTRY_H
+#define OOT_COMPAT_SOH_MODAPI_CUSTOMITEMREGISTRY_CUSTOMITEMREGISTRY_H
+
+#include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
+#include "soh_api_names.h"
+
+#endif

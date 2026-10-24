@@ -13,7 +13,7 @@ SetLightingSettingsFactory::ReadResource(std::shared_ptr<Ship::ResourceInitData>
     setLightingSettings->settings.reserve(count);
 
     for (uint32_t i = 0; i < count; i++) {
-        EnvLightSettings lightSettings;
+        EnvLightSettings lightSettings = {};
         lightSettings.ambientColor[0] = reader->ReadInt8();
         lightSettings.ambientColor[1] = reader->ReadInt8();
         lightSettings.ambientColor[2] = reader->ReadInt8();

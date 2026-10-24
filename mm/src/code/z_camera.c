@@ -7192,7 +7192,7 @@ s32 Camera_UpdateWater(Camera* camera) {
     s16 camSetting;
     s32 pad[2];
     s32* waterPrevCamSetting = &camera->waterPrevCamSetting;
-    s16 prevBgId;
+    s32 prevBgId;
 
     if (!(camera->stateFlags & CAM_STATE_CHECK_WATER) || (sCameraSettings[camera->setting].flags & 0x40000000)) {
         return false;
@@ -7621,6 +7621,7 @@ Vec3s Camera_Update(Camera* camera) {
     camera->quakeOffset = camShake.eyeOffset;
     View_SetScale(&camera->play->view, (OREG(67) * 0.01f) + 1.0f);
     camera->play->view.fovy = viewFov;
+    GameInteractor_ExecuteOnCameraResolveView(camera, &viewEye, &viewAt, &viewUp);
     View_LookAt(&camera->play->view, &viewEye, &viewAt, &viewUp);
     camera->camDir.x = sp3C.pitch;
     camera->camDir.y = sp3C.yaw;

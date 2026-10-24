@@ -1,6 +1,8 @@
+#include "2s2h/ModApi/ProgressiveItems/ProgressiveItems.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
 
 extern "C" {
 #include "variables.h"
@@ -10,6 +12,13 @@ extern "C" {
 #define CLEAR_OWL_WARP(owlId) (gSaveContext.save.saveInfo.playerData.owlActivationFlags &= ~(1 << owlId))
 
 void Rando::RemoveItem(RandoItemId randoItemId) {
+    if (ProgressiveItems_ChangeRando(randoItemId, false)) return;
+    if (DungeonRegistry_GrantItem(randoItemId, true)) { return; }
+    if (RandoItems_IsModItem(randoItemId)) {
+        RandoItems_Remove(randoItemId);
+        return;
+    }
+
     switch (randoItemId) {
         case RI_CLOCK_TOWN_STRAY_FAIRY:
             CLEAR_WEEKEVENTREG(WEEKEVENTREG_08_80);

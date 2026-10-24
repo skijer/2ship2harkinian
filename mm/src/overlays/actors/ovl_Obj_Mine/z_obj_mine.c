@@ -100,7 +100,7 @@ static InitChainEntry sInitChain[] = {
 };
 
 void ObjMine_Path_MoveToWaypoint(ObjMine* this, s32 index) {
-    Math_Vec3s_ToVec3f(&this->actor.world.pos, &this->waypoints[index]);
+    Math_Vec3f_Copy(&this->actor.world.pos, &this->waypoints[index]);
 }
 
 s32 ObjMine_GetUnitVec3f(Vec3f* src, Vec3f* dst) {
@@ -171,13 +171,11 @@ s32 ObjMine_AirWater_CheckOC(ObjMine* this) {
 
 void ObjMine_Air_CheckAC(ObjMine* this, s16* hitAngle, s16* torqueAngle) {
     s32 pad[2];
-    Vec3s* centerPos3s = &this->collider.elements[0].dim.worldSphere.center;
-    Vec3f centerPos;
+    Vec3f* centerPos = &this->collider.elements[0].dim.worldSphere.center;
     s16 yawToAttack;
     Actor* attackActor = this->collider.base.ac;
 
-    Math_Vec3s_ToVec3f(&centerPos, centerPos3s);
-    yawToAttack = Math_Vec3f_Yaw(&attackActor->world.pos, &centerPos);
+    yawToAttack = Math_Vec3f_Yaw(&attackActor->world.pos, centerPos);
 
     // dmgFlag check is (DMG_DEKU_BUBBLE | DMG_FIRE_ARROW | DMG_ICE_ARROW | DMG_FIRE_ARROW | DMG_NORMAL_ARROW)
     if (this->collider.elements[0].base.acHitElem->atDmgInfo.dmgFlags & 0x13820) {
@@ -697,7 +695,7 @@ void ObjMine_Init(Actor* thisx, PlayState* play) {
 
             this->waypointIndex = 0;
             this->waypointCount = path->count - 1;
-            this->waypoints = (Vec3s*)Lib_SegmentedToVirtual(path->points);
+            this->waypoints = (Vec3f*)Lib_SegmentedToVirtual(path->points);
 
             ObjMine_Path_MoveToWaypoint(this, this->waypointIndex);
             ObjMine_Path_SetupMove(this);
@@ -769,7 +767,7 @@ void ObjMine_Path_Move(ObjMine* this, PlayState* play) {
     s32 bgId; // not used
 
     // thisx->velocity is temporarily set to the vector difference to the next waypoint.
-    Math_Vec3s_ToVec3f(&nextWaypoint, &this->waypoints[this->waypointIndex + 1]);
+    Math_Vec3f_Copy(&nextWaypoint, &this->waypoints[this->waypointIndex + 1]);
     Math_Vec3f_Diff(&nextWaypoint, &thisx->world.pos, &thisx->velocity);
     distToWaypoint = Math3D_Vec3fMagnitude(&thisx->velocity);
 

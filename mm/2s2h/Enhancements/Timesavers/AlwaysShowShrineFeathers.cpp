@@ -21,7 +21,7 @@ static void RegisterAlwaysShowShrineFeathers() {
         }
 
         Path* path = &gPlayState->setupPathList[pathIndex];
-        Vec3s* points = (Vec3s*)Lib_SegmentedToVirtual(path->points);
+        Vec3f* points = (Vec3f*)Lib_SegmentedToVirtual(path->points);
 
         for (s32 i = 0; i < path->count; i++) {
             Actor_Spawn(&gPlayState->actorCtx, gPlayState, ACTOR_EN_OWL, points[i].x, points[i].y, points[i].z, 0, 0, 0,

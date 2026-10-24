@@ -185,7 +185,7 @@ void EnGe1_ShadowDraw(Actor* thisx, Lights* lights, PlayState* play) {
 
 void EnGe1_SetupPath(EnGe1* this, PlayState* play) {
     s32 pad;
-    Vec3s* point;
+    Vec3f* point;
     Vec3f nextPoint;
 
     this->curPointIndex = 0;
@@ -194,10 +194,10 @@ void EnGe1_SetupPath(EnGe1* this, PlayState* play) {
         this->path = &play->setupPathList[GERUDO_WHITE_GET_PATH_INDEX(&this->picto.actor)];
         if (this->path != NULL) {
             point = Lib_SegmentedToVirtual(this->path->points);
-            Math_Vec3s_ToVec3f(&this->picto.actor.world.pos, point);
+            Math_Vec3f_Copy(&this->picto.actor.world.pos, point);
             this->curPointIndex++;
             point++;
-            Math_Vec3s_ToVec3f(&nextPoint, point);
+            Math_Vec3f_Copy(&nextPoint, point);
 
             this->picto.actor.world.rot.y = Math_Vec3f_Yaw(&this->picto.actor.world.pos, &nextPoint);
             this->picto.actor.world.rot.x = Math_Vec3f_Pitch(&this->picto.actor.world.pos, &nextPoint);
@@ -214,7 +214,7 @@ void EnGe1_SetupPath(EnGe1* this, PlayState* play) {
 s32 EnGe1_FollowPath(EnGe1* this) {
     s32 pad;
     Path* path = this->path;
-    Vec3s* curPoint;
+    Vec3f* curPoint;
     Vec3f point;
     s16 yawTarget;
     s16 pitchTarget;
@@ -226,7 +226,7 @@ s32 EnGe1_FollowPath(EnGe1* this) {
     curPoint = Lib_SegmentedToVirtual(this->path->points);
     curPoint += this->curPointIndex;
 
-    Math_Vec3s_ToVec3f(&point, curPoint);
+    Math_Vec3f_Copy(&point, curPoint);
     yawTarget = Math_Vec3f_Yaw(&this->picto.actor.world.pos, &point);
     pitchTarget = Math_Vec3f_Pitch(&this->picto.actor.world.pos, &point);
     Math_SmoothStepToS(&this->picto.actor.world.rot.y, yawTarget, 0xA, 0x3E8, 0x64);

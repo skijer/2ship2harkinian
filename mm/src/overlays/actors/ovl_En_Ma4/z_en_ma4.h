@@ -16,7 +16,7 @@ typedef struct EnMa4 {
     /* 0x188 */ EnMa4ActionFunc actionFunc;
     /* 0x18C */ ColliderCylinder collider;
     /* 0x1D8 */ NpcInteractInfo interactInfo;
-    /* 0x200 */ Vec3s* pathPoints;
+    /* 0x200 */ Vec3f* pathPoints;
     /* 0x204 */ Vec3s jointTable[ROMANI_LIMB_MAX];
     /* 0x28E */ UNK_TYPE1 unk28E[0x6];
     /* 0x294 */ Vec3s morphTable[ROMANI_LIMB_MAX];

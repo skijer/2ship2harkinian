@@ -4,6 +4,10 @@
 #include <ship/window/Window.h>
 #include <ship/window/gui/ConsoleWindow.h>
 #include "2s2h/BenPort.h"
+#include "2s2h/ModApi/ActorRegistry/ActorRegistry.h"
+#include "2s2h/ModApi/ConsoleArguments.h"
+#include "2s2h/Unbound/SceneDB.h"
+#include "2s2h/Unbound/UnboundExporter.h"
 #include <vector>
 #include <string>
 
@@ -28,8 +32,41 @@ extern "C" {
         Ship::Context::GetRawInstance()->GetWindow()->GetGui()->GetGuiWindow("Console")) \
         ->SendInfoMessage
 
-static bool ActorSpawnHandler(std::shared_ptr<Ship::Console> Console, const std::vector<std::string>& args,
+static bool IsCustomActorMarker(const std::string& argument) {
+    return argument == "custom_actor" || argument == "custom_enemy";
+}
+
+// Ship's form, `spawn custom_actor|custom_enemy "<key>" <data> ...`, becomes `spawn <id> <data> ...`.
+static bool ResolveCustomActorArgs(std::vector<std::string>& args) {
+    if (args.size() < 2 || !IsCustomActorMarker(args[1])) {
+        return true;
+    }
+    if (args.size() < 3) {
+        ERROR_MESSAGE("Usage: spawn custom_actor|custom_enemy \"<key>\" <data> [x y z [rx ry rz]]");
+        return false;
+    }
+    const bool wantsEnemy = args[1] == "custom_enemy";
+    const std::string key = ModApi_UnquoteConsoleArgument(args[2]);
+    const int16_t actorId = ActorRegistry_FindCustomId(key.c_str());
+    if (actorId < 0 || (wantsEnemy && ActorRegistry_FindEnemyById(actorId) == nullptr)) {
+        ERROR_MESSAGE("No installed mod registers %s named \"%s\"", wantsEnemy ? "an enemy" : "an actor",
+                      key.c_str());
+        return false;
+    }
+    args.erase(args.begin() + 1);
+    args[1] = std::to_string(actorId);
+    return true;
+}
+
+static bool ActorSpawnHandler(std::shared_ptr<Ship::Console> Console, const std::vector<std::string>& rawArgs,
                               std::string* output) {
+    std::vector<std::string> args = rawArgs;
+    while (args.size() > 1 && args.back().empty()) {
+        args.pop_back();
+    }
+    if (!ResolveCustomActorArgs(args)) {
+        return 1;
+    }
     if ((args.size() != 9) && (args.size() != 3) && (args.size() != 6)) {
         ERROR_MESSAGE("Not enough arguments passed to actorspawn");
         return 1;
@@ -46,6 +83,9 @@ static bool ActorSpawnHandler(std::shared_ptr<Ship::Console> Console, const std:
     try {
         actorId = std::stoi(args[1]);
     } catch (std::invalid_argument const& ex) {
+        actorId = ActorRegistry_GetId(args[1].c_str());
+    }
+    if (actorId < 0) {
         ERROR_MESSAGE("Invalid actor ID");
         return 1;
     }
@@ -202,17 +242,35 @@ static bool EntranceHandler(std::shared_ptr<Ship::Console> Console, const std::v
 
     unsigned int entrance;
 
-    try {
-        entrance = std::stoi(args[1], nullptr, 16);
-    } catch (std::invalid_argument const& ex) {
-        ERROR_MESSAGE("[2S2H] Entrance value must be a Hex number.");
-        return 1;
+    if (auto named = SceneDB_FindEntrance(args[1])) {
+        entrance = *named;
+    } else {
+        try {
+            entrance = std::stoi(args[1], nullptr, 16);
+        } catch (std::invalid_argument const& ex) {
+            ERROR_MESSAGE("[2S2H] Entrance must be a hex number or a registered \"<scene>/<entrance>\" name.");
+            return 1;
+        }
     }
 
     gPlayState->nextEntrance = entrance;
     gPlayState->transitionTrigger = TRANS_TRIGGER_START;
     gPlayState->transitionType = TRANS_TYPE_INSTANT;
     gSaveContext.nextTransitionType = TRANS_TYPE_INSTANT;
+    return 0;
+}
+
+static bool UnboundExportHandler(std::shared_ptr<Ship::Console> Console, const std::vector<std::string>& args,
+                                 std::string* output) {
+    if (args.size() < 2) {
+        ERROR_MESSAGE("[2S2H] An output path is required");
+        return 1;
+    }
+    const S2H::Unbound::ExportReport report = S2H::Unbound::ExportArchive(args[1]);
+    if (!report.ok) {
+        ERROR_MESSAGE("[2S2H] Unbound export failed: %s", report.error.c_str());
+        return 1;
+    }
     return 0;
 }
 
@@ -269,8 +327,11 @@ void DebugConsole_Init(void) {
     CMD_REGISTER("void", { VoidHandler, "Voids out of the current map." });
     CMD_REGISTER("reload", { ReloadHandler, "Reloads the current map." });
     CMD_REGISTER("entrance", { EntranceHandler,
-                               "Sends player to the entered entrance (hex)",
-                               { { "entrance", Ship::ArgumentType::NUMBER } } });
+                               "Sends player to the entered entrance (hex, or a registered \"<scene>/<entrance>\")",
+                               { { "entrance", Ship::ArgumentType::TEXT } } });
+    CMD_REGISTER("unbound-export", { UnboundExportHandler,
+                                     "Writes the Unbound scene base converted from mm.o2r to the given path",
+                                     { { "output path", Ship::ArgumentType::TEXT } } });
 
     // Gameplay
     CMD_REGISTER("give_item", { GiveItemHandler,
@@ -280,8 +341,8 @@ void DebugConsole_Init(void) {
     CMD_REGISTER("bItem", { BHandler, "Set an item to the B button.", { { "Item ID", Ship::ArgumentType::NUMBER } } });
 
     CMD_REGISTER("spawn", { ActorSpawnHandler,
-                            "Spawn an actor.",
-                            { { "actor id", Ship::ArgumentType::NUMBER },
+                            "Spawn an actor. Mod actors: spawn custom_actor|custom_enemy \"<key>\" <data> ...",
+                            { { "actor id or key|custom_actor|custom_enemy", Ship::ArgumentType::TEXT },
                               { "data", Ship::ArgumentType::NUMBER },
                               { "x", Ship::ArgumentType::NUMBER, true },
                               { "y", Ship::ArgumentType::NUMBER, true },

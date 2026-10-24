@@ -245,7 +245,7 @@ s32 EnElfgrp_GetFountainFairiesCount(PlayState* play, s32 type) {
     }
 
     if (type == ENELFGRP_TYPE_MAGIC) {
-        if (gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 & 1) {
+        if (SceneFlags_GetPermanent(play->sceneId)->unk_14 & 1) {
             return STRAY_FAIRY_TOTAL;
         } else {
             return STRAY_FAIRY_TOTAL - 1;
@@ -253,7 +253,7 @@ s32 EnElfgrp_GetFountainFairiesCount(PlayState* play, s32 type) {
     }
 
     numberInFountain =
-        (gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 >> (((type - 1) * 5) + 1)) & 0x1F;
+        (SceneFlags_GetPermanent(play->sceneId)->unk_14 >> (((type - 1) * 5) + 1)) & 0x1F;
     if (numberInFountain < STRAY_FAIRY_TOTAL - STRAY_FAIRY_SCATTERED_TOTAL) {
         numberInFountain = STRAY_FAIRY_TOTAL - STRAY_FAIRY_SCATTERED_TOTAL;
     } else if (numberInFountain > STRAY_FAIRY_TOTAL) {
@@ -271,13 +271,13 @@ void EnElfgrp_SetFountainFairiesCount(PlayState* play, s32 type, s32 newCount) {
 
     if (type == ENELFGRP_TYPE_MAGIC) {
         if (newCount == STRAY_FAIRY_TOTAL) {
-            gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 |= 1;
+            SceneFlags_GetPermanent(play->sceneId)->unk_14 |= 1;
         } else {
-            gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 &= ~1;
+            SceneFlags_GetPermanent(play->sceneId)->unk_14 &= ~1;
         }
     } else {
-        gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 &= ~(0x1F << ((type * 5) - 4));
-        gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 |= newCount << ((type * 5) - 4);
+        SceneFlags_GetPermanent(play->sceneId)->unk_14 &= ~(0x1F << ((type * 5) - 4));
+        SceneFlags_GetPermanent(play->sceneId)->unk_14 |= newCount << ((type * 5) - 4);
     }
 }
 

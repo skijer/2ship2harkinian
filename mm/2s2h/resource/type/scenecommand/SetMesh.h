@@ -13,7 +13,7 @@ typedef struct {
 
 typedef struct {
     /* 0x00 */ PolygonBase base;
-    /* 0x01 */ u8 num; // number of dlist entries
+    /* 0x01 */ u32 num; // number of dlist entries
     /* 0x04 */ void* start;
     /* 0x08 */ void* end;
 } PolygonType0; // size = 0xC
@@ -57,7 +57,7 @@ typedef struct {
 
 typedef struct {
     /* 0x00 */ PolygonBase base;
-    /* 0x01 */ u8 num; // number of dlist entries
+    /* 0x01 */ u32 num; // number of dlist entries
     /* 0x04 */ void* start;
     /* 0x08 */ void* end;
 } PolygonType2; // size = 0xC
@@ -69,12 +69,13 @@ typedef union {
     PolygonType2 polygon2;
 } MeshHeader; // "Ground Shape"
 
+// 2S2H [Unbound] mirrors RoomShapeCullableEntry: position is f32 (world extent)
 typedef struct {
-    /* 0x00 */ Vec3s pos;
-    /* 0x06 */ s16 unk_06;
-    /* 0x08 */ Gfx* opa;
-    /* 0x0C */ Gfx* xlu;
-} PolygonDlist2; // size = 0x8
+    /* 0x00 */ Vec3f pos;
+    /* 0x0C */ s16 unk_06;
+    /* 0x10 */ Gfx* opa;
+    /* 0x18 */ Gfx* xlu;
+} PolygonDlist2;
 
 typedef struct {
     /* 0x00 */ Gfx* opa;

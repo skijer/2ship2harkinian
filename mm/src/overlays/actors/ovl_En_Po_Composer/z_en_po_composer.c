@@ -652,7 +652,7 @@ void EnPoComposer_Draw(Actor* thisx, PlayState* play) {
     Color_RGBA8* clothingColor;
     Color_RGBA8* var_t0;
     Vec3f lightOffset;
-    Vec3s lightPos;
+    Vec3f lightPos;
 
     OPEN_DISPS(play->state.gfxCtx);
 

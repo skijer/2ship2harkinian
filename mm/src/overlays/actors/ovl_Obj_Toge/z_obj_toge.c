@@ -117,7 +117,7 @@ void ObjToge_Init(Actor* thisx, PlayState* play) {
     s32 pad;
     ObjToge* this = (ObjToge*)thisx;
     Path* path;
-    Vec3s* points;
+    Vec3f* points;
     s16 sp3E;
     s32 sp38 = OBJTOGE_GET_4000(thisx);
 
@@ -141,8 +141,8 @@ void ObjToge_Init(Actor* thisx, PlayState* play) {
     }
 
     points = Lib_SegmentedToVirtual(path->points);
-    Math_Vec3s_ToVec3f(&this->unk_198[0], &points[0]);
-    Math_Vec3s_ToVec3f(&this->unk_198[1], &points[1]);
+    Math_Vec3f_Copy(&this->unk_198[0], &points[0]);
+    Math_Vec3f_Copy(&this->unk_198[1], &points[1]);
     Math_Vec3f_Copy(&thisx->world.pos, &this->unk_198[0]);
     thisx->world.rot.y = Math_Vec3f_Yaw(&this->unk_198[0], &this->unk_198[1]);
     this->unk_194 = 0;

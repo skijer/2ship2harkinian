@@ -23,6 +23,7 @@ class SetCutscenesMM : public SceneCommand<CutsceneScriptEntry> {
     size_t GetPointerSize();
 
     std::vector<CutsceneScriptEntry> entries;
+    std::vector<std::string> scriptPaths;
 };
 
 }; // namespace SOH

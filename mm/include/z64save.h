@@ -250,7 +250,7 @@ typedef struct Inventory {
     /* 0x48 */ u32 upgrades;                            // "non_equip_register" some bits are wallet upgrades
     /* 0x4C */ u32 questItems;                          // "collect_register"
     /* 0x50 */ u8 dungeonItems[10];                     // "key_compass_map"
-    /* 0x5A */ s8 dungeonKeys[9];                       // "key_register"
+    /* 0x5A */ s8 dungeonKeys[10];                      // "key_register", plus Unbound context
     /* 0x63 */ s8 defenseHearts;
     /* 0x64 */ s8 strayFairies[10];                     // "orange_fairy"
     // 2S2H [Comment] These char[] are not null-terminated, they will not work correctly in string functions
@@ -267,8 +267,8 @@ typedef struct RespawnData {
     /* 0x00 */ Vec3f pos;
     /* 0x0C */ s16 yaw;
     /* 0x0E */ s16 playerParams;
-    /* 0x10 */ u16 entrance;
-    /* 0x12 */ u8 roomIndex;
+    /* 0x10 */ u32 entrance; // 2S2H [Unbound] 32-bit like every entrance
+    /* 0x12 */ u16 roomIndex;
     /* 0x13 */ s8 data;
     /* 0x14 */ u32 tempSwitchFlags;
     /* 0x18 */ u32 unk_18;
@@ -386,7 +386,7 @@ typedef struct RandoSaveInfo {
     u32 finalSeed;
     u32 randoSaveOptions[RO_MAX]; // Type here may change in the future
     u16 randoStartingItems[256]; // Max 256 starting items, using u16 in case we add more than 255 items
-    s8 foundDungeonKeys[9]; // Tracks the number of dungeon keys found, opposed to the number of keys in the inventory
+    s8 foundDungeonKeys[10]; // Tracks the number of dungeon keys found, opposed to the number of keys in the inventory
     u16 foundTriforcePieces;
     u8 sariaHintsAvailable;
     u16 sariaPriorityItems[16];
@@ -610,12 +610,24 @@ typedef enum {
 #define SET_DUNGEON_ITEM(item, dungeonSceneIndex) (gSaveContext.save.saveInfo.inventory.dungeonItems[(void)0, dungeonSceneIndex] |= (u8)gBitFlags[item])
 // 2S2H [Enhancements] We added this for save editor
 #define REMOVE_DUNGEON_ITEM(item, dungeonIndex) (gSaveContext.save.saveInfo.inventory.dungeonItems[(void)0, dungeonIndex] &= ~(u8)gBitFlags[item])
+int32_t DungeonRegistry_KeyIndex(int32_t scene);
+uint32_t DungeonRegistry_ResolveEntrance(uint32_t entrance);
+
 #define DUNGEON_KEY_COUNT(dungeonSceneIndex) (gSaveContext.save.saveInfo.inventory.dungeonKeys[(void)0, dungeonSceneIndex])
-#define GET_DUNGEON_FLOOR_VISITED(sceneId, floor) (gSaveContext.save.saveInfo.permanentSceneFlags[(sceneId)].unk_14 & gBitFlags[floor])
-#define SET_DUNGEON_FLOOR_VISITED(sceneId, floor) (gSaveContext.save.saveInfo.permanentSceneFlags[(sceneId)].unk_14 |= gBitFlags[floor])
-#define GET_ROOM_VISITED(sceneId, room) (((void)0, gSaveContext.save.saveInfo.permanentSceneFlags[(sceneId)].rooms) & (1 << (room)))
-#define SET_ROOM_VISITED(sceneId, room) (gSaveContext.save.saveInfo.permanentSceneFlags[(sceneId)].rooms |= gBitFlags[room])
-#define GET_CYCLE_CHEST_OPENED(sceneId, chestFlagId) ((void)0, gSaveContext.cycleSceneFlags[(sceneId)].chest) & (1 << (chestFlagId));
+// 2S2H [Unbound] Scene flags of a scene id, vanilla or custom (custom ones live outside the Save struct).
+s32 SceneFlags_GetRoomVisited(s16 sceneId, s32 room);
+void SceneFlags_SetRoomVisited(s16 sceneId, s32 room);
+void SceneFlags_ClearRoomVisited(s16 sceneId, s32 room);
+s32 SceneFlags_GetRoomClear(s16 sceneId, s32 room, s32 temporary);
+void SceneFlags_SetRoomClear(s16 sceneId, s32 room, s32 temporary, s32 value);
+PermanentSceneFlags* SceneFlags_GetPermanent(s16 sceneId);
+CycleSceneFlags* SceneFlags_GetCycle(s16 sceneId);
+
+#define GET_DUNGEON_FLOOR_VISITED(sceneId, floor) (SceneFlags_GetPermanent(sceneId)->unk_14 & gBitFlags[floor])
+#define SET_DUNGEON_FLOOR_VISITED(sceneId, floor) (SceneFlags_GetPermanent(sceneId)->unk_14 |= gBitFlags[floor])
+#define GET_ROOM_VISITED(sceneId, room) SceneFlags_GetRoomVisited(sceneId, room)
+#define SET_ROOM_VISITED(sceneId, room) SceneFlags_SetRoomVisited(sceneId, room)
+#define GET_CYCLE_CHEST_OPENED(sceneId, chestFlagId) (SceneFlags_GetCycle(sceneId)->chest) & (1 << (chestFlagId));
 
 
 #define GET_CUR_FORM_BTN_ITEM(btn) ((u8)((btn) == EQUIP_SLOT_B ? BUTTON_ITEM_EQUIP(CUR_FORM, btn) : BUTTON_ITEM_EQUIP(0, btn)))
@@ -1874,14 +1886,14 @@ void func_80147314(SramContext* sramCtx, s32 fileNum); // Removes Owl Saves
 
 void SaveContext_Init(void);
 
-extern u32 gSramSlotOffsets[];
-extern u8 gAmmoItems[];
-extern s32 gFlashSaveStartPages[];
-extern s32 gFlashSaveNumPages[];
-extern s32 gFlashSpecialSaveNumPages[];
-extern s32 gFlashOwlSaveStartPages[];
-extern s32 gFlashOwlSaveNumPages[];
+extern HOST_DATA u32 gSramSlotOffsets[];
+extern HOST_DATA u8 gAmmoItems[];
+extern HOST_DATA s32 gFlashSaveStartPages[];
+extern HOST_DATA s32 gFlashSaveNumPages[];
+extern HOST_DATA s32 gFlashSpecialSaveNumPages[];
+extern HOST_DATA s32 gFlashOwlSaveStartPages[];
+extern HOST_DATA s32 gFlashOwlSaveNumPages[];
 
-extern SaveContext gSaveContext;
+extern HOST_DATA SaveContext gSaveContext;
 
 #endif

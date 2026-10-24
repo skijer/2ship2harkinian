@@ -1,7 +1,10 @@
 #include "Spoiler.h"
+#include "2s2h/ModApi/ModDungeons/BossRegistry.h"
 #include "Rando/Rando.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "ShipUtils.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
+#include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
 
 extern "C" {
 #include "overlays/actors/ovl_En_Sth/z_en_sth.h"
@@ -12,6 +15,8 @@ namespace Rando {
 namespace Spoiler {
 
 void ApplyToSaveContext(nlohmann::json spoiler) {
+    BossRegistry_ParseSpoiler(spoiler);
+    DungeonRegistry_ReadSpoiler(spoiler);
     gSaveContext.save.shipSaveInfo.rando.finalSeed = spoiler["finalSeed"].get<uint32_t>();
 
     for (auto& [randoOptionId, randoStaticOption] : Rando::StaticData::Options) {
@@ -44,6 +49,18 @@ void ApplyToSaveContext(nlohmann::json spoiler) {
         if (spoiler["checks"][randoStaticCheck.name].is_object()) {
             std::string itemName = spoiler["checks"][randoStaticCheck.name]["randoItemId"].get<std::string>();
             RandoItemId randoItemId = Rando::StaticData::GetItemIdFromName(itemName.c_str());
+
+            const auto& location = spoiler["checks"][randoStaticCheck.name];
+            if (location.contains("pickup")) {
+                const auto& identity = location["pickup"];
+                const std::string key = identity.value("key", "");
+                const auto* pickup = CustomItemRegistry_GetPickupVariant(key.c_str());
+                if (pickup == nullptr || identity.value("itemKey", "") != pickup->itemKey ||
+                    identity.value("variantKey", "") != pickup->variantKey) {
+                    throw std::runtime_error("Unknown or mismatched pickup variant in spoiler: " + key);
+                }
+                randoItemId = (RandoItemId)RandoItems_GetRandoGet(key.c_str());
+            }
 
             if (randoItemId == RI_UNKNOWN) {
                 SPDLOG_ERROR("Unknown item in spoiler for check {}: {}", randoStaticCheck.name, itemName);

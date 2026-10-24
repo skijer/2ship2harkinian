@@ -28,7 +28,7 @@ typedef struct EnSyatekiDekunuts {
     /* 0x1CD */ s16 unk_1DC; // Initialized, but never used
     /* 0x1DE */ UNK_TYPE1 unk_1DE[0x4];
     /* 0x1E2 */ s16 isAlive;
-    /* 0x1E4 */ Vec3s* flowerPos;
+    /* 0x1E4 */ Vec3f* flowerPos;
     /* 0x1E8 */ s16 index;
     /* 0x1EA */ s16 flowerCount;
     /* 0x1EC */ s16 shouldDrawFlowers;

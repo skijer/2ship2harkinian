@@ -20,7 +20,7 @@ typedef struct EnKendoJs {
     /* 0x1D4 */ EnKendoJsActionFunc actionFunc;
     /* 0x1D8 */ Vec3s jointTable[OBJECT_JS_LIMB_MAX];
     /* 0x226 */ Vec3s morphTable[OBJECT_JS_LIMB_MAX];
-    /* 0x274 */ Vec3s* pathPoints;
+    /* 0x274 */ Vec3f* pathPoints;
     /* 0x278 */ Vec3s headRot;
     /* 0x27E */ Vec3s torsoRot;
     /* 0x284 */ s16 unk_284;

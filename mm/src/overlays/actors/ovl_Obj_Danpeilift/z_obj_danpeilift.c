@@ -39,7 +39,7 @@ static InitChainEntry sInitChain[] = {
 };
 
 void ObjDanpeilift_UpdatePosition(ObjDanpeilift* this, s32 index) {
-    Math_Vec3s_ToVec3f(&this->dyna.actor.world.pos, &this->pathPoints[index]);
+    Math_Vec3f_Copy(&this->dyna.actor.world.pos, &this->pathPoints[index]);
 }
 
 void ObjDanpeilift_Init(Actor* thisx, PlayState* play) {
@@ -92,9 +92,9 @@ void ObjDanpeilift_Move(ObjDanpeilift* this, PlayState* play) {
     f32 step;
     s32 isTeleporting;
     s32 isPosUpdated;
-    Vec3s* endPoint;
+    Vec3f* endPoint;
 
-    Math_Vec3s_ToVec3f(&nextPoint, this->pathPoints + this->curPoint + this->direction);
+    Math_Vec3f_Copy(&nextPoint, this->pathPoints + this->curPoint + this->direction);
     Math_Vec3f_Diff(&nextPoint, &thisx->world.pos, &thisx->velocity);
     speed = Math3D_Vec3fMagnitude(&thisx->velocity);
     if ((speed < (this->speed * 8.0f)) && (this->speed > 2.0f)) {

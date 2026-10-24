@@ -21,8 +21,8 @@ typedef struct DmGm {
     /* 0x1A4 */ Vec3s torsoComputedRot;
     /* 0x1B0 */ Vec3s jointTable[ANJU1_LIMB_MAX];
     /* 0x22E */ Vec3s morphTable[ANJU1_LIMB_MAX];
-    /* 0x2AC */ s8 an4ObjectSlot;
-    /* 0x2AD */ s8 msmoObjectSlot;
+    /* 0x2AC */ s16 an4ObjectSlot;
+    /* 0x2AD */ s16 msmoObjectSlot;
     /* 0x2AE */ u16 stateFlags;
     /* 0x2B0 */ u8 cueId;
     /* 0x2B4 */ Actor* lookAtActor;

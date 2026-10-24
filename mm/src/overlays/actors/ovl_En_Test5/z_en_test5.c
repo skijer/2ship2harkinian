@@ -43,7 +43,7 @@ void EnTest5_Init(Actor* thisx, PlayState* play2) {
         return;
     }
 
-    Math_Vec3s_ToVec3f(&this->minPos, &waterBox->minPos);
+    BgCheck_Vec3iToVec3f(&waterBox->minPos, &this->minPos);
     this->xLength = (f32)waterBox->xLength;
     this->zLength = (f32)waterBox->zLength;
 

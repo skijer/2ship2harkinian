@@ -13,24 +13,26 @@ struct PlayState;
 //struct Actor;
 //struct DynaPolyActor;
 
-#define SS_NULL 0xFFFF
+#define SS_NULL UINT32_MAX
 
 #define COLPOLY_NORMAL_FRAC (1.0f / SHT_MAX)
 #define COLPOLY_SNORMAL(x) ((s16)((x) * SHT_MAX))
 #define COLPOLY_GET_NORMAL(n) ((n)*COLPOLY_NORMAL_FRAC)
-#define COLPOLY_VIA_FLAG_TEST(vIA, flags) ((vIA) & (((flags)&7) << 13))
-#define COLPOLY_VTX_INDEX(vI) ((vI)&0x1FFF)
-#define COLPOLY_VTX(vtxId, flags) ((((flags) & 7) << 13) | ((vtxId) & 0x1FFF))
+#define COLPOLY_VIA_FLAG_TEST(vIA, flags) ((vIA) & (((flags)&7) << 29))
+#define COLPOLY_VTX_INDEX(vI) ((vI)&0x1FFFFFFFu)
+#define COLPOLY_VTX(vtxId, flags) ((((u32)(flags) & 7) << 29) | ((vtxId) & 0x1FFFFFFFu))
 
 #define DYNAPOLY_INVALIDATE_LOOKUP (1 << 0)
 
 #define BGACTOR_NEG_ONE -1
-#define BG_ACTOR_MAX 50
+// 2S2H [Unbound] stable sentinel, independent of the allocated dyna table.
+#define BG_ACTOR_MAX 0x7FFFFFFF
 #define DYNA_WATERBOX_MAX 30
 #define BGCHECK_SCENE BG_ACTOR_MAX
-#define BGCHECK_Y_MAX 32000.0f
-#define BGCHECK_Y_MIN -32000.0f
-#define BGCHECK_XYZ_ABSMAX 32760.0f
+// 2S2H [Unbound] world extent: 2^20 keeps ~0.06-unit f32 precision at the edge; Y_MIN is the exact "no floor" sentinel
+#define BGCHECK_Y_MAX 1048576.0f
+#define BGCHECK_Y_MIN -2147483648.0f
+#define BGCHECK_XYZ_ABSMAX 1048576.0f
 #define BGCHECK_SUBDIV_OVERLAP 50
 #define BGCHECK_SUBDIV_MIN 150.0f
 
@@ -91,8 +93,8 @@ struct PlayState;
      (((unk27)             &    1) << 27))
 
 typedef struct {
-    /* 0x0 */ Vec3s pos;
-} BgVertex; // size = 0x6
+    /* 0x0 */ Vec3i pos;
+} BgVertex; // size = 0xC
 
 typedef struct {
     /* 0x00 */ Vec3f scale;
@@ -103,19 +105,20 @@ typedef struct {
 typedef struct CollisionPoly {
     /* 0x0 */ u16 type;
     union {
-        /* 0x2 */ u16 vtxData[3];
+        /* 0x2 */ u32 vtxData[3];
         struct {
-            /* 0x2 */ u16 flags_vIA; // 0xE000 is poly exclusion flags (xpFlags), 0x1FFF is vtxId
-            /* 0x4 */ u16 flags_vIB; // 0xE000 is flags, 0x1FFF is vtxId
-                                      // 0x2000 = poly IsConveyor surface
-            /* 0x6 */ u16 vIC;
+            /* 0x2 */ u32 flags_vIA; // upper three bits are exclusion flags
+            /* 0x4 */ u32 flags_vIB; // upper three bits are flags
+                                      // bit 29 = conveyor surface
+            /* 0x6 */ u32 vIC;
         };
     };
     /* 0x8 */ Vec3s normal; // Unit normal vector
                              // Value ranges from -0x7FFF to 0x7FFF, representing -1.0 to 1.0; 0x8000 is invalid
 
-    /* 0xE */ s16 dist; // Plane distance from origin along the normal
-} CollisionPoly; // size = 0x10
+    // 2S2H [Unbound] s32 (world extent). Must match SOH::CollisionPoly in 2s2h/resource/type/CollisionHeader.h
+    /* 0x10 */ s32 dist; // Plane distance from origin along the normal
+} CollisionPoly; // size = 0x14
 
 typedef struct {
     /* 0x0 */ u16 setting; // camera setting described by CameraSettingType enum
@@ -137,16 +140,18 @@ typedef struct {
     /* 0x10 */ s16 unk_10;
 } BgCamFuncData; // size = 0x12
 
+// 2S2H [Unbound] extents are s32 (world extent). Must match SOH::WaterBox in 2s2h/resource/type/CollisionHeader.h
 typedef struct {
-    /* 0x0 */ Vec3s minPos;
-    /* 0x6 */ s16 xLength;
-    /* 0x8 */ s16 zLength;
-    /* 0xC */ u32 properties;
+    /* 0x00 */ Vec3i minPos;
+    /* 0x0C */ s32 xLength;
+    /* 0x10 */ s32 zLength;
+    /* 0x14 */ u32 properties;
+    s32 room; // -1 applies to every room
     // 0x0008_0000 = ?
     // 0x0007_E000 = room index, 0x3F = all rooms
     // 0x0000_1F00 = lighting setting index
     // 0x0000_00FF = bgCam index
-} WaterBox; // size = 0x10
+} WaterBox; // size = 0x18
 
 typedef enum FloorType {
     /*  0 */ FLOOR_TYPE_0,
@@ -288,32 +293,33 @@ typedef struct {
 
 } SurfaceType; // size = 0x8
 
+// 2S2H [Unbound] bounds and vertices are s32 (world extent); mirrored by SOH::CollisionHeaderData
 typedef struct CollisionHeader {
-    /* 0x00 */ Vec3s minBounds; // minimum coordinates of poly bounding box
-    /* 0x06 */ Vec3s maxBounds; // maximum coordinates of poly bounding box
-    /* 0x0C */ u16 numVertices;
-    /* 0x10 */ Vec3s* vtxList;
-    /* 0x14 */ u16 numPolygons;
+    /* 0x00 */ Vec3i minBounds; // minimum coordinates of poly bounding box
+    /* 0x0C */ Vec3i maxBounds; // maximum coordinates of poly bounding box
+    /* 0x18 */ u32 numVertices;
+    /* 0x1C */ Vec3i* vtxList;
+    /* 0x14 */ u32 numPolygons;
     /* 0x18 */ CollisionPoly* polyList;
     /* 0x1C */ SurfaceType* surfaceTypeList;
     /* 0x20 */ BgCamInfo* bgCamList;
-    /* 0x24 */ u16 numWaterBoxes;
+    /* 0x24 */ u32 numWaterBoxes;
     /* 0x28 */ WaterBox* waterBoxes;
 } CollisionHeader; // size = 0x2C
 
 typedef struct {
-    /* 0x0 */ s16 polyId;
-    /* 0x2 */ u16 next; // index of the next SSNode in the list, or SS_NULL if last element 
+    /* 0x0 */ s32 polyId;
+    /* 0x2 */ u32 next; // index of the next SSNode in the list, or SS_NULL if last element
 } SSNode; // size = 0x4
 
 // represents a linked list of type SSNode
 typedef struct {
-    /* 0x0 */ u16 head; // index of the first SSNode in the list, or SS_NULL if the list is empty
+    /* 0x0 */ u32 head; // index of the first SSNode in the list, or SS_NULL if the list is empty
 } SSList; // size = 0x2
 
 typedef struct {
-    /* 0x0 */ u16 max;
-    /* 0x2 */ u16 count;
+    /* 0x0 */ u32 max;
+    /* 0x2 */ u32 count;
     /* 0x4 */ SSNode* tbl;
     /* 0x8 */ u8* polyCheckTbl;
 } SSNodeList; // size = 0xC
@@ -325,7 +331,7 @@ typedef struct {
 } DynaSSNodeList; // size = 0xC
 
 typedef struct {
-    /* 0x0 */ s32 unk0;
+    /* 0x0 */ s32 max;
     /* 0x4 */ WaterBox* boxes;
 } DynaWaterBoxList; // size = 0x8
 
@@ -336,7 +342,7 @@ typedef struct {
 } StaticLookup; // size = 0x6
 
 typedef struct {
-    /* 0x0 */ s16 polyStartIndex;
+    /* 0x0 */ s32 polyStartIndex;
     /* 0x2 */ SSList ceiling;
     /* 0x4 */ SSList wall;
     /* 0x6 */ SSList floor;
@@ -346,8 +352,8 @@ typedef struct {
     /* 0x00 */ Actor* actor;
     /* 0x04 */ CollisionHeader* colHeader;
     /* 0x08 */ DynaLookup dynaLookup;
-    /* 0x10 */ u16 vtxStartIndex;
-    /* 0x12 */ u16 waterboxesStartIndex;
+    /* 0x10 */ u32 vtxStartIndex;
+    /* 0x12 */ u32 waterboxesStartIndex;
     /* 0x14 */ ScaleRotPos prevTransform;
     /* 0x34 */ ScaleRotPos curTransform;
     /* 0x54 */ Sphere16 boundingSphere;
@@ -363,10 +369,11 @@ typedef struct {
 
 typedef struct {
     /* 0x0000 */ u8 bitFlag;
-    /* 0x0004 */ BgActor bgActors[BG_ACTOR_MAX];
-    /* 0x138C */ u16 bgActorFlags[BG_ACTOR_MAX];
+    /* 0x0004 */ BgActor* bgActors;
+    /* 0x138C */ u16* bgActorFlags;
+    s32 bgActorMax;
     /* 0x13F0 */ CollisionPoly* polyList;
-    /* 0x13F4 */ Vec3s* vtxList;
+    /* 0x13F4 */ Vec3i* vtxList;
     /* 0x13F8 */ DynaWaterBoxList waterBoxList;
     /* 0x1400 */ DynaSSNodeList polyNodes;
     /* 0x140C */ s32 polyNodesMax;
@@ -439,7 +446,7 @@ typedef struct {
 
 typedef struct {
     /* 0x00 */ CollisionPoly* poly;
-    /* 0x04 */ Vec3s* vtxList;
+    /* 0x04 */ Vec3i* vtxList;
     /* 0x08 */ Vec3f* posA;
     /* 0x0C */ Vec3f* posB;
     /* 0x10 */ Vec3f* planeIntersect;
@@ -473,35 +480,37 @@ typedef struct {
     /* 0x8 */ s32 nodeListMax; // if -1, dynamically compute max nodes
 } BgCheckSceneSubdivisionEntry; // size = 0xC
 
-void SSNode_SetValue(SSNode* node, s16* polyIndex, u16 next);
+void SSNode_SetValue(SSNode* node, s32* polyIndex, u32 next);
 void SSList_SetNull(SSList* ssList);
-void SSNodeList_SetSSListHead(SSNodeList* list, SSList* ssList, s16* polyIndex);
-void DynaSSNodeList_SetSSListHead(DynaSSNodeList* list, SSList* ssList, s16* polyIndex);
+void SSNodeList_SetSSListHead(SSNodeList* list, SSList* ssList, s32* polyIndex);
+void DynaSSNodeList_SetSSListHead(DynaSSNodeList* list, SSList* ssList, s32* polyIndex);
 void DynaSSNodeList_Init(struct PlayState* play, DynaSSNodeList* list);
 void DynaSSNodeList_Alloc(struct PlayState* play, DynaSSNodeList* list, u32 numNodes);
 void DynaSSNodeList_ResetCount(DynaSSNodeList* list);
-u16 DynaSSNodeList_GetNextNodeIdx(DynaSSNodeList* list);
+u32 DynaSSNodeList_GetNextNodeIdx(DynaSSNodeList* list);
 void BgCheck_Vec3sToVec3f(Vec3s* src, Vec3f* dest);
 void BgCheck_Vec3fToVec3s(Vec3s* dest, Vec3f* src);
+void BgCheck_Vec3iToVec3f(Vec3i* src, Vec3f* dest);
 f32 func_800BFD84(CollisionPoly *poly, f32 arg1, f32 arg2);
 s32 func_800BFDEC(CollisionPoly* polyA, CollisionPoly* polyB, u32* outVtxId0, u32* outVtxId1);
-s16 CollisionPoly_GetMinY(CollisionPoly* poly, Vec3s* vertices);
+s32 CollisionPoly_GetMinY(CollisionPoly* poly, Vec3i* vertices);
 void CollisionPoly_GetNormalF(CollisionPoly* poly, f32* nx, f32* ny, f32* nz);
 void func_800C0094(CollisionPoly* poly, f32 tx, f32 ty, f32 tz, MtxF* dest);
 f32 CollisionPoly_GetPointDistanceFromPlane(CollisionPoly* poly, Vec3f* point);
 void CollisionPoly_GetVerticesByBgId(CollisionPoly* poly, s32 bgId, CollisionContext* colCtx, Vec3f* dest);
-s32 CollisionPoly_SphVsPoly(CollisionPoly* poly, Vec3s* vtxList, Vec3f* center, f32 radius);
-void StaticLookup_AddPolyToSSList(CollisionContext* colCtx, SSList* ssList, CollisionPoly* polyList, Vec3s* vtxList, s16 polyId);
-void StaticLookup_AddPoly(StaticLookup* lookup, CollisionContext* colCtx, CollisionPoly* polyList, Vec3s* vtxList, s16 index);
+s32 CollisionPoly_SphVsPoly(CollisionPoly* poly, Vec3i* vtxList, Vec3f* center, f32 radius);
+void StaticLookup_AddPolyToSSList(CollisionContext* colCtx, SSList* ssList, CollisionPoly* polyList, Vec3i* vtxList, s32 polyId);
+void StaticLookup_AddPoly(StaticLookup* lookup, CollisionContext* colCtx, CollisionPoly* polyList, Vec3i* vtxList, s32 index);
 void BgCheck_GetSubdivisionMinBounds(CollisionContext* colCtx, Vec3f* pos, s32* sx, s32* sy, s32* sz);
 void BgCheck_GetSubdivisionMaxBounds(CollisionContext* colCtx, Vec3f* pos, s32* sx, s32* sy, s32* sz);
-void BgCheck_GetPolySubdivisionBounds(CollisionContext* colCtx, Vec3s* vtxList, CollisionPoly* polyList, s32* subdivMinX, s32* subdivMinY, s32* subdivMinZ, s32* subdivMaxX, s32* subdivMaxY, s32* subdivMaxZ, s16 polyId);
-s32 BgCheck_PolyIntersectsSubdivision(Vec3f* min, Vec3f* max, CollisionPoly* polyList, Vec3s* vtxList, s16 polyId);
+void BgCheck_GetPolySubdivisionBounds(CollisionContext* colCtx, Vec3i* vtxList, CollisionPoly* polyList, s32* subdivMinX, s32* subdivMinY, s32* subdivMinZ, s32* subdivMaxX, s32* subdivMaxY, s32* subdivMaxZ, s32 polyId);
+s32 BgCheck_PolyIntersectsSubdivision(Vec3f* min, Vec3f* max, CollisionPoly* polyList, Vec3i* vtxList, s32 polyId);
 u32 BgCheck_InitStaticLookup(CollisionContext* colCtx, struct PlayState* play, StaticLookup* lookupTbl);
 s32 BgCheck_IsSmallMemScene(struct PlayState* play);
 s32 BgCheck_TryGetCustomMemsize(s32 sceneId, u32* memSize);
 void BgCheck_SetSubdivisionDimension(f32 min, s32 subdivAmount, f32* max, f32* subdivLength, f32* subdivLengthInv);
 s32 BgCheck_GetSpecialSceneMaxObjects(struct PlayState* play, s32* maxNodes, s32* maxPolygons, s32* maxVertices);
+void BgCheck_Destroy(CollisionContext* colCtx);
 void BgCheck_Allocate(CollisionContext* colCtx, struct PlayState* play, CollisionHeader* colHeader);
 void BgCheck_SetContextFlags(CollisionContext* colCtx, u32 flags);
 void BgCheck_UnsetContextFlags(CollisionContext* colCtx, u32 flags);
@@ -545,21 +554,21 @@ s32 BgCheck_SphVsFirstWall(CollisionContext* colCtx, Vec3f* center, f32 radius);
 void SSNodeList_Init(SSNodeList* this);
 void SSNodeList_Alloc(struct PlayState* play, SSNodeList* thisx, s32 tblMax, s32 numPolys);
 SSNode* SSNodeList_GetNextNode(SSNodeList* this);
-u16 SSNodeList_GetNextNodeIdx(SSNodeList* this);
+u32 SSNodeList_GetNextNodeIdx(SSNodeList* this);
 void ScaleRotPos_Init(ScaleRotPos* srp);
 void ScaleRotPos_SetValue(ScaleRotPos* srp, Vec3f* scale, Vec3s* rot, Vec3f* pos);
 s32 ScaleRotPos_IsEqual(ScaleRotPos* a, ScaleRotPos* b);
 void DynaLookup_ResetLists(DynaLookup* dynaLookup);
 void DynaLookup_Reset(DynaLookup* dynaLookup);
-void DynaLookup_ResetVtxStartIndex(u16* vtxStartIndex);
-void DynaLookup_ResetWaterBoxStartIndex(u16* waterBoxStartIndex);
+void DynaLookup_ResetVtxStartIndex(u32* vtxStartIndex);
+void DynaLookup_ResetWaterBoxStartIndex(u32* waterBoxStartIndex);
 void BgActor_Init(struct PlayState* play, BgActor* bgActor);
 void BgActor_SetActor(BgActor* bgActor, Actor* actor, CollisionHeader* colHeader);
 s32 BgActor_IsTransformUnchanged(BgActor* bgActor);
 void DynaPoly_NullPolyList(CollisionPoly** polyList);
 void DynaPoly_AllocPolyList(struct PlayState* play, CollisionPoly** polyList, s32 numPolys);
-void DynaPoly_NullVtxList(Vec3s** vtxList);
-void DynaPoly_AllocVtxList(struct PlayState* play, Vec3s** vtxList, s32 numVtx);
+void DynaPoly_NullVtxList(Vec3i** vtxList);
+void DynaPoly_AllocVtxList(struct PlayState* play, Vec3i** vtxList, s32 numVtx);
 void DynaPoly_InitWaterBoxList(DynaWaterBoxList* waterBoxList);
 void DynaPoly_AllocWaterBoxList(struct PlayState* play, DynaWaterBoxList* waterBoxList, s32 numWaterBoxes);
 void DynaPoly_SetBgActorPrevTransform(struct PlayState* play, BgActor* bgActor);
@@ -576,7 +585,7 @@ void DynaPoly_DisableFloorCollision(struct PlayState* play, DynaCollisionContext
 void DynaPoly_EnableFloorCollision(struct PlayState* play, DynaCollisionContext* dyna, s32 bgId);
 void DynaPoly_InvalidateLookup(struct PlayState* play, DynaCollisionContext* dyna);
 void DynaPoly_DeleteBgActor(struct PlayState* play, DynaCollisionContext* dyna, s32 bgId);
-void BgCheck_CalcWaterboxDimensions(Vec3f* minPos, Vec3f* maxXPos, Vec3f* maxZPos, Vec3s* minPosOut, s16* xLength, s16* zLength);
+void BgCheck_CalcWaterboxDimensions(Vec3f* minPos, Vec3f* maxXPos, Vec3f* maxZPos, Vec3i* minPosOut, s32* xLength, s32* zLength);
 void DynaPoly_AddBgActorToLookup(struct PlayState* play, DynaCollisionContext* dyna, s32 bgId, s32* vtxStartIndex, s32* polyStartIndex, s32* waterBoxStartIndex);
 void DynaPoly_UnsetAllInteractFlags(struct PlayState* play, DynaCollisionContext* dyna, Actor* actor);
 void DynaPoly_UpdateContext(struct PlayState* play, DynaCollisionContext* dyna);

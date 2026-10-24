@@ -184,8 +184,8 @@ void EnPamera_Init(Actor* thisx, PlayState* play) {
                 func_80BD8700(this);
             } else {
                 this->waypointIndex = this->pathCount - 1;
-                Math_Vec3s_ToVec3f(&this->actor.world.pos, &this->pathPoints[this->waypointIndex]);
-                Math_Vec3s_ToVec3f(&sp44, &this->pathPoints[this->waypointIndex - 1]);
+                Math_Vec3f_Copy(&this->actor.world.pos, &this->pathPoints[this->waypointIndex]);
+                Math_Vec3f_Copy(&sp44, &this->pathPoints[this->waypointIndex - 1]);
                 this->actor.world.rot.y = this->actor.shape.rot.y = Math_Vec3f_Yaw(&sp44, &this->actor.world.pos);
                 func_80BD8CCC(this);
             }
@@ -224,7 +224,7 @@ void func_80BD8588(EnPamera* this, PlayState* play) {
     this->waypointIndex = 0;
     this->pathCount = path->count;
     this->additionalPathIndex = path->additionalPathIndex;
-    Math_Vec3s_ToVec3f(&sp28, this->pathPoints);
+    Math_Vec3f_Copy(&sp28, this->pathPoints);
     this->actor.world.rot.y = this->actor.shape.rot.y = Math_Vec3f_Yaw(&this->actor.world.pos, &sp28);
 }
 
@@ -421,8 +421,8 @@ void func_80BD8FF0(EnPamera* this) {
     s16 pameraYaw;
 
     this->waypointIndex = this->pathCount - 1;
-    Math_Vec3s_ToVec3f(&this->actor.world.pos, &this->pathPoints[this->pathCount - 1]);
-    Math_Vec3s_ToVec3f(&pameraPos, &this->pathPoints[this->pathCount - 2]);
+    Math_Vec3f_Copy(&this->actor.world.pos, &this->pathPoints[this->pathCount - 1]);
+    Math_Vec3f_Copy(&pameraPos, &this->pathPoints[this->pathCount - 2]);
     pameraYaw = Math_Vec3f_Yaw(&pameraPos, &this->actor.world.pos);
     this->actor.shape.rot.y = pameraYaw;
     this->actor.world.rot.y = pameraYaw;

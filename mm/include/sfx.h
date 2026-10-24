@@ -2544,18 +2544,18 @@ void Audio_SetSfxTimerLerpInterval(s8 timerLerpRange1, s8 timerLerpRange2);
 void Audio_SetSfxVolumeTransition(f32* volume, f32 volumeTarget, u16 duration);
 void Audio_SetSfxReverbIndexExceptOcarinaBank(u8 reverbIndex);
 
-extern ActiveSfx gActiveSfx[7][3];
+extern HOST_DATA ActiveSfx gActiveSfx[7][3];
 
-extern u8 gIsLargeSfxBank[7];
-extern u8 D_801D6608[7];
-extern u8 gChannelsPerBank[4][7];
-extern u8 gUsedChannelsPerBank[4][7];
-extern f32 gSfxVolume;
-extern SfxParams* gSfxParams[7];
-extern SfxBankEntry* gSfxBanks[7];
-extern u8 gSfxChannelLayout;
-extern Vec3f gSfxDefaultPos;
-extern f32 gSfxDefaultFreqAndVolScale;
-extern s8 gSfxDefaultReverb;
+extern HOST_DATA u8 gIsLargeSfxBank[7];
+extern HOST_DATA u8 D_801D6608[7];
+extern HOST_DATA u8 gChannelsPerBank[4][7];
+extern HOST_DATA u8 gUsedChannelsPerBank[4][7];
+extern HOST_DATA f32 gSfxVolume;
+extern HOST_DATA SfxParams* gSfxParams[7];
+extern HOST_DATA SfxBankEntry* gSfxBanks[7];
+extern HOST_DATA u8 gSfxChannelLayout;
+extern HOST_DATA Vec3f gSfxDefaultPos;
+extern HOST_DATA f32 gSfxDefaultFreqAndVolScale;
+extern HOST_DATA s8 gSfxDefaultReverb;
 
 #endif

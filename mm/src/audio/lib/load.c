@@ -1,3 +1,4 @@
+#include "2s2h/Unbound/UnboundAudio.h"
 /**
  * @file audio_load.c
  *
@@ -1256,13 +1257,15 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
     char** seqList = ResourceMgr_ListFiles("audio/sequences*", &seqListSize);
     char** customSeqList = ResourceMgr_ListFiles("custom/music/*", &customSeqListSize);
     gSequenceMapSize = (size_t)(seqListSize + customSeqListSize);
-    gSequenceMap = malloc(gSequenceMapSize * sizeof(char*));
+    gSequenceMap = calloc(gSequenceMapSize, sizeof(char*));
     gAudioCtx.seqLoadStatus = calloc(gSequenceMapSize, sizeof(u8));
 
     memset(&gAudioCtx.seqLoadStatus[seqListSize], LOAD_STATUS_PERMANENT, customSeqListSize);
     for (size_t i = 0; i < seqListSize; i++) {
         SequenceData sDat = ResourceMgr_LoadSeqByName(seqList[i]);
+        if (!UnboundAudio_GrowSequenceMap((uint32_t)sDat.seqNumber + 1)) continue;
         gSequenceMap[sDat.seqNumber] = strdup(seqList[i]);
+        gAudioCtx.seqLoadStatus[sDat.seqNumber] = 0;
         seqCachePolicyMap[sDat.seqNumber] = sDat.cachePolicy;
     }
 
@@ -1333,14 +1336,17 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
             sDat->numFonts = 1;
         }
 
-        while (AudioCollection_HasSequenceNum(seqNum)) {
+        while (seqNum < UINT16_MAX && AudioCollection_HasSequenceNum(seqNum)) {
             seqNum++;
         }
 
+        if (seqNum >= UINT16_MAX) continue;
         AudioCollection_AddToCollection(customSeqList[j], seqNum);
 
         sDat->seqNumber = seqNum;
+        if (!UnboundAudio_GrowSequenceMap((uint32_t)sDat->seqNumber + 1)) continue;
         gSequenceMap[sDat->seqNumber] = strdup(customSeqList[j]);
+        gAudioCtx.seqLoadStatus[sDat->seqNumber] = LOAD_STATUS_PERMANENT;
         seqNum++;
     }
 

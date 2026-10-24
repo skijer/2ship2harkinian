@@ -23,10 +23,10 @@ typedef struct ObjTsubo {
     /* 0x148 */ ColliderCylinder cylinderCollider;
     /* 0x194 */ s8 unk_194;
     /* 0x195 */ s8 unk_195;
-    /* 0x196 */ s8 homeRoom;
+    /* 0x196 */ s16 homeRoom;
     /* 0x197 */ s8 unk_197;
     /* 0x198 */ s8 unk_198;
-    /* 0x199 */ s8 objectSlot;
+    /* 0x199 */ s16 objectSlot;
     /* 0x19A */ s8 unk_19A;
     /* 0x19B */ u8 unk_19B;
 } ObjTsubo; // size = 0x19C

@@ -1236,7 +1236,7 @@ void EnGo_UpdateRolledUpCollider(EnGo* this, PlayState* play) {
 void EnGo_UpdateFrozenCollider(EnGo* this, PlayState* play) {
     s32 pad;
 
-    Math_Vec3f_ToVec3s(&this->colliderCylinder.dim.pos, &this->actor.world.pos);
+    Math_Vec3f_Copy(&this->colliderCylinder.dim.pos, &this->actor.world.pos);
     this->colliderCylinder.dim.radius = 46;
     this->colliderCylinder.dim.height = 78;
     if (this->harmlessTimer == 0) {
@@ -1250,7 +1250,7 @@ void EnGo_UpdateFrozenCollider(EnGo* this, PlayState* play) {
  * Update the collider for all standing forms of a Goron.
  */
 void EnGo_UpdateStandingCollider(EnGo* this, PlayState* play) {
-    Math_Vec3f_ToVec3s(&this->colliderCylinder.dim.pos, &this->actor.world.pos);
+    Math_Vec3f_Copy(&this->colliderCylinder.dim.pos, &this->actor.world.pos);
     this->colliderCylinder.dim.radius = 24;
     this->colliderCylinder.dim.height = 62;
     CollisionCheck_SetOC(play, &play->colChkCtx, &this->colliderCylinder.base);
@@ -1374,8 +1374,8 @@ s32 EnGo_UpdateSpringArrivalCutscene(EnGo* this, PlayState* play) {
  * @return True if non-repeating animation has finished
  */
 s32 EnGo_UpdateSkelAnime(EnGo* this, PlayState* play) {
-    s8 objectSlot = this->actor.objectSlot;
-    s8 extraObjectSlot = OBJECT_SLOT_NONE;
+    s16 objectSlot = this->actor.objectSlot;
+    s16 extraObjectSlot = OBJECT_SLOT_NONE;
     s32 isAnimFinished = false;
 
     if ((this->animIndex >= ENGO_ANIM_SPRING_MIN) && (this->hakuginDemoObjectSlot > OBJECT_SLOT_NONE)) {
@@ -1434,8 +1434,8 @@ s32 EnGo_UpdateSfx(EnGo* this, PlayState* play) {
  * @return True if animation was changed
  */
 s32 EnGo_ChangeAnim(EnGo* this, PlayState* play, EnGoAnimation animIndex) {
-    s8 objectSlot = this->actor.objectSlot;
-    s8 extraObjectSlot = OBJECT_SLOT_NONE;
+    s16 objectSlot = this->actor.objectSlot;
+    s16 extraObjectSlot = OBJECT_SLOT_NONE;
     s32 didAnimChange = false;
 
     if ((animIndex >= ENGO_ANIM_SPRING_MIN) && (this->hakuginDemoObjectSlot > OBJECT_SLOT_NONE)) {
@@ -2655,7 +2655,7 @@ void EnGo_HandleSpringArrivalCutscene(EnGo* this, PlayState* play) {
  * On Day 3, they're frozen solid.
  */
 void EnGo_Snowball(EnGo* this, PlayState* play) {
-    Vec3s* pathPoints;
+    Vec3f* pathPoints;
     Vec3f currentPos;
     Vec3f currentPathPoint;
 
@@ -2691,7 +2691,7 @@ void EnGo_Snowball(EnGo* this, PlayState* play) {
             }
         }
 
-        Math_Vec3s_ToVec3f(&currentPathPoint, &pathPoints[this->indexPathPoint]);
+        Math_Vec3f_Copy(&currentPathPoint, &pathPoints[this->indexPathPoint]);
         Math_Vec3f_Copy(&currentPos, &this->actor.world.pos);
         Math_ApproachS(&this->actor.world.rot.y, Math_Vec3f_Yaw(&currentPos, &currentPathPoint), 4, 0x38E);
         this->actor.shape.rot.y = this->actor.world.rot.y;
@@ -2902,7 +2902,7 @@ s32 EnGo_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* po
     if ((ENGO_GET_TYPE(&this->actor) == ENGO_MEDIGORON) && (limbIndex == GORON_LIMB_BODY)) {
         Matrix_MultZero(&worldPos);
         worldPos.y = this->actor.world.pos.y;
-        Math_Vec3f_ToVec3s(&this->colliderSphere.dim.worldSphere.center, &worldPos);
+        Math_Vec3f_Copy(&this->colliderSphere.dim.worldSphere.center, &worldPos);
     }
 
     switch (limbIndex) {

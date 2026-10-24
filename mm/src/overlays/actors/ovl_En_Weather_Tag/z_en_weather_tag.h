@@ -12,7 +12,7 @@ typedef struct EnWeatherTag {
     /* 0x144 */ EnWeatherTagActionFunc actionFunc;
     /* 0x148 */ UNK_TYPE1 pad148[0x4];
     /* 0x14C */ u8 pathCount;
-    /* 0x150 */ Vec3s* pathPoints;
+    /* 0x150 */ Vec3f* pathPoints;
     // 154: the code avoids what would be a negative value if signed, but signed wont match
     /* 0x154 */ u16 unk154;
     /* 0x156 */ u16 fadeDistance;

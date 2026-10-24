@@ -69,7 +69,7 @@ void DmChar09_Destroy(Actor* thisx, PlayState* play) {
 }
 
 void func_80AB1FA0(DmChar09* this, s32 arg1) {
-    Math_Vec3s_ToVec3f(&this->actor.world.pos, &this->pathPoints[arg1]);
+    Math_Vec3f_Copy(&this->actor.world.pos, &this->pathPoints[arg1]);
 }
 
 void func_80AB1FDC(DmChar09* this, PlayState* play) {
@@ -80,10 +80,10 @@ void func_80AB1FDC(DmChar09* this, PlayState* play) {
     f32 phi_fv0;
     Vec3f sp40;
     s32 phi_a1;
-    Vec3s* temp_v1;
+    Vec3f* temp_v1;
 
     Math_Vec3f_Copy(&sp40, &thisx->world.pos);
-    Math_Vec3s_ToVec3f(&sp58, this->pathPoints + this->unk_21C + this->unk_220);
+    Math_Vec3f_Copy(&sp58, this->pathPoints + this->unk_21C + this->unk_220);
     Math_Vec3f_Diff(&sp58, &thisx->world.pos, &thisx->velocity);
     sp54 = Math3D_Vec3fMagnitude(&thisx->velocity);
     if ((sp54 < (this->speed * 8.0f)) && (this->speed > 2.0f)) {

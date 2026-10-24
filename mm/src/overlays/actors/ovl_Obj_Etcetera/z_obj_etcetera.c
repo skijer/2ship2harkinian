@@ -321,7 +321,7 @@ void ObjEtcetera_Setup(ObjEtcetera* this, PlayState* play) {
 void ObjEtcetera_Update(Actor* thisx, PlayState* play) {
     ObjEtcetera* this = (ObjEtcetera*)thisx;
     CollisionPoly* floorPoly;
-    u8 floorBgId = this->dyna.actor.floorBgId;
+    s32 floorBgId = this->dyna.actor.floorBgId;
 
     if (floorBgId == BGCHECK_SCENE) {
         floorPoly = this->dyna.actor.floorPoly;

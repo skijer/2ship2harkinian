@@ -513,7 +513,7 @@ s32 EnGm_UpdateSkelAnime(EnGm* this, PlayState* play) {
 }
 
 s32 EnGm_ChangeAnim(EnGm* this, PlayState* play, s32 animIndex) {
-    s8 objectSlot = this->objectSlot;
+    s16 objectSlot = this->objectSlot;
     s32 changeAnim = false;
     s32 didAnimChange = false;
 
@@ -1196,7 +1196,7 @@ s32 func_8094F53C(EnGm* this, PlayState* play) {
 
 s32 func_8094F7D0(EnGm* this, PlayState* play, ScheduleOutput* scheduleOutput, u8 actorCategory, s16 actorId) {
     u8 pathIndex = ENGM_GET_PATH_INDEX(&this->actor);
-    Vec3s* sp48;
+    Vec3f* sp48;
     Vec3f sp3C;
     Vec3f sp30;
     Actor* actor;
@@ -1213,8 +1213,8 @@ s32 func_8094F7D0(EnGm* this, PlayState* play, ScheduleOutput* scheduleOutput, u
     if ((actor != NULL) && (actor->update != NULL)) {
         if (this->timePath != NULL) {
             sp48 = Lib_SegmentedToVirtual(this->timePath->points);
-            Math_Vec3s_ToVec3f(&sp3C, &sp48[this->timePath->count - 2]);
-            Math_Vec3s_ToVec3f(&sp30, &sp48[this->timePath->count - 1]);
+            Math_Vec3f_Copy(&sp3C, &sp48[this->timePath->count - 2]);
+            Math_Vec3f_Copy(&sp30, &sp48[this->timePath->count - 1]);
             this->actor.shape.shadowDraw = NULL;
             this->actor.world.rot.y = Math_Vec3f_Yaw(&sp3C, &sp30);
             Math_Vec3f_Copy(&this->actor.world.pos, &sp30);
@@ -1228,7 +1228,7 @@ s32 func_8094F904(EnGm* this, PlayState* play, ScheduleOutput* scheduleOutput) {
     u16 sp56 = SCRIPT_TIME_NOW;
     u8 pathIndex = ENGM_GET_PATH_INDEX(&this->actor);
     EnDoor* door;
-    Vec3s* sp4C;
+    Vec3f* sp4C;
     Vec3f sp40;
     Vec3f sp34;
     s32 pad;
@@ -1244,8 +1244,8 @@ s32 func_8094F904(EnGm* this, PlayState* play, ScheduleOutput* scheduleOutput) {
     if ((door != NULL) && (door->knobDoor.dyna.actor.update != NULL)) {
         if (this->timePath != NULL) {
             sp4C = Lib_SegmentedToVirtual(this->timePath->points);
-            Math_Vec3s_ToVec3f(&sp40, &sp4C[0]);
-            Math_Vec3s_ToVec3f(&sp34, &sp4C[1]);
+            Math_Vec3f_Copy(&sp40, &sp4C[0]);
+            Math_Vec3f_Copy(&sp34, &sp4C[1]);
             Math_Vec3f_Copy(&this->unk_278, &sp40);
             Math_Vec3f_Copy(&this->unk_284, &sp34);
             this->actor.world.rot.y = Math_Vec3f_Yaw(&sp40, &sp34);
@@ -1375,7 +1375,7 @@ s32 func_8094FE10(EnGm* this, PlayState* play, ScheduleOutput* scheduleOutput) {
 s32 func_8094FF04(EnGm* this, PlayState* play, ScheduleOutput* scheduleOutput) {
     static Vec3f D_80951D9C = { 64.0f, 0.0f, -122.0f };
     u8 pathIndex = ENGM_GET_PATH_INDEX(&this->actor);
-    Vec3s* sp48;
+    Vec3f* sp48;
     Vec3f sp3C;
     Vec3f sp30;
     s32 pad;
@@ -1389,8 +1389,8 @@ s32 func_8094FF04(EnGm* this, PlayState* play, ScheduleOutput* scheduleOutput) {
 
     if (this->timePath != NULL) {
         sp48 = Lib_SegmentedToVirtual(this->timePath->points);
-        Math_Vec3s_ToVec3f(&sp3C, &sp48[this->timePath->count - 2]);
-        Math_Vec3s_ToVec3f(&sp30, &sp48[this->timePath->count - 1]);
+        Math_Vec3f_Copy(&sp3C, &sp48[this->timePath->count - 2]);
+        Math_Vec3f_Copy(&sp30, &sp48[this->timePath->count - 1]);
         this->actor.shape.shadowDraw = NULL;
         this->actor.world.rot.y = Math_Vec3f_Yaw(&sp3C, &sp30);
         if (this->scheduleResult == 0) {
@@ -2007,7 +2007,7 @@ void EnGm_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, 
 
     if (limbIndex == OBJECT_IN2_LIMB_09) {
         Matrix_MultVec3f(&gZeroVec3f, &sp30);
-        Math_Vec3f_ToVec3s(&this->colliderSphere.dim.worldSphere.center, &sp30);
+        Math_Vec3f_Copy(&this->colliderSphere.dim.worldSphere.center, &sp30);
     }
 }
 

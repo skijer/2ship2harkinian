@@ -24,7 +24,7 @@ ResourceFactoryBinaryCollisionHeaderV0::ReadResource(std::shared_ptr<Ship::File>
     collisionHeader->collisionHeaderData.numVertices = reader->ReadInt32();
     collisionHeader->vertices.reserve(collisionHeader->collisionHeaderData.numVertices);
     for (int32_t i = 0; i < collisionHeader->collisionHeaderData.numVertices; i++) {
-        Vec3s vtx;
+        Vec3i vtx;
         vtx.x = reader->ReadInt16();
         vtx.y = reader->ReadInt16();
         vtx.z = reader->ReadInt16();
@@ -39,15 +39,15 @@ ResourceFactoryBinaryCollisionHeaderV0::ReadResource(std::shared_ptr<Ship::File>
 
         polygon.type = reader->ReadUInt16();
 
-        polygon.flags_vIA = reader->ReadUInt16();
-        polygon.flags_vIB = reader->ReadUInt16();
+        { const u32 word = reader->ReadUInt16(); polygon.flags_vIA = (word & 0x1FFFu) | ((word & 0xE000u) << 16); }
+        { const u32 word = reader->ReadUInt16(); polygon.flags_vIB = (word & 0x1FFFu) | ((word & 0xE000u) << 16); }
         polygon.vIC = reader->ReadUInt16();
 
         polygon.normal.x = reader->ReadUInt16();
         polygon.normal.y = reader->ReadUInt16();
         polygon.normal.z = reader->ReadUInt16();
 
-        polygon.dist = reader->ReadUInt16();
+        polygon.dist = reader->ReadInt16();
 
         collisionHeader->polygons.push_back(polygon);
     }
@@ -116,6 +116,8 @@ ResourceFactoryBinaryCollisionHeaderV0::ReadResource(std::shared_ptr<Ship::File>
         waterBox.xLength = reader->ReadInt16();
         waterBox.zLength = reader->ReadInt16();
         waterBox.properties = reader->ReadInt32();
+        waterBox.room = (waterBox.properties >> 13) & 0x3F;
+        if (waterBox.room == 0x3F) { waterBox.room = -1; }
 
         collisionHeader->waterBoxes.push_back(waterBox);
     }
@@ -153,7 +155,7 @@ ResourceFactoryXMLCollisionHeaderV0::ReadResource(std::shared_ptr<Ship::File> fi
     while (child != nullptr) {
         std::string childName = child->Name();
         if (childName == "Vertex") {
-            Vec3s vtx;
+            Vec3i vtx;
             vtx.x = child->IntAttribute("X");
             vtx.y = child->IntAttribute("Y");
             vtx.z = child->IntAttribute("Z");
@@ -163,15 +165,15 @@ ResourceFactoryXMLCollisionHeaderV0::ReadResource(std::shared_ptr<Ship::File> fi
 
             polygon.type = child->UnsignedAttribute("Type");
 
-            polygon.flags_vIA = child->UnsignedAttribute("VertexA");
-            polygon.flags_vIB = child->UnsignedAttribute("VertexB");
+            { const u32 word = child->UnsignedAttribute("VertexA"); polygon.flags_vIA = (word & 0x1FFFu) | ((word & 0xE000u) << 16); }
+            { const u32 word = child->UnsignedAttribute("VertexB"); polygon.flags_vIB = (word & 0x1FFFu) | ((word & 0xE000u) << 16); }
             polygon.vIC = child->UnsignedAttribute("VertexC");
 
             polygon.normal.x = child->IntAttribute("NormalX");
             polygon.normal.y = child->IntAttribute("NormalY");
             polygon.normal.z = child->IntAttribute("NormalZ");
 
-            polygon.dist = child->IntAttribute("Dist");
+            polygon.dist = (s16)child->IntAttribute("Dist");
 
             collisionHeader->polygons.push_back(polygon);
         } else if (childName == "PolygonType") {
@@ -214,6 +216,8 @@ ResourceFactoryXMLCollisionHeaderV0::ReadResource(std::shared_ptr<Ship::File> fi
             waterBox.xLength = child->IntAttribute("XLength");
             waterBox.zLength = child->IntAttribute("ZLength");
             waterBox.properties = child->IntAttribute("Properties");
+        waterBox.room = (waterBox.properties >> 13) & 0x3F;
+        if (waterBox.room == 0x3F) { waterBox.room = -1; }
 
             collisionHeader->waterBoxes.push_back(waterBox);
         }

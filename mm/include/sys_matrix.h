@@ -16,8 +16,8 @@ typedef enum {
 #define MATRIX_FINALIZE_AND_LOAD(pkt, gfxCtx) \
     gSPMatrix(pkt, Matrix_Finalize(gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW)
 
-extern Mtx gIdentityMtx;
-extern MtxF gIdentityMtxF;
+extern HOST_DATA Mtx gIdentityMtx;
+extern HOST_DATA MtxF gIdentityMtxF;
 
 
 /* Stack operations */

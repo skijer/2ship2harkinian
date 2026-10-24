@@ -22,7 +22,7 @@ typedef struct EnSyatekiWf {
     /* 0x298 */ s16 isActive;
     /* 0x29A */ s16 timer;
     /* 0x29C */ s16 waitTimer;
-    /* 0x2A0 */ Vec3s* pathPoints;
+    /* 0x2A0 */ Vec3f* pathPoints;
     /* 0x2A4 */ s16 currentPointIndex;
     /* 0x2A6 */ s16 maxPointIndex;
     /* 0x2A8 */ s16 yawTarget;

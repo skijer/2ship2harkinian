@@ -941,7 +941,7 @@ void EnPeehat_PostLimbDraw(PlayState* play2, s32 limbIndex, Gfx** dList, Vec3s* 
         gSPDisplayList(&gfx[1], *dList);
 
         POLY_OPA_DISP = &gfx[2];
-        Math_Vec3s_ToVec3f(&this->actor.focus.pos, &this->colliderSphere.dim.worldSphere.center);
+        Math_Vec3f_Copy(&this->actor.focus.pos, &this->colliderSphere.dim.worldSphere.center);
 
         CLOSE_DISPS(play->state.gfxCtx);
     }

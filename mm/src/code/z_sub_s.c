@@ -343,7 +343,7 @@ void SubS_TimePathing_ComputeWeights(s32 order, f32 progress, s32 waypoint, f32 
  * @param[in] points the path's points
  * @param[in] knots see SubS_TimePathing_FillKnots()
  */
-void SubS_TimePathing_ComputeTargetPosXZ(f32* x, f32* z, f32 progress, s32 order, s32 waypoint, Vec3s points[],
+void SubS_TimePathing_ComputeTargetPosXZ(f32* x, f32* z, f32 progress, s32 order, s32 waypoint, Vec3f points[],
                                          f32 knots[]) {
     f32 xPos;
     f32 zPos;
@@ -394,7 +394,7 @@ void SubS_TimePathing_ComputeTargetPosXZ(f32* x, f32* z, f32 progress, s32 order
  */
 s32 SubS_TimePathing_Update(Path* path, f32* progress, s32* elapsedTime, s32 waypointTime, s32 totalTime, s32* waypoint,
                             f32 knots[], Vec3f* targetPos, s32 timeSpeed) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     s32 state;
     f32 endX;
     f32 endZ;
@@ -444,7 +444,7 @@ s32 SubS_TimePathing_Update(Path* path, f32* progress, s32* elapsedTime, s32 way
  * @note Same note as SubS_TimePathing_Update()
  */
 void SubS_TimePathing_ComputeInitialY(PlayState* play, Path* path, s32 waypoint, Vec3f* targetPos) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     Vec3f posA;
     Vec3f posB;
     Vec3f posResult;
@@ -561,7 +561,7 @@ s32 SubS_ChangeAnimationByInfoS(SkelAnime* skelAnime, AnimationInfoS* animationI
 }
 
 s32 SubS_HasReachedPoint(Actor* actor, Path* path, s32 pointIndex) {
-    Vec3s* points = Lib_SegmentedToVirtual(path->points);
+    Vec3f* points = Lib_SegmentedToVirtual(path->points);
     s32 count = path->count;
     s32 index = pointIndex;
     s32 reached = false;
@@ -572,7 +572,7 @@ s32 SubS_HasReachedPoint(Actor* actor, Path* path, s32 pointIndex) {
     f32 d;
     Vec3f point;
 
-    Math_Vec3s_ToVec3f(&point, &points[index]);
+    Math_Vec3f_Copy(&point, &points[index]);
 
     if (index == 0) {
         diffX = points[1].x - points[0].x;
@@ -650,7 +650,7 @@ s32 SubS_WeightPathing_ComputePoint(Path* path, s32 waypoint, Vec3f* point, f32 
     f32 oneMinusProgress;
     f32 squared;
     f32 cubed;
-    Vec3s* points;
+    Vec3f* points;
     s32 count = path->count;
     s32 pointIndex;
     s32 tmp;
@@ -809,7 +809,7 @@ s32 SubS_WeightPathing_Move(Actor* actor, Path* path, s32* waypoint, f32* progre
 }
 
 s32 SubS_CopyPointFromPathCheckBounds(Path* path, s32 pointIndex, Vec3f* dst) {
-    Vec3s* point;
+    Vec3f* point;
 
     if ((path == NULL) || (pointIndex >= path->count) || (pointIndex < 0)) {
         return false;
@@ -1124,7 +1124,7 @@ Path* SubS_GetPathByIndex(PlayState* play, s16 pathIndex, s16 pathIndexNone) {
 }
 
 s32 SubS_CopyPointFromPath(Path* path, s32 pointIndex, Vec3f* dst) {
-    Vec3s* point;
+    Vec3f* point;
 
     if (path == NULL) {
         return false;
@@ -1167,7 +1167,7 @@ s32 SubS_MoveActorToPoint(Actor* actor, Vec3f* point, s16 rotStep) {
 }
 
 s16 SubS_GetDistSqAndOrientPath(Path* path, s32 pointIndex, Vec3f* pos, f32* distSq) {
-    Vec3s* point;
+    Vec3f* point;
     f32 diffX = 0.0f;
     f32 diffZ = 0.0f;
 
@@ -1182,11 +1182,11 @@ s16 SubS_GetDistSqAndOrientPath(Path* path, s32 pointIndex, Vec3f* pos, f32* dis
     return Math_Atan2S(diffX, diffZ);
 }
 
-s8 SubS_IsObjectLoaded(s8 objectSlot, PlayState* play) {
+s8 SubS_IsObjectLoaded(s16 objectSlot, PlayState* play) {
     return !Object_IsLoaded(&play->objectCtx, objectSlot) ? false : true;
 }
 
-s8 SubS_GetObjectSlot(s16 objectId, PlayState* play) {
+s16 SubS_GetObjectSlot(s16 objectId, PlayState* play) {
     return Object_GetSlot(&play->objectCtx, objectId);
 }
 
@@ -1244,7 +1244,7 @@ s32 SubS_IsFloorAbove(PlayState* play, Vec3f* pos, f32 distAbove) {
 
 s32 SubS_CopyPointFromPathList(Path* paths, s32 pathIndex, s32 pointIndex, Vec3f* dst) {
     Path* path = &paths[pathIndex];
-    Vec3s* point = &((Vec3s*)Lib_SegmentedToVirtual(path->points))[pointIndex];
+    Vec3f* point = &((Vec3f*)Lib_SegmentedToVirtual(path->points))[pointIndex];
 
     dst->x = point->x;
     dst->y = point->y;

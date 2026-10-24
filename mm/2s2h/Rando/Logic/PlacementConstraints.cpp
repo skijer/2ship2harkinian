@@ -6,6 +6,8 @@ namespace Rando {
 namespace Logic {
 
 int SceneIdToDungeon(SceneId sceneId) {
+    const int32_t custom = DungeonRegistry_FindScene(sceneId);
+    if (custom >= 0) { return custom + 9; }
     switch (sceneId) {
         case SCENE_MITURIN:
         case SCENE_MITURIN_BS:
@@ -26,6 +28,7 @@ int SceneIdToDungeon(SceneId sceneId) {
 }
 
 int RandoItemIdToDungeon(RandoItemId itemId) {
+    if (DungeonRegistry_FindItem(itemId) >= 0) { return DungeonRegistry_ConfinedItem(itemId); }
     int dungeon = -1;
     switch (itemId) {
         case RI_WOODFALL_SMALL_KEY:
@@ -64,6 +67,9 @@ int RandoItemIdToDungeon(RandoItemId itemId) {
 }
 
 bool IsItemAllowedAtCheck(RandoItemId itemId, RandoCheckId checkId) {
+    if (!DungeonRegistry_ItemAllowed(itemId, SceneIdToDungeon(Rando::StaticData::Checks[checkId].sceneId) >= 0)) {
+        return false;
+    }
     int confinedDungeon = RandoItemIdToDungeon(itemId);
     return confinedDungeon < 0 || confinedDungeon == SceneIdToDungeon(Rando::StaticData::Checks[checkId].sceneId);
 }

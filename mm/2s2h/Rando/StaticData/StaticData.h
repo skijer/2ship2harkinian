@@ -28,7 +28,7 @@ struct RandoStaticCheck {
 };
 
 extern std::map<RandoCheckId, RandoStaticCheck> Checks;
-extern std::array<std::string, RC_MAX> CheckNames;
+extern std::map<RandoCheckId, std::string> CheckNames;
 
 RandoStaticCheck GetCheckFromFlag(FlagType flagType, s32 flag, s16 sceneId = SCENE_MAX);
 RandoCheckId GetCheckIdFromName(const char* name);

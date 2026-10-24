@@ -1,5 +1,7 @@
+#include "2s2h/ModApi/Labels/ModLabels.h"
 
 #include "TimesplitsSettings.h"
+#include <algorithm>
 #include "Timesplits.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <ship/Context.h>
@@ -369,6 +371,7 @@ const char* GetItemImageById(uint32_t itemId) {
             }
             break;
     }
+    return gPauseUnusedCursorTex;
 }
 
 ImVec2 GetItemImageSizeById(uint32_t itemId) {
@@ -555,7 +558,9 @@ void DrawEntranceList() {
 
     if (ImGui::BeginChild("Entrance List")) {
         if (ImGui::BeginTable("Entrances", 2)) {
-            for (int i = sceneRange.startIndex; i <= sceneRange.endIndex; i++) {
+            const size_t first = ModLabels_HasCustomSplits() ? 0 : sceneRange.startIndex;
+            const size_t last = ModLabels_HasCustomSplits() ? sceneObjectList.size() : std::min<size_t>(sceneRange.endIndex + 1, sceneObjectList.size());
+            for (size_t i = first; i < last; i++) {
                 ImGui::TableNextColumn();
                 ImGui::PushID(sceneObjectList[i].splitId);
                 SplitsPushImageButtonStyle();
@@ -583,13 +588,15 @@ void DrawEntranceList() {
 
 void DrawItemList(const char* tableName, IndexRangeObject range, uint32_t tableSize) {
     if (ImGui::BeginTable(tableName, tableSize)) {
-        for (int i = range.startIndex; i <= range.endIndex; i++) {
+        const size_t first = ModLabels_HasCustomSplits() ? 0 : range.startIndex;
+        const size_t last = ModLabels_HasCustomSplits() ? splitObjectList.size() : std::min<size_t>(range.endIndex + 1, splitObjectList.size());
+        for (size_t i = first; i < last; i++) {
             ImGui::TableNextColumn();
             SplitsPushImageButtonStyle();
             if (ImGui::ImageButton(
                     std::to_string(splitObjectList[i].splitId).c_str(),
                     std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                        ->GetTextureByName(GetItemImageById(splitObjectList[i].splitId)),
+                        ->GetTextureByName(GetSplitImage(splitObjectList[i])),
                     GetItemImageSizeById(splitObjectList[i].splitId) * 1.5f, ImVec2(0, 0), ImVec2(1, 1),
                     ImVec4(0, 0, 0, 0), Ship_GetItemColorTint(splitObjectList[i].splitId))) {
                 if (itemSubMenuList.contains(splitObjectList[i].splitId)) {
@@ -651,9 +658,7 @@ void TimesplitsSettingsWindow::DrawElement() {
                             std::to_string(i).c_str(),
                             std::dynamic_pointer_cast<Fast::Fast3dGui>(
                                 Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                                ->GetTextureByName(splitList[i].splitType == SPLIT_TYPE_NORMAL
-                                                       ? GetItemImageById(splitList[i].splitId)
-                                                       : gPauseUnusedCursorTex),
+                                ->GetTextureByName(GetSplitImage(splitList[i])),
                             splitList[i].splitType == SPLIT_TYPE_NORMAL ? GetItemImageSizeById(splitList[i].splitId)
                                                                         : ImVec2(32.0f, 32.0f),
                             ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0),
@@ -721,7 +726,7 @@ void TimesplitsSettingsWindow::DrawElement() {
                 ImGui::TableNextColumn();
                 if (listName != "Entrances") {
                     DrawItemList(listName, range, listColumns);
-                    if (listName == "Quest") {
+                    if (listName == "Quest" && !ModLabels_HasCustomSplits()) {
                         DrawItemList("Quest II",
                                      GetIndexRange((uint32_t)SPLIT_SINGLE_MAGIC, (uint32_t)SPLIT_DOUBLE_DEFENSE), 3);
                     }
@@ -744,4 +749,10 @@ void TimesplitsSettingsWindow::DrawElement() {
 }
 
 void TimesplitsSettingsWindow::InitElement() {
+}
+
+const char* GetSplitImage(const TimesplitObject& split) {
+    if (split.splitType == SPLIT_TYPE_SCENE) return gPauseUnusedCursorTex;
+    if (split.splitType == SPLIT_TYPE_BOSS) return gDungeonMapSkullTex;
+    return GetItemImageById(split.splitId);
 }

@@ -276,7 +276,7 @@ void EnRacedog_UpdateCollision(EnRacedog* this, PlayState* play) {
  * There is a small degree of randomness incorporated into this angle.
  */
 s16 EnRacedog_GetYRotation(Path* path, s32 pointIndex, Vec3f* pos, f32* distSQ) {
-    Vec3s* point;
+    Vec3f* point;
     f32 diffXRand;
     f32 diffZRand;
     f32 diffX;

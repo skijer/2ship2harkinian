@@ -38,7 +38,7 @@ typedef struct EnFu {
     /* 0x524 */ s16 unk_524[3];
     /* 0x52A */ s16 unk_52A[3];
     /* 0x530 */ UNK_TYPE1 unk530[0x8];
-    /* 0x538 */ Vec3s* pathPoints;
+    /* 0x538 */ Vec3f* pathPoints;
     /* 0x53C */ s16 unk_53C;
     /* 0x53E */ s16 unk_53E;
     /* 0x540 */ s16 unk_540;

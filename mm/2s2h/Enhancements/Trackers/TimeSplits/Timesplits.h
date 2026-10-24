@@ -37,7 +37,7 @@ typedef enum SplitFileActions {
 };
 
 typedef enum SplitStatus { SPLIT_INACTIVE, SPLIT_ACTIVE, SPLIT_COMPLETE, SPLIT_SKIPPED };
-typedef enum SplitTypes { SPLIT_TYPE_NORMAL, SPLIT_TYPE_SCENE };
+typedef enum SplitTypes { SPLIT_TYPE_NORMAL, SPLIT_TYPE_SCENE, SPLIT_TYPE_BOSS };
 
 typedef struct {
     uint32_t splitId;
@@ -71,6 +71,7 @@ extern TimesplitObject GetSplitObjectById(uint32_t itemId);
 extern ImVec2 GetItemImageSizeById(uint32_t itemId);
 extern void TableCellCenteredText(ImVec4 color, const char* text);
 extern const char* GetItemImageById(uint32_t itemId);
+extern const char* GetSplitImage(const TimesplitObject& split);
 extern void SplitsPushImageButtonStyle();
 extern void SplitsPopImageButtonStyle();
 extern void HandlePopUpContext(uint32_t popupId);

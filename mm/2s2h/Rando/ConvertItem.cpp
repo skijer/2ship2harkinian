@@ -193,6 +193,12 @@ RandoItemId Rando::CurrentTrapItem(RandoCheckId randoCheckId) {
 }
 
 bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId) {
+    if (DungeonRegistry_FindItem(randoItemId) >= 0) {
+        if (StaticData::Items[randoItemId].randoItemType == RITYPE_SMALL_KEY) {
+            return randoCheckId == RC_UNKNOWN || !RANDO_SAVE_CHECKS[randoCheckId].obtained;
+        }
+        return !DungeonRegistry_HasItem(randoItemId);
+    }
     bool hasObtainedCheck = false;
     if (randoCheckId != RC_UNKNOWN) {
         hasObtainedCheck = RANDO_SAVE_CHECKS[randoCheckId].obtained;

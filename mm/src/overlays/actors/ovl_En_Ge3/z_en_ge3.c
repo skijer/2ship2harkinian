@@ -157,7 +157,7 @@ void EnGe3_SetupPath(EnGe3* this, PlayState* play) {
  */
 s32 EnGe3_FollowPath(EnGe3* this) {
     Path* path = this->path;
-    Vec3s* curPoint;
+    Vec3f* curPoint;
     f32 diffX;
     f32 diffZ;
 

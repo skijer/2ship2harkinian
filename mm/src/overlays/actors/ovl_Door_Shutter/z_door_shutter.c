@@ -141,7 +141,7 @@ void DoorShutter_SetupAction(DoorShutter* this, DoorShutterActionFunc actionFunc
 s32 func_808A0900(DoorShutter* this, PlayState* play) {
     TransitionActorEntry* transitionEntry =
         &play->transitionActors.list[DOOR_GET_TRANSITION_ID(&this->slidingDoor.dyna.actor)];
-    s8 frontRoom = transitionEntry->sides[0].room;
+    s16 frontRoom = transitionEntry->sides[0].room;
 
     if (frontRoom == transitionEntry->sides[1].room) {
         if (ABS_ALT(BINANG_SUB(this->slidingDoor.dyna.actor.shape.rot.y,
@@ -554,7 +554,7 @@ void func_808A1784(DoorShutter* this, PlayState* play) {
 
 void func_808A1884(DoorShutter* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
-    s8 room = this->slidingDoor.dyna.actor.room;
+    s16 room = this->slidingDoor.dyna.actor.room;
     Vec3f sp44;
 
     if (this->slidingDoor.dyna.actor.room >= 0) {

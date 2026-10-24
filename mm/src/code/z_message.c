@@ -11,6 +11,7 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "assets/archives/schedule_dma_static/schedule_dma_static_yar.h"
 #include "assets/archives/icon_item_static/icon_item_static_yar.h"
+#include "2s2h/CustomMessage/CustomMessage.h"
 #include "assets/archives/icon_item_24_static/icon_item_24_static_yar.h"
 #include "assets/interface/message_static/message_static.h"
 #include "assets/interface/message_texture_static/message_texture_static.h"
@@ -2073,6 +2074,15 @@ void Message_LoadItemIcon(PlayState* play, u16 itemId, s16 arg2) {
         // #endregion
     }
 
+    if (msgCtx->currentTextId == CUSTOM_MESSAGE_ID) {
+        const char* customIcon = CustomMessage_GetActiveIconPath();
+        if (customIcon != NULL) {
+            msgCtx->textboxSegment[TEXTBOX_SEG_ICON] = (char*)customIcon;
+        }
+    }
+    msgCtx->textboxSegment[TEXTBOX_SEG_ICON] = (char*)GameInteractor_ExecuteOnMessageResolveItemIcon(
+        itemId, (const char*)msgCtx->textboxSegment[TEXTBOX_SEG_ICON]);
+
     if (play->pauseCtx.bombersNotebookOpen) {
         msgCtx->unk12010 = ((msgCtx->unk12010 * 1.4f) + 2.0f);
         msgCtx->unk12014 = (msgCtx->unk12014 * 1.4f);
@@ -2164,7 +2174,12 @@ void Message_DecodeHeader(PlayState* play) {
     if (msgCtx->msgBufPos == 0) {
         if (((u8)font->msgBuf.schar[msgCtx->msgBufPos + 2]) != 0xFE) {
             msgCtx->unk11F18 = 0;
-            if ((msgCtx->currentTextId == 0x176F) || (msgCtx->currentTextId == 0x1770) ||
+            if ((msgCtx->currentTextId == CUSTOM_MESSAGE_ID) && CustomMessage_GetActiveIconPath() != NULL) {
+                // Custom headers carry an icon path, not a vanilla message-table icon ID.
+                // Select the 32x32 RGBA32 inventory rendering branch explicitly.
+                msgCtx->itemId = ITEM_OCARINA_OF_TIME;
+                msgCtx->msgBufPos += 2;
+            } else if ((msgCtx->currentTextId == 0x176F) || (msgCtx->currentTextId == 0x1770) ||
                 (msgCtx->currentTextId == 0x1771)) {
                 msgCtx->itemId = ITEM_OCARINA_OF_TIME;
                 msgCtx->msgBufPos += 2;
@@ -3399,8 +3414,8 @@ void Message_OpenText(PlayState* play, u16 textId) {
     } else if (msgCtx->textIsCredits) {
         Message_FindCreditsMessage(play, textId);
         MessageTableEntry* msgEntry = (MessageTableEntry*)font->messageStart;
-        msgCtx->msgLength = msgEntry->msgSize;
-        memcpy(&font->msgBuf, msgEntry->segment, msgEntry->msgSize);
+        msgCtx->msgLength = MIN(msgEntry->msgSize, sizeof(font->msgBuf));
+        memcpy(&font->msgBuf, msgEntry->segment, msgCtx->msgLength);
         // DmaMgr_SendRequest0(&font->msgBuf, SEGMENT_ROM_START(staff_message_data_static) + font->messageStart,
         //                     font->messageEnd);
     } else if (gSaveContext.options.language == LANGUAGE_JPN) {
@@ -3411,8 +3426,8 @@ void Message_OpenText(PlayState* play, u16 textId) {
     } else {
         Message_FindMessageNES(play, textId);
         MessageTableEntry* msgEntry = (MessageTableEntry*)font->messageStart;
-        msgCtx->msgLength = msgEntry->msgSize;
-        memcpy(&font->msgBuf, msgEntry->segment, msgEntry->msgSize);
+        msgCtx->msgLength = MIN(msgEntry->msgSize, sizeof(font->msgBuf));
+        memcpy(&font->msgBuf, msgEntry->segment, msgCtx->msgLength);
         // msgCtx->msgLength = font->messageEnd;
         // DmaMgr_SendRequest0(&font->msgBuf, SEGMENT_ROM_START(message_data_static) + font->messageStart,
         //                     font->messageEnd);
@@ -3511,8 +3526,8 @@ void func_801514B0(PlayState* play, u16 arg1, u8 arg2) {
     } else {
         Message_FindMessageNES(play, arg1);
         MessageTableEntry* msgEntry = (MessageTableEntry*)font->messageStart;
-        msgCtx->msgLength = msgEntry->msgSize;
-        memcpy(&font->msgBuf, msgEntry->segment, msgEntry->msgSize);
+        msgCtx->msgLength = MIN(msgEntry->msgSize, sizeof(font->msgBuf));
+        memcpy(&font->msgBuf, msgEntry->segment, msgCtx->msgLength);
         // msgCtx->msgLength = font->messageEnd;
         //  BENTODO
         // DmaMgr_SendRequest0(&font->msgBuf, SEGMENT_ROM_START(message_data_static) + font->messageStart,

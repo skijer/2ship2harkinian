@@ -11,7 +11,7 @@ typedef struct {
     /* 0x0 */ u8 count; // Number of points in the path
     /* 0x1 */ u8 additionalPathIndex;
     /* 0x2 */ s16 customValue; // Path specific to help distinguish different paths
-    /* 0x4 */ Vec3s* points;   // Segment Address to the array of points
+    /* 0x4 */ Vec3f* points;   // Segment Address to the array of points
 } PathDataMM;                  // size = 0x8
 
 class PathMM : public Ship::Resource<PathDataMM> {
@@ -26,7 +26,7 @@ class PathMM : public Ship::Resource<PathDataMM> {
 
     uint32_t numPaths;
     std::vector<PathDataMM> pathData;
-    std::vector<std::vector<Vec3s>> paths;
+    std::vector<std::vector<Vec3f>> paths;
 };
 
 }; // namespace SOH

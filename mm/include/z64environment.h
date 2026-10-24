@@ -191,7 +191,9 @@ typedef struct {
     /* 0x0F */ u8 fogColor[3];
     /* 0x12 */ s16 fogNear; // ranges from 0-1000 (0: starts immediately, 1000: no fog), but is clamped to ENV_FOGNEAR_MAX
     /* 0x14 */ s16 zFar; // Max depth (render distance) of the view as a whole. fogFar will always match zFar
-} CurrentEnvLightSettings; // size = 0x16
+    /* 0x16 */ u8 hasWorldFog; // 2S2H [Unbound]
+    /* 0x18 */ WorldFog worldFog;
+} CurrentEnvLightSettings; // size = 0x28
 
 // `EnvLightSettings` is very similar to `CurrentEnvLightSettings` with one key difference.
 // The light settings data in the scene packs blend rate information with the fog near value.
@@ -209,9 +211,12 @@ typedef struct {
     /* 0x09 */ s8 light2Dir[3];
     /* 0x0C */ u8 light2Color[3];
     /* 0x0F */ u8 fogColor[3];
-    /* 0x12 */ s16 blendRateAndFogNear; 
+    /* 0x12 */ s16 blendRateAndFogNear;
     /* 0x14 */ s16 zFar;
-} EnvLightSettings; // size = 0x16
+    // 2S2H [Unbound] world-unit fog (SPEC §4.2 lighting); mirrored in SetLightingSettings.h
+    /* 0x16 */ u8 hasWorldFog;
+    /* 0x18 */ WorldFog worldFog;
+} EnvLightSettings; // size = 0x28
 
 // ZAPD compatibility typedefs
 // TODO: Remove when ZAPD adds support for them
@@ -281,6 +286,7 @@ s32 Environment_ZBufValToFixedPoint(s32 zBufferVal);
 void Environment_Init(struct PlayState* play2, EnvironmentContext* envCtx, s32 arg2);
 u8 Environment_SmoothStepToU8(u8* pvalue, u8 target, u8 scale, u8 step, u8 minStep);
 f32 Environment_LerpWeight(u16 max, u16 min, u16 val);
+f32 Environment_GetLegacyFogStart(s16 fogNear, s16 zFar);
 f32 Environment_LerpWeightAccelDecel(u16 endFrame, u16 startFrame, u16 curFrame, u16 accelDuration, u16 decelDuration);
 void Environment_UpdateSkybox(u8 skyboxId, EnvironmentContext* envCtx, struct SkyboxContext* skyboxCtx);
 void Environment_EnableUnderwaterLights(struct PlayState* play, s32 waterLightsIndex);
@@ -326,29 +332,29 @@ void func_800FEAB0(void);
 void Environment_NewDay(EnvironmentContext* envCtx);
 
 // Data
-extern u8 gWeatherMode;
-extern u8 gLightConfigAfterUnderwater;
-extern u8 gInterruptSongOfStorms;
-extern u8 gSceneSeqState;
+extern HOST_DATA u8 gWeatherMode;
+extern HOST_DATA u8 gLightConfigAfterUnderwater;
+extern HOST_DATA u8 gInterruptSongOfStorms;
+extern HOST_DATA u8 gSceneSeqState;
 
 // Bss
-extern u8 D_801F4E30;
+extern HOST_DATA u8 D_801F4E30;
 
-extern u8 gCustomLensFlare1On;
-extern Vec3f gCustomLensFlare1Pos;
-extern f32 D_801F4E44;
-extern f32 D_801F4E48;
-extern s16 D_801F4E4C;
+extern HOST_DATA u8 gCustomLensFlare1On;
+extern HOST_DATA Vec3f gCustomLensFlare1Pos;
+extern HOST_DATA f32 D_801F4E44;
+extern HOST_DATA f32 D_801F4E48;
+extern HOST_DATA s16 D_801F4E4C;
 
-extern u8 gCustomLensFlare2On;
-extern Vec3f gCustomLensFlare2Pos;
-extern f32 D_801F4E5C;
-extern f32 D_801F4E60;
-extern s16 D_801F4E64;
+extern HOST_DATA u8 gCustomLensFlare2On;
+extern HOST_DATA Vec3f gCustomLensFlare2Pos;
+extern HOST_DATA f32 D_801F4E5C;
+extern HOST_DATA f32 D_801F4E60;
+extern HOST_DATA s16 D_801F4E64;
 
-extern struct LightningStrike gLightningStrike;
-extern f32 D_801F4E74;
-extern u16 D_801F4E78;
-extern u16 gSkyboxNumStars;
+extern HOST_DATA struct LightningStrike gLightningStrike;
+extern HOST_DATA f32 D_801F4E74;
+extern HOST_DATA u16 D_801F4E78;
+extern HOST_DATA u16 gSkyboxNumStars;
 
 #endif

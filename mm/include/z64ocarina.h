@@ -272,6 +272,7 @@ void AudioOcarina_StartAtSongStartingPos(u32 ocarinaFlags);
 void AudioOcarina_StartForSongCheck(u32 ocarinaFlags, u8 ocarinaStaffPlayingPosStart);
 void AudioOcarina_StartWithSongNoteLengths(u32 ocarinaFlags);
 void AudioOcarina_StartDefault(u32 ocarinaFlags);
+void AudioOcarina_ForceSongPlayed(u8 songIndex);
 u8 func_8019B5AC(void);
 void AudioOcarina_ResetAndReadInput(void);
 void AudioOcarina_SetOcarinaDisableTimer(u8 unused, u8 timer);
@@ -284,7 +285,7 @@ OcarinaStaff* AudioOcarina_GetPlaybackStaff(void);
 void AudioOcarina_TerminaWallGenerateNotes(void);
 void AudioOcarina_PlayLongScarecrowSong(void);
 
-extern u8* gScarecrowSpawnSongPtr;
-extern OcarinaSongButtons gOcarinaSongButtons[OCARINA_SONG_MAX];
+extern HOST_DATA u8* gScarecrowSpawnSongPtr;
+extern HOST_DATA OcarinaSongButtons gOcarinaSongButtons[OCARINA_SONG_MAX];
 
 #endif

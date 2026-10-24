@@ -7,12 +7,13 @@
 #include "z64math.h"
 
 namespace SOH {
+// 2S2H [Unbound] mirrors z64scene.h: position is f32 (world extent)
 typedef struct {
     /* 0x00 */ s16 id;
-    /* 0x02 */ Vec3s pos;
-    /* 0x08 */ Vec3s rot;
-    /* 0x0E */ s16 params;
-} ActorEntry; // size = 0x10
+    /* 0x04 */ Vec3f pos;
+    /* 0x10 */ Vec3s rot;
+    /* 0x16 */ s16 params;
+} ActorEntry; // size = 0x18
 
 class SetActorList : public SceneCommand<ActorEntry> {
   public:

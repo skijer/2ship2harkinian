@@ -2095,6 +2095,16 @@ void AudioOcarina_ReadControllerInput(void) {
 
     // 2S2H [Enhancement] Apply custom ocarina controls via GameInteractor
     sOcarinaInputButtonCur |= GameInteractor_CustomOcarinaControls(input);
+
+    // Runs on the audio thread, which owns the ocarina globals mods read here
+    GameInteractor_ExecuteOnOcarinaInput();
+}
+
+// Marks a song as just played, as AudioOcarina_CheckSongsWithMusicStaff does on a match
+void AudioOcarina_ForceSongPlayed(u8 songIndex) {
+    sPlayedOcarinaSongIndexPlusOne = songIndex + 1;
+    sIsOcarinaInputEnabled = false;
+    sOcarinaFlags = 0;
 }
 
 /**
@@ -2703,6 +2713,8 @@ void AudioOcarina_PlayControllerInput(u8 isOcarinaSfxSuppressedWhenCancelled) {
             // Stops ocarina sound when transitioning from playing to not playing a note
             AudioSfx_StopById(NA_SE_OC_OCARINA);
         }
+
+        GameInteractor_QueueOcarinaNote(sCurOcarinaPitch, sCurOcarinaBendFreq, sOcarinaInstrumentId);
     }
 }
 
@@ -2894,6 +2906,7 @@ void AudioOcarina_PlaybackSong(void) {
                 sPlaybackPitch = OCARINA_PITCH_NONE;
             } else {
                 AudioSfx_StopById(NA_SE_OC_OCARINA);
+                GameInteractor_QueueOcarinaPlaybackNote(OCARINA_PITCH_NONE, 1.0f);
             }
             return;
         } else {
@@ -2944,8 +2957,11 @@ void AudioOcarina_PlaybackSong(void) {
                                         sPlaybackPitch & OCARINA_BUTTON_MASK_PITCH);
                 AudioSfx_PlaySfx(NA_SE_OC_OCARINA, &gSfxDefaultPos, 4, &sRelativeNotePlaybackBend,
                                  &sRelativeNotePlaybackVolume, &gSfxDefaultReverb);
+                GameInteractor_QueueOcarinaPlaybackNote(sPlaybackPitch & OCARINA_BUTTON_MASK_PITCH,
+                                                        sRelativeNotePlaybackBend);
             } else {
                 AudioSfx_StopById(NA_SE_OC_OCARINA);
+                GameInteractor_QueueOcarinaPlaybackNote(OCARINA_PITCH_NONE, 1.0f);
             }
         }
         sPlaybackNotePos++;

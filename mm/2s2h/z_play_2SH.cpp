@@ -2,6 +2,8 @@
 #include "2s2h/resource/type/Scene.h"
 #include <ship/utils/StringHelper.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/Unbound/SceneDB.h"
+#include "2s2h/ModApi/ModDungeons/BossRegistry.h"
 #include <ship/resource/ResourceManager.h>
 
 extern "C" {
@@ -38,15 +40,14 @@ extern "C" void OTRPlay_InitScene(PlayState* play, s32 spawn) {
 
 extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
     s32 pad;
-    SceneTableEntry* scene = &gSceneTable[sceneId];
+    const s32 sourceScene = BossRegistry_ResolveSceneSource(sceneId);
+    SceneTableEntry* scene = SceneDB_GetSceneEntry(sourceScene);
 
     scene->unk_D = 0;
     play->loadedScene = scene;
     play->sceneId = sceneId;
     play->sceneConfig = scene->drawConfig;
-    std::string scenePath =
-        StringHelper::Sprintf("scenes/nonmq/%s/%s", scene->segment.fileName, scene->segment.fileName);
-    play->sceneSegment = OTRPlay_LoadFile(play, scenePath.c_str());
+    play->sceneSegment = OTRPlay_LoadFile(play, SceneDB_GetScenePath(sourceScene));
     scene->unk_D = 0;
     gSegments[2] = (uintptr_t)play->sceneSegment;
     OTRPlay_InitScene(play, spawn);

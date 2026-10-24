@@ -172,33 +172,33 @@ ObjIcePoly* EnKgy_FindIceBlock(PlayState* play) {
 }
 
 void func_80B40C74(PlayState* play) {
-    gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 |= 1;
+    SceneFlags_GetPermanent(play->sceneId)->unk_14 |= 1;
     if (CURRENT_DAY == 1) {
-        gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 |= 2;
+        SceneFlags_GetPermanent(play->sceneId)->unk_14 |= 2;
     } else {
-        gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 &= ~2;
+        SceneFlags_GetPermanent(play->sceneId)->unk_14 &= ~2;
     }
 }
 
 void func_80B40D00(PlayState* play) {
-    gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 |= 4;
+    SceneFlags_GetPermanent(play->sceneId)->unk_14 |= 4;
 }
 
 void func_80B40D30(PlayState* play) {
-    gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 &= ~7;
+    SceneFlags_GetPermanent(play->sceneId)->unk_14 &= ~7;
 }
 
 s32 func_80B40D64(PlayState* play) {
-    return gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 & 1;
+    return SceneFlags_GetPermanent(play->sceneId)->unk_14 & 1;
 }
 
 s32 func_80B40D8C(PlayState* play) {
-    return gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 & 4;
+    return SceneFlags_GetPermanent(play->sceneId)->unk_14 & 4;
 }
 
 s32 func_80B40DB4(PlayState* play) {
     if ((CURRENT_DAY == 3) ||
-        ((CURRENT_DAY == 2) && (gSaveContext.save.saveInfo.permanentSceneFlags[play->sceneId].unk_14 & 2))) {
+        ((CURRENT_DAY == 2) && (SceneFlags_GetPermanent(play->sceneId)->unk_14 & 2))) {
         return true;
     }
     return false;

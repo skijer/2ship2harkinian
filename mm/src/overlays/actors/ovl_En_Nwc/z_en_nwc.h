@@ -15,8 +15,8 @@ typedef struct EnNwc {
     /* 0x144 */ SkelAnime niwSkeleton; // this skeleton is for when the chicks grow up into adults during the breman march
     /* 0x188 */ Vec3s jointTable[NIW_LIMB_MAX];
     /* 0x1E8 */ Vec3s morphTable[NIW_LIMB_MAX];
-    /* 0x248 */ s8 niwObjectSlot;
-    /* 0x249 */ s8 nwcObjectIndex;
+    /* 0x248 */ s16 niwObjectSlot;
+    /* 0x249 */ s16 nwcObjectIndex;
     /* 0x24A */ s16 blinkState;
     /* 0x24C */ s16 blinkTimer;
     /* 0x250 */ EnHs* grog;

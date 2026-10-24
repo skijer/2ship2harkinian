@@ -137,7 +137,7 @@ typedef struct EnInvadepoh {
     /* 0x2EC */ EnInvadepohActionFunc actionFunc;
     /* 0x2F0 */ s16 timer;
     /* 0x2F2 */ s16 frameCounter;
-    /* 0x2F4 */ s8 objectSlot;
+    /* 0x2F4 */ s16 objectSlot;
     /* 0x2F8 */ f32 distanceToRomani;
     /* 0x2FC */ UNK_TYPE1 unk_2FC[4];
     /* 0x300 */ f32 alienAbductorAccelY;
@@ -146,7 +146,7 @@ typedef struct EnInvadepoh {
     /* 0x308 */ s8 endPoint;
     /* 0x309 */ s8 currentPoint;
     /* 0x30A */ s8 pathStep;
-    /* 0x30C */ Vec3s *pathPoints;
+    /* 0x30C */ Vec3f *pathPoints;
     /* 0x310 */ f32 totalPathDistance;
     /* 0x314 */ Vec3f currentPos;
     /* 0x320 */ f32 pathProgress;

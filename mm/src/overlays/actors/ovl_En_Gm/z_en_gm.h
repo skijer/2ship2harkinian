@@ -32,7 +32,7 @@ typedef struct EnGm {
     /* 0x25C */ s32 msgScriptPos;
     /* 0x260 */ s8 unk_260;
     /* 0x261 */ s8 unk_261;
-    /* 0x262 */ s8 objectSlot;
+    /* 0x262 */ s16 objectSlot;
     /* 0x264 */ MsgScript* msgScript;
     /* 0x268 */ Actor* unk_268;
     /* 0x26C */ UNK_TYPE1 unk_26C[0xC];

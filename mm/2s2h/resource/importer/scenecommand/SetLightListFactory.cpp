@@ -11,13 +11,14 @@ std::shared_ptr<Ship::IResource> SetLightListFactory::ReadResource(std::shared_p
     setLightList->numLights = reader->ReadUInt32();
     setLightList->lightList.reserve(setLightList->numLights);
     for (uint32_t i = 0; i < setLightList->numLights; i++) {
-        LightInfo light;
+        LightInfo light = {};
 
         light.type = reader->ReadUByte();
 
-        light.params.point.x = reader->ReadInt16();
-        light.params.point.y = reader->ReadInt16();
-        light.params.point.z = reader->ReadInt16();
+        const s16 x = reader->ReadInt16();
+        const s16 y = reader->ReadInt16();
+        const s16 z = reader->ReadInt16();
+        LightInfo_SetCoords(light, x, y, z);
 
         light.params.point.color[0] = reader->ReadUByte(); // r
         light.params.point.color[1] = reader->ReadUByte(); // g

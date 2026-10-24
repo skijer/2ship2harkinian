@@ -29,7 +29,6 @@ void EnWdhand_SetupGrabbedPlayer(EnWdhand* this, PlayState* play);
 void EnWdhand_SetupDie(EnWdhand* this);
 
 void EnWdhand_GetInitVelocity(EnWdhand* this, Vec3f* dst);
-void EnWdhand_Vec3fToVec3s(Vec3s* dst, Vec3f* src);
 
 ActorProfile En_Wdhand_Profile = {
     /**/ ACTOR_EN_WDHAND,
@@ -211,7 +210,7 @@ void EnWdhand_Init(Actor* thisx, PlayState* play) {
         ColliderJntSphElement* jntSphElem = &this->collider.elements[i];
 
         jntSphElem->dim.worldSphere.radius = jntSphElem->dim.modelSphere.radius;
-        EnWdhand_Vec3fToVec3s(&jntSphElem->dim.worldSphere.center, &this->actor.world.pos);
+        Math_Vec3f_Copy(&jntSphElem->dim.worldSphere.center, &this->actor.world.pos);
     }
 
     for (i = 0; i < EN_WDHAND_NUM_SEGMENTS; i++) {
@@ -293,11 +292,6 @@ void EnWdhand_SetTransform(EnWdhand* this, s32 limbIndex, s32 arg2, Vec3f* trans
     currentMatrix->mf[3][2] = translation->z;
 }
 
-void EnWdhand_Vec3fToVec3s(Vec3s* dst, Vec3f* src) {
-    dst->x = src->x;
-    dst->y = src->y;
-    dst->z = src->z;
-}
 
 s16 EnWdhand_GetLimbXRotation(EnWdhand* this, s32 limbIndex) {
     return this->limbRotations[limbIndex].z * Math_SinF((this->timer - limbIndex * 20) * (M_PIf / 40));
@@ -632,7 +626,7 @@ void EnWdhand_SetupDie(EnWdhand* this) {
 void EnWdhand_Die(EnWdhand* this, PlayState* play) {
     static Vec3f sEffectVelocity = { 0.0f, 0.0f, 0.0f };
     static Vec3f sEffectAccel = { 0.0f, 0.05f, 0.0f };
-    Vec3s* handCollider = &this->collider.elements[6].dim.worldSphere.center;
+    Vec3f* handCollider = &this->collider.elements[6].dim.worldSphere.center;
     Vec3f spA0;
     Vec3f sp94;
     s16 effectScale;
@@ -775,9 +769,9 @@ void EnWdhand_Update(Actor* thisx, PlayState* play) {
 void EnWdhand_UpdateColliderLocationsForLimb(EnWdhand* this, s32 limbIndex, Vec3f* limbPos) {
     EnWdhand_SetTransform(this, limbIndex, true, limbPos);
     Matrix_MultVecY(575.0f, limbPos);
-    EnWdhand_Vec3fToVec3s(&this->collider.elements[2 * limbIndex + 0].dim.worldSphere.center, limbPos);
+    Math_Vec3f_Copy(&this->collider.elements[2 * limbIndex + 0].dim.worldSphere.center, limbPos);
     Matrix_MultVecY(1725.0f, limbPos);
-    EnWdhand_Vec3fToVec3s(&this->collider.elements[2 * limbIndex + 1].dim.worldSphere.center, limbPos);
+    Math_Vec3f_Copy(&this->collider.elements[2 * limbIndex + 1].dim.worldSphere.center, limbPos);
     Matrix_MultVecY(2300.0f, limbPos);
 }
 
@@ -841,7 +835,7 @@ void EnWdhand_Draw(Actor* thisx, PlayState* play) {
 
     Math_Vec3f_Copy(&this->actor.focus.pos, &limbPos);
     Matrix_MultVecY(1000.0f, &limbPos);
-    EnWdhand_Vec3fToVec3s(&this->collider.elements[6].dim.worldSphere.center, &limbPos);
+    Math_Vec3f_Copy(&this->collider.elements[6].dim.worldSphere.center, &limbPos);
 
     POLY_OPA_DISP = gfx;
     SkelAnime_DrawFlexOpa(play, this->skelAnime.skeleton, this->skelAnime.jointTable, this->skelAnime.dListCount, NULL,

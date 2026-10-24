@@ -62,7 +62,7 @@ typedef struct EnKnight {
     /* 0x151 */ u8 inCurtainCutscene;
     /* 0x152 */ u8 doBgChecks;
     /* 0x153 */ u8 closeCurtainAction;
-    /* 0x154 */ u8 roomLightingState;
+    /* 0x154 */ s16 roomLightingState;
     /* 0x156 */ s16 invincibilityTimer;
     /* 0x158 */ s16 damageFlashTimer;
     /* 0x15A */ s16 strafeTarget;

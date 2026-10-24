@@ -1,7 +1,10 @@
+#include "2s2h/ModApi/ProgressiveItems/ProgressiveItems.h"
+#include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
 #include "Rando/Rando.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/ShipInit.hpp"
 #include "2s2h/Rando/DrawFuncs.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "2s2h_assets.h"
 
 extern "C" {
@@ -505,6 +508,10 @@ void DrawTycoonWallet() {
 }
 
 void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* actor) {
+    if (const char* key = ProgressiveItems_ResolveRando(randoItemId, RandoInfCustom_GetActiveBank())) {
+        CustomItemRegistry_DrawAcquisition(key, gPlayState);
+        return;
+    }
     // Apply hilites with actor world pos before drawing
     if (actor != NULL) {
         func_800B8118(actor, gPlayState, 0);
@@ -690,6 +697,14 @@ void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* 
         case RI_UNKNOWN:
             break;
         default:
+            if (RandoItems_IsModItem(randoItemId)) {
+                if (DungeonRegistry_FindItem(randoItemId) >= 0) {
+                    GetItem_Draw(gPlayState, Rando::StaticData::Items[randoItemId].drawId);
+                    break;
+                }
+                RandoItems_Draw(randoItemId);
+                break;
+            }
             GetItem_Draw(gPlayState, Rando::StaticData::Items[randoItemId].drawId);
             break;
     }

@@ -11,7 +11,7 @@ struct ObjMakeoshihiki;
 
 typedef struct ObjMakeoshihiki {
     /* 0x000 */ Actor actor;
-    /* 0x144 */ Vec3s* pathPoints;
+    /* 0x144 */ Vec3f* pathPoints;
     /* 0x148 */ s32 pathCount;
 } ObjMakeoshihiki; // size = 0x14C
 

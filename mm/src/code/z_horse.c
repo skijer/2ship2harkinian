@@ -22,9 +22,9 @@ s32 Horse_GetJumpingFencePathIndex(PlayState* play) {
 }
 
 // unused
-s32 Horse_CopyPointFromPathList(PlayState* play, s32 pathIndex, s32 pointIndex, Vec3s* dst, s16* arg4) {
+s32 Horse_CopyPointFromPathList(PlayState* play, s32 pathIndex, s32 pointIndex, Vec3f* dst, s16* arg4) {
     Path* path = &play->setupPathList[pathIndex];
-    Vec3s* points;
+    Vec3f* points;
     s32 count = path->count;
 
     dst->x = 0;

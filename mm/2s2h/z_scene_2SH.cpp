@@ -82,6 +82,23 @@ void Scene_CommandActorCutsceneCamList(PlayState* play, SOH::ISceneCommand* cmd)
     play->actorCsCamList = (ActorCsCamInfo*)cams->GetPointer();
 }
 
+static_assert(sizeof(::CollisionPoly) == sizeof(SOH::CollisionPoly));
+static_assert(offsetof(::CollisionPoly, dist) == offsetof(SOH::CollisionPoly, dist));
+static_assert(sizeof(::WaterBox) == sizeof(SOH::WaterBox));
+static_assert(offsetof(::WaterBox, properties) == offsetof(SOH::WaterBox, properties));
+static_assert(offsetof(::CollisionHeader, vtxList) == offsetof(SOH::CollisionHeaderData, vtxList));
+static_assert(offsetof(::CollisionHeader, waterBoxes) == offsetof(SOH::CollisionHeaderData, waterBoxes));
+static_assert(sizeof(::ActorEntry) == sizeof(SOH::ActorEntry));
+static_assert(offsetof(::ActorEntry, params) == offsetof(SOH::ActorEntry, params));
+static_assert(sizeof(::TransitionActorEntry) == sizeof(SOH::TransitionActorEntry));
+static_assert(offsetof(::TransitionActorEntry, params) == offsetof(SOH::TransitionActorEntry, params));
+static_assert(sizeof(::LightInfo) == sizeof(SOH::LightInfo));
+static_assert(offsetof(::LightInfo, params.point.radius) == offsetof(SOH::LightInfo, params.point.radius));
+static_assert(sizeof(::RoomShapeCullableEntry) == sizeof(SOH::PolygonDlist2));
+static_assert(offsetof(::RoomShapeCullableEntry, xlu) == offsetof(SOH::PolygonDlist2, xlu));
+static_assert(sizeof(::EnvLightSettings) == sizeof(SOH::EnvLightSettings));
+static_assert(offsetof(::EnvLightSettings, worldFog) == offsetof(SOH::EnvLightSettings, worldFog));
+
 void Scene_CommandCollisionHeader(PlayState* play, SOH::ISceneCommand* cmd) {
     SOH::SetCollisionHeader* colHeader = (SOH::SetCollisionHeader*)cmd;
     BgCheck_Allocate(&play->colCtx, play, (CollisionHeader*)colHeader->GetRawPointer());
@@ -177,8 +194,12 @@ void Scene_CommandObjectList(PlayState* play, SOH::ISceneCommand* cmd) {
     }
 
     // Continuing from the last index, add the remaining object ids from the command object list
-    for (; k < objList->objects.size(); i++, k++) {
+    for (; k < objList->objects.size() && i < ARRAY_COUNT(play->objectCtx.slots); i++, k++) {
         play->objectCtx.slots[i].id = -objList->objects[k];
+    }
+    if (k < objList->objects.size()) {
+        SPDLOG_ERROR("[Unbound] The object list exceeds the {} object slots; {} objects were not loaded",
+                     ARRAY_COUNT(play->objectCtx.slots), objList->objects.size() - k);
     }
 
     play->objectCtx.numEntries = i;
@@ -255,7 +276,11 @@ void Scene_CommandPathList(PlayState* play, SOH::ISceneCommand* cmd) {
 void Scene_CommandTransiActorList(PlayState* play, SOH::ISceneCommand* cmd) {
     SOH::SetTransitionActorList* list = (SOH::SetTransitionActorList*)cmd;
 
-    play->transitionActors.count = list->numTransitionActors;
+    if (list->numTransitionActors > ROOM_TRANSITION_MAX) {
+        SPDLOG_ERROR("[Unbound] The transition actor list exceeds {}; {} transition actors were not loaded",
+                     ROOM_TRANSITION_MAX, list->numTransitionActors - ROOM_TRANSITION_MAX);
+    }
+    play->transitionActors.count = MIN(list->numTransitionActors, ROOM_TRANSITION_MAX);
     play->transitionActors.list = (TransitionActorEntry*)list->GetRawPointer();
     MapDisp_InitTransitionActorData(play, play->transitionActors.count, play->transitionActors.list);
 }
@@ -330,7 +355,7 @@ void Scene_CommandSkyboxDisables(PlayState* play, SOH::ISceneCommand* cmd) {
 }
 
 void Scene_CommandExitList(PlayState* play, SOH::ISceneCommand* cmd) {
-    play->setupExitList = (u16*)cmd->GetRawPointer();
+    play->setupExitList = (u32*)cmd->GetRawPointer();
 }
 
 void Scene_CommandSoundSettings(PlayState* play, SOH::ISceneCommand* cmd) {

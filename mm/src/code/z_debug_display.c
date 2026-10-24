@@ -145,7 +145,7 @@ Gfx* DebugDisplay_PathDisplayList(GraphicsContext* gfxCtx, Path* path) {
     Vtx* curVtx;
     Vtx* curBaseVtx;  // First Vtx for the current point
     Vtx* prevBaseVtx; // First Vtx for the previous point
-    Vec3s* curPoint;
+    Vec3f* curPoint;
     s32 segment; // of path ending at the current point, 1-indexed
 
     if (path != NULL) {

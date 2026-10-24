@@ -17,6 +17,9 @@
 s32 Object_SpawnPersistent(ObjectContext* objectCtx, s16 id) {
     size_t size;
 
+    if (id < 0 || id >= OBJECT_ID_MAX || objectCtx->numEntries >= OBJECT_SLOT_CAPACITY) {
+        return OBJECT_SLOT_NONE;
+    }
     objectCtx->slots[objectCtx->numEntries].id = id;
     size = gObjectTable[id].vromEnd - gObjectTable[id].vromStart;
 
@@ -117,7 +120,7 @@ s32 Object_GetSlot(ObjectContext* objectCtx, s16 objectId) {
 }
 
 s32 Object_IsLoaded(ObjectContext* objectCtx, s32 slot) {
-    if (objectCtx->slots[slot].id > 0) {
+    if (slot >= 0 && slot < objectCtx->numEntries && objectCtx->slots[slot].id > 0) {
         return true;
     } else {
         return false;
@@ -614,13 +617,13 @@ s32 Scene_ExecuteCommands(PlayState* play, SceneCmd* sceneCmd) {
 /**
  * Creates an entrance from the scene, spawn, and layer.
  */
-u16 Entrance_Create(s32 scene, s32 spawn, s32 layer) {
-    return (scene << 9) | (spawn << 4) | layer;
+u32 Entrance_Create(s32 scene, s32 spawn, s32 layer) {
+    return ((u32)scene << 9) | (spawn << 4) | layer;
 }
 
 /**
  * Creates an layer 0 entrance from the current entrance and the given spawn.
  */
-u16 Entrance_CreateFromSpawn(s32 spawn) {
+u32 Entrance_CreateFromSpawn(s32 spawn) {
     return Entrance_Create((u32)gSaveContext.save.entrance >> 9, spawn, 0);
 }

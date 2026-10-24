@@ -259,7 +259,7 @@ s32 EnRz_SetupPath(EnRz* this, PlayState* play) {
         this->path = &play->setupPathList[EN_RZ_GET_PATH_INDEX(&this->actor)];
         if (this->path != NULL) {
             Path* path = this->path;
-            Vec3s* points = (Vec3s*)Lib_SegmentedToVirtual(path->points);
+            Vec3f* points = (Vec3f*)Lib_SegmentedToVirtual(path->points);
             f32 diffX = points->x - this->actor.world.pos.x;
             f32 diffY = points->z - this->actor.world.pos.z;
 
@@ -281,7 +281,7 @@ s32 EnRz_SetupPath(EnRz* this, PlayState* play) {
 
 EnRzPathStatus EnRz_GetPathStatus(EnRz* this) {
     Path* path = this->path;
-    Vec3s* curPoint;
+    Vec3f* curPoint;
     f32 diffX;
     f32 diffZ;
 
@@ -289,7 +289,7 @@ EnRzPathStatus EnRz_GetPathStatus(EnRz* this) {
         return EN_RZ_PATHSTATUS_AT_POINT;
     }
 
-    curPoint = &((Vec3s*)Lib_SegmentedToVirtual(path->points))[this->curPointIndex];
+    curPoint = &((Vec3f*)Lib_SegmentedToVirtual(path->points))[this->curPointIndex];
     diffX = curPoint->x - this->actor.world.pos.x;
     diffZ = curPoint->z - this->actor.world.pos.z;
     this->actor.world.rot.y = Math_Atan2S(diffX, diffZ);

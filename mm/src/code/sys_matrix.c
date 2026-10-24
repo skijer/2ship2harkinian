@@ -43,30 +43,19 @@
 #include "global.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 
+// 2S2H [Unbound] every Mtx writer assumes float matrices; an s16.16 build would wrap world positions >= 32768
+#ifndef GBI_FLOAT_MTX
+#error "2S2H: Unbound requires libultraship built with GBI_FLOAT_MTX"
+#endif
+
 /* data */
-#define qs1616(e) ((s32)((e)*0x00010000))
-
-#define IPART(x) ((qs1616(x) >> 16) & 0xFFFF)
-#define FPART(x) (qs1616(x) & 0xFFFF)
-
-#define gdSPDefMtx(xx, yx, zx, wx, xy, yy, zy, wy, xz, yz, zz, wz, xw, yw, zw, ww)                                 \
-    {                                                                                                              \
-        {                                                                                                          \
-            (IPART(xx) << 0x10) | IPART(xy), (IPART(xz) << 0x10) | IPART(xw), (IPART(yx) << 0x10) | IPART(yy),     \
-                (IPART(yz) << 0x10) | IPART(yw), (IPART(zx) << 0x10) | IPART(zy), (IPART(zz) << 0x10) | IPART(zw), \
-                (IPART(wx) << 0x10) | IPART(wy), (IPART(wz) << 0x10) | IPART(ww), (FPART(xx) << 0x10) | FPART(xy), \
-                (FPART(xz) << 0x10) | FPART(xw), (FPART(yx) << 0x10) | FPART(yy), (FPART(yz) << 0x10) | FPART(yw), \
-                (FPART(zx) << 0x10) | FPART(zy), (FPART(zz) << 0x10) | FPART(zw), (FPART(wx) << 0x10) | FPART(wy), \
-                (FPART(wz) << 0x10) | FPART(ww),                                                                   \
-        }                                                                                                          \
-    }
 // clang-format off
-Mtx gIdentityMtx = gdSPDefMtx(
-    1.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 1.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 1.0f
-);
+Mtx gIdentityMtx = { {
+    { 1.0f, 0.0f, 0.0f, 0.0f },
+    { 0.0f, 1.0f, 0.0f, 0.0f },
+    { 0.0f, 0.0f, 1.0f, 0.0f },
+    { 0.0f, 0.0f, 0.0f, 1.0f },
+} };
 // clang-format on
 
 MtxF gIdentityMtxF = { {

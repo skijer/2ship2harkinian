@@ -11,7 +11,7 @@ s16 Play_GetOriginalSceneId(s16 sceneId);
 namespace Rando {
 
 namespace StaticData {
-std::array<std::string, RC_MAX> CheckNames = std::array<std::string, RC_MAX>();
+std::map<RandoCheckId, std::string> CheckNames;
 
 #define RC(id, type, scene, flagType, flag, item)      \
     {                                                  \
