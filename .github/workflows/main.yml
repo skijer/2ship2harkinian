@@ -1,7 +1,10 @@
 name: generate-builds
 on:
+  # Builds run by hand or from a release tag, never on every push.
   push:
-  pull_request:
+    tags:
+      - '*unbound*'
+  workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
