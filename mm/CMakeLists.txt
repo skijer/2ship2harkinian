@@ -215,8 +215,8 @@ if (MSVC)
     )
 endif()
 
-# "open" until a mod-signing key ships; then releases use "signed" and mod authors "ask".
-set(S2H_MOD_POLICY "open" CACHE STRING
+# Releases are "signed"; the unsafe edition for mod authors is "ask".
+set(S2H_MOD_POLICY "signed" CACHE STRING
     "Native mods: open (load all), ask (unsigned ones need the player's yes), signed (only signed ones)")
 set_property(CACHE S2H_MOD_POLICY PROPERTY STRINGS open ask signed)
 if(S2H_MOD_POLICY STREQUAL "ask")

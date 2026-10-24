@@ -146,7 +146,7 @@ jobs:
       env:
         CCACHE_SLOPPINESS: pch_defines,time_macros
       run: |
-        cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DCMAKE_C_FLAGS="-Xclang -fno-pch-timestamp" -DCMAKE_CXX_FLAGS="-Xclang -fno-pch-timestamp"
+        cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DS2H_MOD_POLICY=signed -DCMAKE_C_FLAGS="-Xclang -fno-pch-timestamp" -DCMAKE_CXX_FLAGS="-Xclang -fno-pch-timestamp"
         cmake --build build-cmake -j
         # Spotlight indexing the new disk image keeps hdiutil from unmounting it ("Resource busy").
         sudo mdutil -a -i off || true
@@ -258,7 +258,7 @@ jobs:
     - name: Build 2Ship
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-        cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_REMOTE_CONTROL=1
+        cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_REMOTE_CONTROL=1 -DS2H_MOD_POLICY=signed
         cmake --build build-cmake --config Release -j3
         (cd build-cmake && cpack -G External)
 
@@ -342,7 +342,7 @@ jobs:
         VCPKG_ROOT: ${{github.workspace}}/vcpkg
       run: |
         set $env:PATH="$env:USERPROFILE/.cargo/bin;$env:PATH"
-        cmake -S . -B build-windows -G Ninja -DCMAKE_MAKE_PROGRAM=ninja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+        cmake -S . -B build-windows -G Ninja -DCMAKE_MAKE_PROGRAM=ninja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DS2H_MOD_POLICY=signed
         cmake --build build-windows --config Release --parallel 10
 
         (cd build-windows && cpack)

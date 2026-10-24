@@ -8,9 +8,9 @@ listed when the game starts. Asset-only packages (no `binaries` in the manifest)
 
 | `S2H_MOD_POLICY` | What loads |
 | --- | --- |
-| `open` (current default) | Every mod; the Mod Menu still shows which are signed |
-| `ask` | Signed mods, plus unsigned ones after the player says yes (the `unsafe-mods` downloads) |
-| `signed` | Only mods signed by the sign-mod workflow |
+| `signed` (default, the regular downloads) | Only mods signed by the sign-mod workflow |
+| `ask` (the `unsafe-mods` downloads, for mod authors) | Signed mods, plus unsigned ones after the player says yes |
+| `open` | Every mod; the Mod Menu still shows which are signed |
 
 Set it with `cmake ... -DS2H_MOD_POLICY=signed`. The policy is fixed when the game is compiled: no setting,
 config file or mod can switch it.
