@@ -1,0 +1,5 @@
+<Root>
+    <File Name="object_gi_hammer" Segment="6" OutName="oot_object_gi_hammer" Game="OOT">
+        <DList Name="gGiHammerDL" Offset="0x09D0" />
+    </File>
+</Root>

@@ -1,0 +1,65 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_ganon" Segment="6" OutName="oot_object_ganon" Game="OOT">
+        <Texture Name="gGanondorfBlackLeatherTex" Offset="0xA020" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gGanondorfBodysuitTex" Offset="0x8D30" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="gGanondorfCapeFasteningTex" Offset="0x8FB0" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gGanondorfChestJewelTex" Offset="0x9E20" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gGanondorfCrazedEyeTex" Offset="0xA4E0" Format="rgba16" Width="32" Height="16" />
+        <Texture Name="gGanondorfEarTex" Offset="0x8630" Format="rgba16" Width="8" Height="16" />
+        <Texture Name="gGanondorfEmptyEyeTex" Offset="0xA8E0" Format="rgba16" Width="32" Height="16" />
+        <Animation Name="gGanondorfEndingFloatAnim" Offset="0xFF48" />
+        <Texture Name="gGanondorfEyeOrbitTex" Offset="0x8730" Format="ci8" Width="32" Height="16" TlutOffset="0x7B10" />
+        <Texture Name="gGanondorfEyebrowTex" Offset="0x83F0" Format="ci8" Width="16" Height="8" TlutOffset="0x7D10" />
+        <DList Name="gGanondorfEyesDL" Offset="0xBE90" />
+        <Texture Name="gGanondorfFingerTex" Offset="0xA4A0" Format="ci8" Width="8" Height="8" TlutOffset="0x95B0" />
+        <Texture Name="gGanondorfGauntletAndPauldronTex" Offset="0xA260" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gGanondorfGerudoFabricTex" Offset="0x8930" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gGanondorfGerudoFabricWithSunTex" Offset="0x91B0" Format="rgba16" Width="32" Height="16" />
+        <Texture Name="gGanondorfHairFringeTex" Offset="0x8470" Format="ci8" Width="16" Height="16" TlutOffset="0x7D10" />
+        <Texture Name="gGanondorfHairTLUT" Offset="0x7D10" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gGanondorfHairTex" Offset="0x82D0" Format="ci8" Width="16" Height="16" TlutOffset="0x7D10" />
+        <Texture Name="gGanondorfHandSideTex" Offset="0xA460" Format="ci8" Width="8" Height="8" TlutOffset="0x95B0" />
+        <Texture Name="gGanondorfHandTLUT" Offset="0x95B0" Format="rgba16" Width="56" Height="1" />
+        <DList Name="gGanondorfHeadDL" Offset="0x54D8" />
+        <Texture Name="gGanondorfInnerMouthTex" Offset="0x7F10" Format="rgba16" Width="8" Height="8" />
+        <DList Name="gGanondorfJawDL" Offset="0x6460" />
+        <Texture Name="gGanondorfJawTex" Offset="0x7F90" Format="ci8" Width="16" Height="16" TlutOffset="0x7B10" />
+        <DList Name="gGanondorfJewelDL" Offset="0xBF40" />
+        <Texture Name="gGanondorfJewelTex" Offset="0x9620" Format="rgba16" Width="16" Height="32" />
+        <Texture Name="gGanondorfLeatherTex" Offset="0x8DB0" Format="rgba16" Width="16" Height="16" />
+        <DList Name="gGanondorfLeftFootDL" Offset="0x5270" />
+        <DList Name="gGanondorfLeftForearmDL" Offset="0x7518" />
+        <DList Name="gGanondorfLeftHandDL" Offset="0xC048" />
+        <DList Name="gGanondorfLeftShinDL" Offset="0x5070" />
+        <DList Name="gGanondorfLeftShoulderDL" Offset="0x7908" />
+        <DList Name="gGanondorfLeftThighDL" Offset="0x5388" />
+        <DList Name="gGanondorfLeftUpperArmDL" Offset="0x7640" />
+        <DList Name="gGanondorfLeftUpperLipDL" Offset="0x6A28" />
+        <DList Name="gGanondorfLowerHairEndDL" Offset="0x6198" />
+        <DList Name="gGanondorfMouthDL" Offset="0x66E8" />
+        <Texture Name="gGanondorfNormalEyeTex" Offset="0x9A20" Format="rgba16" Width="32" Height="16" />
+        <Texture Name="gGanondorfNoseBridgeTex" Offset="0x8570" Format="rgba16" Width="4" Height="16" />
+        <Texture Name="gGanondorfNoseTex" Offset="0x85F0" Format="ci8" Width="8" Height="8" TlutOffset="0x7B10" />
+        <Texture Name="gGanondorfOuterMouthTex" Offset="0x8190" Format="rgba16" Width="4" Height="8" />
+        <DList Name="gGanondorfPelvisDL" Offset="0x49C0" />
+        <Texture Name="gGanondorfRedFabricTex" Offset="0x8B30" Format="rgba16" Width="16" Height="16" />
+        <DList Name="gGanondorfRightFootDL" Offset="0x4E08" />
+        <DList Name="gGanondorfRightForearmDL" Offset="0x6F20" />
+        <DList Name="gGanondorfRightHandClosedDL" Offset="0xC518" />
+        <DList Name="gGanondorfRightHandOpenDL" Offset="0xC9E8" />
+        <DList Name="gGanondorfRightShinDL" Offset="0x4C08" />
+        <DList Name="gGanondorfRightShoulderDL" Offset="0x7310" />
+        <DList Name="gGanondorfRightThighDL" Offset="0x4F20" />
+        <DList Name="gGanondorfRightUpperArmDL" Offset="0x7048" />
+        <DList Name="gGanondorfRightUpperLipDL" Offset="0x6030" />
+        <Texture Name="gGanondorfSideburnTex" Offset="0x8090" Format="ci8" Width="16" Height="16" TlutOffset="0x7D10" />
+        <Skeleton Name="gGanondorfSkel" Offset="0x100E8" Type="Flex" LimbType="Standard" />
+        <Texture Name="gGanondorfSkinTLUT" Offset="0x7B10" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gGanondorfTeethTex" Offset="0x83D0" Format="rgba16" Width="4" Height="4" />
+        <Texture Name="gGanondorfThumbTex" Offset="0xA220" Format="ci8" Width="8" Height="8" TlutOffset="0x95B0" />
+        <DList Name="gGanondorfTorsoDL" Offset="0x6B90" />
+        <DList Name="gGanondorfUpperHairEndDL" Offset="0x62F0" />
+        <Texture Name="gGanondorfUpperLipTex" Offset="0x81D0" Format="ci8" Width="16" Height="16" TlutOffset="0x7B10" />
+    </File>
+</Root>

@@ -1,0 +1,44 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_ma1" Segment="6" OutName="oot_object_ma1" Game="OOT">
+        <Texture Name="gMalonChildBootTex" Offset="0x10F0" Format="ci8" Width="64" Height="16" TlutOffset="0x830" />
+        <Texture Name="gMalonChildBowserTex" Offset="0xCB0" Format="rgba16" Width="16" Height="32" />
+        <Texture Name="gMalonChildBrownCircleTex" Offset="0x1798" Format="rgba16" Width="8" Height="8" />
+        <DList Name="gMalonChildChestDL" Offset="0x6F10" />
+        <Texture Name="gMalonChildDressDesignTex" Offset="0xA30" Format="ci8" Width="8" Height="16" TlutOffset="0x830" />
+        <DList Name="gMalonChildDressLowerDL" Offset="0x6C68" />
+        <DList Name="gMalonChildDressMiddleDL" Offset="0x6DD8" />
+        <Texture Name="gMalonChildDressTLUT" Offset="0x830" Format="rgba16" Width="16" Height="16" />
+        <DList Name="gMalonChildDressUpperDL" Offset="0x7C40" />
+        <Texture Name="gMalonChildEarTex" Offset="0x1818" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gMalonChildEyeClosedTex" Offset="0x2718" Format="ci8" Width="32" Height="32" TlutOffset="0x15B0" />
+        <Texture Name="gMalonChildEyeHalfTex" Offset="0x2318" Format="ci8" Width="32" Height="32" TlutOffset="0x15B0" />
+        <Texture Name="gMalonChildEyeOpenTex" Offset="0x1B18" Format="ci8" Width="32" Height="32" TlutOffset="0x15B0" />
+        <Texture Name="gMalonChildEyeTLUT" Offset="0x15B0" Format="rgba16" Width="15" Height="12" />
+        <Texture Name="gMalonChildFingersTex" Offset="0xAB0" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gMalonChildHairTLUT" Offset="0x14F0" Format="rgba16" Width="96" Height="1" />
+        <Texture Name="gMalonChildHairTex" Offset="0x1A18" Format="ci8" Width="16" Height="16" TlutOffset="0x14F0" />
+        <DList Name="gMalonChildHeadDL" Offset="0x4148" />
+        <Animation Name="gMalonChildIdleAnim" Offset="0x820" />
+        <DList Name="gMalonChildLeftArmDL" Offset="0x7988" />
+        <DList Name="gMalonChildLeftFootDL" Offset="0x81F8" />
+        <DList Name="gMalonChildLeftHandDL" Offset="0x7A98" />
+        <DList Name="gMalonChildLeftShinDL" Offset="0x8098" />
+        <DList Name="gMalonChildLeftShoulderDL" Offset="0x77D0" />
+        <DList Name="gMalonChildLeftThighDL" Offset="0x8040" />
+        <Texture Name="gMalonChildNeutralMouthTex" Offset="0x1F18" Format="rgba16" Width="32" Height="16" />
+        <Animation Name="gMalonChildRaiseHandsAnim" Offset="0x244" />
+        <DList Name="gMalonChildRightArmDL" Offset="0x7518" />
+        <DList Name="gMalonChildRightFoorDL" Offset="0x7EF8" />
+        <DList Name="gMalonChildRightHandDL" Offset="0x7628" />
+        <DList Name="gMalonChildRightShinDL" Offset="0x7D98" />
+        <DList Name="gMalonChildRightShoulderDL" Offset="0x7360" />
+        <DList Name="gMalonChildRightThighDL" Offset="0x7D40" />
+        <Texture Name="gMalonChildScarfTex" Offset="0x10B0" Format="ci8" Width="8" Height="8" TlutOffset="0x830" />
+        <Animation Name="gMalonChildSingAnim" Offset="0x8D64" />
+        <Skeleton Name="gMalonChildSkel" Offset="0x8460" Type="Flex" LimbType="Standard" />
+        <Texture Name="gMalonChildSkinGradientTex" Offset="0x1718" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="gMalonChildSmilingMouthTex" Offset="0x2B18" Format="rgba16" Width="32" Height="16" />
+        <Texture Name="gMalonChildTalkingMouthTex" Offset="0x2F18" Format="rgba16" Width="32" Height="16" />
+    </File>
+</Root>

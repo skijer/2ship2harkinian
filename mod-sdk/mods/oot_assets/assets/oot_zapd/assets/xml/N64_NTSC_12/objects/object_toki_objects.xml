@@ -1,0 +1,24 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_toki_objects" Segment="6" OutName="oot_object_toki_objects" Game="OOT">
+        <DList Name="object_toki_objects_DL_000880" Offset="0x880" />
+        <DList Name="object_toki_objects_DL_0009C0" Offset="0x9C0" />
+        <DList Name="object_toki_objects_DL_001BD0" Offset="0x1BD0" />
+        <DList Name="object_toki_objects_DL_0028E0" Offset="0x28E0" />
+        <DList Name="object_toki_objects_DL_007440" Offset="0x7440" />
+        <DList Name="object_toki_objects_DL_007578" Offset="0x7578" />
+        <DList Name="object_toki_objects_DL_007E20" Offset="0x7E20" />
+        <DList Name="object_toki_objects_DL_007EE0" Offset="0x7EE0" />
+        <DList Name="object_toki_objects_DL_008190" Offset="0x8190" />
+        <DList Name="object_toki_objects_DL_008390" Offset="0x8390" />
+        <Texture Name="object_toki_objects_Tex_000000" Offset="0x0" Format="i8" Width="32" Height="64" />
+        <Texture Name="object_toki_objects_Tex_000A30" Offset="0xA30" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_toki_objects_Tex_000C30" Offset="0xC30" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="object_toki_objects_Tex_002DC0" Offset="0x2DC0" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="object_toki_objects_Tex_0035C0" Offset="0x35C0" Format="ia8" Width="64" Height="32" />
+        <Texture Name="object_toki_objects_Tex_003DC0" Offset="0x3DC0" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="object_toki_objects_Tex_0045C0" Offset="0x45C0" Format="i4" Width="64" Height="128" />
+        <Texture Name="object_toki_objects_Tex_0055C0" Offset="0x55C0" Format="rgba16" Width="32" Height="64" />
+        <Texture Name="object_toki_objects_Tex_006FC0" Offset="0x6FC0" Format="rgba16" Width="16" Height="16" />
+    </File>
+</Root>

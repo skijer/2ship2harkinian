@@ -1,0 +1,6 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_gi_bracelet" Segment="6" OutName="oot_object_gi_bracelet" Game="OOT">
+        <DList Name="gGiGoronBraceletDL" Offset="0x0960" />
+    </File>
+</Root>

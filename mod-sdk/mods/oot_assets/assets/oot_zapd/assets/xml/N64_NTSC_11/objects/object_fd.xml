@@ -1,0 +1,96 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_fd" Segment="6" OutName="oot_object_fd" Game="OOT">
+        <DList Name="gVolvagiaBodySeg10DL" Offset="0x7E10" />
+        <DList Name="gVolvagiaBodySeg11DL" Offset="0x7E70" />
+        <DList Name="gVolvagiaBodySeg12DL" Offset="0x7ED0" />
+        <DList Name="gVolvagiaBodySeg13DL" Offset="0x7F30" />
+        <DList Name="gVolvagiaBodySeg14DL" Offset="0x7F90" />
+        <DList Name="gVolvagiaBodySeg15DL" Offset="0x7FF0" />
+        <DList Name="gVolvagiaBodySeg16DL" Offset="0x8038" />
+        <DList Name="gVolvagiaBodySeg17DL" Offset="0x8080" />
+        <DList Name="gVolvagiaBodySeg18DL" Offset="0x80D8" />
+        <DList Name="gVolvagiaBodySeg1DL" Offset="0x79A0" />
+        <DList Name="gVolvagiaBodySeg2DL" Offset="0x7AC0" />
+        <DList Name="gVolvagiaBodySeg3DL" Offset="0x7B70" />
+        <DList Name="gVolvagiaBodySeg4DL" Offset="0x7BD0" />
+        <DList Name="gVolvagiaBodySeg5DL" Offset="0x7C30" />
+        <DList Name="gVolvagiaBodySeg6DL" Offset="0x7C90" />
+        <DList Name="gVolvagiaBodySeg7DL" Offset="0x7CF0" />
+        <DList Name="gVolvagiaBodySeg8DL" Offset="0x7D50" />
+        <DList Name="gVolvagiaBodySeg9DL" Offset="0x7DB0" />
+        <Skeleton Name="gVolvagiaBodySkel" Offset="0x10020" Type="Flex" LimbType="Standard" />
+        <Animation Name="gVolvagiaBodyStaticAnim" Offset="0x61D8" />
+        <Texture Name="gVolvagiaBodyTex" Offset="0x8128" Format="rgba16" Width="32" Height="64" />
+        <DList Name="gVolvagiaBrokenFaceDL" Offset="0x59F8" />
+        <DList Name="gVolvagiaDL_009668" Offset="0x9668" />
+        <DList Name="gVolvagiaDebrisMaterialDL" Offset="0xD3A0" />
+        <DList Name="gVolvagiaDebrisModelDL" Offset="0xD420" />
+        <DList Name="gVolvagiaDustMaterialDL" Offset="0xB3A8" />
+        <DList Name="gVolvagiaDustModelDL" Offset="0xB3C8" />
+        <DList Name="gVolvagiaEmberMaterialDL" Offset="0xA880" />
+        <DList Name="gVolvagiaEmberModelDL" Offset="0xA900" />
+        <Texture Name="gVolvagiaEyeClosedTex" Offset="0x3CA8" Format="i8" Width="32" Height="32" />
+        <Texture Name="gVolvagiaEyeHalfTex" Offset="0x34A8" Format="i8" Width="32" Height="32" />
+        <Texture Name="gVolvagiaEyeOpenTex" Offset="0x38A8" Format="i8" Width="32" Height="32" />
+        <Animation Name="gVolvagiaHeadEmergeAnim" Offset="0x101E4" />
+        <Skeleton Name="gVolvagiaHeadSkel" Offset="0x10260" Type="Normal" LimbType="Standard" />
+        <DList Name="gVolvagiaJawboneDL" Offset="0xD0A0" />
+        <Animation Name="gVolvagiaLeftArmEmergeAnim" Offset="0x10064" />
+        <Skeleton Name="gVolvagiaLeftArmSkel" Offset="0x100E0" Type="Normal" LimbType="Standard" />
+        <DList Name="gVolvagiaManeMaterialDL" Offset="0x9168" />
+        <DList Name="gVolvagiaManeModelDL" Offset="0x91E8" />
+        <DList Name="gVolvagiaPlatformDL" Offset="0x240" />
+        <DList Name="gVolvagiaRibsDL" Offset="0xB2F8" />
+        <Animation Name="gVolvagiaRightArmEmergeAnim" Offset="0x10124" />
+        <Skeleton Name="gVolvagiaRightArmSkel" Offset="0x101A0" Type="Normal" LimbType="Standard" />
+        <DList Name="gVolvagiaRockDL" Offset="0x9F20" />
+        <DList Name="gVolvagiaSkullDL" Offset="0xCBC8" />
+        <DList Name="gVolvagiaSkullPieceMaterialDL" Offset="0xD668" />
+        <DList Name="gVolvagiaSkullPieceModelDL" Offset="0xD6E8" />
+        <Texture Name="object_fdTLUT_000438" Offset="0x438" Format="rgba16" Width="4" Height="4" />
+        <Texture Name="object_fdTLUT_000A58" Offset="0xA58" Format="rgba16" Width="4" Height="4" />
+        <Texture Name="object_fdTLUT_0032A8" Offset="0x32A8" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_000458" Offset="0x458" Format="ci4" Width="32" Height="32" TlutOffset="0x438" />
+        <Texture Name="object_fdTex_000658" Offset="0x658" Format="ci4" Width="32" Height="64" TlutOffset="0x438" />
+        <Texture Name="object_fdTex_000A78" Offset="0xA78" Format="ci4" Width="32" Height="32" TlutOffset="0xA58" />
+        <Texture Name="object_fdTex_0040A8" Offset="0x40A8" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="object_fdTex_0048A8" Offset="0x48A8" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="object_fdTex_0050A8" Offset="0x50A8" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_0052A8" Offset="0x52A8" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_0054A8" Offset="0x54A8" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_0056A8" Offset="0x56A8" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_005B60" Offset="0x5B60" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_005D60" Offset="0x5D60" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_005F60" Offset="0x5F60" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_009208" Offset="0x9208" Format="i8" Width="16" Height="16" />
+        <Texture Name="object_fdTex_009780" Offset="0x9780" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_009980" Offset="0x9980" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_00A050" Offset="0xA050" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="object_fdTex_00A918" Offset="0xA918" Format="i8" Width="16" Height="16" />
+        <Texture Name="object_fdTex_00AA18" Offset="0xAA18" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="object_fdTex_00B458" Offset="0xB458" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="object_fdTex_00BC58" Offset="0xBC58" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_00BE58" Offset="0xBE58" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_00C058" Offset="0xC058" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_00D170" Offset="0xD170" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fdTex_00D438" Offset="0xD438" Format="rgba16" Width="16" Height="16" />
+        <DList Name="gVolvagiaHeadSkelLimbsLimb_01023CDL_001DB0" Offset="0x001DB0" />
+        <DList Name="gVolvagiaHeadSkelLimbsLimb_010230DL_0020A8" Offset="0x0020A8" />
+        <DList Name="gVolvagiaHeadSkelLimbsLimb_01020CDL_002180" Offset="0x002180" />
+        <DList Name="gVolvagiaHeadSkelLimbsLimb_010218DL_002358" Offset="0x002358" />
+        <DList Name="gVolvagiaHeadSkelLimbsLimb_010224DL_002420" Offset="0x002420" />
+        <DList Name="gVolvagiaLeftArmSkelLimbsLimb_010080DL_0024E8" Offset="0x0024E8" />
+        <DList Name="gVolvagiaLeftArmSkelLimbsLimb_01008CDL_002678" Offset="0x002678" />
+        <DList Name="gVolvagiaLeftArmSkelLimbsLimb_010098DL_002770" Offset="0x002770" />
+        <DList Name="gVolvagiaLeftArmSkelLimbsLimb_0100A4DL_002850" Offset="0x002850" />
+        <DList Name="gVolvagiaLeftArmSkelLimbsLimb_0100BCDL_002990" Offset="0x002990" />
+        <DList Name="gVolvagiaLeftArmSkelLimbsLimb_0100B0DL_002AD0" Offset="0x002AD0" />
+        <DList Name="gVolvagiaRightArmSkelLimbsLimb_010140DL_002C10" Offset="0x002C10" />
+        <DList Name="gVolvagiaRightArmSkelLimbsLimb_01014CDL_002D10" Offset="0x002D10" />
+        <DList Name="gVolvagiaRightArmSkelLimbsLimb_010158DL_002E08" Offset="0x002E08" />
+        <DList Name="gVolvagiaRightArmSkelLimbsLimb_010170DL_002EE8" Offset="0x002EE8" />
+        <DList Name="gVolvagiaRightArmSkelLimbsLimb_010164DL_003028" Offset="0x003028" />
+        <DList Name="gVolvagiaRightArmSkelLimbsLimb_01017CDL_003168" Offset="0x003168" />
+    </File>
+</Root>

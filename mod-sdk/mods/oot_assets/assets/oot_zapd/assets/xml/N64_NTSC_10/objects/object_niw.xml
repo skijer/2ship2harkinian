@@ -1,0 +1,24 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_niw" Segment="6" OutName="oot_object_niw" Game="OOT">
+        <Animation Name="gCuccoAnim" Offset="0xE8" />
+        <Texture Name="gCuccoBaseFeathersTex" Offset="0x1580" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="gCuccoBeakTex" Offset="0x1600" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="gCuccoClawTex" Offset="0x2080" Format="rgba16" Width="8" Height="16" />
+        <Texture Name="gCuccoCombTex" Offset="0x1680" Format="rgba16" Width="16" Height="16" />
+        <DList Name="gCuccoEffectFeatherMaterialDL" Offset="0x23B0" />
+        <DList Name="gCuccoEffectFeatherModelDL" Offset="0x2428" />
+        <Texture Name="gCuccoEyeTex" Offset="0x1280" Format="rgba16" Width="16" Height="16" />
+        <DList Name="gCuccoHeadDL" Offset="0x0A98" />
+        <Texture Name="gCuccoHeadFeathersTex" Offset="0x1480" Format="rgba16" Width="8" Height="16" />
+        <DList Name="gCuccoLeftFootDL" Offset="0x11E0" />
+        <DList Name="gCuccoLeftWingDL" Offset="0x1128" />
+        <DList Name="gCuccoNeckDL" Offset="0x09C0" />
+        <DList Name="gCuccoRightFootDL" Offset="0x1088" />
+        <DList Name="gCuccoRightWingDL" Offset="0x0FD0" />
+        <Skeleton Name="gCuccoSkel" Offset="0x2530" Type="Flex" LimbType="Standard" />
+        <DList Name="gCuccoTailAndUndersideDL" Offset="0x0DF0" />
+        <Texture Name="gCuccoTailFeathersTex" Offset="0x1880" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="gCuccoTex_2180" Offset="0x2180" Format="rgba16" Width="16" Height="16" />
+    </File>
+</Root>

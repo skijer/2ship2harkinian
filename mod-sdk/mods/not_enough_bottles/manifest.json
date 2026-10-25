@@ -1,0 +1,10 @@
+{
+  "name": "not_enough_bottles",
+  "author": "Skijer",
+  "version": "1.0",
+  "description": "MM: four pairs of bottles, with the Net and Bottomless Bottle in the two remaining cells.",
+  "permissions": [
+    "network"
+  ],
+  "game": "mm"
+}

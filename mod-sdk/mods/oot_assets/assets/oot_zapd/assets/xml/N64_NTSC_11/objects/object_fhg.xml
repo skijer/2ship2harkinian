@@ -1,0 +1,59 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_fhg" Segment="6" OutName="oot_object_fhg" Game="OOT">
+        <DList Name="gPhantomEnergyBallDL" Offset="0x10D60" />
+        <Texture Name="gPhantomGanonTitleCardTex" Offset="0x59A0" Format="ia8" Width="128" Height="80" />
+        <Animation Name="gPhantomHorseAirAnim" Offset="0xA5D0" />
+        <Animation Name="gPhantomHorseFenceJumpAnim" Offset="0xAD80" />
+        <Animation Name="gPhantomHorseIdleAnim" Offset="0xD4A0" />
+        <Animation Name="gPhantomHorseLandAnim" Offset="0xB71C" />
+        <Animation Name="gPhantomHorseLeapAnim" Offset="0xB25C" />
+        <Animation Name="gPhantomHorseRearingAnim" Offset="0xC9B8" />
+        <Animation Name="gPhantomHorseRunningAnim" Offset="0xA0C8" />
+        <Skeleton Name="gPhantomHorseSkel" Offset="0x9C98" Type="Normal" LimbType="Skin" />
+        <Animation Name="gPhantomHorseStillAnim" Offset="0x5990" />
+        <Animation Name="gPhantomHorseUnusedRearingAnim" Offset="0x5804" />
+        <DList Name="gPhantomLightningBlastDL" Offset="0xE8F8" />
+        <DList Name="gPhantomLightningDL" Offset="0xF1E0" />
+        <DList Name="gPhantomUnkDL_10CA0" Offset="0xF8A0" />
+        <DList Name="gPhantomUnkDL_FCA0" Offset="0xE8A0" />
+        <DList Name="gPhantomWarpDL" Offset="0xE6A0" />
+        <Texture Name="object_fhgTex_003320" Offset="0x3320" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fhgTex_003520" Offset="0x3520" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fhgTex_003720" Offset="0x3720" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fhgTex_003920" Offset="0x3920" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fhgTex_003B20" Offset="0x3B20" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="object_fhgTex_003BA0" Offset="0x3BA0" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fhgTex_003DA0" Offset="0x3DA0" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fhgTex_003FA0" Offset="0x3FA0" Format="rgba16" Width="16" Height="32" />
+        <Texture Name="object_fhgTex_0043A0" Offset="0x43A0" Format="rgba16" Width="16" Height="8" />
+        <Texture Name="object_fhgTex_0044A0" Offset="0x44A0" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="object_fhgTex_004CA0" Offset="0x4CA0" Format="rgba16" Width="8" Height="16" />
+        <Texture Name="object_fhgTex_004DA0" Offset="0x4DA0" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="object_fhgTex_00D040" Offset="0xBC40" Format="rgba16" Width="4" Height="4" />
+        <Texture Name="object_fhgTex_00D060" Offset="0xBC60" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_fhgTex_00E8B0" Offset="0xD4B0" Format="i4" Width="64" Height="64" />
+        <Texture Name="object_fhgTex_00F0B0" Offset="0xDCB0" Format="i4" Width="64" Height="64" />
+        <Texture Name="object_fhgTex_00FD98" Offset="0xE998" Format="i8" Width="64" Height="32" />
+        <Texture Name="object_fhgTex_010660" Offset="0xF260" Format="i4" Width="32" Height="96" />
+        <Texture Name="object_fhgTex_010D20" Offset="0xF920" Format="i8" Width="32" Height="32" />
+        <Texture Name="object_fhgTex_011120" Offset="0xFD20" Format="i8" Width="64" Height="64" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009954DL_001F50" Offset="0x001F50" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009944DL_002098" Offset="0x002098" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_0099E4DL_002438" Offset="0x002438" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_0099F4DL_002510" Offset="0x002510" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009B24DL_002610" Offset="0x002610" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_0099C4DL_002710" Offset="0x002710" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009B34DL_002810" Offset="0x002810" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_0099D4DL_0028C0" Offset="0x0028C0" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009AA4DL_002970" Offset="0x002970" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009AB4DL_002C48" Offset="0x002C48" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009A94DL_002DE8" Offset="0x002DE8" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009A74DL_002EE8" Offset="0x002EE8" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009A64DL_002F98" Offset="0x002F98" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009A84DL_003098" Offset="0x003098" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009BB4DL_003170" Offset="0x003170" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_009BA4DL_003220" Offset="0x003220" />
+        <DList Name="gPhantomHorseSkelLimbsLimb_0098C4SkinLimbDL_00B730" Offset="0x00B730" />
+    </File>
+</Root>

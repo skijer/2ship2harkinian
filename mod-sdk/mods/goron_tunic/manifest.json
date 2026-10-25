@@ -1,0 +1,10 @@
+{
+  "name": "goron_tunic",
+  "author": "Skijer",
+  "version": "1.0.1",
+  "description": "Daruk's Protection on oot_equipment's Goron Tunic: hold R, three charges and three-minute recharge.",
+  "game": "mm",
+  "dependencies": [
+    "oot_equipment"
+  ]
+}

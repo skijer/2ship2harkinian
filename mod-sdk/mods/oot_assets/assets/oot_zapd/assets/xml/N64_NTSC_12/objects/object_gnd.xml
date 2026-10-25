@@ -1,0 +1,79 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_gnd" Segment="6" OutName="oot_object_gnd" Game="OOT">
+        <Animation Name="gPhantomGanonAirDamageAnim" Offset="0x108D8" />
+        <Animation Name="gPhantomGanonAnim_003854" Offset="0x3854" />
+        <Animation Name="gPhantomGanonAnim_00CC84" Offset="0xCC84" />
+        <Animation Name="gPhantomGanonAnim_00D398" Offset="0xD398" />
+        <Animation Name="gPhantomGanonAnim_012320" Offset="0x12320" />
+        <DList Name="gPhantomGanonBarsDL" Offset="0x12AB0" />
+        <Animation Name="gPhantomGanonBlockAnim" Offset="0x10344" />
+        <Animation Name="gPhantomGanonChargeAnim" Offset="0x1267C" />
+        <Animation Name="gPhantomGanonChargeStartAnim" Offset="0x11F44" />
+        <Animation Name="gPhantomGanonChargeWindupAnim" Offset="0x129E0" />
+        <Animation Name="gPhantomGanonDeathBlowAnim" Offset="0x90C" />
+        <Texture Name="gPhantomGanonEyeTLUT" Offset="0x3CC0" Format="rgba16" Width="16" Height="5" />
+        <Texture Name="gPhantomGanonEyeTex" Offset="0x3DB0" Format="ci8" Width="32" Height="16" TlutOffset="0x3CC0" />
+        <DList Name="gPhantomGanonFaceDL" Offset="0x4EC0" />
+        <Animation Name="gPhantomGanonGroundDamageAnim" Offset="0xFAC8" />
+        <Animation Name="gPhantomGanonHorseRearingAnim" Offset="0x2684" />
+        <Animation Name="gPhantomGanonLastPoseAnim" Offset="0x1AB0" />
+        <Texture Name="gPhantomGanonLimbTex_00A000" Offset="0xA000" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gPhantomGanonLimbTex_00A200" Offset="0xA200" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gPhantomGanonLimbTex_00A400" Offset="0xA400" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gPhantomGanonLimbTex_00A600" Offset="0xA600" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gPhantomGanonLimbTex_00A800" Offset="0xA800" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="gPhantomGanonLimbTex_00A880" Offset="0xA880" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gPhantomGanonLimbTex_00AA80" Offset="0xAA80" Format="rgba16" Width="32" Height="16" />
+        <Texture Name="gPhantomGanonLimbTex_00AE80" Offset="0xAE80" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="gPhantomGanonLimbTex_00AF00" Offset="0xAF00" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="gPhantomGanonLimbTex_00AF80" Offset="0xAF80" Format="rgba16" Width="32" Height="16" />
+        <Texture Name="gPhantomGanonLimbTex_00B380" Offset="0xB380" Format="rgba16" Width="16" Height="32" />
+        <Texture Name="gPhantomGanonLimbTex_00B780" Offset="0xB780" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gPhantomGanonLimbTex_00B980" Offset="0xB980" Format="rgba16" Width="16" Height="8" />
+        <Texture Name="gPhantomGanonLimbTex_00BA80" Offset="0xBA80" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gPhantomGanonLimbTex_00BC80" Offset="0xBC80" Format="rgba16" Width="16" Height="8" />
+        <Texture Name="gPhantomGanonLimbTex_00BD80" Offset="0xBD80" Format="rgba16" Width="16" Height="8" />
+        <Texture Name="gPhantomGanonLimbTex_00BE80" Offset="0xBE80" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gPhantomGanonLimbTex_00C080" Offset="0xC080" Format="rgba16" Width="16" Height="8" />
+        <Texture Name="gPhantomGanonLimbTex_00C180" Offset="0xC180" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="gPhantomGanonLimbTex_00C200" Offset="0xC200" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="gPhantomGanonLimbTex_00C400" Offset="0xC400" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="gPhantomGanonLimbTex_00C480" Offset="0xC480" Format="rgba16" Width="16" Height="8" />
+        <Animation Name="gPhantomGanonLimpAnim" Offset="0xD84" />
+        <Animation Name="gPhantomGanonMaskOnAnim" Offset="0x1144" />
+        <Texture Name="gPhantomGanonMouthTLUT" Offset="0x3D60" Format="rgba16" Width="8" Height="5" />
+        <Texture Name="gPhantomGanonMouthTex" Offset="0x40B0" Format="ci8" Width="16" Height="16" TlutOffset="0x3D60" />
+        <Animation Name="gPhantomGanonNeutralAnim" Offset="0x10060" />
+        <Animation Name="gPhantomGanonReturn1Anim" Offset="0x10FD4" />
+        <Animation Name="gPhantomGanonReturn2Anim" Offset="0x11800" />
+        <Animation Name="gPhantomGanonRideAnim" Offset="0x3CA4" />
+        <Animation Name="gPhantomGanonRidePoseAnim" Offset="0x19A4" />
+        <Animation Name="gPhantomGanonRideSpearRaiseAnim" Offset="0xD99C" />
+        <Animation Name="gPhantomGanonRideSpearResetAnim" Offset="0xDF80" />
+        <Animation Name="gPhantomGanonRideSpearStrikeAnim" Offset="0x3080" />
+        <Animation Name="gPhantomGanonScreamAnim" Offset="0x189C" />
+        <Skeleton Name="gPhantomGanonSkel" Offset="0xC710" Type="Normal" LimbType="Standard" />
+        <Texture Name="gPhantomGanonSmileTex" Offset="0x3FB0" Format="ci8" Width="16" Height="16" TlutOffset="0x3D60" />
+        <Animation Name="gPhantomGanonStunnedAnim" Offset="0x11BCC" />
+        <Animation Name="gPhantomGanonThrowAnim" Offset="0xEC94" />
+        <Animation Name="gPhantomGanonThrowEndAnim" Offset="0xF48C" />
+        <Texture Name="object_gndTex_012B50" Offset="0x12B50" Format="rgba16" Width="16" Height="32" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C628DL_0080F8" Offset="0x0080F8" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C5B0DL_0086F0" Offset="0x0086F0" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C5BCDL_008918" Offset="0x008918" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C5C8DL_0089F0" Offset="0x0089F0" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C61CDL_008BE0" Offset="0x008BE0" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C640DL_009038" Offset="0x009038" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C610DL_009298" Offset="0x009298" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C670DL_009460" Offset="0x009460" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C658DL_009520" Offset="0x009520" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C664DL_009650" Offset="0x009650" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C5F8DL_0097B8" Offset="0x0097B8" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C5ECDL_0099A8" Offset="0x0099A8" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C5E0DL_009A80" Offset="0x009A80" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C6A0DL_009CA8" Offset="0x009CA8" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C694DL_009D68" Offset="0x009D68" />
+        <DList Name="gPhantomGanonSkelLimbsLimb_00C688DL_009ED0" Offset="0x009ED0" />
+    </File>
+</Root>
