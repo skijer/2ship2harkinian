@@ -539,7 +539,8 @@ def translate_manifest(path):
 
 def write_report(destination, source, items):
     lines = [f"# Translation of {source.name}", "",
-             f"Translated from `{source}` by mod-sdk/tools/translate_mod.py. Every line below needs a person.",
+             f"Translated from Shipwright's `mod-sdk/mods/{source.name}` by mod-sdk/tools/translate_mod.py. "
+             "Every line below needs a person.",
              "Fields of OoT actor structs are not checked here: the first build lists those.", ""]
     if not items:
         lines.append("Nothing flagged. Build it and test it in game.")
