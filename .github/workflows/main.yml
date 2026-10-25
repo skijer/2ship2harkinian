@@ -105,6 +105,7 @@ jobs:
         cmake ..
         make
         sudo make install
+    - uses: ./.github/actions/install-sdl2-net
     - name: Generate 2ship.o2r
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
@@ -236,6 +237,9 @@ jobs:
         cmake ..
         make
         sudo make install
+    - uses: ./.github/actions/install-sdl2-net
+    - name: Copy SDL libs to multiarch dir
+      run: sudo cp -av /usr/local/lib/libSDL* /lib/x86_64-linux-gnu/
     - name: Install libzip without crypto
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
