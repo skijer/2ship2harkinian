@@ -44,6 +44,9 @@ jobs:
             platform: darwin
     runs-on: ${{ matrix.os }}
     steps:
+    # Every platform must package byte-identical assets, so Windows checks out without CRLF conversion.
+    - name: Keep line endings as committed
+      run: git config --global core.autocrlf false
     - name: Git Checkout
       uses: actions/checkout@v6
       with:

@@ -173,6 +173,9 @@ jobs:
       contents: read
       actions: read
     steps:
+    # Every platform must package byte-identical assets, so Windows checks out without CRLF conversion.
+    - name: Keep line endings as committed
+      run: git config --global core.autocrlf false
     - name: Checkout the signing tools
       uses: actions/checkout@v6
       with:
