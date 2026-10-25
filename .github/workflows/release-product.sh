@@ -6,7 +6,7 @@ set -euo pipefail
 
 TAG="$1"
 case "$TAG" in
-  *unbound*) echo "product=unbound"; echo "branch=unbound"; echo "title=2Ship: Unbound ${TAG}" ;;
+  *unbound*) echo "product=unbound"; echo "branch=unbound-modapi"; echo "title=2Ship: Unbound ${TAG}" ;;
   *) echo "tag ${TAG} names no product" >&2; exit 1 ;;
 esac
 case "$TAG" in
