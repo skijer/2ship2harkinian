@@ -44,7 +44,7 @@ void RegisterHooksOnce() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveInit>(
         [](s16 fileNum) { ReadAll(nlohmann::json()); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveLoad>([](s16 fileNum) {
-        auto lastRead = sLastReadByFile.find(SaveManager_GetFileName(fileNum));
+        auto lastRead = sLastReadByFile.find(SaveManager_GetFileName(fileNum + 1));
         ReadAll(lastRead == sLastReadByFile.end() ? nlohmann::json() : lastRead->second);
     });
 }
@@ -70,5 +70,10 @@ void SaveSections_Write(nlohmann::json& saveFile, bool isOwlSave) {
 void SaveSections_RememberRead(const std::string& fileName, const nlohmann::json& saveFile, bool isOwlSave) {
     const char* key = VariantKey(isOwlSave);
     const bool present = saveFile.contains("sections") && saveFile["sections"].contains(key);
-    sLastReadByFile[fileName] = present ? saveFile["sections"][key] : nlohmann::json();
+    std::string slotName = fileName;
+    const std::string backupSuffix = "backup.json";
+    if (slotName.ends_with(backupSuffix)) {
+        slotName.replace(slotName.size() - backupSuffix.size(), backupSuffix.size(), ".json");
+    }
+    sLastReadByFile[slotName] = present ? saveFile["sections"][key] : nlohmann::json();
 }

@@ -698,7 +698,25 @@ bool KaleidoMaskEquipment_Update(PlayState* play) {
             }
         }
     }
-    if (page == nullptr) return false;
+    if (page == nullptr) {
+        if (pause->cursorSpecialPos == 0 &&
+            (std::abs(pause->stickAdjX) > StickThreshold || std::abs(pause->stickAdjY) > StickThreshold)) {
+            const int dx = pause->stickAdjX > StickThreshold ? 1 : pause->stickAdjX < -StickThreshold ? -1 : 0;
+            const int dy = dx ? 0 : pause->stickAdjY > StickThreshold ? 1 : -1;
+            const int old = pause->cursorPoint[PAUSE_MASK];
+            const int next = SpatialCell(UINT16_MAX, old, dx, dy);
+            if (next != old) {
+                pause->cursorPoint[PAUSE_MASK] = pause->cursorSlot[PAUSE_MASK] = next;
+                pause->cursorXIndex[PAUSE_MASK] = next % GridColumns;
+                pause->cursorYIndex[PAUSE_MASK] = next / GridColumns;
+                PlayPauseSfx(NA_SE_SY_CURSOR);
+            } else if (dx) {
+                KaleidoScope_MoveCursorToSpecialPos(play, dx < 0 ? PAUSE_CURSOR_PAGE_LEFT : PAUSE_CURSOR_PAGE_RIGHT);
+            }
+            pause->stickAdjX = pause->stickAdjY = 0;
+        }
+        return false;
+    }
     int slot = std::clamp<int>(pause->cursorPoint[PAUSE_MASK], 0, SlotCount - 1);
     if (pause->cursorSpecialPos != 0) {
         if ((pause->cursorSpecialPos == PAUSE_CURSOR_PAGE_LEFT && pause->stickAdjX > StickThreshold) ||

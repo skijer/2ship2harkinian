@@ -4906,6 +4906,10 @@ s32 Inventory_HasItemInBottle(u8 item) {
 
 // #region 2S2H [Dpad]
 void Inventory_Dpad_UpdateBottleItem(PlayState* play, u8 item, u8 btn) {
+    if (!GameInteractor_Should(VB_UPDATE_BOTTLE_ITEM, true, DPAD_TO_HELD_ITEM(btn), item)) {
+        GameInteractor_ExecuteOnBottleContentsUpdate(item);
+        return;
+    }
     gSaveContext.save.saveInfo.inventory.items[DPAD_GET_CUR_FORM_BTN_SLOT(btn)] = item;
     DPAD_SET_CUR_FORM_BTN_ITEM(btn, item);
 
@@ -4923,9 +4927,11 @@ void Inventory_Dpad_UpdateBottleItem(PlayState* play, u8 item, u8 btn) {
 // #endregion
 
 void Inventory_UpdateBottleItem(PlayState* play, u8 item, u8 btn) {
-    if (GameInteractor_Should(VB_UPDATE_BOTTLE_ITEM, true, btn, item)) {
-        gSaveContext.save.saveInfo.inventory.items[GET_CUR_FORM_BTN_SLOT(btn)] = item;
+    if (!GameInteractor_Should(VB_UPDATE_BOTTLE_ITEM, true, btn, item)) {
+        GameInteractor_ExecuteOnBottleContentsUpdate(item);
+        return;
     }
+    gSaveContext.save.saveInfo.inventory.items[GET_CUR_FORM_BTN_SLOT(btn)] = item;
     SET_CUR_FORM_BTN_ITEM(btn, item);
 
     Interface_LoadItemIconImpl(play, btn);

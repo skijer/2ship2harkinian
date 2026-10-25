@@ -9,6 +9,7 @@
 #include "2s2h/Rando/Rando.h"
 
 #include <set>
+#include <chrono>
 #include <map>
 #include <string>
 #include <vector>
@@ -48,6 +49,7 @@ typedef struct AnchorClient {
     uint8_t leftHandType;
     int8_t currentShield;
     uint8_t sheathType;
+    uint8_t modelGroup = PLAYER_MODELGROUP_DEFAULT;
     int8_t heldItemAction;
     uint8_t heldItemId;
     int8_t itemAction;
@@ -78,6 +80,7 @@ typedef struct {
 
 class Anchor : public Network {
   private:
+    std::chrono::steady_clock::time_point connectedAt;
     std::atomic<bool> connectionChanged{false};
     bool isProcessingIncomingPacket = false;
     bool refreshingActors = false;

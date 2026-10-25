@@ -53,6 +53,7 @@ void Anchor::SendPacket_PlayerUpdate() {
     payload["leftHandType"] = player->leftHandType;
     payload["currentShield"] = player->currentShield;
     payload["sheathType"] = player->sheathType;
+    payload["modelGroup"] = player->modelGroup;
     payload["heldItemAction"] = player->heldItemAction;
     payload["heldItemId"] = player->heldItemId;
     payload["itemAction"] = player->itemAction;
@@ -120,8 +121,15 @@ void Anchor::HandlePacket_PlayerUpdate(nlohmann::json payload) {
         client.currentShield = payload.value("currentShield", (int8_t)0);
         client.sheathType = payload.value("sheathType", (uint8_t)0);
         client.heldItemAction = payload.value("heldItemAction", (int8_t)0);
+        if (!client.heldCustomItemKey.empty()) {
+            client.heldItemAction = PLAYER_IA_CUSTOM;
+        }
         client.heldItemId = payload.value("heldItemId", (uint8_t)0);
         client.itemAction = payload.value("itemAction", (int8_t)0);
+        client.modelGroup = payload.value("modelGroup", (uint8_t)PLAYER_MODELGROUP_DEFAULT);
+        if (client.modelGroup >= PLAYER_MODELGROUP_MAX) {
+            client.modelGroup = PLAYER_MODELGROUP_DEFAULT;
+        }
         client.stateFlags1 = payload.value("stateFlags1", (uint32_t)0);
         client.stateFlags2 = payload.value("stateFlags2", (uint32_t)0);
         client.stateFlags3 = payload.value("stateFlags3", (uint32_t)0);

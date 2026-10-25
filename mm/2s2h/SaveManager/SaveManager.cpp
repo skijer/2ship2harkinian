@@ -554,8 +554,6 @@ extern "C" s32 SaveManager_SysFlashrom_ReadData(void* saveBuffer, u32 pageNum, u
         return -1;
     }
 
-    SaveSections_RememberRead(fileName, j, isOwlSave);
-
     if (isOwlSave) {
         if (!j.contains("owlSave")) {
             return -1;
@@ -570,6 +568,7 @@ extern "C" s32 SaveManager_SysFlashrom_ReadData(void* saveBuffer, u32 pageNum, u
             saveContext.save.saveInfo.checksum = Sram_CalcChecksum(&saveContext, offsetof(SaveContext, fileNum));
 
             memcpy(saveBuffer, &saveContext, offsetof(SaveContext, fileNum));
+            SaveSections_RememberRead(fileName, j, true);
             return 0;
         } catch (nlohmann::json::exception& je) {
             SPDLOG_ERROR("Failed to parse owl save json: {}", je.what());
@@ -595,6 +594,7 @@ extern "C" s32 SaveManager_SysFlashrom_ReadData(void* saveBuffer, u32 pageNum, u
             save.saveInfo.checksum = Sram_CalcChecksum(&save, sizeof(Save));
 
             memcpy(saveBuffer, &save, sizeof(Save));
+            SaveSections_RememberRead(fileName, j, false);
             return 0;
         } catch (nlohmann::json::exception& je) {
             SPDLOG_ERROR("Failed to parse new cycle save json: {}", je.what());

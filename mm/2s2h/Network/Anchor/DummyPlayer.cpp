@@ -152,12 +152,12 @@ void DummyPlayer_Update(Actor* actor, PlayState* play) {
     player->unk_ACC = client.unk_ACC;
     player->invincibilityTimer = client.invincibilityTimer;
 
-    PlayerItemAction modelItemAction =
-        (PlayerItemAction)(player->itemAction > PLAYER_IA_MINUS1 ? player->itemAction : player->heldItemAction);
-    if (modelItemAction < PLAYER_IA_NONE || modelItemAction >= PLAYER_IA_MAX) {
-        modelItemAction = PLAYER_IA_NONE;
-    }
-    Player_SetModels(player, Player_ActionToModelGroup(player, modelItemAction));
+    // Custom items share one action, so use the sender's actual model group.
+    Player_SetModelGroup(player, (PlayerModelGroup)client.modelGroup);
+    player->rightHandType = client.rightHandType;
+    player->leftHandType = client.leftHandType;
+    player->sheathType = client.sheathType;
+    player->itemAction = client.itemAction;
 
     if (Anchor::Instance->roomState.pvpMode == 0 ||
         (Anchor::Instance->roomState.pvpMode == 1 &&

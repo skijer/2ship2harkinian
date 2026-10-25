@@ -2590,12 +2590,31 @@ static void DrawModInventoryEditor() {
         ImVec2 size(cell.width*scale,cell.height*scale);
         ImGui::SetCursorScreenPos(pos);ImGui::PushID(slot);
         if(ImGui::InvisibleButton("Cell",size)) ImGui::OpenPopup("Edit cell wheel");
+        if (ImGui::BeginDragDropSource()) {
+            const uint32_t source = (static_cast<uint32_t>(page) << 8) | slot;
+            ImGui::SetDragDropPayload("S2H_MOD_LAYOUT_CELL", &source, sizeof(source));
+            ImGui::Text("Move cell %d", slot + 1);
+            ImGui::EndDragDropSource();
+        }
         draw->AddRectFilled(pos,ImVec2(pos.x+size.x,pos.y+size.y),ImGui::GetColorU32(ImGuiCol_FrameBg),3);
         draw->AddRect(pos,ImVec2(pos.x+size.x,pos.y+size.y),ImGui::GetColorU32(ImGuiCol_Border),3);
-        if (!(screen==2 && pageNumber==0) && ImGui::BeginDragDropTarget()) {
-            if(const auto* payload=ImGui::AcceptDragDropPayload("S2H_MOD_LAYOUT_ITEM")) {
+        if (ImGui::BeginDragDropTarget()) {
+            if(const auto* payload=ImGui::AcceptDragDropPayload("S2H_MOD_LAYOUT_ITEM");
+               payload != nullptr && !(screen==2 && pageNumber==0)) {
                 S2HCustomItemPlacement p={page,static_cast<uint8_t>(slot)};
                 KaleidoItemManager_SetPlacement(static_cast<const char*>(payload->Data),&p);
+            }
+            if (const auto* payload = ImGui::AcceptDragDropPayload("S2H_MOD_LAYOUT_CELL")) {
+                const uint32_t source = *static_cast<const uint32_t*>(payload->Data);
+                const uint16_t sourcePage = source >> 8;
+                const uint8_t sourceSlot = source & 255;
+                if (sourcePage == page && sourceSlot != slot) {
+                    S2HLayoutCell from;
+                    if (ModLayout_GetCell(page, sourceSlot, &from)) {
+                        ModLayout_SetCell(page, sourceSlot, &cell);
+                        ModLayout_SetCell(page, slot, &from);
+                    }
+                }
             }
             ImGui::EndDragDropTarget();
         }
@@ -2625,8 +2644,7 @@ static void DrawModInventoryEditor() {
                 if(slot==6 && shield)item=ITEM_SHIELD_HERO+shield-1;
             } else {
                 const int nativeSlot=slot+(screen==2?ITEM_NUM_SLOTS:0);
-                if(nativeSlot<=SLOT_MASK_FIERCE_DEITY && !safeItemsForInventorySlot[nativeSlot].empty())
-                    item=safeItemsForInventorySlot[nativeSlot].front();
+                if(nativeSlot<=SLOT_MASK_FIERCE_DEITY) item=gSaveContext.save.saveInfo.inventory.items[nativeSlot];
             }
             if(item!=ITEM_NONE&&item<ITEM_CUSTOM) {
                 auto gui=std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());

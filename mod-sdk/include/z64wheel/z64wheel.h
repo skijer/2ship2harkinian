@@ -518,7 +518,7 @@ static inline void Z64Wheel_Draw(PlayState* play) {
     }
 }
 
-static inline void Z64Wheel_OnLoadFile(int32_t fileNum) {
+static inline void Z64Wheel_OnLoadFile(int16_t fileNum) {
     Z64Wheel_Load();
 }
 
@@ -526,7 +526,7 @@ static inline void Z64Wheel_OnInterfaceDrawEnd(PlayState* play) {
     Z64Wheel_Draw(play);
 }
 
-static inline void Z64Wheel_OnPlayerUpdate(void) {
+static inline void Z64Wheel_OnPlayerUpdate(Player* player) {
     Z64Wheel_Update();
 }
 

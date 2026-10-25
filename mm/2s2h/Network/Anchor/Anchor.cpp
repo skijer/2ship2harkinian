@@ -20,10 +20,13 @@ extern PlayState* gPlayState;
 // MARK: - Overrides
 
 void Anchor::Enable() {
-    Network::Enable(CVarGetString("gNetwork.Anchor.Host", "anchor.proxysaw.dev"),
-                    CVarGetInteger("gNetwork.Anchor.Port", 43383));
+    if (isEnabled) {
+        return;
+    }
     ownClientId = CVarGetInteger("gNetwork.Anchor.LastClientId", 0);
     roomState.ownerClientId = 0;
+    Network::Enable(CVarGetString("gNetwork.Anchor.Host", "anchor.proxysaw.dev"),
+                    CVarGetInteger("gNetwork.Anchor.Port", 43383));
 }
 
 void Anchor::Disable() {
@@ -34,6 +37,7 @@ void Anchor::Disable() {
 }
 
 void Anchor::OnConnected() {
+    connectedAt = std::chrono::steady_clock::now();
     SendPacket_Handshake();
     connectionChanged = true;
 
@@ -41,6 +45,12 @@ void Anchor::OnConnected() {
 }
 
 void Anchor::OnDisconnected() {
+    // A shared config can make another session take over this client ID.
+    constexpr auto TakeoverWindow = std::chrono::seconds(10);
+    if (std::chrono::steady_clock::now() - connectedAt < TakeoverWindow) {
+        SPDLOG_WARN("[Anchor] Closed right after connecting; another client may be using id {}", ownClientId);
+        ownClientId = 0;
+    }
     connectionChanged = true;
 }
 
