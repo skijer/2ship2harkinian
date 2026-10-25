@@ -72,7 +72,7 @@ def main():
             draw.line((project(points[parent]),project(points[i])),fill='#176b96',width=3)
         hand=10 if age=='child' else 13
         x,y=project(points[hand]);draw.ellipse((x-4,y-4,x+4,y+4),fill='#d97b16')
-    image.save(HERE/'retarget-preview.png')
+    image.save(HERE/'assets/retarget-preview.png')
     print(f'PASS: 20 clips, both 19-joint rigs, original durations, all frames; max matrix error {maximum:.6f}; bow topology valid')
 
 if __name__=='__main__':main()
