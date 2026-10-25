@@ -169,6 +169,10 @@ S2HRandoInfBank RandoInfCustom_GetActiveBank() {
     return sActiveBank;
 }
 
+bool RandoInfCustom_IsLogicSimulation(void) {
+    return sActiveBank == S2H_RANDO_INF_LOGIC;
+}
+
 std::vector<std::string> RandoInfCustom_ListSet() {
     std::vector<std::string> keys = sKeysOfUnloadedMods;
     for (uint16_t flag = 1; flag <= sKeys.size(); ++flag) {

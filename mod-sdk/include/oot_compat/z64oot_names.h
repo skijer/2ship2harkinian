@@ -14,6 +14,7 @@
 #include "oot_rando.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/actors/ovl_En_Arrow/z_en_arrow.h"
+#include "z64quake.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -277,6 +278,14 @@ static inline void Z64Items_SetAge(S2HCustomItemDefinition* definition, SOHCusto
 #define Quake_Add Quake_Request
 #define Quake_SetQuakeValues Quake_SetPerturbations
 #define Quake_SetCountdown Quake_SetDuration
+// OoT's named textbox types share MM's numbering.
+#define TEXTBOX_TYPE_BLACK TEXTBOX_TYPE_0
+#define TEXTBOX_TYPE_WOODEN TEXTBOX_TYPE_1
+#define TEXTBOX_TYPE_BLUE TEXTBOX_TYPE_2
+#define TEXTBOX_TYPE_OCARINA TEXTBOX_TYPE_3
+#define TEXTBOX_TYPE_NONE_BOTTOM TEXTBOX_TYPE_4
+#define TEXTBOX_TYPE_NONE_NO_SHADOW TEXTBOX_TYPE_5
+#define TEXTBOX_TYPE_CREDITS TEXTBOX_TYPE_B
 #define Gfx_SetupDL_27Xlu Gfx_SetupDL27_Xlu
 #define SEGMENTED_TO_VIRTUAL(x) Lib_SegmentedToVirtual((void*)(x))
 #define Matrix_ToMtx OotCompat_Matrix_ToMtx

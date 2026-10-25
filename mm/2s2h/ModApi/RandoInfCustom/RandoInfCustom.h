@@ -27,6 +27,7 @@ void RandoInfCustom_ClearBank(S2HRandoInfBank bank);
 
 bool RandoInfCustom_GetByKey(const char* key);
 void RandoInfCustom_SetByKey(const char* key, bool state);
+bool RandoInfCustom_IsLogicSimulation(void);
 
 #ifdef __cplusplus
 }
