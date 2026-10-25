@@ -9,7 +9,7 @@
 #include "variables.h"
 #include "objects/oot_gameplay_keep/gameplay_keep.h"
 #include "overlays/effects/ovl_Effect_Ss_Hahen/z_eff_ss_hahen.h"
-#include "overlays/effects/ovl_Effect_Ss_HitMark/z_eff_ss_hitmark.h"
+#include "overlays/effects/ovl_Effect_Ss_Hitmark/z_eff_ss_hitmark.h"
 
 #include "object_lynel_assets.h"
 #include "object_lynel_assets.inc.c"
