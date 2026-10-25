@@ -9,7 +9,6 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
-#include "message_data_textbox_types.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/ModApi/ModMenu/ModUI.h"
 #include "soh/Enhancements/randomizer/randomizerEnums.h"

@@ -9,7 +9,6 @@
 #include "macros.h"
 #include "align_asset_macro.h"
 #include "variables.h"
-#include "message_data_textbox_types.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 #include "objects/oot_object_ganon/object_ganon.h"
