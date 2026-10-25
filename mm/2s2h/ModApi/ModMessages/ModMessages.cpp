@@ -120,9 +120,9 @@ uint8_t ModMessages_RegisterTatlHint(const char* actorKey, const char* hint) {
     const uint8_t hintId = sNextTatlHintId++;
     const uint16_t textId = TatlHintTextBase + hintId;
 
-    CustomMessage::Entry entry;
-    entry.msg = hint;
-    sMessages.emplace(textId, std::move(entry));
+    ModMessage stored;
+    stored.entry.msg = hint;
+    sMessages.emplace(textId, std::move(stored));
     sTatlHintIdsByActor.emplace(actorKey, hintId);
     GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnOpenText>(textId, LoadMessage);
     return hintId;

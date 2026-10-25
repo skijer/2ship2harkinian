@@ -5,6 +5,7 @@
  */
 
 #include "global.h"
+#include "libc/assert.h"
 #include "z64horse.h"
 #include "z64malloc.h"
 #include "z64quake.h"
