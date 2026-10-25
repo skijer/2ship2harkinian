@@ -16,8 +16,10 @@ struct Table {
     std::vector<MessageTableEntry> entries;
     std::unordered_map<u16, size_t> indices;
 };
-Table normal, staff;
-bool initialized = false;
+// Not "normal": macOS MacTypes.h declares an enumerator of that name.
+Table sMessageTable;
+Table sCreditsTable;
+bool sInitialized = false;
 std::string TextBytes(const std::string& text) {
     std::string result;
     for (size_t i = 0; i < text.size();) {
@@ -109,17 +111,20 @@ void Load(Table& table, const char* binary, const char* jsonPath, bool credits) 
 }
 }
 extern "C" MessageTableEntry* OTRMessage_Find(MessageTableEntry* entries, u16 id) {
-    Table* table = entries == normal.entries.data() ? &normal : entries == staff.entries.data() ? &staff : nullptr;
+    Table* table = entries == sMessageTable.entries.data()   ? &sMessageTable
+                   : entries == sCreditsTable.entries.data() ? &sCreditsTable
+                                                             : nullptr;
     if (!table) { return nullptr; }
     const auto found = table->indices.find(id);
     return found == table->indices.end() ? &table->entries.front() : &table->entries[found->second];
 }
 extern "C" void OTRMessage_Init() {
-    if (!initialized) {
-        Load(normal, "text/message_data_static/message_data_static", "text/eng/messages.json", false);
-        Load(staff, "text/staff_message_data_static/staff_message_data_static", "text/staff/messages.json", true);
-        initialized = true;
+    if (!sInitialized) {
+        Load(sMessageTable, "text/message_data_static/message_data_static", "text/eng/messages.json", false);
+        Load(sCreditsTable, "text/staff_message_data_static/staff_message_data_static", "text/staff/messages.json",
+             true);
+        sInitialized = true;
     }
-    sMessageTableNES = normal.entries.data();
-    sMessageTableCredits = staff.entries.data();
+    sMessageTableNES = sMessageTable.entries.data();
+    sMessageTableCredits = sCreditsTable.entries.data();
 }
