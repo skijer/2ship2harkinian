@@ -41,6 +41,7 @@ bool ProgressiveItems_GiveRando(int32_t item);
 void ProgressiveItems_ResetLogic(void);
 #ifdef __cplusplus
 }
+#ifndef S2H_MOD
 #include <vector>
 #include <nlohmann/json.hpp>
 #include "2s2h/Rando/Types.h"
@@ -54,5 +55,6 @@ void ProgressiveItems_ConfigurePool(const std::vector<RandoItemId>& pool);
 void ProgressiveItems_ResetLogic();
 bool ProgressiveItems_IsSource(int32_t item);
 bool ProgressiveItems_CheckObtainability(int32_t item, bool* result);
+#endif
 #endif
 #endif
