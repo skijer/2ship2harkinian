@@ -77,7 +77,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         RUN_ID: ${{ inputs.run_id }}
       run: |
-        for name in 2ship-windows 2ship-mac 2ship-linux; do
+        for name in 2ship-windows 2ship-mac 2ship-linux 2ship-unbound-unsafe-windows 2ship-unbound-unsafe-mac 2ship-unbound-unsafe-linux; do
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$name" --dir "rel/$name"
         done
     - name: Package and describe the release
@@ -86,11 +86,7 @@ jobs:
         VERSION: ${{ steps.facts.outputs.version }}
         S2H_RELEASE_SIGNING_KEY: ${{ secrets.S2H_RELEASE_SIGNING_KEY }}
       run: |
-        mkdir -p dist
-        (cd rel/2ship-windows && zip -qr "../../dist/2Ship-${TAG}-Win64.zip" .)
-        cp rel/2ship-mac/2Ship.dmg "dist/2Ship-${TAG}-Mac.dmg"
-        cp rel/2ship-linux/2ship.appimage "dist/2Ship-${TAG}-Linux.appimage"
-        cp rel/2ship-windows/2ship.lib dist/2ship.lib
+        bash .github/workflows/package-release.sh "$TAG"
         BASE="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG"
         python mod-sdk/tools/release_manifest.py build --version "$VERSION" \
                --page "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" --release-base "$BASE" \
@@ -104,8 +100,9 @@ jobs:
         TAG: ${{ steps.facts.outputs.tag }}
         SHA: ${{ steps.run.outputs.sha }}
       run: |
+        sed "s|{{TAG}}|$TAG|g" .github/release-notes/unbound.md > release-notes.md
         gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$SHA" --draft \
-           --title "2Ship: Unbound $TAG" --notes-file .github/release-notes/unbound.md --generate-notes
+           --title "2Ship: Unbound $TAG" --notes-file release-notes.md --generate-notes
 
   rebuild-mods:
     needs: draft

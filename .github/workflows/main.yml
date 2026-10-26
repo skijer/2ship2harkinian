@@ -431,14 +431,7 @@ jobs:
         path: rel
     - name: Package release assets
       run: |
-        mkdir -p dist
-        cp "rel/2ship-mac/2Ship.dmg" "dist/2Ship-${TAG}-Mac.dmg"
-        cp "rel/2ship-linux/2ship.appimage" "dist/2Ship-${TAG}-Linux.appimage"
-        (cd rel/2ship-windows && zip -r "../../dist/2Ship-${TAG}-Win64.zip" .)
-        cp "rel/2ship-windows/2ship.lib" "dist/2ship.lib"
-        cp "rel/2ship-unbound-unsafe-mac/2Ship-unbound-unsafe.dmg" "dist/2Ship-${TAG}-Mac-unsafe-mods.dmg"
-        cp "rel/2ship-unbound-unsafe-linux/2ship-unbound-unsafe.appimage" "dist/2Ship-${TAG}-Linux-unsafe-mods.appimage"
-        (cd rel/2ship-unbound-unsafe-windows && zip -r "../../dist/2Ship-${TAG}-Win64-unsafe-mods.zip" .)
+        bash .github/workflows/package-release.sh "$TAG"
     - name: Publish GitHub Release
       env:
         GH_TOKEN: ${{ github.token }}
@@ -450,6 +443,9 @@ jobs:
         NOTES_FILE=".github/release-notes/${PRODUCT}.md"
         ARGS=(--title "$TITLE" --generate-notes)
         [ -n "$PREV" ] && ARGS+=(--notes-start-tag "$PREV")
-        [ -f "$NOTES_FILE" ] && ARGS+=(--notes-file "$NOTES_FILE")
+        if [ -f "$NOTES_FILE" ]; then
+          sed "s|{{TAG}}|$TAG|g" "$NOTES_FILE" > release-notes.md
+          ARGS+=(--notes-file release-notes.md)
+        fi
         [ "$DRAFT" = true ] && ARGS+=(--draft)
         gh release create "$TAG" dist/* "${ARGS[@]}"
