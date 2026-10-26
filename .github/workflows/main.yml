@@ -449,3 +449,21 @@ jobs:
         fi
         [ "$DRAFT" = true ] && ARGS+=(--draft)
         gh release create "$TAG" dist/* "${ARGS[@]}"
+
+  record-download-source:
+    needs: [build-macos, build-linux, build-windows]
+    if: github.ref_name == 'unbound-modapi' && !inputs.tag && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    runs-on: ubuntu-22.04
+    permissions: {}
+    steps:
+    - name: Record the built commit for rolling downloads
+      env:
+        PROJECT: 2ship
+      run: |
+        jq -n --arg project "$PROJECT" --arg repository "$GITHUB_REPOSITORY" --arg commit "$GITHUB_SHA" \
+          --argjson run_id "$GITHUB_RUN_ID" '{project: $project, repository: $repository, commit: $commit, run_id: $run_id}' > download-source.json
+    - uses: actions/upload-artifact@v7
+      with:
+        name: unbound-download-source
+        path: download-source.json
+        retention-days: 7
