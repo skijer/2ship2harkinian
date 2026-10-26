@@ -2,7 +2,8 @@ name: generate-builds
 # 2S2H [Unbound] Builds run by hand (Actions > generate-builds > Run workflow) or from a release tag, never on
 # every push. A pushed "*unbound*" tag builds nothing itself: a tag ref cannot read the branch's caches, so it
 # starts this workflow on the tag's branch with the tag as input, which checks the tag out, builds and publishes
-# the release. Without a tag input a manual run only builds; publish-release.yml can release it later.
+# the release. Without a tag input, successful builds update the fixed public and modder downloads.
+# publish-release.yml separately manages versioned releases for the signed in-game updater.
 on:
   push:
     tags:
@@ -10,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to build and publish (already pushed, on this branch); empty = build only
+        description: Optional release tag; leave empty to update the fixed public and modder downloads
         default: ''
         type: string
 concurrency:
