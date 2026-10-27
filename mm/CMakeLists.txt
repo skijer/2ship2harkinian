@@ -188,6 +188,10 @@ if (S2H_SHARED_GAME_MODULE)
     add_library(${PROJECT_NAME} SHARED ${ALL_FILES})
     add_executable(${S2H_LAUNCHER_TARGET} ${launcher__})
     target_link_libraries(${S2H_LAUNCHER_TARGET} PRIVATE ${PROJECT_NAME})
+    # As on Windows, mods see the game's own symbols only, not its static dependencies (ZAPD, libgfxd...).
+    if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_link_options(${PROJECT_NAME} PRIVATE "LINKER:--exclude-libs,ALL")
+    endif()
 else()
     add_executable(${PROJECT_NAME} ${ALL_FILES} ${launcher__})
 endif()
@@ -267,6 +271,7 @@ endif()
 if (S2H_SHARED_GAME_MODULE)
     # The launcher keeps the 2ship name; its PDB must not overwrite the game's.
     set_target_properties(${S2H_LAUNCHER_TARGET} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
         PDB_NAME "${S2H_LAUNCHER_TARGET}"
         BUILD_RPATH "$<IF:$<PLATFORM_ID:Darwin>,@executable_path,$ORIGIN>"
         INSTALL_RPATH "$<IF:$<PLATFORM_ID:Darwin>,@executable_path,$ORIGIN>"

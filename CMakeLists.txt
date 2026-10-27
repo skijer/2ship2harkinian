@@ -101,6 +101,10 @@ else()
     set(S2H_SHARED_GAME_MODULE OFF)
 endif()
 set(LUS_BUILD_SHARED ${S2H_SHARED_GAME_MODULE})
+# Static libraries (ZAPD, OTRExporter...) are linked into shared modules.
+if (S2H_SHARED_GAME_MODULE)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 # The game target keeps the name "2ship" so mods keep linking against 2ship.lib.
 if (S2H_SHARED_GAME_MODULE)
     set(S2H_LAUNCHER_TARGET 2ship-launcher)
@@ -236,6 +240,11 @@ add_subdirectory(ZAPDTR/ZAPD ${CMAKE_BINARY_DIR}/ZAPD)
 s2h_use_shared_crt_in(ZAPDTR/ZAPD)
 add_subdirectory(OTRExporter)
 s2h_use_shared_crt_in(OTRExporter/OTRExporter)
+# OTRExporter's archive headers #undef _DLL, which stamps their objects as static CRT (LNK2038).
+# Including the CRT first fixes the runtime choice before that line runs.
+if (S2H_MSVC_RUNTIME_LIBRARY)
+    target_compile_options(OTRExporter PRIVATE /FIyvals.h)
+endif()
 add_subdirectory(mm)
 
 set_property(TARGET ${S2H_LAUNCHER_TARGET} PROPERTY APPIMAGE_DESKTOP_FILE_TERMINAL YES)
@@ -327,6 +336,13 @@ install(CODE "
   fixup_bundle(\"\${CMAKE_INSTALL_PREFIX}/../MacOS/2s2h\" \"\" \"${dirs}\")
    ")
 
+endif()
+
+if (MSVC AND S2H_SHARED_GAME_MODULE)
+    # The shared CRT ships beside the game so players need no Visual C++ redistributable.
+    set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION .)
+    set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT 2s2h)
+    include(InstallRequiredSystemLibraries)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Windows|NintendoSwitch|CafeOS")
