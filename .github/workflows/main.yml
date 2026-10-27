@@ -423,10 +423,6 @@ jobs:
       run: |
         FACTS=$(.github/workflows/release-product.sh "$TAG")
         echo "$FACTS" >> "$GITHUB_OUTPUT"
-        PRODUCT=$(sed -n 's/^product=//p' <<< "$FACTS")
-        # Notes start at the previous tag of the same product, never at a pipeline test tag.
-        PREV=$(git tag --sort=-creatordate | grep -- "$PRODUCT" | grep -v -- '-test$' | grep -vx -- "$TAG" | head -n 1 || true)
-        echo "prev=$PREV" >> "$GITHUB_OUTPUT"
     - name: Download the builds
       uses: actions/download-artifact@v7
       with:
@@ -440,15 +436,15 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         PRODUCT: ${{ steps.product.outputs.product }}
         TITLE: ${{ steps.product.outputs.title }}
-        PREV: ${{ steps.product.outputs.prev }}
         DRAFT: ${{ steps.product.outputs.draft }}
       run: |
         NOTES_FILE=".github/release-notes/${PRODUCT}.md"
-        ARGS=(--title "$TITLE" --generate-notes)
-        [ -n "$PREV" ] && ARGS+=(--notes-start-tag "$PREV")
+        ARGS=(--title "$TITLE")
         if [ -f "$NOTES_FILE" ]; then
           sed "s|{{TAG}}|$TAG|g" "$NOTES_FILE" > release-notes.md
           ARGS+=(--notes-file release-notes.md)
+        else
+          ARGS+=(--notes "")
         fi
         [ "$DRAFT" = true ] && ARGS+=(--draft)
         gh release create "$TAG" dist/* "${ARGS[@]}"
