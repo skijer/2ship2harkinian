@@ -136,7 +136,8 @@ void ReadSection(const nlohmann::json& section) {
     }
     sSnapshot = {};
     sSnapshot.seed = section.value("seed", 0u);
-    for (const auto& [key, value] : section.value("values", nlohmann::json::object()).items()) {
+    const nlohmann::json values = section.value("values", nlohmann::json::object());
+    for (const auto& [key, value] : values.items()) {
         if (value.is_number_unsigned()) {
             sSnapshot.values[key] = value.get<uint8_t>();
         }
