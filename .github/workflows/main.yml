@@ -103,7 +103,8 @@ jobs:
         cd deps/tinyxml2-10.0.0
         mkdir -p build
         cd build
-        cmake ..
+        # Linked into libultraship.so, so it must be position independent.
+        cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         make
         sudo make install
     - uses: ./.github/actions/install-sdl2-net
@@ -235,7 +236,8 @@ jobs:
         cd deps/tinyxml2-10.0.0
         mkdir -p build
         cd build
-        cmake ..
+        # Linked into libultraship.so, so it must be position independent.
+        cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         make
         sudo make install
     - uses: ./.github/actions/install-sdl2-net
