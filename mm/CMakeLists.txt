@@ -279,6 +279,11 @@ if (S2H_SHARED_GAME_MODULE)
     if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
         set_target_properties(${S2H_LAUNCHER_TARGET} PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
     endif()
+    # The game module finds libultraship beside itself once packaged (AppImage, app bundle).
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        BUILD_RPATH "$<IF:$<PLATFORM_ID:Darwin>,@loader_path,$ORIGIN>"
+        INSTALL_RPATH "$<IF:$<PLATFORM_ID:Darwin>,@loader_path,$ORIGIN>"
+    )
 endif()
 ################################################################################
 # MSVC runtime library
