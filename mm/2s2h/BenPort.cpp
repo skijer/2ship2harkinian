@@ -3,6 +3,7 @@
 #include "2s2h/ModApi/ModStore/ModStore.h"
 #include "2s2h/ModApi/ModDungeons/DungeonRegistry.h"
 #include "2s2h/Unbound/ActorRegistry.h"
+#include "2s2h/Fleet/FleetGame.h"
 #include "BenPort.h"
 #include <iostream>
 #include <algorithm>
@@ -153,14 +154,32 @@ static bool VerifyArchiveVersion(ArchiveVersion version);
 std::string portArchivePath = "";
 static bool shipArchiveVersionMatch = false;
 
-OTRGlobals::OTRGlobals() {
-    context = Ship::Context::CreateUninitializedInstance("2 Ship 2 Harkinian", appShortName, "2ship2harkinian.json");
-
+static void LocatePortArchive() {
     portArchivePath = Ship::Context::LocateFileAcrossAppDirs("2ship.o2r");
     ArchiveVersion portArchiveVersion = DetectArchiveVersion("2ship.o2r", true);
     shipArchiveVersionMatch = portArchiveVersion.major == gBuildVersionMajor &&
                               portArchiveVersion.minor == gBuildVersionMinor &&
                               portArchiveVersion.patch == gBuildVersionPatch;
+}
+
+// Runs in the window Fleet opened, with 2ship's own resources registered beside the other game's.
+static Ship::Context* JoinFleetContext() {
+    Ship::Context* context = Ship::Context::GetRawInstance();
+    FleetGame_JoinHostContext();
+    LocatePortArchive();
+    FleetGame_CreateResources(portArchivePath);
+    context->GetWindow()->GetGui()->RegisterResourceFactories();
+    benFast3dWindow = std::dynamic_pointer_cast<Fast::Fast3dWindow>(context->GetWindow());
+    if (benFast3dWindow != nullptr) {
+        benFast3dWindow->SetIsRunning(true);
+    }
+    return context;
+}
+
+static Ship::Context* CreateStandaloneContext() {
+    Ship::Context* context =
+        Ship::Context::CreateUninitializedInstance("2 Ship 2 Harkinian", appShortName, "2ship2harkinian.json");
+    LocatePortArchive();
 
     context->InitConfiguration();
     context->InitConsoleVariables();
@@ -185,6 +204,14 @@ OTRGlobals::OTRGlobals() {
     benFast3dWindow =
         std::make_shared<Fast::Fast3dWindow>(std::vector<std::shared_ptr<Ship::GuiWindow>>({ benInputEditorWindow }));
     context->InitWindow(benFast3dWindow);
+    return context;
+}
+
+OTRGlobals::OTRGlobals() {
+    const bool hosted = FleetGame_IsHosted();
+    context = hosted ? JoinFleetContext() : CreateStandaloneContext();
+    // GImGui is per module: with a shared libultraship the context lives in the other module.
+    ImGui::SetCurrentContext(context->GetWindow()->GetGui()->GetImGuiContext());
 
     BenGui::SetupMenu();
 
@@ -207,6 +234,10 @@ OTRGlobals::OTRGlobals() {
     previousImGuiScaleIndex = -1;
     previousImGuiScale = defaultImGuiScale;
     ScaleImGui();
+    // Fleet's backend already built the font atlas; the fonts added above need it rebuilt.
+    if (hosted) {
+        context->GetWindow()->GetGui()->RebuildFontTexture();
+    }
 }
 
 typedef enum ExtractSteps {
@@ -1052,7 +1083,13 @@ extern "C" void DeinitOTR() {
     benFast3dWindow = nullptr;
 
     OTRGlobals::Instance->context = nullptr;
-    Ship::Context::DestroyInstance();
+    // Fleet owns the Context it hosts 2ship in.
+    if (FleetGame_IsHosted()) {
+        FleetGame_LeaveHostContext();
+    } else {
+        Ship::Context::DestroyInstance();
+    }
+    ImGui::SetCurrentContext(nullptr);
     delete AudioCollection::Instance;
 }
 

@@ -1,7 +1,7 @@
 [submodule "libultraship"]
 	path = libultraship
 	url = https://github.com/skijer/libultraship.git
-	branch = unbound-toon
+	branch = unbound-fleet
 [submodule "OTRExporter"]
 	path = OTRExporter
 	url = https://github.com/HarbourMasters/OTRExporter.git

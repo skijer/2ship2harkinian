@@ -14,6 +14,7 @@
 #include "stack.h"
 #include "stackcheck.h"
 #include "BenPort.h"
+#include "2s2h/Fleet/FleetGame.h"
 #include <libultraship/bridge/crashhandlerbridge.h>
 
 // Variables are put before most headers as a hacky way to bypass bss reordering
@@ -49,27 +50,30 @@ size_t gSystemHeapSize = 0;
 
 void InitOTR(int argc, char* argv[]);
 void Heaps_Free(void);
-#ifdef __GNUC__
-#define SDL_main main
-#endif
 
-int SDL_main(int argc, char* argv[] /* void* arg*/) {
+// Entered from the launcher (mm/launcher/main.c); argv is UTF-8 on every platform.
+int S2H_RunMain(int argc, char* argv[]) {
     intptr_t fb;
     intptr_t sysHeap;
     s32 exit;
     s16* msg;
 
-// Attach console for windows so we can conditionally display it when running the extractor
+    const bool hosted = FleetGame_IsHosted();
+
+// Attach console for windows so we can conditionally display it when running the extractor.
+// Inside Fleet the console and the locale are Fleet's.
 #ifdef _WIN32
-    AllocConsole();
-    (void)freopen("CONIN$", "r", stdin);
-    (void)freopen("CONOUT$", "w", stdout);
-    (void)freopen("CONOUT$", "w", stderr);
+    if (!hosted) {
+        AllocConsole();
+        (void)freopen("CONIN$", "r", stdin);
+        (void)freopen("CONOUT$", "w", stdout);
+        (void)freopen("CONOUT$", "w", stderr);
 #ifndef _DEBUG
-    ShowWindow(GetConsoleWindow(), SW_HIDE);
+        ShowWindow(GetConsoleWindow(), SW_HIDE);
 #endif
-    // Allow non-ascii characters for Windows
-    setlocale(LC_ALL, ".UTF8");
+        // Allow non-ascii characters for Windows
+        setlocale(LC_ALL, ".UTF8");
+    }
 #endif // _WIN32
 
     InitOTR(argc, argv);
@@ -148,7 +152,10 @@ int SDL_main(int argc, char* argv[] /* void* arg*/) {
     DeinitOTR();
 
 #ifdef _WIN32
-    FreeConsole();
+    if (!hosted) {
+        FreeConsole();
+    }
 #endif
     Heaps_Free();
+    return 0;
 }

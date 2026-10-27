@@ -353,7 +353,7 @@ jobs:
         (cd build-windows && cpack)
         cd ..
         mv _packages/*.zip _packages/2ship-windows.zip
-    # Mods link against 2ship.lib, the import library of 2ship.exe; it ships next to the exe and as its own artifact.
+    # Mods link against 2ship.lib, the import library of 2ship.dll; it ships next to the game and as its own artifact.
     - name: Find the mod import library
       run: |
         $lib = Get-ChildItem -Path build-windows -Recurse -Filter 2ship.lib | Select-Object -First 1

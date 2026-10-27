@@ -132,9 +132,11 @@ endif()
 # src (decomp) {{{
 file(GLOB_RECURSE src__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/*.c" "src/*.h")
 
+set(launcher__ launcher/main.c)
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    list(APPEND src__ ${CMAKE_CURRENT_SOURCE_DIR}/windows/Resource.rc)
+    list(APPEND launcher__ ${CMAKE_CURRENT_SOURCE_DIR}/windows/Resource.rc)
 endif()
+source_group("launcher" FILES ${launcher__})
 
 list(FILTER src__ EXCLUDE REGEX "src/dmadata/*")
 list(FILTER src__ EXCLUDE REGEX "src/elf_message/*")
@@ -178,10 +180,20 @@ set(ALL_FILES
 ################################################################################
 # Target
 ################################################################################
-add_executable(${PROJECT_NAME} ${ALL_FILES})
+if (NOT S2H_LAUNCHER_TARGET)
+    set(S2H_LAUNCHER_TARGET ${PROJECT_NAME})
+endif()
+
+if (S2H_SHARED_GAME_MODULE)
+    add_library(${PROJECT_NAME} SHARED ${ALL_FILES})
+    add_executable(${S2H_LAUNCHER_TARGET} ${launcher__})
+    target_link_libraries(${S2H_LAUNCHER_TARGET} PRIVATE ${PROJECT_NAME})
+else()
+    add_executable(${PROJECT_NAME} ${ALL_FILES} ${launcher__})
+endif()
 
 ################################################################################
-# Mod API: native mods link against the executable's own symbols
+# Mod API: native mods link against the game module's own symbols
 ################################################################################
 set_target_properties(${PROJECT_NAME} PROPERTIES
     ENABLE_EXPORTS ON
@@ -208,6 +220,7 @@ if (MSVC)
         COMMAND ${CMAKE_COMMAND}
             -DOBJECT_DIR=${S2H_OBJECT_DIR}
             -DLIBULTRASHIP_OBJECT_DIR=${S2H_LIBULTRASHIP_OBJECT_DIR}
+            -DFORWARD_LIBULTRASHIP=${S2H_SHARED_GAME_MODULE}
             -DOUTPUT=${S2H_WINDOWS_EXPORTS}
             -DPYTHON=${Python3_EXECUTABLE}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/2s2h/ModApi/GenerateWindowsExports.cmake
@@ -235,23 +248,39 @@ set(ROOT_NAMESPACE 2s2h)
 
 # No INTERPROCEDURAL_OPTIMIZATION on Windows: /GL objects are compiler IL, which the export generation cannot read.
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
-	set_target_properties(${PROJECT_NAME} PROPERTIES
+	set_target_properties(${PROJECT_NAME} ${S2H_LAUNCHER_TARGET} PROPERTIES
 		VS_GLOBAL_KEYWORD "Win32Proj"
 	)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(${PROJECT_NAME} PROPERTIES
         XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
+    )
+    set_target_properties(${S2H_LAUNCHER_TARGET} PROPERTIES
         OUTPUT_NAME "2s2h-macos"
     )
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-	set_target_properties(${PROJECT_NAME} PROPERTIES
+	set_target_properties(${S2H_LAUNCHER_TARGET} PROPERTIES
 	OUTPUT_NAME "2s2h.elf"
 	)
+endif()
+
+if (S2H_SHARED_GAME_MODULE)
+    # The launcher keeps the 2ship name; its PDB must not overwrite the game's.
+    set_target_properties(${S2H_LAUNCHER_TARGET} PROPERTIES
+        PDB_NAME "${S2H_LAUNCHER_TARGET}"
+        BUILD_RPATH "$<IF:$<PLATFORM_ID:Darwin>,@executable_path,$ORIGIN>"
+        INSTALL_RPATH "$<IF:$<PLATFORM_ID:Darwin>,@executable_path,$ORIGIN>"
+    )
+    if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        set_target_properties(${S2H_LAUNCHER_TARGET} PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
+    endif()
 endif()
 ################################################################################
 # MSVC runtime library
 ################################################################################
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+if (S2H_MSVC_RUNTIME_LIBRARY)
+    set_target_properties(${PROJECT_NAME} ${S2H_LAUNCHER_TARGET} PROPERTIES MSVC_RUNTIME_LIBRARY ${S2H_MSVC_RUNTIME_LIBRARY})
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 	get_property(MSVC_RUNTIME_LIBRARY_DEFAULT TARGET ${PROJECT_NAME} PROPERTY MSVC_RUNTIME_LIBRARY)
 	string(CONCAT "MSVC_RUNTIME_LIBRARY_STR"
 		$<$<CONFIG:Debug>:
@@ -392,6 +421,10 @@ if(MSVC)
         /DEBUG;
         /SUBSYSTEM:WINDOWS
     )
+    if (S2H_SHARED_GAME_MODULE)
+        # Not incremental: its .ilk would share the game module's name.
+        target_link_options(${S2H_LAUNCHER_TARGET} PRIVATE /INCREMENTAL:NO /MANIFEST:NO /DEBUG /SUBSYSTEM:WINDOWS)
+    endif()
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
@@ -575,6 +608,14 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
         COMMAND ${VS_COPY_ASSETS_CMD}
     )
 endif()
+if (S2H_SHARED_GAME_MODULE)
+    add_custom_command(
+        TARGET ${PROJECT_NAME}
+        POST_BUILD
+        COMMENT "Copying libultraship next to the game..."
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:libultraship> $<TARGET_FILE_DIR:2ship>
+    )
+endif()
 ################################################################################
 # Dependencies
 ################################################################################
@@ -605,7 +646,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 		"ZAPDLib;"
 		"glu32;"
 		"SDL2::SDL2;"
-		"SDL2::SDL2main;"
         SDL2_net::SDL2_net-static
 		"glfw;"
 		"winmm;"
@@ -668,6 +708,9 @@ endif()
 
 if(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin|NintendoSwitch|CafeOS")
 INSTALL(TARGETS 2ship DESTINATION . COMPONENT 2s2h)
+if (S2H_SHARED_GAME_MODULE)
+INSTALL(TARGETS ${S2H_LAUNCHER_TARGET} libultraship RUNTIME DESTINATION . LIBRARY DESTINATION . COMPONENT 2s2h)
+endif()
 endif()
 
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
@@ -680,7 +723,10 @@ execute_process(COMMAND ${CURL} -sSfL https://raw.githubusercontent.com/gabomdq/
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/macosx/Info.plist.in ${CMAKE_BINARY_DIR}/macosx/Info.plist @ONLY)
-INSTALL(TARGETS 2ship DESTINATION ../MacOS COMPONENT 2s2h)
+INSTALL(TARGETS ${S2H_LAUNCHER_TARGET} DESTINATION ../MacOS COMPONENT 2s2h)
+if (S2H_SHARED_GAME_MODULE)
+INSTALL(TARGETS 2ship libultraship LIBRARY DESTINATION ../MacOS COMPONENT 2s2h)
+endif()
 INSTALL(FILES ${CMAKE_BINARY_DIR}/gamecontrollerdb.txt DESTINATION ../MacOS COMPONENT 2s2h)
 INSTALL(FILES ${CMAKE_BINARY_DIR}/mm/2ship.o2r DESTINATION ../Resources COMPONENT 2s2h)
 elseif(NOT "${CMAKE_SYSTEM_NAME}" MATCHES "NintendoSwitch|CafeOS")

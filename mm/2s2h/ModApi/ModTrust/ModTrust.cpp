@@ -26,7 +26,7 @@ using Json = nlohmann::json;
 
 constexpr const char* SignatureFileName = "2ship-signature.json";
 constexpr const char* SignatureDomain = "2ship-mod-signature-v1";
-constexpr const char* HostExecutable = "2ship.exe";
+constexpr std::string_view HostModules[] = { "2ship.dll", "libultraship.dll" };
 constexpr size_t ContentHashSize = 64;
 constexpr size_t SignatureSize = 64;
 constexpr size_t MaxImportedLibraries = 256;
@@ -378,7 +378,7 @@ std::vector<std::string> ModTrust_ListUnusualImports(const std::vector<char>& bi
     std::set<std::string> unusual;
     for (const PeImport& import : ReadPeImports(binary)) {
         const std::string library = Lowercase(import.library);
-        if (library == HostExecutable) {
+        if (Contains(HostModules, library)) {
             if (ContainsAny(HostTrustInternals, import.function)) {
                 unusual.insert(import.library + "!" + import.function);
             }

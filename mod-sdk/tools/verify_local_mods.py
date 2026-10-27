@@ -1,4 +1,4 @@
-"""Check installed MM packages and their imports against the built host executable."""
+"""Check installed MM packages and their imports against the built game module."""
 import argparse
 import hashlib
 import json
@@ -7,6 +7,10 @@ import zipfile
 from pathlib import Path
 
 import lief
+
+# Mods import from the game module; it forwards libultraship's symbols to libultraship.dll.
+HOST_MODULE = '2ship.dll'
+MODAPI_MAJOR = 3
 
 
 def digest(path):
@@ -20,7 +24,8 @@ def main():
     parser.add_argument('--game', type=Path, required=True)
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
-    host = lief.PE.parse(str(args.game / '2ship.exe'))
+    host_path = args.game / HOST_MODULE
+    host = lief.PE.parse(str(host_path))
     if host is None or not host.has_exports:
         raise SystemExit('The host is missing or has no exports.')
     exports = {entry.name for entry in host.get_export().entries}
@@ -39,8 +44,8 @@ def main():
                 if archive.testzip() is not None:
                     problems.append('archive integrity failure')
                 manifest = json.loads(archive.read('manifest.json'))
-                if manifest.get('game') != 'mm' or manifest.get('modapi') != 2:
-                    problems.append('expected game=mm, modapi=2')
+                if manifest.get('game') != 'mm' or manifest.get('modapi') != MODAPI_MAJOR:
+                    problems.append(f'expected game=mm, modapi={MODAPI_MAJOR}')
                 binary_path = manifest.get('binaries', {}).get('windows_x64')
                 binary = lief.PE.parse(list(archive.read(binary_path))) if binary_path else None
                 if binary is None:
@@ -51,12 +56,12 @@ def main():
                         if entry not in entry_points:
                             problems.append('missing entry point: ' + entry)
                     for library in binary.imports:
-                        if library.name.lower() == '2ship.exe':
+                        if library.name.lower() == HOST_MODULE:
                             for entry in library.entries:
                                 if entry.is_ordinal or entry.name not in exports:
                                     problems.append('unresolved host import: ' + (entry.name or str(entry.ordinal)))
         results.append({'mod': name, 'problems': problems})
-    report = {'host': str(args.game / '2ship.exe'), 'host_sha256': digest(args.game / '2ship.exe'),
+    report = {'host': str(host_path), 'host_sha256': digest(host_path),
               'checked': len(results), 'failed': sum(bool(row['problems']) for row in results), 'mods': results}
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')

@@ -2,7 +2,7 @@
 #define S2H_MOD_API_H
 
 // Append table entries without changing this; bump for incompatible ABI changes.
-#define S2H_MOD_API_MAJOR 2
+#define S2H_MOD_API_MAJOR 3
 
 #include <stdarg.h>
 #include <stdbool.h>

@@ -6,7 +6,7 @@ if(NOT S2H_ROOT)
 endif()
 set(S2H_ROOT "${S2H_ROOT}" CACHE PATH "2Ship source checkout the mods compile against")
 set(S2H_IMPORT_LIBRARY "${S2H_ROOT}/build/x64/mm/$<CONFIG>/2ship.lib" CACHE STRING
-    "Windows only: 2ship.lib, the import library of the 2ship.exe the mods will load into")
+    "Windows only: 2ship.lib, the import library of the 2ship game module the mods will load into")
 set(S2H_GAME_DIR "" CACHE PATH "Game folder; when set, every built mod is copied into its mods/ folder")
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -63,7 +63,9 @@ if(NOT TARGET s2h_mod_sdk)
         )
     endif()
     if(WIN32)
+        # 2ship.lib also forwards libultraship's symbols, which live in libultraship.dll.
         target_link_libraries(s2h_mod_sdk INTERFACE "${S2H_IMPORT_LIBRARY}")
+        target_compile_definitions(s2h_mod_sdk INTERFACE LUS_SHARED_LIBRARY)
     elseif(APPLE)
         target_link_options(s2h_mod_sdk INTERFACE "LINKER:-undefined,dynamic_lookup")
     endif()
