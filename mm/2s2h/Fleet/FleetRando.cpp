@@ -35,12 +35,12 @@ using Rando::StaticData::RandoStaticItem;
 uint32_t sSeed = 0;
 
 // The combined Triforce Hunt. pieces is this game's share, -1 = unset; the required count is combined.
-struct ComboGoal {
+struct ComboOptions {
     bool hunt = false;
     uint32_t required = 0;
     int pieces = -1;
 };
-ComboGoal sComboGoal;
+ComboOptions sComboOptions;
 
 // The game's own save while the oracle borrows gSaveContext; restored by the "Finish" request.
 std::unique_ptr<SaveContext> sLiveSave;
@@ -104,14 +104,14 @@ nlohmann::json FixedEntry(RandoCheckId check, RandoItemId item, bool hintable) {
 }
 
 // The combined goal replaces the player's own hunt settings in the seed's options.
-void ApplyComboGoal() {
-    RANDO_SAVE_OPTIONS[RO_SHUFFLE_TRIFORCE_PIECES] = sComboGoal.hunt ? RO_GENERIC_YES : RO_GENERIC_NO;
-    if (!sComboGoal.hunt) {
+void ApplyComboOptions() {
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_TRIFORCE_PIECES] = sComboOptions.hunt ? RO_GENERIC_YES : RO_GENERIC_NO;
+    if (!sComboOptions.hunt) {
         return;
     }
-    RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED] = sComboGoal.required;
-    if (sComboGoal.pieces >= 0) {
-        RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_MAX] = static_cast<uint32_t>(sComboGoal.pieces);
+    RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED] = sComboOptions.required;
+    if (sComboOptions.pieces >= 0) {
+        RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_MAX] = static_cast<uint32_t>(sComboOptions.pieces);
     }
 }
 
@@ -126,7 +126,7 @@ void PrepareSeed(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>&
     Rando::MiscBehavior::PrepareRandoSave();
     Ship_Random_Seed(sSeed);
     Rando::MiscBehavior::PersistSeedOptions(sSeed);
-    ApplyComboGoal();
+    ApplyComboOptions();
     Rando::Logic::GeneratePools(gSaveContext.save.shipSaveInfo.rando, checkPool, itemPool);
     Rando::GrantStartingItems();
 
@@ -396,8 +396,8 @@ char* FleetRando_Request(const char* op, const char* json) {
         sSeed = input.value("seed", 0u);
         return CopyString("{}");
     }
-    if (request == "SetComboGoal") {
-        sComboGoal = { .hunt = input.value("hunt", false),
+    if (request == "SetComboOptions") {
+        sComboOptions = { .hunt = input.value("hunt", false),
                        .required = static_cast<uint32_t>(std::clamp(input.value("required", 0), 0, 100)),
                        .pieces = std::clamp(input.value("pieces", -1), -1, 100) };
         return CopyString("{}");
