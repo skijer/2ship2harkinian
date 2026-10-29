@@ -507,5 +507,5 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(EAST_CLOCK_TOWN, 4),              ENTRANCE(TREASURE_CHEST_SHOP, 0), true),
         },
     };
-}, {});
+}, RegionGraphInitPaths);
 // clang-format on

@@ -571,5 +571,5 @@ static RegisterShipInitFunc initFunc([]() {
             CONNECTION(RR_STONE_TOWER_TOP, HAS_ITEM(ITEM_HOOKSHOT))
         },
     };
-}, {});
+}, RegionGraphInitPaths);
 // clang-format on

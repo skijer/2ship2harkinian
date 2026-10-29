@@ -350,5 +350,5 @@ static RegisterShipInitFunc initFunc([]() {
             CONNECTION(RR_GREAT_BAY_TEMPLE_ENTRANCE,      true),
         }
     };
-}, {});
+}, RegionGraphInitPaths);
 // clang-format on

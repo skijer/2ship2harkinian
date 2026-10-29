@@ -119,5 +119,5 @@ static RegisterShipInitFunc initFunc([]() {
             ENTRANCE(THE_MOON, 0), // From rooftop and trials
         },
     };
-}, {});
+}, RegionGraphInitPaths);
 // clang-format on

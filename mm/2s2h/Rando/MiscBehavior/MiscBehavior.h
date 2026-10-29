@@ -18,6 +18,10 @@ void InitOfferGetItemBehavior();
 void BeforeEndOfCycleSave();
 void AfterEndOfCycleSave();
 void OnFileCreate(s16 fileNum);
+// Turns the new save into a rando save that starts as Human in South Clock Town.
+void PrepareRandoSave();
+// Records finalSeed with the options and starting items configured in the menu.
+void PersistSeedOptions(uint32_t finalSeed);
 void OnFlagSet(FlagType flagType, u32 flag);
 void OnSceneFlagSet(s16 sceneId, FlagType flagType, u32 flag);
 void OnSceneInit(s16 sceneId, s8 spawnNum);

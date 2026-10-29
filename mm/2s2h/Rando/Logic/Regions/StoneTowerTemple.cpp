@@ -438,5 +438,5 @@ static RegisterShipInitFunc initFunc([]() {
             ENTRANCE(TWINMOLDS_LAIR, 0), // Blue warp exit
         }
     };
-}, {});
+}, RegionGraphInitPaths);
 // clang-format on

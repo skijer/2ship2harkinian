@@ -202,5 +202,5 @@ static RegisterShipInitFunc initFunc([]() {
             EVENT(RE_ACCESS_BUGS, CAN_LIGHT_TORCH_NEAR_ANOTHER),
         },
     };
-}, {});
+}, RegionGraphInitPaths);
 // clang-format on

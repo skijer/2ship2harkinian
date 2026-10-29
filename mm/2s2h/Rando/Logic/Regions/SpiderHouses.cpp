@@ -303,5 +303,5 @@ static RegisterShipInitFunc initFunc([]() {
             EVENT(RE_ACCESS_BUGS, true),
         },
     };
-}, {});
+}, RegionGraphInitPaths);
 // clang-format on

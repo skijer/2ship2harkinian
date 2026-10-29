@@ -19,6 +19,10 @@ namespace Rando {
 
 namespace Logic {
 
+// 2S2H [Fleet] Tags the region graph so ShipInit::Init(RegionGraphPath) builds it without the rest of the game.
+inline const std::string RegionGraphPath = "RANDO_LOGIC";
+inline const std::set<std::string> RegionGraphInitPaths = { RegionGraphPath };
+
 // Time slice enum - 45 granular time points throughout MM's 3-day cycle
 enum TimeSlice {
     TIME_DAY1_AM_06_00 = 0,

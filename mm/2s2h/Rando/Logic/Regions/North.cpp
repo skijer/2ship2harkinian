@@ -593,5 +593,5 @@ static RegisterShipInitFunc initFunc([]() {
             // CONNECTION(RR_SNOWHEAD_NEAR_PATH, true), // can void out to this RR
         },
     };
-}, {});
+}, RegionGraphInitPaths);
 // clang-format on

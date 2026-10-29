@@ -257,7 +257,7 @@ static RegisterShipInitFunc initFunc([]() {
             EXIT(ENTRANCE(STONE_TOWER, 3),                           ONE_WAY_EXIT, CAN_PLAY_SONG(SOARING) && CAN_OWL_WARP(OWL_WARP_STONE_TOWER)),
         },
     };
-}, {});
+}, RegionGraphInitPaths);
 // clang-format on
 
 } // namespace Logic
