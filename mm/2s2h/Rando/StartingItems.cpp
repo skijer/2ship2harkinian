@@ -179,7 +179,16 @@ void SetStartingItemsInSave(RandoSaveInfo& randoSaveInfo, std::vector<RandoItemI
     }
 }
 
+static std::optional<std::vector<RandoItemId>> sStartingItemsOverride;
+
+void OverrideStartingItems(std::optional<std::vector<RandoItemId>> startingItems) {
+    sStartingItemsOverride = std::move(startingItems);
+}
+
 std::vector<RandoItemId> GetStartingItemsFromConfig() {
+    if (sStartingItemsOverride.has_value()) {
+        return *sStartingItemsOverride;
+    }
     auto allConfig = Ship::Context::GetRawInstance()->GetConfig()->GetNestedJson();
     std::vector<RandoItemId> startingItems = { RI_PROGRESSIVE_SWORD, RI_SHIELD_HERO, RI_OCARINA, RI_SONG_TIME };
 

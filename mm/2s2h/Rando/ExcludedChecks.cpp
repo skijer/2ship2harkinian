@@ -5,7 +5,16 @@
 
 namespace Rando {
 
+static std::optional<std::vector<RandoCheckId>> sExcludedChecksOverride;
+
+void OverrideExcludedChecks(std::optional<std::vector<RandoCheckId>> excludedChecks) {
+    sExcludedChecksOverride = std::move(excludedChecks);
+}
+
 std::vector<RandoCheckId> GetExcludedChecksFromConfig() {
+    if (sExcludedChecksOverride.has_value()) {
+        return *sExcludedChecksOverride;
+    }
     auto allConfig = Ship::Context::GetRawInstance()->GetConfig()->GetNestedJson();
     std::vector<RandoCheckId> excludedChecks;
 

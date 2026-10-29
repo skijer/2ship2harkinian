@@ -8,7 +8,9 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
+#include <libultraship/bridge/consolevariablebridge.h>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -145,6 +147,65 @@ void PrepareSeed(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>&
         itemPool.push_back(RI_JUNK);
     }
     sSeedSave = std::make_unique<SaveContext>(gSaveContext);
+}
+
+const char* const kExcludedChecksKey = "gRando.ExcludedChecks";
+const char* const kStartingItemsKey = "gRando.StartingItems";
+
+// Every option lives in its CVar; excluded checks and starting items are config lists named by their tokens.
+nlohmann::json DumpSettings() {
+    nlohmann::json settings = nlohmann::json::object();
+    for (const auto& [id, option] : Rando::StaticData::Options) {
+        if (IsNamed(option.cvar)) {
+            settings[option.cvar] = CVarGetInteger(option.cvar, option.defaultValue);
+        }
+    }
+    nlohmann::json excluded = nlohmann::json::array();
+    for (RandoCheckId check : Rando::GetExcludedChecksFromConfig()) {
+        auto staticCheck = Rando::StaticData::Checks.find(check);
+        if (staticCheck != Rando::StaticData::Checks.end() && IsNamed(staticCheck->second.name)) {
+            excluded.push_back(staticCheck->second.name);
+        }
+    }
+    settings[kExcludedChecksKey] = std::move(excluded);
+    nlohmann::json startingItems = nlohmann::json::array();
+    for (RandoItemId item : Rando::GetStartingItemsFromConfig()) {
+        if (IsNamed(ItemName(item))) {
+            startingItems.push_back(ItemName(item));
+        }
+    }
+    settings[kStartingItemsKey] = std::move(startingItems);
+    return { { "settings", std::move(settings) } };
+}
+
+// The snapshot is authoritative: an absent exclusion list clears the local one. The lists stay in memory,
+// so the player's own config file is never rewritten.
+void RestoreSettings(const nlohmann::json& snapshot) {
+    const nlohmann::json settings = snapshot.value("settings", nlohmann::json::object());
+    std::vector<RandoCheckId> excluded;
+    for (const nlohmann::json& name : settings.value(kExcludedChecksKey, nlohmann::json::array())) {
+        const RandoCheckId check =
+            name.is_string() ? Rando::StaticData::GetCheckIdFromName(name.get<std::string>().c_str()) : RC_UNKNOWN;
+        if (check != RC_UNKNOWN) {
+            excluded.push_back(check);
+        }
+    }
+    Rando::OverrideExcludedChecks(excluded);
+    if (settings.contains(kStartingItemsKey)) {
+        std::vector<RandoItemId> startingItems;
+        for (const nlohmann::json& name : settings[kStartingItemsKey]) {
+            auto item = name.is_string() ? ItemIdsByName().find(name.get<std::string>()) : ItemIdsByName().end();
+            if (item != ItemIdsByName().end()) {
+                startingItems.push_back(item->second);
+            }
+        }
+        Rando::OverrideStartingItems(startingItems);
+    }
+    for (const auto& [cvar, value] : settings.items()) {
+        if (value.is_number_integer()) {
+            CVarSetInteger(cvar.c_str(), value.get<int32_t>());
+        }
+    }
 }
 
 void InitRandoHeadless() {
@@ -320,12 +381,21 @@ char* FleetRando_Request(const char* op, const char* json) {
         sSeed = input.value("seed", 0u);
         return CopyString("{}");
     }
+    if (request == "DumpSettings") {
+        return CopyString(DumpSettings().dump());
+    }
+    if (request == "RestoreSettings") {
+        RestoreSettings(input.is_object() ? input : nlohmann::json::object());
+        return CopyString("{}");
+    }
     if (request == "Finish") {
         if (sLiveSave != nullptr) {
             gSaveContext = *sLiveSave;
             sLiveSave.reset();
         }
         sSeedSave.reset();
+        Rando::OverrideExcludedChecks(std::nullopt);
+        Rando::OverrideStartingItems(std::nullopt);
         return CopyString("{}");
     }
     SPDLOG_WARN("[Fleet] 2Ship has no randomizer service '{}'", request);

@@ -1,6 +1,9 @@
 #ifndef RANDO_H
 #define RANDO_H
 
+#include <optional>
+#include <vector>
+
 #include "StaticData/StaticData.h"
 #include "Types.h"
 #include "variables.h"
@@ -32,6 +35,8 @@ std::vector<RandoItemId> GetStartingItemsFromSave(RandoSaveInfo& randoSaveInfo);
 void SetStartingItemsInSave(RandoSaveInfo& randoSaveInfo, std::vector<RandoItemId>& startingItems);
 std::vector<RandoItemId> GetStartingItemsFromConfig();
 void SetStartingItemsInConfig(std::vector<RandoItemId>& startingItems);
+// While set, the config getters return a seed's own list instead of the player's; it is never saved.
+void OverrideStartingItems(std::optional<std::vector<RandoItemId>> startingItems);
 
 std::vector<RandoItemId> GetDefaultSariaPriorityItems();
 std::vector<RandoItemId> GetSariaPriorityItemsFromSpoiler(nlohmann::json& spoiler);
@@ -44,6 +49,7 @@ std::vector<RandoItemId> GetSariaPriorityItemCandidates();
 
 std::vector<RandoCheckId> GetExcludedChecksFromConfig();
 void SetExcludedChecksInConfig(std::vector<RandoCheckId>& excludedChecks);
+void OverrideExcludedChecks(std::optional<std::vector<RandoCheckId>> excludedChecks);
 
 std::vector<RandoCheckId> FindMultiItemPlacement(RandoItemId randoItemId);
 
