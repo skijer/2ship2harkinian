@@ -3,6 +3,9 @@
 
 #include <map>
 #include <array>
+#include <string>
+#include <unordered_map>
+#include <vector>
 #include "Rando/Types.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 
@@ -33,6 +36,9 @@ extern std::map<RandoCheckId, std::string> CheckNames;
 RandoStaticCheck GetCheckFromFlag(FlagType flagType, s32 flag, s16 sceneId = SCENE_MAX);
 RandoCheckId GetCheckIdFromName(const char* name);
 void PopulateCheckNames();
+// Unique readable names, one-to-one with ids: the names a combined seed speaks.
+const std::string& GetCheckDisplayName(RandoCheckId randoCheckId);
+RandoCheckId GetCheckIdFromDisplayName(const std::string& name);
 std::string GetLocationNameForHint(RandoCheckId randoCheckId, bool exact);
 
 struct RandoStaticItem {
@@ -57,6 +63,9 @@ const char* GetIconTexturePath(RandoItemId itemId);
 bool ShouldShowGetItemCutscene(RandoItemId itemId);
 std::string GetItemName(RandoItemId randoItemId, bool includeArticle = true, RandoCheckId randoCheckId = RC_UNKNOWN);
 std::string GetTrapMessage();
+std::vector<std::string> GetTrickNames(RandoItemId randoItemId);
+const std::string& GetItemDisplayName(RandoItemId randoItemId);
+RandoItemId GetItemIdFromDisplayName(const std::string& name);
 
 struct RandoStaticOption {
     RandoOptionId randoOptionId;

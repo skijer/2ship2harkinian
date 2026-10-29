@@ -733,6 +733,52 @@ std::string GetItemName(RandoItemId randoItemId, bool includeArticle, RandoCheck
     return result;
 }
 
+std::vector<std::string> GetTrickNames(RandoItemId randoItemId) {
+    auto fakeNames = fakeItemNames.find(randoItemId);
+    return fakeNames == fakeItemNames.end() ? std::vector<std::string>{} : fakeNames->second;
+}
+
+// A readable name two items share would be ambiguous, so those items keep their spoiler token.
+// RI_TRIFORCE_PIECE_PREVIOUS only draws and shares its name with the real piece.
+static const std::unordered_map<RandoItemId, std::string>& UniqueItemNames() {
+    static const std::unordered_map<RandoItemId, std::string> names = [] {
+        std::unordered_map<std::string, int> uses;
+        for (const auto& [id, item] : Items) {
+            if (id != RI_TRIFORCE_PIECE_PREVIOUS && !Ship_IsCStringEmpty(item.name)) {
+                uses[item.name]++;
+            }
+        }
+        std::unordered_map<RandoItemId, std::string> unique;
+        for (const auto& [id, item] : Items) {
+            const bool readable =
+                id != RI_TRIFORCE_PIECE_PREVIOUS && !Ship_IsCStringEmpty(item.name) && uses[item.name] == 1;
+            unique[id] = readable ? item.name : (Ship_IsCStringEmpty(item.spoilerName) ? "" : item.spoilerName);
+        }
+        return unique;
+    }();
+    return names;
+}
+
+const std::string& GetItemDisplayName(RandoItemId randoItemId) {
+    static const std::string unnamed;
+    auto name = UniqueItemNames().find(randoItemId);
+    return name == UniqueItemNames().end() ? unnamed : name->second;
+}
+
+RandoItemId GetItemIdFromDisplayName(const std::string& name) {
+    static const std::unordered_map<std::string, RandoItemId> ids = [] {
+        std::unordered_map<std::string, RandoItemId> map;
+        for (const auto& [id, displayName] : UniqueItemNames()) {
+            if (!displayName.empty()) {
+                map.emplace(displayName, id);
+            }
+        }
+        return map;
+    }();
+    auto id = ids.find(name);
+    return id == ids.end() ? RI_UNKNOWN : id->second;
+}
+
 } // namespace StaticData
 
 } // namespace Rando

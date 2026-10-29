@@ -1,5 +1,6 @@
 #include "FleetRando.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -32,6 +33,15 @@ namespace {
 using Rando::StaticData::RandoStaticItem;
 
 uint32_t sSeed = 0;
+
+// The combined Triforce Hunt. pieces is this game's share, -1 = unset; the required count is combined.
+struct ComboGoal {
+    bool hunt = false;
+    uint32_t required = 0;
+    int pieces = -1;
+};
+ComboGoal sComboGoal;
+
 // The game's own save while the oracle borrows gSaveContext; restored by the "Finish" request.
 std::unique_ptr<SaveContext> sLiveSave;
 // The prepared seed before any query: options, starting items, prices and confined placements.
@@ -43,41 +53,14 @@ char* CopyString(const std::string& text) {
     return copy;
 }
 
-// Checks travel by their readable name ("Moon Majora Pot 01"): the combined engine keys its win condition on it.
-const std::unordered_map<std::string, RandoCheckId>& CheckIdsByName() {
-    static const std::unordered_map<std::string, RandoCheckId> ids = [] {
-        std::unordered_map<std::string, RandoCheckId> map;
-        for (const auto& [id, name] : Rando::StaticData::CheckNames) {
-            if (!name.empty()) {
-                map.emplace(name, id);
-            }
-        }
-        return map;
-    }();
-    return ids;
-}
-
-const std::unordered_map<std::string, RandoItemId>& ItemIdsByName() {
-    static const std::unordered_map<std::string, RandoItemId> ids = [] {
-        std::unordered_map<std::string, RandoItemId> map;
-        for (const auto& [id, item] : Rando::StaticData::Items) {
-            if (item.spoilerName != nullptr && item.spoilerName[0] != '\0') {
-                map.emplace(item.spoilerName, id);
-            }
-        }
-        return map;
-    }();
-    return ids;
-}
-
+// Checks and items travel by their unique readable names ("Moon Majora Pot 01", "Piece of the Triforce"):
+// the combined engine keys its win conditions on them.
 const char* CheckName(RandoCheckId id) {
-    auto name = Rando::StaticData::CheckNames.find(id);
-    return name == Rando::StaticData::CheckNames.end() ? nullptr : name->second.c_str();
+    return Rando::StaticData::GetCheckDisplayName(id).c_str();
 }
 
 const char* ItemName(RandoItemId id) {
-    auto item = Rando::StaticData::Items.find(id);
-    return item == Rando::StaticData::Items.end() ? nullptr : item->second.spoilerName;
+    return Rando::StaticData::GetItemDisplayName(id).c_str();
 }
 
 bool IsNamed(const char* name) {
@@ -115,9 +98,21 @@ const char* CategoryName(const RandoStaticItem& item) {
 nlohmann::json FixedEntry(RandoCheckId check, RandoItemId item, bool hintable) {
     const RandoStaticItem& staticItem = Rando::StaticData::Items[item];
     return { { "check", CheckName(check) },
-             { "item", staticItem.spoilerName },
+             { "item", ItemName(item) },
              { "advancement", IsAdvancement(staticItem) },
              { "hintable", hintable } };
+}
+
+// The combined goal replaces the player's own hunt settings in the seed's options.
+void ApplyComboGoal() {
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_TRIFORCE_PIECES] = sComboGoal.hunt ? RO_GENERIC_YES : RO_GENERIC_NO;
+    if (!sComboGoal.hunt) {
+        return;
+    }
+    RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED] = sComboGoal.required;
+    if (sComboGoal.pieces >= 0) {
+        RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_MAX] = static_cast<uint32_t>(sComboGoal.pieces);
+    }
 }
 
 // The native generator's preparation up to its free fill, in a fresh save. Leaves the free pools behind.
@@ -131,6 +126,7 @@ void PrepareSeed(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>&
     Rando::MiscBehavior::PrepareRandoSave();
     Ship_Random_Seed(sSeed);
     Rando::MiscBehavior::PersistSeedOptions(sSeed);
+    ApplyComboGoal();
     Rando::Logic::GeneratePools(gSaveContext.save.shipSaveInfo.rando, checkPool, itemPool);
     Rando::GrantStartingItems();
 
@@ -170,8 +166,8 @@ nlohmann::json DumpSettings() {
     settings[kExcludedChecksKey] = std::move(excluded);
     nlohmann::json startingItems = nlohmann::json::array();
     for (RandoItemId item : Rando::GetStartingItemsFromConfig()) {
-        if (IsNamed(ItemName(item))) {
-            startingItems.push_back(ItemName(item));
+        if (IsNamed(Rando::StaticData::Items[item].spoilerName)) {
+            startingItems.push_back(Rando::StaticData::Items[item].spoilerName);
         }
     }
     settings[kStartingItemsKey] = std::move(startingItems);
@@ -194,9 +190,10 @@ void RestoreSettings(const nlohmann::json& snapshot) {
     if (settings.contains(kStartingItemsKey)) {
         std::vector<RandoItemId> startingItems;
         for (const nlohmann::json& name : settings[kStartingItemsKey]) {
-            auto item = name.is_string() ? ItemIdsByName().find(name.get<std::string>()) : ItemIdsByName().end();
-            if (item != ItemIdsByName().end()) {
-                startingItems.push_back(item->second);
+            const RandoItemId item =
+                name.is_string() ? Rando::StaticData::GetItemIdFromName(name.get<std::string>().c_str()) : RI_UNKNOWN;
+            if (item != RI_UNKNOWN) {
+                startingItems.push_back(item);
             }
         }
         Rando::OverrideStartingItems(startingItems);
@@ -237,8 +234,8 @@ char* FleetRando_DumpStaticData(void) {
     nlohmann::json pool = nlohmann::json::array();
     for (RandoItemId item : itemPool) {
         const RandoStaticItem& staticItem = Rando::StaticData::Items[item];
-        if (IsNamed(staticItem.spoilerName)) {
-            pool.push_back({ { "name", staticItem.spoilerName },
+        if (IsNamed(ItemName(item))) {
+            pool.push_back({ { "name", ItemName(item) },
                              { "advancement", IsAdvancement(staticItem) },
                              { "category", CategoryName(staticItem) } });
         }
@@ -277,23 +274,41 @@ char* FleetRando_DumpStaticData(void) {
 
     nlohmann::json items = nlohmann::json::array();
     for (const auto& [id, item] : Rando::StaticData::Items) {
-        if (!IsNamed(item.spoilerName)) {
+        if (!IsNamed(ItemName(id))) {
             continue;
         }
-        nlohmann::json entry = { { "name", item.spoilerName },
+        nlohmann::json entry = { { "name", ItemName(id) },
                                  { "token", item.spoilerName },
                                  { "advancement", IsAdvancement(item) },
                                  { "trap", id == RI_TRAP },
-                                 { "trickNames", nlohmann::json::array() } };
+                                 { "trickNames", Rando::StaticData::GetTrickNames(id) },
+                                 { "weightClass", Rando::GetItemHintWeight(id) } };
         if (IsNamed(item.name)) {
             entry["displayName"] = item.name;
         }
         items.push_back(std::move(entry));
     }
 
-    const nlohmann::json dump = { { "checks", std::move(checks) }, { "pool", std::move(pool) },
-                                  { "fixed", std::move(fixed) },   { "items", std::move(items) },
-                                  { "prices", std::move(prices) } };
+    // Cross-game hints phrase MM checks the way MM's own gossip stones do.
+    nlohmann::json locationHints = nlohmann::json::object();
+    for (const auto& [id, check] : Rando::StaticData::Checks) {
+        if (IsNamed(CheckName(id))) {
+            locationHints[CheckName(id)] = Rando::StaticData::GetLocationNameForHint(id, false);
+        }
+    }
+    const nlohmann::json options = { { "RO_HINTS_GOSSIP_STONES", RANDO_SAVE_OPTIONS[RO_HINTS_GOSSIP_STONES] },
+                                     { "RO_HINTS_PURCHASEABLE", RANDO_SAVE_OPTIONS[RO_HINTS_PURCHASEABLE] } };
+    nlohmann::json junkPool = nlohmann::json::array();
+    for (RandoItemId item : Rando::JunkRotation()) {
+        if (item != RI_NONE) {
+            junkPool.push_back(ItemName(item));
+        }
+    }
+
+    const nlohmann::json dump = { { "checks", std::move(checks) },     { "pool", std::move(pool) },
+                                  { "fixed", std::move(fixed) },       { "items", std::move(items) },
+                                  { "prices", std::move(prices) },     { "locationHints", std::move(locationHints) },
+                                  { "options", options },              { "junkPool", std::move(junkPool) } };
     return CopyString(dump.dump());
 }
 
@@ -311,11 +326,11 @@ void FleetRando_SetOwnedItems(const char* itemsJson) {
     if (!items.is_array()) {
         return;
     }
-    const auto& ids = ItemIdsByName();
     for (const nlohmann::json& name : items) {
-        auto item = ids.find(name.get<std::string>());
-        if (item != ids.end() && item->second != RI_TRAP) {
-            Rando::GiveItem(Rando::ConvertItem(item->second));
+        const RandoItemId item =
+            name.is_string() ? Rando::StaticData::GetItemIdFromDisplayName(name.get<std::string>()) : RI_UNKNOWN;
+        if (item != RI_UNKNOWN && item != RI_TRAP) {
+            Rando::GiveItem(Rando::ConvertItem(item));
         }
     }
 }
@@ -360,13 +375,13 @@ bool FleetRando_PlaceItem(const char* check, const char* item) {
     if (check == nullptr || item == nullptr) {
         return false;
     }
-    auto checkId = CheckIdsByName().find(check);
-    auto itemId = ItemIdsByName().find(item);
-    if (checkId == CheckIdsByName().end() || itemId == ItemIdsByName().end()) {
+    const RandoCheckId checkId = Rando::StaticData::GetCheckIdFromDisplayName(check);
+    const RandoItemId itemId = Rando::StaticData::GetItemIdFromDisplayName(item);
+    if (checkId == RC_UNKNOWN || itemId == RI_UNKNOWN) {
         return false;
     }
-    RANDO_SAVE_CHECKS[checkId->second].randoItemId = itemId->second;
-    RANDO_SAVE_CHECKS[checkId->second].shuffled = true;
+    RANDO_SAVE_CHECKS[checkId].randoItemId = itemId;
+    RANDO_SAVE_CHECKS[checkId].shuffled = true;
     return true;
 }
 
@@ -379,6 +394,12 @@ char* FleetRando_Request(const char* op, const char* json) {
     }
     if (request == "SetSeed") {
         sSeed = input.value("seed", 0u);
+        return CopyString("{}");
+    }
+    if (request == "SetComboGoal") {
+        sComboGoal = { .hunt = input.value("hunt", false),
+                       .required = static_cast<uint32_t>(std::clamp(input.value("required", 0), 0, 100)),
+                       .pieces = std::clamp(input.value("pieces", -1), -1, 100) };
         return CopyString("{}");
     }
     if (request == "DumpSettings") {

@@ -21,6 +21,8 @@ void DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN, A
 void GiveItem(RandoItemId randoItemId);
 void RemoveItem(RandoItemId randoItemId);
 RandoItemId CurrentJunkItem(RandoCheckId randoCheckId = RC_UNKNOWN);
+const std::vector<RandoItemId>& JunkRotation();
+u32 GetItemHintWeight(RandoItemId randoItemId);
 RandoItemId CurrentTrapItem(RandoCheckId randoCheckId = RC_UNKNOWN);
 bool IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN);
 RandoItemId ConvertItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN);

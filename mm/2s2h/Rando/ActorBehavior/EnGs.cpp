@@ -70,6 +70,14 @@ std::unordered_map<RandoItemType, u32> itemTypeToWeight = {
 };
 // clang-format on
 
+u32 Rando::GetItemHintWeight(RandoItemId randoItemId) {
+    if (riToWeight.contains(randoItemId)) {
+        return riToWeight[randoItemId];
+    }
+    const RandoItemType type = Rando::StaticData::Items[randoItemId].randoItemType;
+    return itemTypeToWeight.contains(type) ? itemTypeToWeight[type] : 1;
+}
+
 s32 GetNormalizedCost() {
     s32 obtainedChecks = 0;
     s32 maxChecks = 0;
@@ -106,14 +114,8 @@ RandoCheckId GetRandomCheck(bool repeatableOnlyObtained = false) {
             continue;
         }
 
-        u32 baseWeight = 1;
-        if (rcToWeight.contains(randoCheckId)) {
-            baseWeight = rcToWeight[randoCheckId];
-        } else if (riToWeight.contains(saveCheck.randoItemId)) {
-            baseWeight = riToWeight[saveCheck.randoItemId];
-        } else if (itemTypeToWeight.contains(item.randoItemType)) {
-            baseWeight = itemTypeToWeight[item.randoItemType];
-        }
+        const u32 baseWeight =
+            rcToWeight.contains(randoCheckId) ? rcToWeight[randoCheckId] : Rando::GetItemHintWeight(saveCheck.randoItemId);
 
         u32 effectiveWeight = 100 + (baseWeight - 1) * strength;
         totalWeight += effectiveWeight;

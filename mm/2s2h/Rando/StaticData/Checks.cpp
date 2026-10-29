@@ -2724,6 +2724,44 @@ void PopulateCheckNames() {
     }
 }
 
+// The readable name, unless two checks read the same: those keep their RC_ token so the name stays unique.
+static const std::unordered_map<RandoCheckId, std::string>& UniqueCheckNames() {
+    static const std::unordered_map<RandoCheckId, std::string> names = [] {
+        std::unordered_map<RandoCheckId, std::string> readable;
+        std::unordered_map<std::string, int> uses;
+        for (const auto& [id, check] : Checks) {
+            if (!Ship_IsCStringEmpty(check.name)) {
+                readable[id] = convertEnumToReadableName(check.name);
+                uses[readable[id]]++;
+            }
+        }
+        std::unordered_map<RandoCheckId, std::string> unique;
+        for (const auto& [id, name] : readable) {
+            unique[id] = uses[name] == 1 ? name : Checks[id].name;
+        }
+        return unique;
+    }();
+    return names;
+}
+
+const std::string& GetCheckDisplayName(RandoCheckId randoCheckId) {
+    static const std::string unnamed;
+    auto name = UniqueCheckNames().find(randoCheckId);
+    return name == UniqueCheckNames().end() ? unnamed : name->second;
+}
+
+RandoCheckId GetCheckIdFromDisplayName(const std::string& name) {
+    static const std::unordered_map<std::string, RandoCheckId> ids = [] {
+        std::unordered_map<std::string, RandoCheckId> map;
+        for (const auto& [id, displayName] : UniqueCheckNames()) {
+            map.emplace(displayName, id);
+        }
+        return map;
+    }();
+    auto id = ids.find(name);
+    return id == ids.end() ? RC_UNKNOWN : id->second;
+}
+
 static std::set<SceneId> scenesToCheckParent = {
     SCENE_KAKUSIANA, SCENE_TAKARAYA,    SCENE_BOWLING,      SCENE_SONCHONOIE, SCENE_SYATEKI_MIZU, SCENE_YADOYA,
     SCENE_MILK_BAR,  SCENE_AYASHIISHOP, SCENE_YOUSEI_IZUMI, SCENE_DOUJOU,     SCENE_8ITEMSHOP,    SCENE_BOMYA,

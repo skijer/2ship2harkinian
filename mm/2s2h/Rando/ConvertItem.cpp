@@ -78,6 +78,10 @@ static std::vector<RandoItemId> junkItems = {
     RI_NONE,
 };
 
+const std::vector<RandoItemId>& Rando::JunkRotation() {
+    return junkItems;
+}
+
 static std::vector<RandoItemId> obtainableJunkItems;
 static std::vector<RandoItemId> obtainableTrapItems;
 static std::vector<RandoItemId> allTrapItems;
