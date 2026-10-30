@@ -1863,6 +1863,8 @@ void Sram_InitNewSave(void);
 void Sram_InitDebugSave(void);
 void Sram_ResetSaveFromMoonCrash(SramContext* sramCtx);
 void Sram_OpenSave(struct FileSelectState* fileSelect, SramContext* sramCtx);
+void Sram_PrepareLoadedSave(void);
+void Sram_InitNamedSave(s32 fileNum, const u8* playerName);
 void func_8014546C(SramContext* sramCtx);
 void func_801457CC(struct GameState* gameState, SramContext* sramCtx);
 void Sram_EraseSave(struct FileSelectState* fileSelect2, SramContext* sramCtx, s32 fileNum);

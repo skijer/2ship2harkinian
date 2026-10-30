@@ -1321,6 +1321,58 @@ static u16 sOwlWarpEntrances[OWL_WARP_MAX - 1] = {
     ENTRANCE(STONE_TOWER, 3),              // OWL_WARP_STONE_TOWER
 };
 
+// 2S2H [Fleet] The per-session state file select resets when it starts gameplay from an opened save.
+void Sram_PrepareLoadedSave(void) {
+    s32 i;
+
+    gSaveContext.respawnFlag = 0;
+    gSaveContext.respawn[RESPAWN_MODE_DOWN].entrance = ENTR_LOAD_OPENING;
+    gSaveContext.seqId = NA_BGM_DISABLED;
+    gSaveContext.ambienceId = AMBIENCE_ID_DISABLED;
+    gSaveContext.showTitleCard = true;
+    gSaveContext.dogParams = 0;
+
+    for (i = 0; i < TIMER_ID_MAX; i++) {
+        gSaveContext.timerStates[i] = TIMER_STATE_OFF;
+    }
+
+    gSaveContext.prevHudVisibility = HUD_VISIBILITY_ALL;
+    gSaveContext.nayrusLoveTimer = 0;
+    gSaveContext.healthAccumulator = 0;
+    gSaveContext.magicFlag = 0;
+    gSaveContext.forcedSeqId = 0;
+    gSaveContext.skyboxTime = CLOCK_TIME(0, 0);
+    gSaveContext.nextTransitionType = TRANS_NEXT_TYPE_DEFAULT;
+    gSaveContext.cutsceneTrigger = 0;
+    gSaveContext.chamberCutsceneNum = 0;
+    gSaveContext.nextDayTime = NEXT_TIME_NONE;
+    gSaveContext.retainWeatherMode = false;
+
+    gSaveContext.buttonStatus[EQUIP_SLOT_B] = BTN_ENABLED;
+    gSaveContext.buttonStatus[EQUIP_SLOT_C_LEFT] = BTN_ENABLED;
+    gSaveContext.buttonStatus[EQUIP_SLOT_C_DOWN] = BTN_ENABLED;
+    gSaveContext.buttonStatus[EQUIP_SLOT_C_RIGHT] = BTN_ENABLED;
+    // #region 2S2H
+    gSaveContext.shipSaveContext.dpad.status[EQUIP_SLOT_D_RIGHT] = BTN_ENABLED;
+    gSaveContext.shipSaveContext.dpad.status[EQUIP_SLOT_D_LEFT] = BTN_ENABLED;
+    gSaveContext.shipSaveContext.dpad.status[EQUIP_SLOT_D_DOWN] = BTN_ENABLED;
+    gSaveContext.shipSaveContext.dpad.status[EQUIP_SLOT_D_UP] = BTN_ENABLED;
+    // This is only zeroed out when playing SoT, so if they give masks and soft reset it's wrongly persisted.
+    // To fix, we just always zero it out when loading a file.
+    memset(gSaveContext.masksGivenOnMoon, 0, sizeof(gSaveContext.masksGivenOnMoon));
+    // #endregion
+    gSaveContext.buttonStatus[EQUIP_SLOT_A] = BTN_ENABLED;
+
+    gSaveContext.hudVisibilityForceButtonAlphasByStatus = false;
+    gSaveContext.nextHudVisibility = HUD_VISIBILITY_IDLE;
+    gSaveContext.hudVisibility = HUD_VISIBILITY_IDLE;
+    gSaveContext.hudVisibilityTimer = 0;
+
+    gSaveContext.save.saveInfo.playerData.tatlTimer = 0;
+
+    GameInteractor_ExecuteOnSaveLoad(gSaveContext.fileNum);
+}
+
 void Sram_OpenSave(FileSelectState* fileSelect, SramContext* sramCtx) {
     s32 i;
     s32 pad;
@@ -1922,33 +1974,38 @@ void Sram_CopySave(FileSelectState* fileSelect2, SramContext* sramCtx) {
     gSaveContext.flashSaveAvailable = D_801F6AF2;
 }
 
+// 2S2H [Fleet] A new save in gSaveContext only, written later like any other; file select and Fleet both start here.
+void Sram_InitNamedSave(s32 fileNum, const u8* playerName) {
+    s32 i;
+
+    Sram_InitNewSave();
+    if (fileNum == 0) {
+        gSaveContext.save.cutsceneIndex = 0xFFF0;
+    }
+
+    for (i = 0; i < ARRAY_COUNT(gSaveContext.save.saveInfo.playerData.playerName); i++) {
+        gSaveContext.save.saveInfo.playerData.playerName[i] = playerName[i];
+    }
+
+    gSaveContext.save.saveInfo.playerData.newf[0] = 'Z';
+    gSaveContext.save.saveInfo.playerData.newf[1] = 'E';
+    gSaveContext.save.saveInfo.playerData.newf[2] = 'L';
+    gSaveContext.save.saveInfo.playerData.newf[3] = 'D';
+    gSaveContext.save.saveInfo.playerData.newf[4] = 'A';
+    gSaveContext.save.saveInfo.playerData.newf[5] = '3';
+
+    gSaveContext.save.saveInfo.checksum = Sram_CalcChecksum(&gSaveContext.save, sizeof(Save));
+
+    GameInteractor_ExecuteOnSaveInit(fileNum);
+}
+
 void Sram_InitSave(FileSelectState* fileSelect2, SramContext* sramCtx) {
-    s32 phi_v0;
     u16 i;
     FileSelectState* fileSelect = fileSelect2;
     s16 maskCount;
 
     if (gSaveContext.flashSaveAvailable) {
-        Sram_InitNewSave();
-        if (fileSelect->buttonIndex == 0) {
-            gSaveContext.save.cutsceneIndex = 0xFFF0;
-        }
-
-        for (phi_v0 = 0; phi_v0 < ARRAY_COUNT(gSaveContext.save.saveInfo.playerData.playerName); phi_v0++) {
-            gSaveContext.save.saveInfo.playerData.playerName[phi_v0] =
-                fileSelect->fileNames[fileSelect->buttonIndex][phi_v0];
-        }
-
-        gSaveContext.save.saveInfo.playerData.newf[0] = 'Z';
-        gSaveContext.save.saveInfo.playerData.newf[1] = 'E';
-        gSaveContext.save.saveInfo.playerData.newf[2] = 'L';
-        gSaveContext.save.saveInfo.playerData.newf[3] = 'D';
-        gSaveContext.save.saveInfo.playerData.newf[4] = 'A';
-        gSaveContext.save.saveInfo.playerData.newf[5] = '3';
-
-        gSaveContext.save.saveInfo.checksum = Sram_CalcChecksum(&gSaveContext.save, sizeof(Save));
-
-        GameInteractor_ExecuteOnSaveInit(fileSelect->buttonIndex);
+        Sram_InitNamedSave(fileSelect->buttonIndex, fileSelect->fileNames[fileSelect->buttonIndex]);
 
         memcpy(sramCtx->saveBuf, &gSaveContext.save, sizeof(Save));
         memcpy(&sramCtx->saveBuf[SAVE_BUFFER_SIZE_HALF], &gSaveContext.save, sizeof(Save));

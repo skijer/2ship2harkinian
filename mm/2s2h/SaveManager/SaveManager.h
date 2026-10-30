@@ -10,6 +10,8 @@ std::string SaveManager_GetFileName(int fileNum, bool isBackup = false);
 bool SaveManager_HandleFileDropped(char* filePath);
 bool BinarySaveConverter_HandleFileDropped(char* filePath);
 int SaveManager_GetOpenFileSlot();
+// Whether file select would list gSaveContext.fileNum `fileNum` (0-based) as an existing file.
+bool SaveManager_SlotExists(int fileNum);
 void SaveManager_WriteSaveFile(const std::filesystem::path& fileName, nlohmann::json j);
 void SaveManager_PersistSariaHintsAvailable();
 #else
