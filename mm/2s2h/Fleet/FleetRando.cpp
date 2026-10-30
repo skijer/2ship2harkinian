@@ -6,6 +6,7 @@
 #include <cstring>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -15,6 +16,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
+#include "FleetCrossDungeon.h"
 #include "FleetGame.h"
 #include "2s2h/ModApi/RandoLogic/RandoLogic.h"
 #include "2s2h/Rando/Logic/Logic.h"
@@ -216,6 +218,31 @@ void InitRandoHeadless() {
     Rando::StaticData::PopulateCheckNames();
 }
 
+// The cross-game entrance services; nullopt for any other request.
+std::optional<nlohmann::json> HandleCrossDungeonRequest(const std::string& request, const nlohmann::json& input) {
+    if (request == "DumpCrossDungeonCatalogue") {
+        return FleetCrossDungeon_DumpCatalogue(input);
+    }
+    if (request == "DumpCrossDungeonCatalogueForSeed") {
+        return FleetCrossDungeon_DumpCatalogueForSeed(input);
+    }
+    if (request == "SetCrossDungeonSeed") {
+        FleetCrossDungeon_SetSeed(input);
+        return nlohmann::json::object();
+    }
+    if (request == "SetCrossDungeonAccess") {
+        FleetCrossDungeon_SetAccess(input);
+        return nlohmann::json::object();
+    }
+    if (request == "GetCrossDungeonExits") {
+        return FleetCrossDungeon_GetExits();
+    }
+    if (request == "CanEnterCrossEntrance") {
+        return nlohmann::json{ { "allowed", FleetCrossDungeon_CanEnterArrival(input.value("entrance", -1)) } };
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 char* FleetRando_DumpStaticData(void) {
@@ -337,8 +364,10 @@ void FleetRando_SetOwnedItems(const char* itemsJson) {
 
 // GlitchlessLogic's fixpoint without placing anything: regions and events unlock each other until both settle.
 char* FleetRando_GetReachableChecks(void) {
-    std::set<RandoRegionId> reachable = { RR_MAX };
-    auto timeStates = Rando::Logic::InitializeRegionTimeStates(RR_MAX);
+    FleetCrossDungeonSearch crossRoutes;
+    std::set<RandoRegionId> reachable;
+    std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState> timeStates;
+    crossRoutes.Roots(reachable, timeStates);
     std::set<std::pair<RandoEvent, std::function<bool()>>*> applied;
     bool changed = true;
     while (changed) {
@@ -368,6 +397,7 @@ char* FleetRando_GetReachableChecks(void) {
             }
         }
     }
+    crossRoutes.Remember(reachable, timeStates);
     return CopyString(names.dump());
 }
 
@@ -398,8 +428,21 @@ char* FleetRando_Request(const char* op, const char* json) {
     }
     if (request == "SetComboOptions") {
         sComboOptions = { .hunt = input.value("hunt", false),
-                       .required = static_cast<uint32_t>(std::clamp(input.value("required", 0), 0, 100)),
-                       .pieces = std::clamp(input.value("pieces", -1), -1, 100) };
+                          .required = static_cast<uint32_t>(std::clamp(input.value("required", 0), 0, 100)),
+                          .pieces = std::clamp(input.value("pieces", -1), -1, 100) };
+        return CopyString("{}");
+    }
+    // A saved seed's prices win over this preparation's rolls, so wallet logic judges what the player pays.
+    if (request == "SetCheckPrices") {
+        if (sSeedSave == nullptr) {
+            return nullptr;
+        }
+        for (const auto& [name, price] : input.items()) {
+            const RandoCheckId check = Rando::StaticData::GetCheckIdFromDisplayName(name);
+            if (check != RC_UNKNOWN && price.is_number_integer()) {
+                DungeonRegistry_SaveCheck(sSeedSave->save.shipSaveInfo.rando, check).price = price.get<uint16_t>();
+            }
+        }
         return CopyString("{}");
     }
     if (request == "DumpSettings") {
@@ -418,6 +461,14 @@ char* FleetRando_Request(const char* op, const char* json) {
         Rando::OverrideExcludedChecks(std::nullopt);
         Rando::OverrideStartingItems(std::nullopt);
         return CopyString("{}");
+    }
+    try {
+        if (const std::optional<nlohmann::json> reply = HandleCrossDungeonRequest(request, input)) {
+            return CopyString(reply->dump());
+        }
+    } catch (const std::exception& e) {
+        SPDLOG_ERROR("[Fleet] 2Ship rejected '{}': {}", request, e.what());
+        return nullptr;
     }
     SPDLOG_WARN("[Fleet] 2Ship has no randomizer service '{}'", request);
     return nullptr;

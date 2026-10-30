@@ -9,6 +9,8 @@
 
 #include <set>
 #include <cassert>
+#include <functional>
+#include <optional>
 
 extern "C" {
 #include "functions.h"
@@ -129,6 +131,10 @@ inline void SetCurrentRegionTime(const std::unordered_map<RandoRegionId, RegionT
 void FindReachableRegions(RandoRegionId currentRegion, std::set<RandoRegionId>& reachableRegions,
                           std::unordered_map<RandoRegionId, RegionTimeState>& regionTimeStates);
 RandoRegionId GetRegionIdFromEntrance(s32 entrance);
+// While set, the search follows an exit to the region this returns: nullopt keeps the native destination and
+// RR_MAX leaves the graph. A combined seed reroutes exits across games.
+using ExitRedirect = std::function<std::optional<RandoRegionId>(s32 exitId, RandoRegionId fromRegion)>;
+void SetExitRedirect(ExitRedirect redirect);
 void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool);
 void ApplyGlitchlessLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool);
 void ApplyNearlyNoLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool);

@@ -160,6 +160,12 @@ void EnsureRegionTimeState(std::unordered_map<RandoRegionId, RegionTimeState>& r
     }
 }
 
+static ExitRedirect sExitRedirect;
+
+void SetExitRedirect(ExitRedirect redirect) {
+    sExitRedirect = std::move(redirect);
+}
+
 // Time expansion during region traversal with stay restrictions
 // Time expansion semantics: if canStayOverTime, sequentially test each future time slice
 // Stop permanently if any timeStayRestrictions check fails
@@ -211,7 +217,12 @@ void FindReachableRegions(RandoRegionId currentRegion, std::set<RandoRegionId>& 
         // Set global time for check evaluation
         gCurrentRegionTime = currentTime;
 
-        RandoRegionId connectedRegionId = GetRegionIdFromEntrance(exitId);
+        const std::optional<RandoRegionId> rerouted =
+            sExitRedirect ? sExitRedirect(exitId, currentRegion) : std::nullopt;
+        if (rerouted == RR_MAX) {
+            continue;
+        }
+        RandoRegionId connectedRegionId = rerouted.value_or(GetRegionIdFromEntrance(exitId));
         if (regionExit.condition()) {
             auto& targetRegion = Regions[connectedRegionId];
             RegionTimeState incomingState = { .timeSlices = currentTime,
