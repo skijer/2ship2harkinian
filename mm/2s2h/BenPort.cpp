@@ -314,6 +314,10 @@ extern std::shared_ptr<BenGui::BenMenu> mBenMenu;
 }
 
 void OTRGlobals::RunExtract(int argc, char* argv[]) {
+    // Inside Fleet the archives come with 2ship's install, already checked when Fleet attached it.
+    if (FleetGame_IsHosted()) {
+        return;
+    }
     bool extractDone = false;
     ExtractSteps extractStep = ES_PORT_ARCHIVE;
     WindowsSteps windowsStep = WS_TEMP;
@@ -999,6 +1003,39 @@ extern "C" void Messagebox_ShowErrorBox(char* title, char* body) {
 
 bool VerifyArchiveVersion(ArchiveVersion version) {
     return version.major != INT16_MAX && version.major != gBuildVersionMajor;
+}
+
+static std::string VersionText(uint16_t major, uint16_t minor, uint16_t patch) {
+    return std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(patch);
+}
+
+std::string S2H_InstallProblem(const std::string& directory) {
+    const std::filesystem::path folder(directory);
+    const std::string where = " in " + folder.string();
+    const std::filesystem::path port = folder / "2ship.o2r";
+    if (!std::filesystem::exists(port)) {
+        return "2ship.o2r is missing" + where + ". Reinstall 2 Ship 2 Harkinian there.";
+    }
+    const ArchiveVersion portVersion = ReadPortVersionFromArchive(port.string(), true);
+    if (portVersion.major != gBuildVersionMajor || portVersion.minor != gBuildVersionMinor ||
+        portVersion.patch != gBuildVersionPatch) {
+        return "2ship.o2r" + where + " belongs to 2Ship " +
+               VersionText(portVersion.major, portVersion.minor, portVersion.patch) + ", but 2ship.dll is 2Ship " +
+               VersionText(gBuildVersionMajor, gBuildVersionMinor, gBuildVersionPatch) +
+               ". Reinstall 2 Ship 2 Harkinian there.";
+    }
+    const std::filesystem::path game = folder / "mm.o2r";
+    if (!std::filesystem::exists(game)) {
+        return "The MM game archive (mm.o2r) is missing" + where +
+               ". Open 2 Ship 2 Harkinian from that folder once to extract it from your ROM.";
+    }
+    const ArchiveVersion gameVersion = ReadPortVersionFromArchive(game.string(), true);
+    if (VerifyArchiveVersion(gameVersion)) {
+        return "mm.o2r" + where + " was extracted by 2Ship " + std::to_string(gameVersion.major) +
+               ".x, and this 2Ship needs " + std::to_string(gBuildVersionMajor) +
+               ".x. Open 2 Ship 2 Harkinian from that folder to extract it again.";
+    }
+    return "";
 }
 
 extern "C" void InitOTR(int argc, char* argv[]) {

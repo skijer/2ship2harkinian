@@ -7,6 +7,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <libultraship/bridge/windowbridge.h>
 #include <string.h>
+#include "2s2h/Fleet/FleetGame.h"
 
 // Variables are put before most headers as a hacky way to bypass bss reordering
 FaultAddrConvClient sGraphFaultAddrConvClient;
@@ -429,6 +430,7 @@ void RunFrame() {
 void Graph_ThreadEntry(void* arg0) {
     while (WindowIsRunning()) {
         RunFrame();
+        FleetGame_FrameEnd();
     }
 }
 
