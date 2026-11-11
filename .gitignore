@@ -1,6 +1,8 @@
 *.zip
 *.otr
 *.o2r
+# Signed mod packages cannot hold resource .meta files.
+mod-sdk/mods/**/*.meta
 .DS_Store
 .vscode
 .idea
