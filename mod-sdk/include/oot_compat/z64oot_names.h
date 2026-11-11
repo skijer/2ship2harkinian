@@ -241,19 +241,8 @@ static inline u8* OotCompat_ButtonSlot(s32 cButton) {
     return &C_SLOT_EQUIP(0, cButton + 1);
 }
 
-// MM has no child/adult: an age-restricted OoT item is a human-form item.
-typedef enum {
-    SOH_CUSTOM_ITEM_AGE_ANY = 0,
-    SOH_CUSTOM_ITEM_AGE_CHILD = 1,
-    SOH_CUSTOM_ITEM_AGE_ADULT = 2,
-} SOHCustomItemAge;
-
-// A constant expression, so translated static initializers (.ageRequirement = X → .formMask = ...) still compile.
+// For mods translated before 2Ship had ageRequirement: any age restriction meant Human Link.
 #define OOT_COMPAT_AGE_FORM_MASK(age) (((age) == SOH_CUSTOM_ITEM_AGE_ANY) ? 0 : S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN))
-
-static inline void Z64Items_SetAge(S2HCustomItemDefinition* definition, SOHCustomItemAge age) {
-    definition->formMask = OOT_COMPAT_AGE_FORM_MASK(age);
-}
 
 #define func_8002836C OotCompat_SpawnDust
 #define func_800283D4 OotCompat_SpawnDustLit
@@ -522,12 +511,11 @@ static inline void OotCompat_Actor_SetPlayerKnockback(PlayState* play, Actor* ac
 #define ARROW_SEED ARROW_TYPE_SLINGSHOT
 #define NA_SE_VO_LI_AUTO_JUMP_KID NA_SE_VO_LI_AUTO_JUMP
 #define NA_SE_VO_LI_SWORD_N_KID NA_SE_VO_LI_SWORD_N
-// MM keeps linkAge at 0, which reads as adult; human Link in MM has the child's body, so OoT code picks its
-// child animations and sockets.
+// MM keeps linkAge at 0, which would read as adult: human Link has the child's body unless an adult form is on.
 #undef LINK_IS_ADULT
 #undef LINK_IS_CHILD
-#define LINK_IS_ADULT 0
-#define LINK_IS_CHILD 1
+#define LINK_IS_ADULT (FormRegistry_IsCurrentFormAdult())
+#define LINK_IS_CHILD (!FormRegistry_IsCurrentFormAdult())
 
 // IS_RANDO guards OoT randomizer data (checks, RAND_INF flags) MM never has; MM rando reaches mods via the ModApi.
 #define IS_RANDO 0

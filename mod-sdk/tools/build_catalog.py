@@ -25,7 +25,25 @@ def empty_catalog():
 def read_catalog(path):
     if path is None or not path.is_file():
         return empty_catalog()
-    return {**empty_catalog(), **json.loads(path.read_text(encoding="utf-8"))}
+    catalog = {**empty_catalog(), **json.loads(path.read_text(encoding="utf-8"))}
+    for mod in catalog["mods"].values():
+        mod["builds"] = keep_newest_build_per_game(mod.get("builds", {}))
+    return catalog
+
+
+def split_build_key(key):
+    """Older catalogs keyed builds "<game>:<major>", or a bare major for OoT; current keys are the game."""
+    game, _, major = key.rpartition(":")
+    if not major.isdigit():
+        return key, float("inf")
+    return game or "oot", int(major)
+
+
+def keep_newest_build_per_game(builds):
+    newest = {}
+    for key in sorted(builds, key=lambda key: split_build_key(key)[1]):
+        newest[split_build_key(key)[0]] = builds[key]
+    return newest
 
 
 def find_mod_directories(mods_directory):
@@ -72,20 +90,20 @@ def file_hash(path):
     return hashlib.blake2b(path.read_bytes(), digest_size=64).hexdigest()
 
 
-def plan(catalog, packages, hashes, issue, trusted, approved, held_permissions, major, game="mm", author=None):
+def plan(catalog, packages, hashes, issue, trusted, approved, held_permissions, game="mm", author=None):
     """Which built mods to sign and publish, which are already published, and which wait or are refused."""
     source = catalog["sources"].get(f"{game}:{issue}", catalog["sources"].get(str(issue)) if game == "oot" else None)
     # Until an issue has a mod in the store, everything it asks for is part of the approval it got first.
     published = any(mod.get("variants", {}).get(game, mod if game == "oot" and "variants" not in mod else {}).get("issue") == issue
                     for mod in catalog["mods"].values())
     allowed = set(source["permissions"]) if source and published else None
-    result = {"game": game, "modapi": major, "publish": [], "unchanged": [], "held": {}, "rejected": {}}
+    result = {"game": game, "publish": [], "unchanged": [], "held": {}, "rejected": {}}
     for package in sorted(packages):
         mod_id = package.stem
         manifest = read_package_manifest(package)
         existing = catalog["mods"].get(mod_id)
         variant = (existing or {}).get("variants", {}).get(game, existing if game == "oot" and "variants" not in (existing or {}) else {}) or {}
-        build = (existing or {}).get("builds", {}).get(f"{game}:{major}", (existing or {}).get("builds", {}).get(str(major), {}) if game == "oot" else {})
+        build = (existing or {}).get("builds", {}).get(game, {})
         new_permissions = sorted(set(manifest.get("permissions", [])) - allowed) if allowed is not None else []
         if not MOD_ID.match(mod_id):
             result["rejected"][mod_id] = "the folder name must be lowercase letters, digits, '_' or '-'"
@@ -95,9 +113,6 @@ def plan(catalog, packages, hashes, issue, trusted, approved, held_permissions, 
             result["rejected"][mod_id] = f"the name '{mod_id}' already belongs to #{existing['issue']}"
         elif existing and not variant and existing.get("owner") and existing["owner"] != author:
             result["rejected"][mod_id] = "the other game variant belongs to another publisher"
-        # Packages from an SDK older than the field were built for major 1, as the game's loader assumes too.
-        elif manifest.get("modapi", 1) != major:
-            result["rejected"][mod_id] = f"it was built for mod API {manifest.get('modapi', 1)}, not {major}"
         elif existing and hashes.get(mod_id) and build.get("source_hash") == hashes[mod_id] and existing.get("listed", True):
             result["unchanged"].append(mod_id)
         elif new_permissions and not trusted and not (approved and set(new_permissions) <= held_permissions):
@@ -109,23 +124,21 @@ def plan(catalog, packages, hashes, issue, trusted, approved, held_permissions, 
 
 def apply(catalog, plan_result, request, signed, hashes, packs, links, release_base):
     issue = request["issue"]
-    major = str(plan_result["modapi"])
     game = plan_result.get("game", "oot")
-    build_key = f"{game}:{major}"
     catalog["format"] = CATALOG_FORMAT
     source = catalog["sources"].get(f"{game}:{issue}", catalog["sources"].get(str(issue), {}) if game == "oot" else {})
     permissions = set(source.get("permissions", []))
     for mod_id in plan_result["publish"]:
         package = signed / f"{mod_id}.o2r"
         manifest = read_package_manifest(package)
-        asset = f"{mod_id}-api{major}.o2r" if game == "oot" else f"{mod_id}-mm-api{major}.o2r"
+        asset = f"{mod_id}.o2r" if game == "oot" else f"{mod_id}-mm.o2r"
         existing = catalog["mods"].get(mod_id, {})
         if existing.get("owner") and existing["owner"] != request["author"]:
             raise ValueError(f"{mod_id} belongs to another publisher")
         builds = dict(existing.get("builds", {}))
-        if manifest.get("game", "oot") != game or manifest.get("modapi", 1) != int(major):
+        if manifest.get("game", "oot") != game:
             raise ValueError(f"{package} no longer matches the publication plan")
-        builds[build_key] = {"file": asset, "url": f"{release_base}/{asset}", "hash": file_hash(package),
+        builds[game] = {"file": asset, "url": f"{release_base}/{asset}", "hash": file_hash(package),
                          "size": package.stat().st_size, "source_hash": hashes.get(mod_id, "")}
         metadata = {
             "name": manifest.get("name", mod_id), "author": manifest.get("author", request["author"]),
@@ -177,9 +190,9 @@ def summarize(plan_result, catalog):
         for mod_id in plan_result["publish"]:
             mod = catalog["mods"][mod_id]
             variant = mod.get("variants", {}).get(game, mod)
-            url = mod["builds"][f"{game}:{plan_result['modapi']}"]["url"]
+            url = mod["builds"][game]["url"]
             published.append(f"[{variant['name']} {variant['version']}]({url})")
-        lines.append(f"✔ Signed and in the store (mod API {plan_result['modapi']}): " + ", ".join(published))
+        lines.append("✔ Signed and in the store: " + ", ".join(published))
     if plan_result["unchanged"]:
         lines.append("Unchanged, so not signed again: " + ", ".join(plan_result["unchanged"]))
     for mod, permissions in plan_result["held"].items():
@@ -212,7 +225,6 @@ def main():
     plan_parser.add_argument("--packages", type=Path, required=True)
     plan_parser.add_argument("--source-hashes", type=Path, required=True)
     plan_parser.add_argument("--issue", type=int, required=True)
-    plan_parser.add_argument("--modapi-major", type=int, required=True)
     plan_parser.add_argument("--game", choices=("oot", "mm"), default="mm")
     plan_parser.add_argument("--author")
     plan_parser.add_argument("--trusted", action="store_true")
@@ -253,7 +265,7 @@ def main():
         held = {permission for permission in args.held_permissions.split(",") if permission}
         result = plan(read_catalog(args.catalog), list(args.packages.glob("*.o2r")),
                       read_json(args.source_hashes, {}), args.issue, args.trusted, args.approved, held,
-                      args.modapi_major, args.game, args.author)
+                      args.game, args.author)
         write_json(args.output, result)
         print(json.dumps(result, indent=2))
     elif args.command == "apply":

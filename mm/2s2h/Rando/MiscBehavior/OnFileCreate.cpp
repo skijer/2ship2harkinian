@@ -1,4 +1,6 @@
 #include "MiscBehavior.h"
+#include "2s2h/Fleet/FleetRuntime.h"
+#include "2s2h/Fleet/FleetRando.h"
 #include "2s2h/ModApi/ModDungeons/BossRegistry.h"
 #include "Rando/Rando.h"
 #include "Rando/Spoiler/Spoiler.h"
@@ -73,12 +75,14 @@ void Rando::MiscBehavior::PersistSeedOptions(uint32_t finalSeed) {
 // Very primitive randomizer implementation, when a save is created, if rando is enabled
 // we set the save type to rando and shuffle all checks and persist the results to the save
 void Rando::MiscBehavior::OnFileCreate(s16 fileNum) {
-    if (CVarGetInteger("gRando.Enabled", 0)) {
+    if (CVarGetInteger("gRando.Enabled", 0) || FleetRuntime_HasSession()) {
         PrepareRandoSave();
 
         try {
             // SpoilerFileIndex == 0 means we're generating a new one
-            if (CVarGetInteger("gRando.SpoilerFileIndex", 0) == 0) {
+            if (FleetRuntime_HasSession()) {
+                FleetRando_ApplyCombinedSave(FleetRuntime_Seed());
+            } else if (CVarGetInteger("gRando.SpoilerFileIndex", 0) == 0) {
                 bool hadInputSeed = true;
                 std::string inputSeed = Ship_RemoveSpecialCharacters(CVarGetString("gRando.InputSeed", ""));
                 if (inputSeed.empty()) {

@@ -10,11 +10,31 @@
 #include "2s2h/ShipUtils.h"
 #include "2s2h/Rando/Spoiler/Spoiler.h"
 #include "2s2h/Rando/MiscBehavior/MiscBehavior.h"
+#include "2s2h/Fleet/FleetGame.h"
 
 extern "C" {
 #include "variables.h"
 #include "functions.h"
 extern PlayState* gPlayState;
+}
+
+// MARK: - Rooms
+
+static const std::string sOcarinaGlobalRoomId = "soh-global";
+
+bool Anchor::IsGlobalRoom() {
+    const std::string room = CVarGetString("gNetwork.Anchor.RoomId", "");
+    if (room == GLOBAL_ROOM_ID) {
+        return true;
+    }
+    return FleetGame_IsHosted() && room == sOcarinaGlobalRoomId;
+}
+
+std::string Anchor::RoomToJoin() {
+    if (IsGlobalRoom()) {
+        return GLOBAL_ROOM_ID;
+    }
+    return FleetGame_NetworkRoom(CVarGetString("gNetwork.Anchor.RoomId", ""));
 }
 
 // MARK: - Overrides
@@ -25,7 +45,7 @@ void Anchor::Enable() {
     }
     ownClientId = CVarGetInteger("gNetwork.Anchor.LastClientId", 0);
     roomState.ownerClientId = 0;
-    Network::Enable(CVarGetString("gNetwork.Anchor.Host", "anchor.proxysaw.dev"),
+    Network::Enable(CVarGetString("gNetwork.Anchor.Host", "anchor.hm64.org"),
                     CVarGetInteger("gNetwork.Anchor.Port", 43383));
 }
 

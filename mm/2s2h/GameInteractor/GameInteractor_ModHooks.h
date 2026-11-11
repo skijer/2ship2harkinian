@@ -69,7 +69,7 @@ PlayerAnimationHeader* GameInteractor_ExecuteOnPlayerResolveAnimSite(s32 site, s
 void GameInteractor_ExecuteOnResolveSwordDamage(PlayState* play, s32 dmgFlags, u8* damage);
 bool GameInteractor_ExecuteOnBgCheckLineTest(CollisionContext* colCtx, Vec3f* posA, Vec3f* posB, Vec3f* hitPos,
                                              CollisionPoly** poly, s32* bgId, Actor* actor, u32 flags, bool result);
-bool GameInteractor_ExecuteOnActorTalk(Actor* actor, PlayState* play);
+void GameInteractor_ExecuteOnActorTalk(Actor* actor, PlayState* play);
 void GameInteractor_ExecuteOnAudioTablesReady(void);
 
 // Called from the audio thread; the hooks run on the game thread at the start of the next frame.

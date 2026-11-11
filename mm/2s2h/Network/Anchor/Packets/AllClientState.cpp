@@ -15,7 +15,7 @@
 
 void Anchor::HandlePacket_AllClientState(nlohmann::json payload) {
     std::vector<AnchorClient> newClients = payload["state"].get<std::vector<AnchorClient>>();
-    bool isGlobalRoom = (std::string("2ship-global") == CVarGetString("gNetwork.Anchor.RoomId", ""));
+    const bool isGlobalRoom = IsGlobalRoom();
 
     // add new clients
     for (auto& client : newClients) {

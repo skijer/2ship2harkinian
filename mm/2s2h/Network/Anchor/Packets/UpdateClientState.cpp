@@ -28,7 +28,6 @@ nlohmann::json Anchor::PrepClientState() {
     payload["teamId"] = CVarGetString("gNetwork.Anchor.TeamId", "default");
     payload["online"] = true;
     payload["game"] = "mm";
-    payload["modapi"] = 1;
     payload["capabilities"] = {"unbound.mod-channel.v1", "unbound.form-key.v1", "unbound.custom-progress.v1"};
 
     if (IsSaveLoaded()) {

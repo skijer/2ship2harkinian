@@ -1,6 +1,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
+#include "2s2h/Fleet/FleetGame.h"
 
 extern "C" {
 #include "variables.h"
@@ -12,6 +13,11 @@ extern "C" {
 #define CVAR CVarGetInteger(CVAR_NAME, 0)
 
 static constexpr int32_t OPENING_CS_INDEX = 0xFFFA;
+
+static bool FleetFileSelectEnabled() {
+    const auto enabled = reinterpret_cast<bool (*)()>(FleetGame_GetHostFunction("HasFileSelect"));
+    return enabled != nullptr && enabled();
+}
 
 // Normally the following is called by the opening cutscene
 static void SkipToFileSelect() {
@@ -34,11 +40,11 @@ static void RegisterSkipToFileSelect() {
         }
     });
 
-    COND_HOOK(OnConsoleLogoUpdate, CVAR, []() {
+    COND_HOOK(OnConsoleLogoUpdate, CVAR || FleetFileSelectEnabled(), []() {
         ConsoleLogoState* consoleLogoState = (ConsoleLogoState*)gGameState;
 
         // Wait for the console logo to fade out
-        if (consoleLogoState->exit) {
+        if (FleetFileSelectEnabled() || consoleLogoState->exit) {
             // Normally the PRNG seed is set at least once from the title opening running Play_Init
             // We need to call it manually before file select creates RNG values for new saves
             Rand_Seed(osGetTime());

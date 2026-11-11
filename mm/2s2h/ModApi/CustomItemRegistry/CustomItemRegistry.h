@@ -30,8 +30,15 @@ typedef enum {
     S2H_CUSTOM_ITEM_WEARABLE = 1 << 6,
 } S2HCustomItemFlags;
 
-// One bit per PlayerTransformation; zero means every form may use the item.
+// Legacy formMask: one bit per PlayerTransformation; zero means every form may use the item.
 #define S2H_CUSTOM_ITEM_FORM_BIT(form) (1u << (form))
+
+// Ages belong to Human Link: a child unless the form he wears is an adult one (S2HFormDefinition.isAdult).
+typedef enum {
+    S2H_CUSTOM_ITEM_AGE_ANY = 0,
+    S2H_CUSTOM_ITEM_AGE_CHILD = 1,
+    S2H_CUSTOM_ITEM_AGE_ADULT = 2,
+} S2HCustomItemAge;
 
 typedef enum {
     S2H_ITEM_ICON_TEXTBOX = 1 << 0,
@@ -120,7 +127,7 @@ typedef struct {
 typedef void (*S2HPickupVariantReceiveFunc)(const char* itemKey, const char* variantKey);
 typedef struct {
     uint32_t structSize;
-    const char* key; // Stable acquisition identity, written into the seed.
+    const char* key;     // Stable acquisition identity, written into the seed.
     const char* itemKey; // The single equipable inventory item.
     const char* variantKey;
     const char* iconPath;
@@ -195,6 +202,10 @@ typedef struct {
     S2HCustomItemAppearance appearance;
     // Optional UTF-8 label for messages; omitted labels fall back to the registered key.
     const char* displayName;
+    uint8_t ageRequirement;
+    // Optional form keys (S2H_FORM_KEY_* or a registered form's key) that may use the item; none means every form.
+    const char* const* allowedForms;
+    uint32_t allowedFormCount;
 } S2HCustomItemDefinition;
 
 #define S2H_CUSTOM_ITEM_RANDOMIZER_MIN_SIZE \
@@ -211,7 +222,13 @@ static inline bool CustomItemRegistry_IsVanillaUpgrade(const S2HCustomItemDefini
 
 bool CustomItemRegistry_Register(const S2HCustomItemDefinition* definition);
 const S2HCustomItemDefinition* CustomItemRegistry_FindReplacement(uint16_t vanillaItem);
+// The two tests items and equipment share, against the local player as he is now.
+bool CustomItemRegistry_IsAgeMet(uint8_t ageRequirement);
+bool CustomItemRegistry_IsFormInMask(uint8_t formMask);
+bool CustomItemRegistry_IsAgeAllowed(const char* key);
 bool CustomItemRegistry_IsFormAllowed(const char* key);
+// The one gate for showing, equipping and using an item: its age and its form both allow the player.
+bool CustomItemRegistry_IsUsableNow(const char* key);
 bool CustomItemRegistry_IsPauseItemFormAllowed(void);
 const char* CustomItemRegistry_ResolveTexture(const char* key, S2HItemIconSurface surface);
 bool CustomItemRegistry_IsEditorVisible(const char* key);
@@ -285,10 +302,12 @@ const S2HCustomItemDefinition* CustomItemRegistry_GetMessageItem(void);
 const S2HCustomItemDefinition* CustomItemRegistry_GetActive(void);
 const char* CustomItemRegistry_GetHeldKey(void);
 bool CustomItemRegistry_SetIconPath(const char* key, const char* path);
+bool CustomItemRegistry_SetNamePath(const char* key, const char* path);
 bool CustomItemRegistry_SetText(const char* key, S2HItemTextKind kind, const char* text);
 int32_t CustomItemRegistry_GetAmmo(const char* key);
 uint8_t CustomItemRegistry_GetActiveMeleeWeapon(void);
 uint8_t CustomItemRegistry_GetHeldMeleeWeapon(void);
+uint8_t CustomItemRegistry_GetActiveModelGroup(void);
 void CustomItemRegistry_InitHeld(struct PlayState* play, struct Player* player);
 int32_t CustomItemRegistry_UpdateHeld(struct Player* player, struct PlayState* play);
 void CustomItemRegistry_DrawHeld(struct Player* player, struct PlayState* play);

@@ -4,6 +4,7 @@
 #include <ship/window/Window.h>
 #include <ship/window/gui/ConsoleWindow.h>
 #include "2s2h/BenPort.h"
+#include "2s2h/Fleet/FleetGame.h"
 #include "2s2h/ModApi/ActorRegistry/ActorRegistry.h"
 #include "2s2h/ModApi/ConsoleArguments.h"
 #include "2s2h/Unbound/SceneDB.h"
@@ -160,16 +161,24 @@ static bool SetPosHandler(std::shared_ptr<Ship::Console> Console, const std::vec
     return 0;
 }
 
+extern "C" void S2H_ResetToTitle(void) {
+    if (gGameState == nullptr) {
+        return;
+    }
+    STOP_GAMESTATE(gGameState);
+    SET_NEXT_GAMESTATE(gGameState, ConsoleLogo_Init, sizeof(ConsoleLogoState));
+}
+
+// Inside Fleet both games share one console, so the command resets whichever game is being played.
 static bool ResetHandler(std::shared_ptr<Ship::Console> Console, std::vector<std::string> args, std::string* output) {
+    if (FleetGame_ResetActiveGame()) {
+        return 0;
+    }
     if (gGameState == nullptr) {
         ERROR_MESSAGE("gGameState == nullptr");
         return 1;
     }
-
-    STOP_GAMESTATE(gGameState);
-    SET_NEXT_GAMESTATE(gGameState, ConsoleLogo_Init, sizeof(ConsoleLogoState));
-    // GI-TODO
-    // GameInteractor::Instance->ExecuteHooks<GameInteractor::OnExitGame>(gSaveContext.fileNum);
+    S2H_ResetToTitle();
     return 0;
 }
 

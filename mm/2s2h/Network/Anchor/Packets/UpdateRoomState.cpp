@@ -16,9 +16,8 @@ extern PlayState* gPlayState;
 nlohmann::json Anchor::PrepRoomState() {
     nlohmann::json payload;
     payload["ownerClientId"] = ownClientId;
-    bool isGlobalRoom = (std::string("2ship-global") == CVarGetString("gNetwork.Anchor.RoomId", ""));
 
-    if (isGlobalRoom) {
+    if (IsGlobalRoom()) {
         payload["pvpMode"] = 0;
         payload["teleportMode"] = 0;
         payload["showLocationsMode"] = 0;

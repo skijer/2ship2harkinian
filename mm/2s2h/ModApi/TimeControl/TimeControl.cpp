@@ -23,7 +23,7 @@ namespace {
 
 constexpr u16 FreezeRefreshFrames = 3;
 constexpr size_t MaxTrackedHurtboxes = 64;
-constexpr std::array<u8, 9> StoppableCategories = { ACTORCAT_SWITCH, ACTORCAT_BG,   ACTORCAT_EXPLOSIVES,
+constexpr std::array<u8, 9> StoppableCategories = { ACTORCAT_SWITCH, ACTORCAT_BG,    ACTORCAT_EXPLOSIVES,
                                                     ACTORCAT_NPC,    ACTORCAT_ENEMY, ACTORCAT_PROP,
                                                     ACTORCAT_MISC,   ACTORCAT_BOSS,  ACTORCAT_CHEST };
 
@@ -129,14 +129,16 @@ void ReleaseActor(PlayState* play, Actor* actor) {
     actor->freezeTimer = 0;
 }
 
-void KeepSlowedActorHittable(PlayState* play, Actor* actor) {
-    if (actor->freezeTimer > 1 && ReregisterHurtboxesWasHit(play, actor)) {
-        actor->freezeTimer = 0;
-    }
-}
-
 u16 StutterFrames() {
     return static_cast<u16>(std::max(1, static_cast<int>(1.0f / WinningSpeed()) - 1));
+}
+
+// A timer below the stutter length means the actor skipped its update this frame and registered no hurtbox.
+void KeepSlowedActorHittable(PlayState* play, Actor* actor) {
+    const bool skippedUpdate = actor->freezeTimer != 0 && actor->freezeTimer < StutterFrames();
+    if (skippedUpdate && ReregisterHurtboxesWasHit(play, actor)) {
+        actor->freezeTimer = 0;
+    }
 }
 
 void HoldDayClock(bool isHeld) {
@@ -177,6 +179,13 @@ void StutterSlowedActor(Actor* actor) {
     }
 }
 
+// Actor_UpdateAll resets colChkInfo.damage even on frozen frames, so a hit victim must update in the frame it is hit.
+void LetHitActorReadDamage(Actor* victim, ColliderElement*, f32*) {
+    if (sWinningClaim && WinningSpeed() < 1.0f && !IsExempt(victim)) {
+        victim->freezeTimer = 0;
+    }
+}
+
 void StopStoppedActorMotion(Actor* actor, f32* scale) {
     if (IsStopped() && !IsExempt(actor)) {
         *scale = 0.0f;
@@ -198,6 +207,7 @@ void TimeControl_Init() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnActorUpdate>(StutterSlowedActor);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnActorResolveMotionScale>(StopStoppedActorMotion);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnCollisionRegisterAC>(TrackHurtbox);
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnCollisionResolveDamage>(LetHitActorReadDamage);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>(DropClaimsOnSceneChange);
 }
 

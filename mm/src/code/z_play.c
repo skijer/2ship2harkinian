@@ -1,4 +1,5 @@
 #include "z64.h"
+#include "2s2h/Fleet/FleetRuntimeBridge.h"
 #include "regs.h"
 #include "functions.h"
 #include "z64vismono.h"
@@ -449,6 +450,7 @@ Gfx* Play_SetFog(PlayState* this, Gfx* gfx) {
 }
 
 void Play_Destroy(GameState* thisx) {
+    FleetRuntime_CancelTransition();
     PlayState* this = (PlayState*)thisx;
     GraphicsContext* gfxCtx = this->state.gfxCtx;
 
@@ -661,6 +663,9 @@ void Play_UpdateTransition(PlayState* this) {
     switch (this->transitionMode) {
         case TRANS_MODE_SETUP:
             if (this->transitionTrigger != TRANS_TRIGGER_END) {
+                this->nextEntrance = FleetRuntime_ResolveTransition(this->nextEntrance);
+            }
+            if (this->transitionTrigger != TRANS_TRIGGER_END) {
                 s16 sceneLayer = 0;
 
                 Interface_SetHudVisibility(HUD_VISIBILITY_NONE);
@@ -800,6 +805,9 @@ void Play_UpdateTransition(PlayState* this) {
                         STOP_GAMESTATE(&this->state);
                         SET_NEXT_GAMESTATE(&this->state, TitleSetup_Init, sizeof(TitleSetupState));
                     } else if (gSaveContext.gameMode != GAMEMODE_FILE_SELECT) {
+                        if (FleetRuntime_CompleteTransition()) {
+                            break;
+                        }
                         STOP_GAMESTATE(&this->state);
                         SET_NEXT_GAMESTATE(&this->state, Play_Init, sizeof(PlayState));
                         gSaveContext.save.entrance = this->nextEntrance;
@@ -854,6 +862,9 @@ void Play_UpdateTransition(PlayState* this) {
             this->envCtx.screenFillColor[3] = (sTransitionFillTimer / 20.0f) * 255.0f;
 
             if (sTransitionFillTimer >= 20) {
+                if (FleetRuntime_CompleteTransition()) {
+                    break;
+                }
                 STOP_GAMESTATE(&this->state);
                 SET_NEXT_GAMESTATE(&this->state, Play_Init, sizeof(PlayState));
                 gSaveContext.save.entrance = this->nextEntrance;
@@ -896,6 +907,9 @@ void Play_UpdateTransition(PlayState* this) {
 
         case TRANS_MODE_INSTANT:
             if (this->transitionTrigger != TRANS_TRIGGER_END) {
+                if (FleetRuntime_CompleteTransition()) {
+                    break;
+                }
                 STOP_GAMESTATE(&this->state);
                 SET_NEXT_GAMESTATE(&this->state, Play_Init, sizeof(PlayState));
                 gSaveContext.save.entrance = this->nextEntrance;
@@ -938,6 +952,9 @@ void Play_UpdateTransition(PlayState* this) {
                 }
             } else {
                 if (this->envCtx.sandstormEnvA == 255) {
+                    if (FleetRuntime_CompleteTransition()) {
+                        break;
+                    }
                     STOP_GAMESTATE(&this->state);
                     SET_NEXT_GAMESTATE(&this->state, Play_Init, sizeof(PlayState));
                     gSaveContext.save.entrance = this->nextEntrance;

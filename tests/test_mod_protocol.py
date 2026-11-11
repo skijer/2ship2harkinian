@@ -33,7 +33,7 @@ class ModProtocolTests(unittest.TestCase):
         self.assertEqual(problems, set())
         self.assertEqual(used["sample"], {"network", "files"})
 
-    def package(self, game=GAME, major=1):
+    def package(self, game=GAME):
         mod = self.directory / "sample"
         mod.mkdir(exist_ok=True)
         (mod / "manifest.json").write_text(json.dumps({"name": "Sample", "permissions": []}))
@@ -42,38 +42,41 @@ class ModProtocolTests(unittest.TestCase):
         package = self.directory / "sample.o2r"
         subprocess.run([sys.executable, str(TOOLS / "pack_mod.py"), "--mod-directory", str(mod),
                         "--binary", str(binary), "--platform", "windows_x64", "--output", str(package),
-                        "--game", game, "--modapi-major", str(major)], check=True, capture_output=True)
+                        "--game", game], check=True, capture_output=True)
         return package
 
     def test_package_identity(self):
         with zipfile.ZipFile(self.package()) as archive:
             manifest = json.loads(archive.read("manifest.json"))
-            self.assertEqual((manifest["format"], manifest["game"], manifest["modapi"]), (2, GAME, 1))
+            self.assertEqual((manifest["format"], manifest["game"]), (2, GAME))
+            self.assertNotIn("modapi", manifest)
             self.assertEqual(archive.read(manifest["binaries"]["windows_x64"]), b"packaging fixture")
 
-    def test_reject_other_game_and_major_in_publication(self):
-        for game, major in [("mm" if GAME == "oot" else "oot", 1), (GAME, 2)]:
-            with self.subTest(game=game, major=major):
-                result = build_catalog.plan(build_catalog.empty_catalog(), [self.package(game, major)],
-                                            {}, 10, True, False, set(), 1, GAME)
-                self.assertIn("sample", result["rejected"])
-                self.assertFalse(result["publish"])
+    def test_reject_other_game_in_publication(self):
+        other_game = "mm" if GAME == "oot" else "oot"
+        result = build_catalog.plan(build_catalog.empty_catalog(), [self.package(other_game)],
+                                    {}, 10, True, False, set(), GAME)
+        self.assertIn("sample", result["rejected"])
+        self.assertFalse(result["publish"])
 
-    def test_package_rejects_nonpositive_major(self):
-        with self.assertRaises(subprocess.CalledProcessError):
-            self.package(major=0)
+    def test_old_catalogs_keep_the_newest_build_per_game(self):
+        path = self.directory / "catalog.json"
+        builds = {"1": {"url": "oot1"}, "2": {"url": "oot2"}, "mm:2": {"url": "mm2"}, "mm:3": {"url": "mm3"}}
+        path.write_text(json.dumps({"mods": {"sample": {"builds": builds}}}))
+        self.assertEqual(build_catalog.read_catalog(path)["mods"]["sample"]["builds"],
+                         {"oot": {"url": "oot2"}, "mm": {"url": "mm3"}})
 
     def test_catalog_preserves_other_game_build(self):
         package = self.package()
         catalog = build_catalog.empty_catalog()
         other_game = "mm" if GAME == "oot" else "oot"
-        catalog["mods"]["sample"] = {"issue": 10, "version": "old-version", "builds": {f"{other_game}:1": {"url": "other"}}}
-        plan = build_catalog.plan(catalog, [package], {}, 10, True, False, set(), 1, GAME)
+        catalog["mods"]["sample"] = {"issue": 10, "version": "old-version", "builds": {other_game: {"url": "other"}}}
+        plan = build_catalog.plan(catalog, [package], {}, 10, True, False, set(), GAME)
         request = {"issue": 10, "author": "test", "repository": "test/mods", "commit": "0" * 40,
                    "directory": "mods"}
         build_catalog.apply(catalog, plan, request, self.directory, {}, [], [], "https://example.com")
-        self.assertEqual(catalog["mods"]["sample"]["builds"][f"{other_game}:1"], {"url": "other"})
-        build = catalog["mods"]["sample"]["builds"][f"{GAME}:1"]
+        self.assertEqual(catalog["mods"]["sample"]["builds"][other_game], {"url": "other"})
+        build = catalog["mods"]["sample"]["builds"][GAME]
         self.assertEqual(build["size"], package.stat().st_size)
         if GAME == "mm":
             self.assertEqual(catalog["mods"]["sample"]["variants"]["oot"]["version"], "old-version")
@@ -85,12 +88,12 @@ class ModProtocolTests(unittest.TestCase):
         catalog = build_catalog.empty_catalog()
         request = {"issue": 11, "author": "test", "repository": "test/mods", "commit": "0" * 40, "directory": "mods"}
         other = "mm" if GAME == "oot" else "oot"
-        first = build_catalog.plan(catalog, [self.package(other)], {}, 11, True, False, set(), 1, other, "test")
+        first = build_catalog.plan(catalog, [self.package(other)], {}, 11, True, False, set(), other, "test")
         build_catalog.apply(catalog, first, request, self.directory, {}, [], [], "https://example.com")
         second_package = self.package(GAME)
-        refused = build_catalog.plan(catalog, [second_package], {}, 12, True, False, set(), 1, GAME, "attacker")
+        refused = build_catalog.plan(catalog, [second_package], {}, 12, True, False, set(), GAME, "attacker")
         self.assertIn("sample", refused["rejected"])
-        second = build_catalog.plan(catalog, [second_package], {}, 12, True, False, set(), 1, GAME, "test")
+        second = build_catalog.plan(catalog, [second_package], {}, 12, True, False, set(), GAME, "test")
         self.assertEqual(second["publish"], ["sample"])
         request["issue"] = 12
         build_catalog.apply(catalog, second, request, self.directory, {}, [], [], "https://example.com")

@@ -53,8 +53,7 @@ class Parser {
     bool Take(const std::string& value, bool word = false) {
         Space();
         const size_t end = position + value.size();
-        if (text.compare(position, value.size(), value) != 0 ||
-            (word && end < text.size() && NameChar(text[end]))) {
+        if (text.compare(position, value.size(), value) != 0 || (word && end < text.size() && NameChar(text[end]))) {
             return false;
         }
         position = end;
@@ -64,8 +63,12 @@ class Parser {
         Space();
         if (position < text.size() && text[position] == '"') {
             const size_t start = ++position;
-            while (position < text.size() && text[position] != '"') { position++; }
-            if (position == text.size()) { Fail("unterminated quoted name"); }
+            while (position < text.size() && text[position] != '"') {
+                position++;
+            }
+            if (position == text.size()) {
+                Fail("unterminated quoted name");
+            }
             const std::string result = text.substr(start, position - start);
             position++;
             return result;
@@ -116,28 +119,52 @@ class Parser {
     }
     Condition Atom() {
         const std::string name = Name();
-        if (name == "true") { return []() { return true; }; }
-        if (name == "false") { return []() { return false; }; }
-        if (name == "child" || name == "human") { return RandoLogic_IsChild; }
-        if (name == "adult" || name == "transformed") { return RandoLogic_IsAdult; }
-        if (name == "day") { return RandoLogic_IsAtDay; }
-        if (name == "night") { return RandoLogic_IsAtNight; }
-        if (name == "bosskey") { return [context = dungeon]() { return DungeonRegistry_HasBossKey(context); }; }
+        if (name == "true") {
+            return []() { return true; };
+        }
+        if (name == "false") {
+            return []() { return false; };
+        }
+        if (name == "child" || name == "human") {
+            return RandoLogic_IsChild;
+        }
+        if (name == "adult" || name == "transformed") {
+            return RandoLogic_IsAdult;
+        }
+        if (name == "day") {
+            return RandoLogic_IsAtDay;
+        }
+        if (name == "night") {
+            return RandoLogic_IsAtNight;
+        }
+        if (name == "bosskey") {
+            return [context = dungeon]() { return DungeonRegistry_HasBossKey(context); };
+        }
         if (Take("(")) {
             Space();
             const size_t start = position;
-            while (position < text.size() && text[position] != ')' && text[position] != ',') { position++; }
+            while (position < text.size() && text[position] != ')' && text[position] != ',') {
+                position++;
+            }
             std::string argument = text.substr(start, position - start);
-            while (!argument.empty() && std::isspace(static_cast<unsigned char>(argument.back()))) { argument.pop_back(); }
+            while (!argument.empty() && std::isspace(static_cast<unsigned char>(argument.back()))) {
+                argument.pop_back();
+            }
             if (argument.size() >= 2 && argument.front() == '"' && argument.back() == '"') {
                 argument = argument.substr(1, argument.size() - 2);
             }
             int32_t settingValue = 1;
-            if (Take(",")) { settingValue = Integer(Name()); }
-            if (!Take(")")) { Fail("expected ')'"); }
+            if (Take(",")) {
+                settingValue = Integer(Name());
+            }
+            if (!Take(")")) {
+                Fail("expected ')'");
+            }
             if (name == "keys") {
                 const int32_t count = Integer(argument);
-                if (count < 0 || count > 127) { Fail("invalid key count"); }
+                if (count < 0 || count > 127) {
+                    Fail("invalid key count");
+                }
                 return [context = dungeon, count]() { return DungeonRegistry_HasKeys(context, count); };
             }
             if (name == "event") {
@@ -149,17 +176,23 @@ class Parser {
             }
             if (name == "setting" || name == "trick") {
                 const int32_t option = DungeonRegistry_FindSymbol(argument);
-                if (option < 0 || option >= RO_MAX || !argument.starts_with("RO_")) { Fail("unknown option"); }
+                if (option < 0 || option >= RO_MAX || !argument.starts_with("RO_")) {
+                    Fail("unknown option");
+                }
                 return [option, settingValue]() { return RANDO_SAVE_OPTIONS[option] == settingValue; };
             }
             if (name == "tokens") {
                 const int32_t count = Integer(argument);
-                return [count]() { return Inventory_GetSkullTokenCount(SCENE_KINSTA1) >= count ||
-                                         Inventory_GetSkullTokenCount(SCENE_KINDAN2) >= count; };
+                return [count]() {
+                    return Inventory_GetSkullTokenCount(SCENE_KINSTA1) >= count ||
+                           Inventory_GetSkullTokenCount(SCENE_KINDAN2) >= count;
+                };
             }
             if (name == "canKill") {
                 const int32_t actor = DungeonRegistry_FindSymbol(argument);
-                if (actor < 0 || !argument.starts_with("ACTOR_")) { Fail("unknown actor"); }
+                if (actor < 0 || !argument.starts_with("ACTOR_")) {
+                    Fail("unknown actor");
+                }
                 return [actor]() { return Rando::Logic::CanKillEnemy(static_cast<ActorId>(actor)); };
             }
             if (name == "capability" || name == "cap") {
@@ -176,16 +209,23 @@ class Parser {
 #undef S2H_LOGIC_NAME
         };
         for (const char* capability : capabilities) {
-            if (name == capability) { return Capability(name); }
+            if (name == capability) {
+                return Capability(name);
+            }
         }
         return Item(name, false);
     }
     Condition Capability(const std::string& name) {
         bool known = false;
-#define S2H_LOGIC_KNOWN(capability, token) if (name == #capability) { known = true; }
+#define S2H_LOGIC_KNOWN(capability, token) \
+    if (name == #capability) {             \
+        known = true;                      \
+    }
         RANDO_LOGIC_CAPABILITIES(S2H_LOGIC_KNOWN)
 #undef S2H_LOGIC_KNOWN
-        if (!known) { Fail("unknown capability '" + name + "'"); }
+        if (!known) {
+            Fail("unknown capability '" + name + "'");
+        }
         return [name]() { return RandoLogic_HasCapability(name.c_str()); };
     }
     Condition Item(const std::string& name, bool has) {
@@ -199,11 +239,13 @@ class Parser {
             }
         }
         const int32_t custom = RandoItems_GetRandoGet(name.c_str());
-        if (!RandoItems_IsModItem(custom)) { Fail("unknown item '" + name + "'"); }
+        if (!RandoItems_IsModItem(custom)) {
+            Fail("unknown item '" + name + "'");
+        }
         return [custom, has]() { return has ? RandoLogic_HasLogicItem(custom) : RandoLogic_CanUseItem(custom); };
     }
 };
-}
+} // namespace
 
 bool LogicExpr::Compile(const std::string& expression, std::string& error, int32_t dungeon) {
     mCondition = nullptr;

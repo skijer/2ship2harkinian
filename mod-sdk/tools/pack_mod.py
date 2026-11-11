@@ -57,18 +57,15 @@ def main():
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--platform", choices=PLATFORMS, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--modapi-major", type=int, default=1)
     parser.add_argument("--game", choices=("oot", "mm"), default="mm")
     args = parser.parse_args()
 
     manifest = read_manifest(args.mod_directory)
     if not args.binary.is_file():
         raise ValueError(f"Missing native binary: {args.binary}")
-    if args.modapi_major is None or args.modapi_major <= 0:
-        raise ValueError("A package requires a positive Mod API major")
     if manifest.get("game", args.game) != args.game:
         raise ValueError("Manifest game differs from the SDK target")
-    manifest.update(format=2, game=args.game, modapi=args.modapi_major)
+    manifest.update(format=2, game=args.game)
     payload = collect_assets(args.mod_directory)
     binary_path = binary_archive_path(args.platform, args.binary)
     manifest["binaries"] = {args.platform: binary_path}

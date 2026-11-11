@@ -31,7 +31,7 @@ constexpr const char* AdultSkeleton = "gLinkAdultSkel";
 constexpr const char* ChildSkeleton = "gLinkChildSkel";
 constexpr s32 MaxLinkLimbCount = 32;
 constexpr std::array<const char*, PLAYER_EYES_MAX> EyeNames = { "Open",      "Half",  "Closedf", "RollLeft",
-                                                                 "RollRight", "Shock", "Unk1",    "Unk2" };
+                                                                "RollRight", "Shock", "Unk1",    "Unk2" };
 
 std::string sModelPath;
 float sRootScaleAdult = 1.0f;
@@ -204,7 +204,9 @@ void ScaleRootLimb(s32 limbIndex, Vec3f* pos) {
 }
 
 bool HideEmptySheath(const Player* player, s32 limbIndex, Gfx** dList) {
-    if (gPlayState != nullptr && player != GET_PLAYER(gPlayState)) return false;
+    if (gPlayState != nullptr && player != GET_PLAYER(gPlayState)) {
+        return false;
+    }
     if (limbIndex != PLAYER_LIMB_SHEATH || GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) != EQUIP_VALUE_SWORD_NONE ||
         GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) != EQUIP_VALUE_SHIELD_NONE) {
         return false;
@@ -213,13 +215,15 @@ bool HideEmptySheath(const Player* player, s32 limbIndex, Gfx** dList) {
     return true;
 }
 
-// MM's override swaps the waist and the empty hands for its own child meshes, which the form's skeleton already replaces.
+// MM's override swaps the waist and the empty hands for its own child meshes, which the form's skeleton already
+// replaces.
 bool IsBareLimb(const Player* player, s32 limbIndex) {
     switch (limbIndex) {
         case PLAYER_LIMB_WAIST:
             return true;
         case PLAYER_LIMB_LEFT_HAND:
-            return player->leftHandType == PLAYER_MODELTYPE_LH_OPEN || player->leftHandType == PLAYER_MODELTYPE_LH_CLOSED;
+            return player->leftHandType == PLAYER_MODELTYPE_LH_OPEN ||
+                   player->leftHandType == PLAYER_MODELTYPE_LH_CLOSED;
         case PLAYER_LIMB_RIGHT_HAND:
             return player->rightHandType == PLAYER_MODELTYPE_RH_OPEN ||
                    player->rightHandType == PLAYER_MODELTYPE_RH_CLOSED;
@@ -259,8 +263,8 @@ s32 OverrideLimbDrawMirrored(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f*
 
 void FormModel_Init() {
     GameInteractor::Instance->RegisterGameHookForID<GameInteractor::ShouldActorDraw>(ACTOR_PLAYER, SwapSkeleton);
-    GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnActorDraw>(
-        ACTOR_PLAYER, [](Actor*) { RestoreSkeleton(); });
+    GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnActorDraw>(ACTOR_PLAYER,
+                                                                                 [](Actor*) { RestoreSkeleton(); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([]() { sSwappedPlayer = nullptr; });
 }
 

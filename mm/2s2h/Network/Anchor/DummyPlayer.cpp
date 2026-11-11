@@ -104,8 +104,7 @@ void DummyPlayer_Init(Actor* actor, PlayState* play) {
     player->cylinder.dim.radius = 30;
     player->actor.colChkInfo.damageTable = &DummyPlayerDamageTable;
 
-    bool isGlobalRoom = (std::string("2ship-global") == CVarGetString("gNetwork.Anchor.RoomId", ""));
-    if (!isGlobalRoom) {
+    if (!Anchor::IsGlobalRoom()) {
         NameTag_RegisterForActorWithOptions(actor, client.name.c_str(), { .yOffset = 30 });
     }
 }

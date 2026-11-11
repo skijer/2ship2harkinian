@@ -69,7 +69,6 @@ void Anchor::SendPacket_PlayerUpdate() {
     payload["formKey"] = form != nullptr ? form : "";
     payload["heldCustomItemKey"] = held != nullptr ? held : "";
     payload["wornCustomItemKeys"] = CustomItemRegistry_ListWorn();
-    payload["modapi"] = 1;
     payload["quiet"] = true;
 
     for (auto& [clientId, client] : clients) {

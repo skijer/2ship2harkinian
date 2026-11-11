@@ -35,7 +35,11 @@ uint8_t RandoOptions_GetForSeed(const char* key);
 #ifdef __cplusplus
 }
 
+#include <string>
+#include <vector>
+
 void RandoOptions_Init();
+std::vector<std::string> RandoOptions_GetCvars();
 
 // While a seed is being generated the menu choice is the seed's value; afterwards the value captured with the save is.
 void RandoOptions_BeginSeedGeneration();

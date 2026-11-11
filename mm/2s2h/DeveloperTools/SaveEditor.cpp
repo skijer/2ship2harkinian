@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstring>
 #include <unordered_set>
+#include <spdlog/spdlog.h>
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Rando/Rando.h"
@@ -1008,6 +1009,16 @@ void DrawItemsAndMasksTab() {
         std::string riFilterString(riFilter.InputBuf);
 
         for (auto& [randoItemId, randoStaticItem] : Rando::StaticData::Items) {
+            // Lookups of unknown/dynamic RIs may leave default rows in the table.
+            // They are not giveable definitions and must not reach string construction.
+            if (randoStaticItem.name == nullptr || randoStaticItem.name[0] == '\0') {
+                static std::unordered_set<int> reportedMissingNames;
+                if (reportedMissingNames.insert(static_cast<int>(randoItemId)).second) {
+                    SPDLOG_WARN("[SaveEditor] Skipping randomizer item {} with no registered name",
+                                static_cast<int>(randoItemId));
+                }
+                continue;
+            }
             if (!riFilter.PassFilter(randoStaticItem.name)) {
                 continue;
             }
@@ -2760,6 +2771,7 @@ void SaveEditorWindow::InitElement() {
     initSafeItemsForInventorySlot();
     randoItemIdComboboxMap.clear();
     for (auto& [_, randoItem] : Rando::StaticData::Items) {
+        if (randoItem.spoilerName == nullptr || randoItem.spoilerName[0] == '\0') continue;
         randoItemIdComboboxMap[randoItem.randoItemId] = randoItem.spoilerName;
     }
 }

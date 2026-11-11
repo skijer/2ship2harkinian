@@ -214,7 +214,9 @@ bool ExtractFor(const ModIdentity* mod, const S2HRomExtractRequest* request) {
                                                   request->configPath, request->filelistDir, outputPath }) &&
                            ModArchive_Prepare(outputPath, archiveError) &&
                            PlaceInModsFolder(outputPath, request->outputFileName);
-    if (!archiveError.empty()) SPDLOG_ERROR("[UserFiles] {}", archiveError);
+    if (!archiveError.empty()) {
+        SPDLOG_ERROR("[UserFiles] {}", archiveError);
+    }
     std::filesystem::remove_all(workspace, error);
     return extracted;
 }
@@ -227,7 +229,9 @@ extern "C" bool UserFiles_Pick(const char* title, const char* filterName, const 
 }
 
 extern "C" bool UserFiles_HasModArchiveFile(const char* fileName) {
-    if (fileName == nullptr || !IsPlainFileName(fileName) || std::filesystem::path(fileName).extension() != ".o2r") return false;
+    if (fileName == nullptr || !IsPlainFileName(fileName) || std::filesystem::path(fileName).extension() != ".o2r") {
+        return false;
+    }
     std::error_code error;
     return std::filesystem::is_regular_file(ModLoader_GetModsDirectory() / fileName, error);
 }

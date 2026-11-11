@@ -2171,7 +2171,8 @@ s16 D_801AED48[] = {
 s32 Actor_TalkOfferAccepted(Actor* actor, GameState* gameState) {
     if (actor->flags & ACTOR_FLAG_TALK) {
         actor->flags &= ~ACTOR_FLAG_TALK;
-        return GameInteractor_ExecuteOnActorTalk(actor, (PlayState*)gameState);
+        GameInteractor_ExecuteOnActorTalk(actor, (PlayState*)gameState);
+        return true;
     }
 
     return false;

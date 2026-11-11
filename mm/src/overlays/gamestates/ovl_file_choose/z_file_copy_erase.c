@@ -5,6 +5,7 @@
  */
 
 #include "z_file_select.h"
+#include "2s2h/Fleet/FleetGame.h"
 #include "z64rumble.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -434,6 +435,11 @@ void FileSelect_CopyConfirm(GameState* thisx) {
         this->fileInfoAlpha[this->copyDestFileIndex] = this->nameAlpha[this->copyDestFileIndex];
         this->nextTitleLabel = FS_TITLE_COPY_COMPLETE;
         this->actionTimer = 4;
+        if (FleetGame_ManageSave("copy", this->selectedFileIndex, this->copyDestFileIndex)) {
+            STOP_GAMESTATE(&this->state);
+            SET_NEXT_GAMESTATE(&this->state, FileSelect_Init, sizeof(FileSelectState));
+            return;
+        }
         Sram_CopySave(this, sramCtx);
         if (!gSaveContext.flashSaveAvailable) {
             this->configMode = CM_COPY_ANIM_1;
@@ -976,6 +982,11 @@ void FileSelect_EraseConfirm(GameState* thisx) {
         this->actionTimer = 4;
         Audio_PlaySfx(NA_SE_SY_FSEL_CLOSE);
     } else if (CHECK_BTN_ANY(input->press.button, BTN_A | BTN_START)) {
+        if (FleetGame_ManageSave("erase", this->selectedFileIndex, -1)) {
+            STOP_GAMESTATE(&this->state);
+            SET_NEXT_GAMESTATE(&this->state, FileSelect_Init, sizeof(FileSelectState));
+            return;
+        }
         Sram_EraseSave(this, sramCtx, this->selectedFileIndex);
         if (!gSaveContext.flashSaveAvailable) {
             this->configMode = CM_ERASE_ANIM_1;

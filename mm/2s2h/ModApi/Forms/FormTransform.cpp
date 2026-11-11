@@ -140,8 +140,8 @@ bool FormTransform_IsActive(void) {
 
 bool FormTransform_Begin(const S2HFormDefinition* from, const S2HFormDefinition* to) {
     Player* player = GetPlayer();
-    const bool isStarted = player != nullptr && !sActive && CVarGetInteger(InstantTransformCvar, 0) == 0 &&
-                           CanPlayMaskCutscene(player);
+    const bool isStarted =
+        player != nullptr && !sActive && CVarGetInteger(InstantTransformCvar, 0) == 0 && CanPlayMaskCutscene(player);
     const S2HFormDefinition* wearer = from != nullptr ? from : to;
     if (!isStarted || wearer == nullptr) {
         return false;

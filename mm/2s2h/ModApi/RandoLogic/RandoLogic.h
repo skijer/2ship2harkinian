@@ -5,27 +5,31 @@
 #include <stdint.h>
 
 // X(name, macro): the macro is the token of Rando/Logic/Logic.h that capability selectors look for in a condition.
-#define RANDO_LOGIC_CAPABILITIES(X)                      \
-    X(BlastOrSmash, "CAN_USE_EXPLOSIVE")                 \
-    X(HasExplosives, "CAN_USE_EXPLOSIVE")                \
-    X(HasFireSource, "CAN_USE_MAGIC_ARROW(FIRE)")        \
+#define RANDO_LOGIC_CAPABILITIES(X)                           \
+    X(BlastOrSmash, "CAN_USE_EXPLOSIVE")                      \
+    X(HasExplosives, "CAN_USE_EXPLOSIVE")                     \
+    X(HasFireSource, "CAN_USE_MAGIC_ARROW(FIRE)")             \
     X(HasFireSourceWithTorch, "CAN_LIGHT_TORCH_NEAR_ANOTHER") \
-    X(CanHitSwitch, "")                                  \
-    X(CanUseSword, "CAN_USE_SWORD")                      \
-    X(CanUseHumanSword, "CAN_USE_HUMAN_SWORD")           \
-    X(CanAttack, "")                                     \
-    X(CanDamage, "")                                     \
-    X(CanShield, "EQUIP_TYPE_SHIELD")                    \
-    X(CanUseProjectile, "CAN_USE_PROJECTILE")            \
-    X(HookshotOrBoomerang, "ITEM_HOOKSHOT")              \
-    X(SummonEpona, "CAN_RIDE_EPONA")                     \
-    X(ScarecrowsSong, "CAN_HOOK_SCARECROW")              \
-    X(CanOpenUnderwaterChest, "CAN_USE_ABILITY(SWIM)")   \
-    X(HasMagic, "HAS_MAGIC")                             \
-    X(CanBeHuman, "CAN_BE_HUMAN")                        \
-    X(CanBeDeku, "CAN_BE_DEKU")                          \
-    X(CanBeGoron, "CAN_BE_GORON")                        \
-    X(CanBeZora, "CAN_BE_ZORA")                          \
+    X(CanUseFireArrow, "CAN_USE_MAGIC_ARROW(FIRE)")           \
+    X(CanUseIceArrow, "CAN_USE_MAGIC_ARROW(ICE)")             \
+    X(CanUseLightArrow, "CAN_USE_MAGIC_ARROW(LIGHT)")         \
+    X(CanHitSwitch, "")                                       \
+    X(CanUseSword, "CAN_USE_SWORD")                           \
+    X(CanUseHumanSword, "CAN_USE_HUMAN_SWORD")                \
+    X(CanAttack, "")                                          \
+    X(CanDamage, "")                                          \
+    X(CanShield, "EQUIP_TYPE_SHIELD")                         \
+    X(CanReflectLight, "HAS_MIRROR_SHIELD")                   \
+    X(CanUseProjectile, "CAN_USE_PROJECTILE")                 \
+    X(HookshotOrBoomerang, "ITEM_HOOKSHOT")                   \
+    X(SummonEpona, "CAN_RIDE_EPONA")                          \
+    X(ScarecrowsSong, "CAN_HOOK_SCARECROW")                   \
+    X(CanOpenUnderwaterChest, "CAN_USE_ABILITY(SWIM)")        \
+    X(HasMagic, "HAS_MAGIC")                                  \
+    X(CanBeHuman, "CAN_BE_HUMAN")                             \
+    X(CanBeDeku, "CAN_BE_DEKU")                               \
+    X(CanBeGoron, "CAN_BE_GORON")                             \
+    X(CanBeZora, "CAN_BE_ZORA")                               \
     X(CanBeFierceDeity, "CAN_BE_DEITY")
 
 typedef enum {

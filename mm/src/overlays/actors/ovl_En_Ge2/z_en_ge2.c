@@ -5,6 +5,7 @@
  */
 
 #include "z_en_ge2.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 
 #define FLAGS (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_MINIMAP_ICON_ENABLED)
 
@@ -139,6 +140,9 @@ void EnGe2_Destroy(Actor* thisx, PlayState* play) {
 
 // Detect Player through hearing or proximity
 GerudoPurpleDetection EnGe2_DetectPlayer(PlayState* play, EnGe2* this) {
+    if (!GameInteractor_Should(VB_PIRATE_DETECT_PLAYER, true)) {
+        return GERUDO_PURPLE_DETECTION_UNDETECTED;
+    }
     if (this->picto.actor.xzDistToPlayer > 250.0f) {
         return GERUDO_PURPLE_DETECTION_UNDETECTED;
     } else if ((Player_GetMask(play) != PLAYER_MASK_STONE) && (this->picto.actor.xzDistToPlayer < 50.0f)) {
@@ -168,6 +172,9 @@ s32 EnGe2_LookForPlayer(PlayState* play, Actor* actor, Vec3f* pos, s16 yaw, s16 
     CollisionPoly* outPoly;
     Player* player = GET_PLAYER(play);
 
+    if (!GameInteractor_Should(VB_PIRATE_DETECT_PLAYER, true)) {
+        return false;
+    }
     if (Player_GetMask(play) == PLAYER_MASK_STONE) {
         return false;
     }

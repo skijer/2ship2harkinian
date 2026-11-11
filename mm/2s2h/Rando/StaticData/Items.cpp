@@ -740,22 +740,26 @@ std::vector<std::string> GetTrickNames(RandoItemId randoItemId) {
 
 // A readable name two items share would be ambiguous, so those items keep their spoiler token.
 // RI_TRIFORCE_PIECE_PREVIOUS only draws and shares its name with the real piece.
+// Rebuilt whenever mods add rows: a first call before mod registration must not hide their items.
 static const std::unordered_map<RandoItemId, std::string>& UniqueItemNames() {
-    static const std::unordered_map<RandoItemId, std::string> names = [] {
-        std::unordered_map<std::string, int> uses;
-        for (const auto& [id, item] : Items) {
-            if (id != RI_TRIFORCE_PIECE_PREVIOUS && !Ship_IsCStringEmpty(item.name)) {
-                uses[item.name]++;
-            }
+    static std::unordered_map<RandoItemId, std::string> names;
+    static size_t namedRows = 0;
+    if (namedRows == Items.size()) {
+        return names;
+    }
+    std::unordered_map<std::string, int> uses;
+    for (const auto& [id, item] : Items) {
+        if (id != RI_TRIFORCE_PIECE_PREVIOUS && !Ship_IsCStringEmpty(item.name)) {
+            uses[item.name]++;
         }
-        std::unordered_map<RandoItemId, std::string> unique;
-        for (const auto& [id, item] : Items) {
-            const bool readable =
-                id != RI_TRIFORCE_PIECE_PREVIOUS && !Ship_IsCStringEmpty(item.name) && uses[item.name] == 1;
-            unique[id] = readable ? item.name : (Ship_IsCStringEmpty(item.spoilerName) ? "" : item.spoilerName);
-        }
-        return unique;
-    }();
+    }
+    names.clear();
+    for (const auto& [id, item] : Items) {
+        const bool readable =
+            id != RI_TRIFORCE_PIECE_PREVIOUS && !Ship_IsCStringEmpty(item.name) && uses[item.name] == 1;
+        names[id] = readable ? item.name : (Ship_IsCStringEmpty(item.spoilerName) ? "" : item.spoilerName);
+    }
+    namedRows = Items.size();
     return names;
 }
 
@@ -766,15 +770,17 @@ const std::string& GetItemDisplayName(RandoItemId randoItemId) {
 }
 
 RandoItemId GetItemIdFromDisplayName(const std::string& name) {
-    static const std::unordered_map<std::string, RandoItemId> ids = [] {
-        std::unordered_map<std::string, RandoItemId> map;
+    static std::unordered_map<std::string, RandoItemId> ids;
+    static size_t indexedRows = 0;
+    if (indexedRows != Items.size()) {
+        ids.clear();
         for (const auto& [id, displayName] : UniqueItemNames()) {
             if (!displayName.empty()) {
-                map.emplace(displayName, id);
+                ids.emplace(displayName, id);
             }
         }
-        return map;
-    }();
+        indexedRows = Items.size();
+    }
     auto id = ids.find(name);
     return id == ids.end() ? RI_UNKNOWN : id->second;
 }

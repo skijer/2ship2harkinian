@@ -98,9 +98,30 @@ static inline void Z64Items_SetButtons(S2HCustomItemDefinition* definition, uint
     definition->flags |= S2H_CUSTOM_ITEM_EQUIPPABLE | buttonFlags;
 }
 
-// Ship's Z64Items_SetAge: Majora's Mask has forms instead of ages, one bit per S2H_CUSTOM_ITEM_FORM_BIT.
+// Legacy mask of Majora's Mask's own forms, one bit per S2H_CUSTOM_ITEM_FORM_BIT; Ship has no counterpart.
 static inline void Z64Items_SetForms(S2HCustomItemDefinition* definition, uint8_t formMask) {
     definition->formMask = formMask;
+}
+
+static inline void Z64Items_SetAge(S2HCustomItemDefinition* definition, S2HCustomItemAge age) {
+    definition->ageRequirement = (uint8_t)age;
+}
+
+// The game copies the keys when the item registers; until then the array must stay alive.
+static inline void Z64Items_SetAllowedForms(S2HCustomItemDefinition* definition, const char* const* formKeys,
+                                            uint32_t formKeyCount) {
+    definition->allowedForms = formKeys;
+    definition->allowedFormCount = formKeyCount;
+}
+
+static inline void Z64Items_SetEquipAge(S2HCustomEquipDefinition* definition, S2HCustomItemAge age) {
+    definition->ageRequirement = (uint8_t)age;
+}
+
+static inline void Z64Items_SetEquipAllowedForms(S2HCustomEquipDefinition* definition, const char* const* formKeys,
+                                                 uint32_t formKeyCount) {
+    definition->allowedForms = formKeys;
+    definition->allowedFormCount = formKeyCount;
 }
 
 static inline void Z64Items_SetReplaces(S2HCustomItemDefinition* definition, uint16_t vanillaItem) {

@@ -27,7 +27,6 @@ FIELD_REWRITES = [
     (re.compile(r"(\.|->)linearVelocity\b"), r"\1speedXZ"),
     (re.compile(r"(actorLists\[(?:[^\[\]]|\[[^\]]*\])*\])\.head\b"), r"\1.first"),
     (re.compile(r"(?<![Rr]oom)(\.|->)segment\b"), r"\1segmentVoid"),
-    (re.compile(r"(\.|->)ageRequirement(\s*=\s*)([^;,}\n]+)"), r"\1formMask\2OOT_COMPAT_AGE_FORM_MASK(\3)"),
     (re.compile(r"(\.|->)nextEntranceIndex\b"), r"\1nextEntrance"),
     (re.compile(r"(\.|->)entranceIndex\b"), r"\1entrance"),
     # EnvironmentContext weather, same offsets in both games.

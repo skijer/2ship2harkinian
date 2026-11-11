@@ -132,8 +132,7 @@ bool IsStashableButton(uint8_t button) {
 
 // C and D-pad buttons are shared by every form, so the Human row is the one they live in.
 uint8_t GetButtonItem(uint8_t button) {
-    return IsDpadButton(button) ? DPAD_GET_CUR_FORM_BTN_ITEM(HELD_ITEM_TO_DPAD(button))
-                                : BUTTON_ITEM_EQUIP(0, button);
+    return IsDpadButton(button) ? DPAD_GET_CUR_FORM_BTN_ITEM(HELD_ITEM_TO_DPAD(button)) : BUTTON_ITEM_EQUIP(0, button);
 }
 
 uint8_t GetButtonSlot(uint8_t button) {
@@ -567,13 +566,15 @@ void FormRegistry_RunActionOverride(PlayState* play, Player* player, int32_t act
 }
 
 void FormRegistry_ResolveMotionScale(Player*, int32_t kind, float* scale) {
-    if (kind == SOH_PLAYER_MOTION_STICK_SPEED && sAppliedForm != nullptr && sAppliedForm->definition.motionScale > 0.0f) {
+    if (kind == SOH_PLAYER_MOTION_STICK_SPEED && sAppliedForm != nullptr &&
+        sAppliedForm->definition.motionScale > 0.0f) {
         *scale *= sAppliedForm->definition.motionScale;
     }
 }
 
 float FormRegistry_ResolveHeight(Player* player, float height) {
-    const bool hasOwnHeight = sAppliedForm != nullptr && player == GetPlayer() && sAppliedForm->definition.height > 0.0f;
+    const bool hasOwnHeight =
+        sAppliedForm != nullptr && player == GetPlayer() && sAppliedForm->definition.height > 0.0f;
     return hasOwnHeight ? sAppliedForm->definition.height : height;
 }
 
@@ -679,4 +680,47 @@ const char* FormRegistry_GetActiveKey(void) {
 bool FormRegistry_IsActive(const char* key) {
     const char* active = FormRegistry_GetActiveKey();
     return key != nullptr && active != nullptr && std::strcmp(active, key) == 0;
+}
+
+const char* FormRegistry_GetNativeKey(uint8_t playerForm) {
+    switch (playerForm) {
+        case PLAYER_FORM_FIERCE_DEITY:
+            return S2H_FORM_KEY_FIERCE_DEITY;
+        case PLAYER_FORM_GORON:
+            return S2H_FORM_KEY_GORON;
+        case PLAYER_FORM_ZORA:
+            return S2H_FORM_KEY_ZORA;
+        case PLAYER_FORM_DEKU:
+            return S2H_FORM_KEY_DEKU;
+        default:
+            return S2H_FORM_KEY_HUMAN;
+    }
+}
+
+// A registered form only shows on Human Link, so a native transformation outranks the one the save remembers.
+static const RegisteredForm* GetWornForm() {
+    return gSaveContext.save.playerForm == PLAYER_FORM_HUMAN ? sActiveForm : nullptr;
+}
+
+const char* FormRegistry_GetCurrentKey(void) {
+    const RegisteredForm* wornForm = GetWornForm();
+    return wornForm != nullptr ? wornForm->key.c_str() : FormRegistry_GetNativeKey(gSaveContext.save.playerForm);
+}
+
+bool FormRegistry_IsCurrentFormIn(const char* const* formKeys, uint32_t formKeyCount) {
+    if (formKeys == nullptr || formKeyCount == 0) {
+        return true;
+    }
+    const char* currentKey = FormRegistry_GetCurrentKey();
+    for (uint32_t index = 0; index < formKeyCount; index++) {
+        if (std::strcmp(formKeys[index], currentKey) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool FormRegistry_IsCurrentFormAdult(void) {
+    const RegisteredForm* wornForm = GetWornForm();
+    return wornForm != nullptr && wornForm->definition.isAdult;
 }

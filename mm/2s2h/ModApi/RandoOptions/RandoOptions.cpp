@@ -199,6 +199,14 @@ uint8_t RandoOptions_GetForSeed(const char* key) {
     return IS_RANDO && !sIsGenerating ? ReadCapturedChoice(*option) : ReadMenuChoice(*option);
 }
 
+std::vector<std::string> RandoOptions_GetCvars() {
+    std::vector<std::string> cvars;
+    for (const RegisteredOption& option : sOptions) {
+        cvars.push_back(option.cvar);
+    }
+    return cvars;
+}
+
 void RandoOptions_Init() {
     SaveSections_Register(SaveSection, WriteSection, ReadSection);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnRandoSeedGeneration>(CaptureSnapshot);

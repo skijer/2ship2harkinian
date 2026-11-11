@@ -7529,9 +7529,23 @@ void func_808378FC(PlayState* play, Player* this) {
     }
 }
 
+static bool Player_IsGoronOnlyCarry(Actor* actor) {
+    if (actor->id == ACTOR_EN_BOM) {
+        return ((EnBom*)actor)->isPowderKeg;
+    }
+    return ((actor->id == ACTOR_EN_ISHI) && (actor->params & 1)) || (actor->id == ACTOR_EN_MM);
+}
+
+static bool Player_CanLiftActor(Player* this, Actor* actor) {
+    bool canLift = (this->transformation != PLAYER_FORM_DEKU) &&
+                   ((this->transformation == PLAYER_FORM_GORON) || !Player_IsGoronOnlyCarry(actor));
+
+    return GameInteractor_Should(VB_PLAYER_LIFT_ACTOR, canLift, this, actor);
+}
+
 bool func_8083798C(Player* this) {
     return (this->interactRangeActor != NULL) && (this->heldActor == NULL) &&
-           (this->transformation != PLAYER_FORM_DEKU);
+           Player_CanLiftActor(this, this->interactRangeActor);
 }
 
 void func_808379C0(PlayState* play, Player* this) {
@@ -7787,6 +7801,13 @@ void func_8083827C(Player* this, PlayState* play) {
                 Player_StopHorizontalMovement(this);
             }
             this->actor.bgCheckFlags |= BGCHECKFLAG_GROUND_TOUCH;
+            return;
+        }
+
+        // OoT func_8083AA10: gravity nets the 1.0f out, and property 9 keeps the ledge hop from triggering.
+        if (GameInteractor_Should(VB_PLAYER_WALK_ON_AIR, false, this)) {
+            this->actor.velocity.y = 1.0f;
+            sPrevFloorProperty = FLOOR_PROPERTY_9;
             return;
         }
 
@@ -9837,17 +9858,8 @@ s32 Player_ActionHandler_2(Player* this, PlayState* play) {
                         }
                     } else if ((!(this->stateFlags1 & PLAYER_STATE1_8000000) ||
                                 (Player_IsBottomWalking(this) && (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND))) &&
-                               (this->transformation != PLAYER_FORM_DEKU)) {
+                               Player_CanLiftActor(this, interactRangeActor)) {
                         if ((this->heldActor == NULL) || Player_IsHoldingHookshot(this)) {
-                            EnBom* bomb = (EnBom*)interactRangeActor;
-
-                            if (((this->transformation != PLAYER_FORM_GORON) &&
-                                 (((bomb->actor.id == ACTOR_EN_BOM) && bomb->isPowderKeg) ||
-                                  ((interactRangeActor->id == ACTOR_EN_ISHI) && (interactRangeActor->params & 1)) ||
-                                  (interactRangeActor->id == ACTOR_EN_MM)))) {
-                                return false;
-                            }
-
                             this->stateFlags2 |= PLAYER_STATE2_10000;
                             if (CHECK_BTN_ALL(sPlayerControlInput->press.button, BTN_A)) {
                                 Player_SetupWaitForPutAway(play, this, func_808379C0);

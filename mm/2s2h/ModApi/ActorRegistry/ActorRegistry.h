@@ -42,8 +42,7 @@ typedef struct {
 } S2HActorDefinition;
 
 #define S2H_ACTOR_DEFINITION_MIN_SIZE (offsetof(S2HActorDefinition, draw) + sizeof(((S2HActorDefinition*)0)->draw))
-#define S2H_ACTOR_DEFINITION_RESET_SIZE \
-    (offsetof(S2HActorDefinition, reset) + sizeof(((S2HActorDefinition*)0)->reset))
+#define S2H_ACTOR_DEFINITION_RESET_SIZE (offsetof(S2HActorDefinition, reset) + sizeof(((S2HActorDefinition*)0)->reset))
 #define S2H_ACTOR_DEFINITION_ENEMY_SIZE \
     (offsetof(S2HActorDefinition, enemySpawnHeight) + sizeof(((S2HActorDefinition*)0)->enemySpawnHeight))
 #define S2H_ACTOR_DEFINITION_HINT_SIZE \

@@ -72,11 +72,11 @@ El `.cmake` se llama `S2HModSdk.cmake` frente a `UnboundModSdk.cmake`: unificar 
 
 ## Paridad de la ModApi (tabla)
 
-- Ship 159 servicios, 2Ship 168: **los 159 nombres de Ship existen en 2Ship**. Mismo `MOD_API_MAJOR = 1`.
-- Extra solo en 2Ship: `ExtractRom`, `ExtractRomToModsFolder`, `GetHostGame`, `GetModApiMajor`,
+- Ship 159 servicios, 2Ship 168: **los 159 nombres de Ship existen en 2Ship**. Ninguno lleva versión de API.
+- Extra solo en 2Ship: `ExtractRom`, `ExtractRomToModsFolder`, `GetHostGame`,
   `HasModArchiveFile`, `HasVanillaBehavior`, `RegisterVBByName`, `SetCustomItemIconPath`,
   `IsCustomItemFormAllowed` (equivalente MM de la edad). Para 1:1 real, Ship debería recibir los genéricos
-  (`GetHostGame`, `GetModApiMajor`, `HasModArchiveFile`, `HasVanillaBehavior`, `RegisterVBByName`,
+  (`GetHostGame`, `HasModArchiveFile`, `HasVanillaBehavior`, `RegisterVBByName`,
   `SetCustomItemIconPath`); así un mod puede preguntar "¿en qué juego estoy?" en los dos.
 - La tabla NO es binariamente intercambiable (orden y structs distintos). Compatibilidad = mismo fuente,
   dos builds.
@@ -256,8 +256,7 @@ regs de la HUD de OoT y campos de UI de Ship.
 Cambio de host para esto: `S2HGetItemEntry` tiene ya el layout del `GetItemEntry` de Ship (con `drawFunc`, `gi`,
 `gid`); `CustomItemRegistry_DrawAcquisition` llama a `drawFunc`, si no hay modelo dibuja `GetItem_Draw(gid)`, y
 `VanillaItems_GetItemEntry` rellena la entrada desde `sGetItemTable` de `z_player.c`. Como cambia el layout en medio
-de `S2HCustomItemDefinition`, `S2H_MOD_API_MAJOR` pasa de 1 a 2: los mods compilados antes se rechazan y el store
-busca builds `2`.
+de `S2HCustomItemDefinition`, los mods compilados antes hay que recompilarlos y volver a firmarlos.
 
 Huecos de API de 2Ship que salen al traducir: `ModMenu/ModUI.h` (widgets con tema), `ActorDB`, `frame_interpolation`,
 `ModDungeons/{DungeonEntrancePairs,ModDungeonsHost,RandoEnumNames}.h`, `SOHCustomEnemy`/`SOH_ACTOR_ENEMY*`,

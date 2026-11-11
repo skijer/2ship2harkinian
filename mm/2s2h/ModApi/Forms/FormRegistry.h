@@ -74,9 +74,19 @@ typedef struct {
     PlayerAnimationHeader* transformOffAnim;
     Vec3f transformGlowOffset;
     float transformGlowScale;
+    // Majora's Mask has no ages of its own: Link is an adult while the form he wears says so.
+    bool isAdult;
 } S2HFormDefinition;
 
 #define S2H_FORM_DEFINITION_MIN_SIZE (offsetof(S2HFormDefinition, draw) + sizeof(((S2HFormDefinition*)0)->draw))
+
+// Form keys both games share. Link without a form is HUMAN; the others are the game's own forms, mods in Ship.
+#define S2H_FORM_KEY_HUMAN "nei.human"
+#define S2H_FORM_KEY_DEKU "nei.deku"
+#define S2H_FORM_KEY_GORON "nei.goron"
+#define S2H_FORM_KEY_ZORA "nei.zora"
+#define S2H_FORM_KEY_FIERCE_DEITY "nei.fierce_deity"
+#define S2H_FORM_KEY_ADULT "nei.adult"
 
 bool FormRegistry_Register(const S2HFormDefinition* definition);
 const S2HFormDefinition* FormRegistry_Find(const char* key);
@@ -87,6 +97,12 @@ bool FormRegistry_Toggle(const char* key);
 bool FormRegistry_ApplyActive(const char* key);
 const char* FormRegistry_GetActiveKey(void);
 bool FormRegistry_IsActive(const char* key);
+// The local player's form, never NULL: a native form's S2H_FORM_KEY_*, else the registered form Human Link wears.
+const char* FormRegistry_GetCurrentKey(void);
+const char* FormRegistry_GetNativeKey(uint8_t playerForm);
+// An empty list names no restriction.
+bool FormRegistry_IsCurrentFormIn(const char* const* formKeys, uint32_t formKeyCount);
+bool FormRegistry_IsCurrentFormAdult(void);
 
 // Player_GetHeight (z_actor.c), Human case: the form's own height, or height itself when none applies.
 float FormRegistry_ResolveHeight(Player* player, float height);
@@ -96,7 +112,8 @@ float FormRegistry_ResolveHeight(Player* player, float height);
 
 void FormRegistry_Init();
 
-// Same arguments as the Ship hooks OnPlayerActionHandler and OnPlayerResolveMotionScale (ID SOH_PLAYER_MOTION_STICK_SPEED).
+// Same arguments as the Ship hooks OnPlayerActionHandler and OnPlayerResolveMotionScale (ID
+// SOH_PLAYER_MOTION_STICK_SPEED).
 void FormRegistry_RunActionOverride(PlayState* play, Player* player, int32_t action, bool* consumed,
                                     bool* startedAction);
 void FormRegistry_ResolveMotionScale(Player* player, int32_t kind, float* scale);

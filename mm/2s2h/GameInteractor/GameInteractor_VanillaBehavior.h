@@ -2694,6 +2694,34 @@ typedef enum {
     // - `*Player`
     // - `SOHPlayerAbility`
     VB_PLAYER_USE_FORM_ABILITY,
+
+    // #### `result`
+    // ```c
+    // this->transformation != PLAYER_FORM_DEKU &&
+    //     (this->transformation == PLAYER_FORM_GORON || !Player_IsGoronOnlyCarry(actor))
+    // ```
+    // #### `args`
+    // - `*Player`
+    // - `*Actor` (the carry offer)
+    VB_PLAYER_LIFT_ACTOR,
+
+    // #### `result`
+    // ```c
+    // false
+    // ```
+    // #### `args`
+    // - `*Player`
+    // True keeps Link in his walk past a ledge, held level, instead of falling or auto-jumping (OoT's hover boots).
+    VB_PLAYER_WALK_ON_AIR,
+    VB_PIRATE_DETECT_PLAYER,
+
+    // #### `result`
+    // ```c
+    // CVarGetInteger("gRando.CSMC", 0) != 0
+    // ```
+    // #### `args`
+    // - None
+    VB_RANDO_MATCH_CONTAINER_STYLE,
 } GIVanillaBehavior;
 
 #endif

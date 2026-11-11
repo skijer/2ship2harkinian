@@ -5,6 +5,7 @@
  */
 
 #include "z_file_select.h"
+#include "2s2h/Fleet/FleetGame.h"
 #include "overlays/gamestates/ovl_opening/z_opening.h"
 #include "z64rumble.h"
 #include "z64save.h"
@@ -251,8 +252,23 @@ void FileSelect_UpdateMainMenu(GameState* thisx) {
     SramContext* sramCtx = &this->sramCtx;
     Input* input = CONTROLLER1(&this->state);
 
+    if (FleetGame_FileSelect()) {
+        return;
+    }
+    for (s32 slot = 0; slot < 3; slot++) {
+        if (FleetGame_HasSaveSlot(slot) && !SLOT_OCCUPIED(this, slot)) {
+            const u8 name[8] = { 0x15, 0x2C, 0x31, 0x2E, 0x3E, 0x3E, 0x3E, 0x3E };
+            memcpy(this->newf[slot], "ZELDA3", 6);
+            memcpy(this->fileNames[slot], name, 8);
+            this->healthCapacity[slot] = this->health[slot] = 0x30;
+            this->nameAlpha[slot] = this->nameBoxAlpha[slot] = 200;
+        }
+    }
     if (CHECK_BTN_ALL(input->press.button, BTN_START) || CHECK_BTN_ALL(input->press.button, BTN_A)) {
         if (this->buttonIndex <= FS_BTN_MAIN_FILE_3) {
+            if (FleetGame_SelectFile(this->buttonIndex)) {
+                return;
+            }
             if (!gSaveContext.flashSaveAvailable) {
                 if (!NO_FLASH_SLOT_OCCUPIED(sramCtx, this->buttonIndex)) {
                     Audio_PlaySfx(NA_SE_SY_FSEL_DECIDE_L);

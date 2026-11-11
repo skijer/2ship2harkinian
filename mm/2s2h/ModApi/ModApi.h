@@ -1,9 +1,6 @@
 #ifndef S2H_MOD_API_H
 #define S2H_MOD_API_H
 
-// Append table entries without changing this; bump for incompatible ABI changes.
-#define S2H_MOD_API_MAJOR 3
-
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -34,6 +31,7 @@ extern "C" {
 #include "2s2h/ModApi/ModMessages/ModMessages.h"
 #include "2s2h/ModApi/ModStorage/ModStorage.h"
 #include "2s2h/ModApi/O2rExtractor/O2rExtractor.h"
+#include "2s2h/ModApi/OcarinaSongs/OcarinaSongRegistry.h"
 #include "2s2h/ModApi/Player/PlayerHookTypes.h"
 #include "2s2h/ModApi/PlayerInput/PlayerInput.h"
 #include "2s2h/ModApi/RandoInfCustom/RandoInfCustom.h"
@@ -51,9 +49,11 @@ extern "C" {
 #define S2H_MOD_EXPORT __attribute__((visibility("default")))
 #endif
 
-#define DEFINE_HOOK(name, args) \
-    typedef void(*S2HCb_##name) args; \
-    static inline S2HCb_##name S2H_CheckHook_##name(S2HCb_##name callback) { return callback; }
+#define DEFINE_HOOK(name, args)                                              \
+    typedef void(*S2HCb_##name) args;                                        \
+    static inline S2HCb_##name S2H_CheckHook_##name(S2HCb_##name callback) { \
+        return callback;                                                     \
+    }
 #include "2s2h/GameInteractor/GameInteractor_HookTable.h"
 #undef DEFINE_HOOK
 
@@ -69,7 +69,7 @@ typedef struct {
     uint32_t requiredBehaviorCount;
 } S2HModRequirements;
 
-// Same rows, in the same order, as Ship's SOHModApi; rows Majora's Mask adds go at the end. Append only.
+// Append only: mods index rows by offset. Row names match Ship's SOHModApi, the order does not.
 typedef struct {
     uint32_t tableSize;
     bool (*RegisterHookByName)(const char* name, void* callback);
@@ -210,7 +210,8 @@ typedef struct {
     bool (*HasVanillaBehavior)(const char* name);
     bool (*RegisterVBByName)(const char* name, S2HVbCallback callback);
     const char* (*GetHostGame)(void);
-    uint32_t (*GetModApiMajor)(void);
+    // Published mods index the rows below by offset: this retired row keeps its slot and stays NULL.
+    void (*retiredRow)(void);
     bool (*RegisterNetChannel)(const char* channel, uint16_t version, S2HNetMessageFunc onMessage);
     bool (*SendNet)(const char* channel, uint32_t to, const void* data, uint32_t size);
     bool (*SetNetPeerState)(const char* channel, const void* data, uint32_t size);
@@ -242,6 +243,11 @@ typedef struct {
     void (*ClearTimeSplitGroups)(void);
     bool (*SetItemIcon)(uint32_t item, uint32_t source);
     bool (*GrantLogic)(const S2HLogicGrant* grant);
+    int8_t (*RegisterOcarinaSong)(const S2HOcarinaSongDefinition* definition);
+    int8_t (*FindOcarinaSong)(const char* itemKey);
+    bool (*SetCustomItemNamePath)(const char* key, const char* path);
+    const char* (*GetShownLayoutPage)(void);
+    bool (*DrawPlayerPreview)(struct PlayState* play, const S2HPlayerPreview* preview);
 } S2HModApi;
 
 #define S2H_REGISTER_HOOK(api, name, callback) ((api)->RegisterHookByName(#name, (void*)S2H_CheckHook_##name(callback)))

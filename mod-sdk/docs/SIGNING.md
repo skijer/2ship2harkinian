@@ -58,10 +58,8 @@ A mod that needs another one names it in its manifest, and the store installs bo
 
 ### Unbound versions
 
-`S2H_MOD_API_MAJOR` in `mm/2s2h/ModApi/ModApi.h` goes up only when a change breaks mods built before it; adding
-entries to `S2HModApi` does not. The SDK stamps it into every package, and the game refuses packages built for
-another major. When a release bumps it, `publish-release.yml` rebuilds every listed mod at its last signed commit
-before the release goes public, and reports each result on its issue.
+Mods carry no API version. Each mod has one build per game in the store; the game compares its hash with the
+installed file and offers the update. Guard newer `S2HModApi` entries with `S2H_MOD_API_HAS`.
 
 The signature names your GitHub account, the repository and the commit, and links to the workflow run with every
 scan and build log. The game shows it in the Mod Menu next to the file name.
@@ -110,8 +108,7 @@ only). Replacing a key means `python mod-sdk/tools/mod_signature.py generate-key
 
 - **Build:** run **generate-builds** by hand, or push a `*unbound*` tag to build and publish a plain release.
 - **Release for the updater:** run **publish-release** with the id of a successful generate-builds run less than
-  a day old. It drafts the release with a signed `unbound-release.json`, rebuilds the mods if the mod API major
-  changed, and publishes it as latest. Bump `PROJECT_FORK_VERSION` in `CMakeLists.txt` first.
+  a day old. It drafts the release with a signed `unbound-release.json` and publishes it as latest. Bump `PROJECT_FORK_VERSION` in `CMakeLists.txt` first.
 - **Approve a new author:** add `approved` to their issue; to skip approval from then on, add their login to
   `.github/mod-signing/trusted-authors.txt`.
 - **Block an author:** add their lowercase login to `kRevokedModAuthors` in

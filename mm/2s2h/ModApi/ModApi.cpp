@@ -79,9 +79,9 @@ nlohmann::json DescribeActors() {
 
 bool DumpRegistryCommand(std::shared_ptr<Ship::Console>, const std::vector<std::string>& args, std::string* output) {
     const std::filesystem::path path =
-        args.size() > 1 ? std::filesystem::path(args[1])
-                        : std::filesystem::path(Ship::Context::GetPathRelativeToAppDirectory(RegistryFileName,
-                                                                                             appShortName));
+        args.size() > 1
+            ? std::filesystem::path(args[1])
+            : std::filesystem::path(Ship::Context::GetPathRelativeToAppDirectory(RegistryFileName, appShortName));
     const bool written = ModApi_WriteRegistry(path);
     if (output != nullptr) {
         *output = written ? "Wrote " + path.string() : "Cannot write " + path.string();
@@ -276,26 +276,33 @@ const char* GetHostGame() {
     return "mm";
 }
 
-uint32_t GetModApiMajor() {
-    return S2H_MOD_API_MAJOR;
-}
-
 bool HasHook(const char* name) {
     return name != nullptr && HookEntries().contains(name);
 }
 
 // Filled field by field: two hook table rows end in ';', which a braced initializer would not survive.
 void SetCelShadingRamp(float center, float softness, float highlight, float shadow, bool debugBands) {
-    if (!std::isfinite(center) || !std::isfinite(softness) || !std::isfinite(highlight) || !std::isfinite(shadow)) return;
+    if (!std::isfinite(center) || !std::isfinite(softness) || !std::isfinite(highlight) || !std::isfinite(shadow)) {
+        return;
+    }
     auto* context = Ship::Context::GetRawInstance();
-    if (!context) return;
+    if (!context) {
+        return;
+    }
     auto window = std::dynamic_pointer_cast<Fast::Fast3dWindow>(context->GetWindow());
-    if (!window) return;
+    if (!window) {
+        return;
+    }
     auto interpreter = window->GetInterpreterWeak().lock();
-    if (!interpreter) return;
+    if (!interpreter) {
+        return;
+    }
     auto* renderer = interpreter->GetCurrentRenderingAPI();
-    if (renderer) renderer->SetToonRamp(std::clamp(center, 0.0f, 1.0f), std::clamp(softness, 0.001f, 0.5f),
-                                      std::clamp(highlight, 0.0f, 2.0f), std::clamp(shadow, 0.0f, 1.0f), debugBands ? 1.0f : 0.0f);
+    if (renderer) {
+        renderer->SetToonRamp(std::clamp(center, 0.0f, 1.0f), std::clamp(softness, 0.001f, 0.5f),
+                              std::clamp(highlight, 0.0f, 2.0f), std::clamp(shadow, 0.0f, 1.0f),
+                              debugBands ? 1.0f : 0.0f);
+    }
 }
 
 S2HModApi BuildTable() {
@@ -434,7 +441,6 @@ S2HModApi BuildTable() {
     api.HasVanillaBehavior = HasVanillaBehavior;
     api.RegisterVBByName = RegisterVBByName;
     api.GetHostGame = GetHostGame;
-    api.GetModApiMajor = GetModApiMajor;
     api.RegisterNetChannel = ModNetwork_RegisterChannel;
     api.SendNet = ModNetwork_Send;
     api.SetNetPeerState = ModNetwork_SetPeerState;
@@ -456,7 +462,7 @@ S2HModApi BuildTable() {
     api.StopNetRoomCountdown = ModNetwork_StopRoomCountdown;
     api.SetCustomItemWorn = CustomItemRegistry_SetWorn;
     api.IsCustomItemWorn = CustomItemRegistry_IsWorn;
-    api.IsCustomItemAgeAllowed = CustomItemRegistry_IsFormAllowed;
+    api.IsCustomItemAgeAllowed = CustomItemRegistry_IsAgeAllowed;
     api.RegisterProgressiveChain = ProgressiveItems_Register;
     api.GetProgressiveLevel = ProgressiveItems_GetLevel;
     api.GetNextProgressiveItem = ProgressiveItems_GetNextItem;
@@ -466,6 +472,11 @@ S2HModApi BuildTable() {
     api.ClearTimeSplitGroups = ModLabels_ClearTimeSplitGroups;
     api.SetItemIcon = ModLabels_SetItemIcon;
     api.GrantLogic = RandoLogic_Grant;
+    api.RegisterOcarinaSong = OcarinaSongRegistry_Register;
+    api.FindOcarinaSong = OcarinaSongRegistry_FindByItem;
+    api.SetCustomItemNamePath = CustomItemRegistry_SetNamePath;
+    api.GetShownLayoutPage = KaleidoItemManager_GetShownLayoutPage;
+    api.DrawPlayerPreview = KaleidoItemManager_DrawPlayerPreview;
     api.RegisterSequence = Unbound_RegisterSequence;
     api.RegisterSoundFont = Unbound_RegisterSoundFont;
     api.GetSequenceId = Unbound_SequenceIdForPath;
@@ -491,12 +502,16 @@ void ModApi_Init() {
     RandoInfCustom_Init();
     RandoOptions_Init();
     TimeControl_Init();
-    Microphone_Init();
+    if (Ship::Context::GetRawInstance()->GetWindow() != nullptr) {
+        Microphone_Init();
+    }
     BossRegistry_Init();
     DungeonRegistry_Init();
     ModNetwork_Init();
     ModLoader_LoadMods();
-    ModStore_Init();
+    if (Ship::Context::GetRawInstance()->GetWindow() != nullptr) {
+        ModStore_Init();
+    }
     RegisterRegistryDumpCommand();
     ModApi_WriteRegistry(Ship::Context::GetPathRelativeToAppDirectory(RegistryFileName, appShortName));
 }

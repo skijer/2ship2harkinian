@@ -12,6 +12,7 @@
 #include "assets/archives/schedule_dma_static/schedule_dma_static_yar.h"
 #include "assets/archives/icon_item_static/icon_item_static_yar.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
+#include "2s2h/ModApi/OcarinaSongs/OcarinaSongRegistry.h"
 #include "assets/archives/icon_item_24_static/icon_item_24_static_yar.h"
 #include "assets/interface/message_static/message_static.h"
 #include "assets/interface/message_texture_static/message_texture_static.h"
@@ -3741,6 +3742,7 @@ void Message_DisplayOcarinaStaffImpl(PlayState* play, u16 ocarinaAction) {
     if (CHECK_EVENTINF(EVENTINF_31)) {
         msgCtx->ocarinaAvailableSongs |= 0x800000;
     }
+    OcarinaSongRegistry_UnlockOwnedSongs();
 
     msgCtx->ocarinaStaff = AudioOcarina_GetRecordingStaff();
 
@@ -4076,6 +4078,10 @@ void Message_SpawnSongEffect(PlayState* play) {
     MessageContext* msgCtx = &play->msgCtx;
     Player* player = GET_PLAYER(play);
 
+    if (OcarinaSongRegistry_IsRegistered(msgCtx->songPlayed)) {
+        OcarinaSongRegistry_Perform(play, msgCtx->songPlayed);
+        return;
+    }
     //! FAKE:
     if (1) {}
     if ((msgCtx->songPlayed <= OCARINA_SONG_SCARECROW_SPAWN) &&
@@ -4369,6 +4375,18 @@ void Message_DrawSceneTitleCard(PlayState* play, Gfx** gfxP) {
     *gfxP = gfx++;
 }
 
+// 0xFE (staff up, nothing played) and 0xFF (no staff) would index CHECK_QUEST_ITEM out of bounds
+static bool Message_IsStaffSongOwned(u8 state) {
+    if ((state == OCARINA_SONG_SCARECROW_SPAWN) || (state == OCARINA_SONG_INVERTED_TIME) ||
+        (state == OCARINA_SONG_DOUBLE_TIME) || (state == OCARINA_SONG_GORON_LULLABY_INTRO)) {
+        return true;
+    }
+    if (state >= OCARINA_SONG_CUSTOM_FIRST) {
+        return OcarinaSongRegistry_IsOwned(state);
+    }
+    return CHECK_QUEST_ITEM(QUEST_SONG_SONATA + state);
+}
+
 s16 sOcarinaSongFanfares[] = {
     NA_BGM_OCARINA_SONATA,            // OCARINA_SONG_SONATA
     NA_BGM_OCARINA_LULLABY,           // OCARINA_SONG_GORON_LULLABY
@@ -4644,20 +4662,10 @@ void Message_DrawMain(PlayState* play, Gfx** gfxP) {
 
                 GameInteractor_Should(VB_OVERRIDE_OCARINA_STAFF_STATE, false, msgCtx->ocarinaStaff);
 
-                bool vanillaOwnedSongCheck = (msgCtx->ocarinaStaff->state == OCARINA_SONG_SCARECROW_SPAWN) ||
-                                             (msgCtx->ocarinaStaff->state == OCARINA_SONG_INVERTED_TIME) ||
-                                             (msgCtx->ocarinaStaff->state == OCARINA_SONG_DOUBLE_TIME) ||
-                                             (msgCtx->ocarinaStaff->state == OCARINA_SONG_GORON_LULLABY_INTRO);
-                // 0xFE means the staff is up but nothing has been played
-                // 0xFF means no staff is up
-                //! @bug states 0xFE and 0xFF will index CHECK_QUEST_ITEM Out of bounds, causing ASAN to crash.
-                // 2S2H [Port] Fix this OOB with a check.
-                if (msgCtx->ocarinaStaff->state != 0xFE && msgCtx->ocarinaStaff->state != 0xFF) {
-                    vanillaOwnedSongCheck =
-                        vanillaOwnedSongCheck || CHECK_QUEST_ITEM(QUEST_SONG_SONATA + msgCtx->ocarinaStaff->state);
-                }
+                bool vanillaOwnedSongCheck = Message_IsStaffSongOwned(msgCtx->ocarinaStaff->state);
 
-                if (msgCtx->ocarinaStaff->state <= OCARINA_SONG_SCARECROW_SPAWN) {
+                if ((msgCtx->ocarinaStaff->state <= OCARINA_SONG_SCARECROW_SPAWN) ||
+                    OcarinaSongRegistry_IsRegistered(msgCtx->ocarinaStaff->state)) {
                     if (msgCtx->ocarinaStaff->state == OCARINA_SONG_EVAN_PART1) {
                         AudioOcarina_ResetAndReadInput();
                         AudioOcarina_StartDefault(0x80100000);
@@ -4843,7 +4851,9 @@ void Message_DrawMain(PlayState* play, Gfx** gfxP) {
                 } else {
                     AudioOcarina_SetInstrument(sPlayerFormOcarinaInstruments[CUR_FORM]);
                     AudioOcarina_SetPlaybackSong((u8)msgCtx->songPlayed + 1, 1);
-                    if (msgCtx->songPlayed != OCARINA_SONG_SCARECROW_SPAWN) {
+                    if (OcarinaSongRegistry_IsRegistered(msgCtx->songPlayed)) {
+                        OcarinaSongRegistry_PlayFanfare(msgCtx->songPlayed, (u8)sOcarinaSongFanfareIoData[CUR_FORM]);
+                    } else if (msgCtx->songPlayed != OCARINA_SONG_SCARECROW_SPAWN) {
                         Audio_PlayFanfareWithPlayerIOPort7((u16)sOcarinaSongFanfares[msgCtx->songPlayed],
                                                            (u8)sOcarinaSongFanfareIoData[CUR_FORM]);
                         AudioSfx_MuteBanks(0x20);
@@ -4863,6 +4873,8 @@ void Message_DrawMain(PlayState* play, Gfx** gfxP) {
             case MSGMODE_DISPLAY_SONG_PLAYED_TEXT_BEGIN:
                 if (msgCtx->songPlayed == OCARINA_SONG_SCARECROW_SPAWN) {
                     Message_ContinueTextbox(play, 0x1B6B);
+                } else if (OcarinaSongRegistry_IsRegistered(msgCtx->songPlayed)) {
+                    Message_ContinueTextbox(play, OcarinaSongRegistry_GetPlayedMessage(msgCtx->songPlayed));
                 } else {
                     Message_ContinueTextbox(play, 0x1B72 + msgCtx->songPlayed);
                 }

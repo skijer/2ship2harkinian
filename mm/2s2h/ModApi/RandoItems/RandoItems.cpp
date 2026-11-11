@@ -81,10 +81,14 @@ void BuildRow(const ModItem& item) {
         return;
     }
     // Mod items have no vanilla ItemId, GetItemId or draw id: their name and icon come from the custom item registry.
-    Rando::StaticData::Items[static_cast<RandoItemId>(item.randoItem)] = {
-        static_cast<RandoItemId>(item.randoItem), item.key.c_str(), "", item.key.c_str(), GetItemType(*block),
-        ITEM_NONE,                                GI_NONE,          GID_NONE
-    };
+    Rando::StaticData::Items[static_cast<RandoItemId>(item.randoItem)] = { static_cast<RandoItemId>(item.randoItem),
+                                                                           item.key.c_str(),
+                                                                           "",
+                                                                           item.key.c_str(),
+                                                                           GetItemType(*block),
+                                                                           ITEM_NONE,
+                                                                           GI_NONE,
+                                                                           GID_NONE };
 }
 
 S2HRandoInfBank GetActiveBank() {
@@ -151,10 +155,14 @@ bool RandoItems_IsOwned(int32_t randoItem, S2HRandoInfBank bank) {
     if (bank == S2H_RANDO_INF_SAVE) {
         return CustomItemRegistry_IsOwned(item->key.c_str());
     }
-    if (RandoInfCustom_Get(bank, item->flag)) return true;
+    if (RandoInfCustom_Get(bank, item->flag)) {
+        return true;
+    }
     for (const auto& candidate : sItems) {
         const auto* pickup = CustomItemRegistry_GetPickupVariant(candidate.key.c_str());
-        if (pickup != nullptr && item->key == pickup->itemKey && RandoInfCustom_Get(bank, candidate.flag)) return true;
+        if (pickup != nullptr && item->key == pickup->itemKey && RandoInfCustom_Get(bank, candidate.flag)) {
+            return true;
+        }
     }
     return false;
 }
@@ -187,7 +195,9 @@ void RandoItems_AddToPool(std::vector<RandoItemId>& itemPool) {
         }
         if (block->poolModeOption != nullptr) {
             const bool match = RandoOptions_GetForSeed(block->poolModeOption) == block->poolModeValue;
-            if (match == block->poolModeInvert) continue;
+            if (match == block->poolModeInvert) {
+                continue;
+            }
         }
         const uint32_t optionCount =
             block->poolCountOption != nullptr ? RandoOptions_GetForSeed(block->poolCountOption) : 0;
@@ -234,15 +244,18 @@ const char* RandoItems_GetIconPath(RandoItemId randoItemId) {
 // Outside the anonymous namespace: OPEN_DISPS redeclares the interpolation hooks in its body, and inside one they
 // get C++ linkage and fail to link.
 void RandoItems_Draw(RandoItemId randoItemId) {
-    if (gPlayState == nullptr) return;
+    if (gPlayState == nullptr) {
+        return;
+    }
     const char* key = RandoItems_GetKey(randoItemId);
     const auto* definition = CustomItemRegistry_Find(key);
-    if (definition != nullptr && definition->getItemModelPath != nullptr) {
+    if (definition != nullptr &&
+        (definition->getItemModelPath != nullptr || definition->getItemEntry.drawFunc != nullptr)) {
         CustomItemRegistry_DrawAcquisition(key, gPlayState);
         return;
     }
     const char* icon = RandoItems_GetIconPath(randoItemId);
-    if (icon == nullptr || gPlayState == nullptr) {
+    if (icon == nullptr) {
         return;
     }
 

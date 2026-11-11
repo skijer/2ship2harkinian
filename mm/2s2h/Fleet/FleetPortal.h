@@ -13,6 +13,9 @@ void FleetPortal_Arrive(const FleetDestination* arrival);
 // Once per frame: hands a pending departure to Fleet and walks into a pending arrival, opening the save first if
 // 2ship is not in gameplay yet.
 void FleetPortal_FrameEnd(void);
+bool FleetPortal_LoadPending(void);
+// Leaves for the other game through `portal` at the next frame end.
+void FleetPortal_RequestDeparture(const char* portal);
 
 #ifdef __cplusplus
 }

@@ -13,6 +13,11 @@ struct StoreDownload {
     uint64_t size = 0;
 };
 
+struct StoreOption {
+    std::string id;
+    std::string name;
+};
+
 struct StoreMod {
     std::string id;
     std::string name;
@@ -20,9 +25,13 @@ struct StoreMod {
     std::string description;
     std::string version;
     std::string repository;
+    std::string icon;
+    std::string owner;
+    bool dependencyOnly = false;
+    std::vector<StoreOption> options;
     std::vector<std::string> permissions;
     std::vector<std::string> dependencies;
-    std::map<int, StoreDownload> builds;
+    StoreDownload build;
 };
 
 struct StorePack {
@@ -30,6 +39,9 @@ struct StorePack {
     std::string name;
     std::string author;
     std::vector<std::string> mods;
+    std::string description;
+    std::string icon;
+    std::string version;
 };
 
 struct StoreLink {
@@ -48,7 +60,6 @@ struct StoreCatalog {
 struct StoreRelease {
     std::string version;
     std::string pageUrl;
-    int modApiMajor = 0;
     std::map<std::string, StoreDownload> assets;
 };
 

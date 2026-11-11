@@ -1073,8 +1073,9 @@ void Message_DecodeNES(PlayState* play) {
     while (true) {
         curChar = msgCtx->msgBufPos < msgCtx->msgLength ? font->msgBuf.schar[msgCtx->msgBufPos] : MESSAGE_END;
         msgCtx->decodedBuffer.schar[decodedBufPos] = curChar;
+        // Vanilla 4-line boxes hold three newlines; the fourth line's offset lands on the unk11F20 padding, as on N64.
         if (decodedBufPos >= MESSAGE_DECODED_BUF_SIZE - 64 ||
-            (curChar == MESSAGE_NEWLINE && spC6 >= ARRAY_COUNT(msgCtx->unk11F1A) - 1) ||
+            (curChar == MESSAGE_NEWLINE && spC6 >= ARRAY_COUNT(msgCtx->unk11F1A)) ||
             charTexIndex >= FONT_CHAR_TEX_SIZE * (MESSAGE_DECODED_BUF_SIZE - 64) ||
             msgCtx->msgBufPos + 8 >= MESSAGE_BUF_SIZE) {
             curChar = MESSAGE_END;

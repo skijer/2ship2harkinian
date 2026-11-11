@@ -15,6 +15,7 @@ void FleetCrossDungeon_SetSeed(const nlohmann::json& seed);
 void FleetCrossDungeon_SetAccess(const nlohmann::json& access);
 nlohmann::json FleetCrossDungeon_GetExits();
 bool FleetCrossDungeon_CanEnterArrival(int32_t entrance);
+uint16_t FleetCrossDungeon_GetBossDefeated();
 
 // While alive, logic follows the installed routes. Roots() gives where a search starts, and Remember() keeps
 // what it reached for GetExits.

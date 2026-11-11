@@ -276,34 +276,44 @@ inline const std::array<GrottoDescriptor, 26>& Grottos() {
     return grottos;
 }
 inline const GrottoDescriptor* FindGrottoByEntry(int32_t logical) {
-    for (const auto& grotto : Grottos())
-        if (grotto.Entry() == logical)
+    for (const auto& grotto : Grottos()) {
+        if (grotto.Entry() == logical) {
             return &grotto;
+        }
+    }
     return nullptr;
 }
 inline const GrottoDescriptor* FindGrottoByExit(int32_t logical) {
-    for (const auto& grotto : Grottos())
-        if (grotto.Exit() == logical)
+    for (const auto& grotto : Grottos()) {
+        if (grotto.Exit() == logical) {
             return &grotto;
+        }
+    }
     return nullptr;
 }
 inline int32_t CanonicalGrottoLoad(int32_t physical, uint8_t content) {
-    for (const auto& grotto : Grottos())
+    for (const auto& grotto : Grottos()) {
         if (grotto.PhysicalEntry() == physical &&
-            ((grotto.physicalSpawn != 4 && grotto.physicalSpawn != 10) || grotto.hole.data == content))
+            ((grotto.physicalSpawn != 4 && grotto.physicalSpawn != 10) || grotto.hole.data == content)) {
             return grotto.Entry();
+        }
+    }
     return physical;
 }
 inline int32_t LogicalGrottoForRoom(int room, uint8_t content) {
-    for (const auto& grotto : Grottos())
-        if (grotto.room == room && ((room != 4 && room != 10) || grotto.hole.data == content))
+    for (const auto& grotto : Grottos()) {
+        if (grotto.room == room && ((room != 4 && room != 10) || grotto.hole.data == content)) {
             return grotto.Entry();
+        }
+    }
     return -1;
 }
 inline int32_t GrottoExitForRegion(RandoRegionId region) {
-    for (const auto& grotto : Grottos())
-        if (grotto.region == region)
+    for (const auto& grotto : Grottos()) {
+        if (grotto.region == region) {
             return grotto.Exit();
+        }
+    }
     return -1;
 }
 inline RandoRegionId RegionForGrottoReturn(int32_t logical) {
@@ -446,13 +456,17 @@ inline void Append(std::vector<Dungeon>& out, const PoolOptions& options) {
         dungeon.expanded = expanded;
         out.push_back(std::move(dungeon));
     };
-    if (options.dungeons && options.expanded)
-        for (const auto& portal : ExpandedDungeons())
+    if (options.dungeons && options.expanded) {
+        for (const auto& portal : ExpandedDungeons()) {
             appendPortal(portal, Pool::Dungeon, true);
-    for (const auto& portal : Interiors())
-        if (const auto pool = InteriorPool(portal.kind, options))
+        }
+    }
+    for (const auto& portal : Interiors()) {
+        if (const auto pool = InteriorPool(portal.kind, options)) {
             appendPortal(portal, *pool, false);
-    if (options.grottos)
+        }
+    }
+    if (options.grottos) {
         for (const auto& grotto : Grottos()) {
             Dungeon dungeon;
             dungeon.id = "mm:grotto:" + std::to_string(grotto.logicalSpawn);
@@ -461,5 +475,6 @@ inline void Append(std::vector<Dungeon>& out, const PoolOptions& options) {
             dungeon.pool = Pool::Grotto;
             out.push_back(std::move(dungeon));
         }
+    }
 }
 } // namespace ComboCrossMmCatalogue

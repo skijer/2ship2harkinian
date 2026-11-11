@@ -338,7 +338,7 @@ void SpawnGrassDrop(Vec3f pos, RandoCheckId randoCheckId) {
 }
 
 Gfx* GetObjGrassDList(RandoCheckId randoCheckId) {
-    if (!CVarGetInteger("gRando.CSMC", 0)) {
+    if (!Rando::ActorBehavior::ShouldMatchContainerStyle()) {
         return (Gfx*)gRandoBushDL;
     }
 
@@ -380,7 +380,7 @@ Gfx* GetObjGrassDList(RandoCheckId randoCheckId) {
 }
 
 Gfx* GetObjGrassXluDList(RandoCheckId randoCheckId) {
-    if (!CVarGetInteger("gRando.CSMC", 0)) {
+    if (!Rando::ActorBehavior::ShouldMatchContainerStyle()) {
         return (Gfx*)gRandoBushXluDL;
     }
 
@@ -423,7 +423,7 @@ Gfx* GetObjGrassXluDList(RandoCheckId randoCheckId) {
 
 // Cuttable grass has its own set of models, as the bush ones above are far too large to stand in for a sprout.
 Gfx* GetCuttableGrassDList(RandoCheckId randoCheckId) {
-    if (!CVarGetInteger("gRando.CSMC", 0)) {
+    if (!Rando::ActorBehavior::ShouldMatchContainerStyle()) {
         return (Gfx*)gRandoCuttableGrassRandomDL;
     }
 

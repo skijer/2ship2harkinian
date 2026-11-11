@@ -4,7 +4,6 @@
     "ExtractRom",
     "ExtractRomToModsFolder",
     "GetHostGame",
-    "GetModApiMajor",
     "HasModArchiveFile",
     "HasVanillaBehavior",
     "IsCustomItemFormAllowed",

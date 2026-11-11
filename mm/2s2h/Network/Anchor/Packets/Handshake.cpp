@@ -14,7 +14,7 @@
 void Anchor::SendPacket_Handshake() {
     nlohmann::json payload;
     payload["type"] = HANDSHAKE;
-    payload["roomId"] = CVarGetString("gNetwork.Anchor.RoomId", "");
+    payload["roomId"] = RoomToJoin();
     payload["roomState"] = PrepRoomState();
     payload["clientState"] = PrepClientState();
 

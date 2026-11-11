@@ -209,6 +209,8 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
     (LOGIC_GRANTED(CanUseHumanSword) || GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) >= EQUIP_VALUE_SWORD_KOKIRI)
 #define CAN_USE_SWORD \
     (LOGIC_GRANTED(CanUseSword) || CAN_USE_HUMAN_SWORD || HAS_ITEM(ITEM_SWORD_GREAT_FAIRY) || CAN_BE_DEITY)
+#define HAS_MIRROR_SHIELD \
+    (LOGIC_GRANTED(CanReflectLight) || GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) >= EQUIP_VALUE_SHIELD_MIRROR)
 #define CAN_FULLY_CUT_KEATON_GRASS                                                      \
     (HAS_MAGIC && (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) >= EQUIP_VALUE_SWORD_RAZOR) && \
      CHECK_WEEKEVENTREG(WEEKEVENTREG_RECEIVED_GREAT_SPIN_ATTACK))
@@ -241,7 +243,11 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
 // Rain only occurs Day 2 from 7:00 AM to 5:30 PM (not Night 2)
 // Requires magic beans and (Day 2 OR manual watering)
 #define CAN_USE_DAY2_RAIN_BEAN (CAN_GROW_BEAN_PLANT || (HAS_ITEM(ITEM_MAGIC_BEANS) && CLOCK_DAY2()))
-#define CAN_USE_MAGIC_ARROW(arrowType) (HAS_ITEM(ITEM_BOW) && HAS_ITEM(ITEM_ARROW_##arrowType) && HAS_MAGIC)
+#define LOGIC_GRANTED_ARROW_FIRE LOGIC_GRANTED(CanUseFireArrow)
+#define LOGIC_GRANTED_ARROW_ICE LOGIC_GRANTED(CanUseIceArrow)
+#define LOGIC_GRANTED_ARROW_LIGHT LOGIC_GRANTED(CanUseLightArrow)
+#define CAN_USE_MAGIC_ARROW(arrowType) \
+    (LOGIC_GRANTED_ARROW_##arrowType || (HAS_ITEM(ITEM_BOW) && HAS_ITEM(ITEM_ARROW_##arrowType) && HAS_MAGIC))
 #define CAN_LIGHT_TORCH_NEAR_ANOTHER (HAS_ITEM(ITEM_DEKU_STICK) || CAN_USE_MAGIC_ARROW(FIRE))
 #define KEY_COUNT(dungeon) (gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[DUNGEON_SCENE_INDEX_##dungeon])
 #define CAN_AFFORD(rc)                                                                                                \
@@ -656,7 +662,7 @@ inline bool CanKillEnemy(ActorId EnemyId) {
                                                    RANDO_SAVE_OPTIONS[RO_SHUFFLE_BOSS_SOULS] == RO_GENERIC_NO);
         case ACTOR_EN_KNIGHT: // Igos du Ikana/IdI Lackey
             return (CAN_USE_MAGIC_ARROW(FIRE) &&
-                    (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) >= EQUIP_VALUE_SHIELD_MIRROR) &&
+                    HAS_MIRROR_SHIELD &&
                     (CAN_USE_SWORD || CAN_BE_DEKU || CAN_BE_GORON || CAN_BE_ZORA));
         case ACTOR_EN_KAIZOKU: // Fighter Pirate
             return (CAN_USE_SWORD || CAN_BE_ZORA);

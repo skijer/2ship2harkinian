@@ -19,8 +19,8 @@ int32_t DungeonRegistry_ConfinedItem(int32_t item);
 bool DungeonRegistry_ItemAllowed(int32_t item, bool dungeonCheck);
 void DungeonRegistry_AdjustPool(std::vector<RandoItemId>& items);
 bool DungeonRegistry_HasItem(int32_t item);
-bool DungeonRegistry_AddCheckToPool(RandoSaveInfo& save, RandoCheckId check,
-                                   std::vector<RandoCheckId>& checks, std::vector<RandoItemId>& items);
+bool DungeonRegistry_AddCheckToPool(RandoSaveInfo& save, RandoCheckId check, std::vector<RandoCheckId>& checks,
+                                    std::vector<RandoItemId>& items);
 bool DungeonRegistry_GrantItem(int32_t item, bool remove = false);
 bool DungeonRegistry_HasKeys(int32_t dungeon, int32_t count);
 bool DungeonRegistry_HasBossKey(int32_t dungeon);
@@ -37,7 +37,9 @@ struct RandoSaveChecksView {
     }
 };
 struct RandoEventsView {
-    uint8_t& operator[](int32_t event) const { return DungeonRegistry_LogicEvent(event); }
+    uint8_t& operator[](int32_t event) const {
+        return DungeonRegistry_LogicEvent(event);
+    }
 };
 #endif
 

@@ -142,7 +142,7 @@ static RegisterShipInitFunc initFunc([]() {
         },
         .connections = {
             CONNECTION(RR_BENEATH_THE_WELL_FOUR_SPIKED_BARS, true),
-            CONNECTION(RR_BENEATH_THE_WELL_BACK_EXIT, CAN_USE_MAGIC_ARROW(LIGHT) || (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) >= EQUIP_VALUE_SHIELD_MIRROR))
+            CONNECTION(RR_BENEATH_THE_WELL_BACK_EXIT, CAN_USE_MAGIC_ARROW(LIGHT) || HAS_MIRROR_SHIELD)
         }
     };
     Regions[RR_BENEATH_THE_WELL_RIGHT_FIRE_KEESE] = RandoRegion{ .name = "Right Fire Keese Room", .sceneId = SCENE_REDEAD,

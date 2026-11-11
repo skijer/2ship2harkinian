@@ -39,7 +39,8 @@ bool IsInsideGameDirectories(const std::filesystem::path& path) {
     if (error) {
         return false;
     }
-    for (const std::string& root : { Ship::Context::GetAppBundlePath(), Ship::Context::GetAppDirectoryPath(appShortName) }) {
+    for (const std::string& root :
+         { Ship::Context::GetAppBundlePath(), Ship::Context::GetAppDirectoryPath(appShortName) }) {
         const std::filesystem::path base = std::filesystem::weakly_canonical(root, error);
         if (error || base.empty()) {
             continue;
@@ -77,9 +78,7 @@ int RunZapdWithoutThrowing(int argc, const char** argv) {
         return zapd_report(argc, const_cast<char**>(argv), nullptr, nullptr);
     } catch (const std::exception& exception) {
         SPDLOG_ERROR("[O2rExtractor] ZAPD threw: {}", exception.what());
-    } catch (...) {
-        SPDLOG_ERROR("[O2rExtractor] ZAPD threw");
-    }
+    } catch (...) { SPDLOG_ERROR("[O2rExtractor] ZAPD threw"); }
 #else
     SPDLOG_ERROR("[O2rExtractor] This platform has no extractor");
 #endif

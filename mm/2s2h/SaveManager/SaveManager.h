@@ -13,6 +13,8 @@ int SaveManager_GetOpenFileSlot();
 // Whether file select would list gSaveContext.fileNum `fileNum` (0-based) as an existing file.
 bool SaveManager_SlotExists(int fileNum);
 void SaveManager_WriteSaveFile(const std::filesystem::path& fileName, nlohmann::json j);
+int SaveManager_ReadSaveFile(const std::filesystem::path& fileName, nlohmann::json& j);
+void SaveManager_WriteFleetSave(const std::filesystem::path& fileName, const nlohmann::json& save);
 void SaveManager_PersistSariaHintsAvailable();
 #else
 void SaveManager_SysFlashrom_WriteData(u8* addr, u32 pageNum, u32 pageCount);

@@ -16,9 +16,9 @@
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <ship/Context.h>
+#include <ship/GameRegistry.h>
 #include <ship/window/Window.h>
 
-#include <libultraship/bridge/consolevariablebridge.h>
 #define CVAR_SETTING(name) "gSettings." name
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ModApi/ModApi.h"
@@ -35,7 +35,8 @@ using Json = nlohmann::json;
 namespace fs = std::filesystem;
 
 constexpr const char* CatalogUrl = "https://github.com/skijer/2ship2harkinian/releases/download/mods/catalog.json";
-constexpr const char* ReleaseUrl = "https://github.com/skijer/2ship2harkinian/releases/latest/download/unbound-release.json";
+constexpr const char* ReleaseUrl =
+    "https://github.com/skijer/2ship2harkinian/releases/latest/download/unbound-release.json";
 constexpr size_t MaxDocumentBytes = 4 * 1024 * 1024;
 constexpr size_t MaxPackageBytes = 512ull * 1024 * 1024;
 constexpr const char* StateFileName = ".2ship-unbound-store.json";
@@ -69,10 +70,15 @@ class StoreWorker {
         }
     }
 
+    // A job runs as the game that posted it: inside Fleet the worker thread has no game of its own.
     void Post(std::function<void()> job) {
+        Ship::GameServices* game = Ship::GameRegistry::GetCurrent();
         {
             std::lock_guard<std::mutex> lock(mMutex);
-            mJobs.push_back(std::move(job));
+            mJobs.push_back([game, job = std::move(job)] {
+                Ship::GameScope scope(game);
+                job();
+            });
             if (!mThread.joinable()) {
                 mThread = std::thread([this] { Run(); });
             }
@@ -216,7 +222,6 @@ void SetOperation(const std::string& id, const char* kind) {
 
 StoreModState ReadState(const StoreMod& mod, const Json& operations) {
     const fs::path mods = ModStore_ModsDirectory();
-    const auto build = mod.builds.find(S2H_MOD_API_MAJOR);
     std::error_code error;
     if (ReadOperation(operations, RemoveOperation).count(mod.id)) {
         return StoreModState::RemovedOnRestart;
@@ -228,13 +233,13 @@ StoreModState ReadState(const StoreMod& mod, const Json& operations) {
         return StoreModState::InstallsOnRestart;
     }
     if (fs::exists(PackagePath(mods, mod.id), error)) {
-        const bool current = build == mod.builds.end() || HashFile(PackagePath(mods, mod.id)) == build->second.hash;
+        const bool current = HashFile(PackagePath(mods, mod.id)) == mod.build.hash;
         return current ? StoreModState::Installed : StoreModState::Outdated;
     }
     if (fs::exists(PackagePath(mods, mod.id, DisabledSuffix), error)) {
         return StoreModState::Disabled;
     }
-    return build == mod.builds.end() ? StoreModState::Unavailable : StoreModState::NotInstalled;
+    return StoreModState::NotInstalled;
 }
 
 std::map<std::string, StoreModState> ReadStates(const StoreCatalog& catalog) {
@@ -365,38 +370,32 @@ std::vector<std::string> ResolveInstallOrder(const StoreCatalog& catalog, const 
     return order;
 }
 
-bool NeedsDownload(StoreModState state, bool requested) {
+// A disabled mod counts too: a dependency left disabled would break the pack that was asked for.
+bool NeedsDownload(StoreModState state) {
     switch (state) {
         case StoreModState::NotInstalled:
         case StoreModState::Outdated:
         case StoreModState::RemovedOnRestart:
+        case StoreModState::Disabled:
+        case StoreModState::DisabledOnRestart:
             return true;
         case StoreModState::Installed:
         case StoreModState::InstallsOnRestart:
-        case StoreModState::Unavailable:
             return false;
-        case StoreModState::Disabled:
-        case StoreModState::DisabledOnRestart:
-            return requested;
         default:
             SPDLOG_WARN("[ModStore] Unknown mod state {}", static_cast<int>(state));
             return false;
     }
 }
 
-bool DownloadPackage(const StoreMod& mod, int major, std::string& error) {
-    const auto build = mod.builds.find(major);
-    if (build == mod.builds.end()) {
-        error = mod.name + " has no build for this version of Unbound yet";
-        return false;
-    }
-    const StoreHttpResult download = ModStore_HttpsGet(build->second.url, MaxPackageBytes);
+bool DownloadPackage(const StoreMod& mod, std::string& error) {
+    const StoreHttpResult download = ModStore_HttpsGet(mod.build.url, MaxPackageBytes);
     if (!download.error.empty()) {
         error = download.error;
         return false;
     }
-    if (download.body.size() != build->second.size ||
-        ModTrust_HashBytes(download.body.data(), download.body.size()) != build->second.hash) {
+    if (download.body.size() != mod.build.size ||
+        ModTrust_HashBytes(download.body.data(), download.body.size()) != mod.build.hash) {
         error = mod.name + " did not match the catalog; nothing was installed";
         return false;
     }
@@ -423,10 +422,9 @@ void InstallNow(const std::vector<std::string>& ids) {
     }
     std::string error;
     const std::vector<std::string> order = ResolveInstallOrder(catalog, ids, error);
-    const std::set<std::string> requested(ids.begin(), ids.end());
     std::vector<std::string> downloads;
     for (const std::string& id : order) {
-        if (NeedsDownload(states[id], requested.count(id) != 0)) {
+        if (NeedsDownload(states[id])) {
             downloads.push_back(id);
         }
     }
@@ -435,31 +433,11 @@ void InstallNow(const std::vector<std::string>& ids) {
         const StoreMod& mod = catalog.mods.at(downloads[i]);
         SetStatus("Downloading " + mod.name + " (" + std::to_string(i + 1) + "/" + std::to_string(downloads.size()) +
                   ")...");
-        DownloadPackage(mod, S2H_MOD_API_MAJOR, error);
+        DownloadPackage(mod, error);
     }
     PublishStates();
     SetStatus(error.empty() ? std::to_string(downloads.size()) + " mod(s) ready: they load after a restart"
                             : "Stopped: " + error);
-}
-
-void StageModsForMajor(int major) {
-    StoreCatalog catalog;
-    std::map<std::string, StoreModState> states;
-    {
-        std::lock_guard<std::mutex> lock(sViewMutex);
-        catalog = sView.catalog;
-        states = sView.states;
-    }
-    for (const auto& [id, state] : states) {
-        if (!ModStore_IsInstalled(state)) {
-            continue;
-        }
-        std::string error;
-        if (!DownloadPackage(catalog.mods.at(id), major, error)) {
-            SPDLOG_WARN("[ModStore] Disabling {} until it has a build for mod API {}: {}", id, major, error);
-            SetOperation(id, DisableOperation);
-        }
-    }
 }
 
 void EmitAnnouncements() {
@@ -575,10 +553,6 @@ void ModStore_InstallRelease() {
         if (!ModStore_StageRelease(*release, error)) {
             SetStatus("Unbound was not updated: " + error);
             return;
-        }
-        if (release->modApiMajor != S2H_MOD_API_MAJOR) {
-            SetStatus("Downloading your mods for Unbound " + release->version + "...");
-            StageModsForMajor(release->modApiMajor);
         }
         {
             std::lock_guard<std::mutex> lock(sViewMutex);

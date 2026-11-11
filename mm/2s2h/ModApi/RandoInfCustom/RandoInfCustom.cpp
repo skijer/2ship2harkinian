@@ -130,8 +130,9 @@ void RandoInfCustom_Set(S2HRandoInfBank bank, uint16_t flag, bool state) {
     }
     const bool changed = sBanks[bank][flag - 1] != state;
     sBanks[bank][flag - 1] = state;
-    if (changed && bank == S2H_RANDO_INF_SAVE)
+    if (changed && bank == S2H_RANDO_INF_SAVE) {
         GameInteractor::Instance->ExecuteHooks<GameInteractor::OnRandoInfCustomChange>(sKeys[flag - 1].c_str(), state);
+    }
 }
 
 void RandoInfCustom_ClearBank(S2HRandoInfBank bank) {
@@ -176,7 +177,9 @@ bool RandoInfCustom_IsLogicSimulation(void) {
 std::vector<std::string> RandoInfCustom_ListSet() {
     std::vector<std::string> keys = sKeysOfUnloadedMods;
     for (uint16_t flag = 1; flag <= sKeys.size(); ++flag) {
-        if (RandoInfCustom_Get(S2H_RANDO_INF_SAVE, flag)) keys.push_back(sKeys[flag - 1]);
+        if (RandoInfCustom_Get(S2H_RANDO_INF_SAVE, flag)) {
+            keys.push_back(sKeys[flag - 1]);
+        }
     }
     return keys;
 }

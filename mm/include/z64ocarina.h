@@ -28,8 +28,11 @@ typedef enum OcarinaSongId {
     /* 21 */ OCARINA_SONG_ZELDAS_LULLABY,
     /* 22 */ OCARINA_SONG_SCARECROW_SPAWN,
     /* 23 */ OCARINA_SONG_TERMINA_WALL,
-    /* 24 */ OCARINA_SONG_MAX,
-    /* 24 */ OCARINA_SONG_SCARECROW_LONG = OCARINA_SONG_MAX // anything larger than 24 is considered the long scarecrow's song
+    // 2S2H [Mods] Slots songs registered by mods are given; they have no bit in the song flags
+    /* 24 */ OCARINA_SONG_CUSTOM_FIRST,
+    /* 31 */ OCARINA_SONG_CUSTOM_LAST = OCARINA_SONG_CUSTOM_FIRST + 7,
+    /* 32 */ OCARINA_SONG_MAX,
+    /* 32 */ OCARINA_SONG_SCARECROW_LONG = OCARINA_SONG_MAX // anything larger than MAX is considered the long scarecrow's song
 } OcarinaSongId;
 
 typedef enum OcarinaSongActionId {
@@ -273,6 +276,9 @@ void AudioOcarina_StartForSongCheck(u32 ocarinaFlags, u8 ocarinaStaffPlayingPosS
 void AudioOcarina_StartWithSongNoteLengths(u32 ocarinaFlags);
 void AudioOcarina_StartDefault(u32 ocarinaFlags);
 void AudioOcarina_ForceSongPlayed(u8 songIndex);
+void AudioOcarina_StartSongCheck(u8 songIndex);
+void AudioOcarina_SetCustomSong(u8 songIndex, const OcarinaNote* notes, u8 numButtons);
+void AudioOcarina_SetCustomSongsUnlocked(u8 unlockedSongs);
 u8 func_8019B5AC(void);
 void AudioOcarina_ResetAndReadInput(void);
 void AudioOcarina_SetOcarinaDisableTimer(u8 unused, u8 timer);

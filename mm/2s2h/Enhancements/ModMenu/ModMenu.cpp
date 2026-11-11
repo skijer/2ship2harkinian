@@ -57,7 +57,9 @@ void SetEnabledModsCVarValue() {
     }
 
     CVarSetString(CVAR_ENABLED_MODS_NAME, s.c_str());
-    Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    if (const auto window = Ship::Context::GetRawInstance()->GetWindow()) {
+        window->GetGui()->SaveConsoleVariablesNextFrame();
+    }
 }
 
 void AfterModChange() {

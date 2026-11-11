@@ -147,6 +147,12 @@ class Anchor : public Network {
     std::vector<uint32_t> actorIndexToClientId;
     RoomState roomState{};
 
+    inline static const std::string GLOBAL_ROOM_ID = "2ship-global";
+    // Inside Fleet both games share one Room ID setting, so the other game's public id also means this one's.
+    static bool IsGlobalRoom();
+    // The room the handshake asks for: the public room as it is, any other kept per game inside Fleet.
+    static std::string RoomToJoin();
+
     void Init();
     void Enable();
     uint32_t GetDummyPlayerClientId(const Actor* actor);

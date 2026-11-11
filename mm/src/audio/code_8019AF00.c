@@ -179,6 +179,9 @@ u16 sMusicStaffExpectedLength[OCARINA_SONG_MAX];
 u8 sMusicStaffExpectedPitch[OCARINA_SONG_MAX]; // Next required pitch in song playback
 u8 D_801FD518[OCARINA_SONG_MAX];
 u32 D_801FD530[OCARINA_SONG_MAX];
+// Bit n is custom slot OCARINA_SONG_CUSTOM_FIRST + n; the game thread writes the unlocked set
+static u8 sCustomOcarinaSongsUnlocked;
+static u8 sCustomOcarinaSongFlags;
 OcarinaNote sScarecrowsLongSongSecondNote;
 u16 sCustomSequencePc;
 
@@ -2195,6 +2198,48 @@ void AudioOcarina_MapSongFromPitchToButton(u8 noteSongIndex, u8 buttonSongIndex,
     gOcarinaSongButtons[buttonSongIndex].numButtons = numButtons;
 }
 
+static bool AudioOcarina_IsCustomSong(u8 songIndex) {
+    return (songIndex >= OCARINA_SONG_CUSTOM_FIRST) && (songIndex <= OCARINA_SONG_CUSTOM_LAST);
+}
+
+static u8 AudioOcarina_GetCustomSongBit(u8 songIndex) {
+    return 1 << (songIndex - OCARINA_SONG_CUSTOM_FIRST);
+}
+
+static bool AudioOcarina_IsSongCandidate(u8 songIndex) {
+    if (AudioOcarina_IsCustomSong(songIndex)) {
+        return sCustomOcarinaSongFlags & AudioOcarina_GetCustomSongBit(songIndex);
+    }
+    return sOcarinaAvailableSongFlags & (1 << songIndex);
+}
+
+// A toggle, as MM's own `^=`: two misses in one check put the song back
+static void AudioOcarina_ToggleSongCandidate(u8 songIndex) {
+    if (AudioOcarina_IsCustomSong(songIndex)) {
+        sCustomOcarinaSongFlags ^= AudioOcarina_GetCustomSongBit(songIndex);
+        return;
+    }
+    sOcarinaAvailableSongFlags ^= 1 << songIndex;
+}
+
+static bool AudioOcarina_HasSongCandidates(void) {
+    return (sOcarinaAvailableSongFlags != 0) || (sCustomOcarinaSongFlags != 0);
+}
+
+void AudioOcarina_SetCustomSong(u8 songIndex, const OcarinaNote* notes, u8 numButtons) {
+    if (!AudioOcarina_IsCustomSong(songIndex) || (notes == NULL)) {
+        return;
+    }
+    for (u8 i = 0; i < ARRAY_COUNT(sOcarinaSongNotes[songIndex]); i++) {
+        sOcarinaSongNotes[songIndex][i] = notes[i];
+    }
+    AudioOcarina_MapSongFromPitchToButton(songIndex, songIndex, numButtons);
+}
+
+void AudioOcarina_SetCustomSongsUnlocked(u8 unlockedSongs) {
+    sCustomOcarinaSongsUnlocked = unlockedSongs;
+}
+
 /**
  * Ocarina flags:
  * bitmask 0x3FFF:
@@ -2219,6 +2264,16 @@ void AudioOcarina_MapSongFromPitchToButton(u8 noteSongIndex, u8 buttonSongIndex,
      (1 << OCARINA_SONG_STORMS) | (1 << OCARINA_SONG_SUNS) | (1 << OCARINA_SONG_INVERTED_TIME) |                    \
      (1 << OCARINA_SONG_DOUBLE_TIME))
 
+static void AudioOcarina_ResetMusicStaffCheck(u8 songIndex) {
+    for (sMusicStaffPos[songIndex] = 0;
+         sOcarinaSongNotes[songIndex][sMusicStaffPos[songIndex]].pitch == OCARINA_PITCH_NONE;) {
+        sMusicStaffPos[songIndex]++;
+    }
+    sMusicStaffCurHeldLength[songIndex] = 0;
+    sMusicStaffExpectedLength[songIndex] = 0;
+    sMusicStaffExpectedPitch[songIndex] = 0;
+}
+
 void AudioOcarina_Start(u32 ocarinaFlags) {
     u8 songIndex;
 
@@ -2242,6 +2297,7 @@ void AudioOcarina_Start(u32 ocarinaFlags) {
         sFirstOcarinaSongIndex = 0;
         sLastOcarinaSongIndex = OCARINA_SONG_MAX;
         sOcarinaAvailableSongFlags = ocarinaFlags & 0xFFFFFF;
+        sCustomOcarinaSongFlags = (ocarinaFlags & 0x40000000) ? sCustomOcarinaSongsUnlocked : 0;
         sMusicStaffNumNotesPerTest = 8; // Ocarina Check
         sOcarinaHasStartedSong = false;
         sPlayedOcarinaSongIndexPlusOne = 0;
@@ -2251,15 +2307,11 @@ void AudioOcarina_Start(u32 ocarinaFlags) {
         sPrevOcarinaWithMusicStaffFlags = 0;
 
         // Reset music staff song check
+        for (songIndex = OCARINA_SONG_CUSTOM_FIRST; songIndex <= OCARINA_SONG_CUSTOM_LAST; songIndex++) {
+            AudioOcarina_ResetMusicStaffCheck(songIndex);
+        }
         for (songIndex = OCARINA_SONG_SONATA; songIndex <= OCARINA_SONG_EVAN_PART2; songIndex++) {
-            for (sMusicStaffPos[songIndex] = 0;
-                 sOcarinaSongNotes[songIndex][sMusicStaffPos[songIndex]].pitch == OCARINA_PITCH_NONE;) {
-                sMusicStaffPos[songIndex]++;
-            }
-
-            sMusicStaffCurHeldLength[songIndex] = 0;
-            sMusicStaffExpectedLength[songIndex] = 0;
-            sMusicStaffExpectedPitch[songIndex] = 0;
+            AudioOcarina_ResetMusicStaffCheck(songIndex);
 
             if (D_801D8530) {
                 if ((1 << songIndex) & ocarinaFlags) {
@@ -2327,7 +2379,7 @@ void AudioOcarina_StartForSongCheck(u32 ocarinaFlags, u8 ocarinaStaffPlayingPosS
 void AudioOcarina_StartWithSongNoteLengths(u32 ocarinaFlags) {
     u8 songIndex;
 
-    for (songIndex = 0; songIndex < OCARINA_SONG_MAX; songIndex++) {
+    for (songIndex = 0; songIndex < OCARINA_SONG_CUSTOM_FIRST; songIndex++) {
         if ((1 << songIndex) & ocarinaFlags) {
             D_801FD530[songIndex] = 0;
         } else {
@@ -2345,12 +2397,23 @@ void AudioOcarina_StartDefault(u32 ocarinaFlags) {
     AudioOcarina_Start(ocarinaFlags);
 }
 
+// Checks the player's notes against one song, as the quest page's prompt does
+void AudioOcarina_StartSongCheck(u8 songIndex) {
+    if (!AudioOcarina_IsCustomSong(songIndex)) {
+        AudioOcarina_StartDefault((1 << songIndex) | 0x80000000);
+        return;
+    }
+    // 0x01000000 sits between the song bits and the mode bits and only keeps the flags non-zero
+    AudioOcarina_StartDefault(0x81000000);
+    sCustomOcarinaSongFlags = AudioOcarina_GetCustomSongBit(songIndex);
+}
+
 u8 func_8019B568(void) {
     u32 temp_v0 = D_801D8534;
     u8 songIndex;
 
-    for (songIndex = OCARINA_SONG_SONATA; !((temp_v0 >> songIndex) & 1) && (songIndex < OCARINA_SONG_MAX);
-         songIndex++) {}
+    for (songIndex = OCARINA_SONG_SONATA;
+         !((temp_v0 >> songIndex) & 1) && (songIndex < OCARINA_SONG_CUSTOM_FIRST); songIndex++) {}
 
     return songIndex;
 }
@@ -2358,7 +2421,7 @@ u8 func_8019B568(void) {
 u8 func_8019B5AC(void) {
     u8 songIndex = func_8019B568();
 
-    if (songIndex < OCARINA_SONG_MAX) {
+    if (songIndex < OCARINA_SONG_CUSTOM_FIRST) {
         return D_801FD518[songIndex];
     }
 
@@ -2398,7 +2461,6 @@ void AudioOcarina_UpdateCurOcarinaSong(void) {
  *      - ocarina prompt for zelda's lullaby, saria's song, Storms, Song of Time, etc...
  */
 void AudioOcarina_CheckSongsWithMusicStaff(void) {
-    u32 curOcarinaSongFlag;
     s32 pad;
     u8 noNewValidInput = false;
     s16 pad2;
@@ -2430,9 +2492,7 @@ void AudioOcarina_CheckSongsWithMusicStaff(void) {
     }
 
     for (songIndex = sFirstOcarinaSongIndex; songIndex < sLastOcarinaSongIndex; songIndex++) {
-        curOcarinaSongFlag = 1 << songIndex;
-
-        if (sOcarinaAvailableSongFlags & curOcarinaSongFlag) {
+        if (AudioOcarina_IsSongCandidate(songIndex)) {
             if (D_801D8530) {
                 sMusicStaffCurHeldLength[songIndex] += sOcarinaUpdateTaskStart - sOcarinaPlaybackTaskStart;
             } else {
@@ -2442,14 +2502,14 @@ void AudioOcarina_CheckSongsWithMusicStaff(void) {
             if (noNewValidInput) {
                 if ((sMusicStaffCurHeldLength[songIndex] > 8) &&
                     (sMusicStaffPrevPitch != sMusicStaffExpectedPitch[songIndex])) {
-                    sOcarinaAvailableSongFlags ^= curOcarinaSongFlag;
+                    AudioOcarina_ToggleSongCandidate(songIndex);
                     if (D_801D8530) {
                         D_801FD518[songIndex] = 1;
                     }
                 }
 
                 if (D_801D8530 && ((sMusicStaffExpectedLength[songIndex] + 9) < sMusicStaffCurHeldLength[songIndex])) {
-                    sOcarinaAvailableSongFlags ^= curOcarinaSongFlag;
+                    AudioOcarina_ToggleSongCandidate(songIndex);
                     D_801FD518[songIndex] = 3;
                 } else if ((sMusicStaffCurHeldLength[songIndex] >= (sMusicStaffExpectedLength[songIndex] - 9)) &&
                            (sMusicStaffCurHeldLength[songIndex] >= sMusicStaffExpectedLength[songIndex]) &&
@@ -2478,7 +2538,7 @@ void AudioOcarina_CheckSongsWithMusicStaff(void) {
                     } else {
                         // Note is not part of expected song, so this song is no longer available as an option in this
                         // playback
-                        sOcarinaAvailableSongFlags ^= curOcarinaSongFlag;
+                        AudioOcarina_ToggleSongCandidate(songIndex);
                         if (D_801D8530) {
                             D_801FD518[songIndex] = 1;
                         }
@@ -2509,13 +2569,13 @@ void AudioOcarina_CheckSongsWithMusicStaff(void) {
                 } else if (D_801D8530) {
                     D_801FD518[songIndex] = 2;
                 }
-                sOcarinaAvailableSongFlags ^= curOcarinaSongFlag;
+                AudioOcarina_ToggleSongCandidate(songIndex);
             }
         }
 
         // if a note is played that doesn't match a song, the song bit in sAvailOcarinaSongFlags is turned off
         // if there are no more songs remaining that it could be and the maximum position has been exceeded, then
-        if ((sOcarinaAvailableSongFlags == 0) && (sOcarinaStaffPlayingPos >= sMusicStaffNumNotesPerTest)) {
+        if (!AudioOcarina_HasSongCandidates() && (sOcarinaStaffPlayingPos >= sMusicStaffNumNotesPerTest)) {
             sIsOcarinaInputEnabled = false;
             if (!D_801D8530) {
                 if ((sOcarinaFlags & 0x40000000) && (sCurOcarinaPitch == sOcarinaSongNotes[songIndex][0].pitch)) {
@@ -2579,7 +2639,7 @@ void AudioOcarina_CheckSongsWithoutMusicStaff(void) {
         // Loop through each of the songs
         for (songIndex = sFirstOcarinaSongIndex; songIndex < sLastOcarinaSongIndex; songIndex++) {
             // Checks to see if the song is available to be played
-            bool vanillaCondition = (u32)sOcarinaAvailableSongFlags & (1 << songIndex);
+            bool vanillaCondition = AudioOcarina_IsSongCandidate(songIndex);
             if (GameInteractor_Should(VB_SONG_AVAILABLE_TO_PLAY, vanillaCondition, &songIndex)) {
                 // Loops through all possible starting indices?
                 // Loops through the notes of the song?

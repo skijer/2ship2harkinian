@@ -1620,7 +1620,10 @@ extern "C" Gfx* ResourceMgr_LoadGfxByName(const char* path) {
     ResourceMgr_PreloadAltWhenItExists(path);
 
     auto res = std::static_pointer_cast<Fast::DisplayList>(GetResourceByName(path));
-    return (Gfx*)&res->Instructions[0];
+    if (res == nullptr || res->Instructions.empty()) {
+        return nullptr;
+    }
+    return reinterpret_cast<Gfx*>(res->Instructions.data());
 }
 
 typedef struct {
@@ -1633,8 +1636,14 @@ std::unordered_map<std::string, std::unordered_map<std::string, GfxPatch>> origi
 // Attention! This is primarily for cosmetics & bug fixes. For things like mods and model replacement you should be
 // using OTRs instead (When that is available). Index can be found using the commented out section below.
 extern "C" void ResourceMgr_PatchGfxByName(const char* path, const char* patchName, int index, Gfx instruction) {
-    auto res = std::static_pointer_cast<Fast::DisplayList>(
-        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
+    auto resource = Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path);
+    if (resource == nullptr || resource->GetInitData()->Type != static_cast<uint32_t>(Fast::ResourceType::DisplayList)) {
+        return;
+    }
+    auto res = std::static_pointer_cast<Fast::DisplayList>(resource);
+    if (index < 0 || static_cast<size_t>(index) >= res->Instructions.size()) {
+        return;
+    }
 
     // Leaving this here for people attempting to find the correct Dlist index to patch
     /*if (strcmp("__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL", path) == 0) {

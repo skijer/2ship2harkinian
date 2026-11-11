@@ -1,6 +1,7 @@
 #include "z_title_setup.h"
 #include "overlays/gamestates/ovl_title/z_title.h"
 #include "z64save.h"
+#include "2s2h/Fleet/FleetPortal.h"
 
 void Setup_InitRegs(void) {
     XREG(2) = 0;
@@ -49,6 +50,7 @@ void Setup_InitRegs(void) {
 }
 
 void Setup_InitImpl(SetupState* this) {
+    if (FleetPortal_LoadPending()) return;
     SysFlashrom_InitFlash();
     SaveContext_Init();
     Sram_LoadGlobalOptions();

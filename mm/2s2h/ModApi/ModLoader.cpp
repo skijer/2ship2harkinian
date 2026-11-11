@@ -216,6 +216,7 @@ struct NativeModPackage {
     std::string archivePath;
     std::shared_ptr<std::vector<char>> binary;
     std::vector<std::string> requiredResources;
+    std::vector<std::string> dependencies;
     std::vector<std::string> permissions;
     ModProvenance provenance;
 };
@@ -335,6 +336,10 @@ void ReportRefusedMods() {
     for (const std::string& refused : sRefusedMods) {
         message += "- " + refused + "\n";
     }
+    if (Ship::Context::GetRawInstance()->GetWindow() == nullptr) {
+        SPDLOG_WARN("[ModApi] {}", message);
+        return;
+    }
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Mods not loaded", message.c_str(), nullptr);
 }
 
@@ -368,7 +373,7 @@ std::optional<NativeModPackage> ReadNativeModPackage(const std::shared_ptr<Ship:
         return std::nullopt;
     }
     std::string protocolError;
-    if (!ModPackage_IsCompatible(manifest, "mm", S2H_MOD_API_MAJOR, protocolError)) {
+    if (!ModPackage_IsCompatible(manifest, "mm", protocolError)) {
         const std::string message = archive->GetPath() + ": " + protocolError;
         sRefusedMods.push_back(message);
         sTrustLabels[archive->GetPath()] = protocolError + ", not loaded";
@@ -392,6 +397,7 @@ std::optional<NativeModPackage> ReadNativeModPackage(const std::shared_ptr<Ship:
     }
     package.binary = file->Buffer;
     package.requiredResources = ReadStringArray(manifest, "requires");
+    package.dependencies = ReadStringArray(manifest, "dependencies");
     package.permissions = ReadStringArray(manifest, "permissions");
     package.provenance = ModTrust_Verify(*archive);
     return package;
@@ -450,10 +456,14 @@ bool ReadRequirements(LoadedMod& mod) {
     }
     if (requirements->structSize >= sizeof(S2HModRequirements)) {
         if (requirements->requiredBehaviorCount > MaxRequirements ||
-            (requirements->requiredBehaviorCount && requirements->requiredBehaviors == nullptr)) return false;
+            (requirements->requiredBehaviorCount && requirements->requiredBehaviors == nullptr)) {
+            return false;
+        }
         for (uint32_t i = 0; i < requirements->requiredBehaviorCount; ++i) {
             const char* name = requirements->requiredBehaviors[i];
-            if (name == nullptr || name[0] == '\0') return false;
+            if (name == nullptr || name[0] == '\0') {
+                return false;
+            }
             mod.requiredBehaviors.emplace_back(name);
         }
     }
@@ -500,12 +510,16 @@ bool ReadCachedCompatibility(const Json& cache, const std::string& environment, 
     const Json& entry = cache[key];
     const bool isCurrent = entry.value("binary", "") == mod.binaryHash &&
                            entry.value("environment", "") == environment && entry.contains("compatible") &&
-                           entry["compatible"].is_boolean() && entry.contains("hooks") && entry["hooks"].is_array() && entry.contains("behaviors") && entry["behaviors"].is_array();
+                           entry["compatible"].is_boolean() && entry.contains("hooks") && entry["hooks"].is_array() &&
+                           entry.contains("behaviors") && entry["behaviors"].is_array();
     if (!isCurrent || !std::all_of(entry["hooks"].begin(), entry["hooks"].end(),
                                    [](const Json& value) { return value.is_string(); })) {
         return false;
     }
-    if (!std::all_of(entry["behaviors"].begin(), entry["behaviors"].end(), [](const Json& value) { return value.is_string(); })) return false;
+    if (!std::all_of(entry["behaviors"].begin(), entry["behaviors"].end(),
+                     [](const Json& value) { return value.is_string(); })) {
+        return false;
+    }
     mod.requiredBehaviors = entry["behaviors"].get<std::vector<std::string>>();
     mod.requiredHooks = entry["hooks"].get<std::vector<std::string>>();
     mod.compatible = entry["compatible"].get<bool>();
@@ -554,6 +568,52 @@ std::vector<NativeModPackage> FindNativeModPackages(const char* platform) {
     return packages;
 }
 
+// A mod initialises after the mods named in its manifest "dependencies"; otherwise archive order is kept.
+class DependencyOrder {
+  public:
+    explicit DependencyOrder(std::vector<NativeModPackage>& packages) : mPackages(packages) {
+        for (size_t i = 0; i < packages.size(); ++i) {
+            mIndexByName.emplace(packages[i].name, i);
+        }
+    }
+
+    std::vector<NativeModPackage> Sort() {
+        mStates.assign(mPackages.size(), State::Unvisited);
+        for (size_t i = 0; i < mPackages.size(); ++i) {
+            Visit(i);
+        }
+        return std::move(mOrdered);
+    }
+
+  private:
+    enum class State { Unvisited, Visiting, Done };
+
+    void Visit(size_t index) {
+        if (mStates[index] != State::Unvisited) {
+            return;
+        }
+        mStates[index] = State::Visiting;
+        for (const std::string& dependency : mPackages[index].dependencies) {
+            const auto found = mIndexByName.find(dependency);
+            if (found == mIndexByName.end()) {
+                continue;
+            }
+            if (mStates[found->second] == State::Visiting) {
+                SPDLOG_ERROR("[ModApi] Mods '{}' and '{}' depend on each other", mPackages[index].name, dependency);
+                continue;
+            }
+            Visit(found->second);
+        }
+        mStates[index] = State::Done;
+        mOrdered.push_back(std::move(mPackages[index]));
+    }
+
+    std::vector<NativeModPackage>& mPackages;
+    std::unordered_map<std::string, size_t> mIndexByName;
+    std::vector<State> mStates;
+    std::vector<NativeModPackage> mOrdered;
+};
+
 void LoadAllowedPackages(const std::vector<NativeModPackage>& packages) {
     std::unordered_set<std::string> modNames;
     for (const NativeModPackage& package : packages) {
@@ -589,7 +649,8 @@ void ModLoader_LoadMods() {
         SPDLOG_INFO("[ModApi] Native mods are not supported on this platform");
         return;
     }
-    LoadAllowedPackages(FindNativeModPackages(platform));
+    std::vector<NativeModPackage> packages = FindNativeModPackages(platform);
+    LoadAllowedPackages(DependencyOrder(packages).Sort());
     ReportRefusedMods();
 
     const std::string environment = Hex(HashText(1469598103934665603ULL, ModApi_GetCatalogFingerprint()));
@@ -601,7 +662,8 @@ void ModLoader_LoadMods() {
         nextCache[CacheKey(*mod)] = { { "binary", mod->binaryHash },
                                       { "environment", environment },
                                       { "compatible", mod->compatible },
-                                      { "hooks", mod->requiredHooks }, { "behaviors", mod->requiredBehaviors } };
+                                      { "hooks", mod->requiredHooks },
+                                      { "behaviors", mod->requiredBehaviors } };
         // `requires` is never cached, so a package added between two boots is picked up.
         if (mod->compatible && HasRequiredResources(*mod)) {
             InitMod(*mod);

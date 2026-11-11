@@ -1,5 +1,6 @@
 #include "FleetCrossDungeon.h"
 
+#include <array>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -23,6 +24,10 @@ std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState> sLastTimeStates
 
 // Grotto portals use logical identities the native entrance table does not know.
 RandoRegionId RegionForEntrance(int32_t entrance) {
+    // Goht's warp lands in spring Mountain Village, which the native graph only enters by its winter doors.
+    if (entrance == ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7)) {
+        return RR_MOUNTAIN_VILLAGE;
+    }
     if (const RandoRegionId region = ComboCrossMmCatalogue::RegionForGrottoReturn(entrance); region != RR_MAX) {
         return region;
     }
@@ -50,10 +55,55 @@ std::optional<RandoRegionId> RerouteDuringSearch(s32 exitId, RandoRegionId fromR
     return route->to.game == kMm ? RegionForEntrance(route->to.index) : RR_MAX;
 }
 
-std::vector<Dungeon> Catalogue(const PoolOptions& options) {
-    if (options.bosses) {
-        throw std::invalid_argument("cross-game boss entrances are not served by 2Ship yet");
+struct BossLair {
+    const char* owner;
+    int32_t entrance;
+    int32_t templeEntrance;
+    int32_t warpExit;
+    RandoRegionId arena;
+    ActorId boss;
+};
+
+// Boss ids 8-11 are MM's in Fleet's shared numbering; Odolwa must stay first (id 8).
+const std::array<BossLair, 4>& BossLairs() {
+    static const std::array<BossLair, 4> lairs = { {
+        { "mm:woodfall", ENTRANCE(ODOLWAS_LAIR, 0), ENTRANCE(WOODFALL_TEMPLE, 0), ENTRANCE(WOODFALL_TEMPLE, 1),
+          RR_WOODFALL_TEMPLE_BOSS_ROOM, ACTOR_BOSS_01 },
+        { "mm:snowhead", ENTRANCE(GOHTS_LAIR, 0), ENTRANCE(SNOWHEAD_TEMPLE, 0), ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7),
+          RR_SNOWHEAD_TEMPLE_BOSS_ROOM, ACTOR_BOSS_HAKUGIN },
+        { "mm:greatbay", ENTRANCE(GYORGS_LAIR, 0), ENTRANCE(GREAT_BAY_TEMPLE, 0), ENTRANCE(ZORA_CAPE, 9),
+          RR_GREAT_BAY_TEMPLE_BOSS_ROOM, ACTOR_BOSS_03 },
+        { "mm:inverted", ENTRANCE(TWINMOLDS_LAIR, 0), ENTRANCE(STONE_TOWER_TEMPLE_INVERTED, 0),
+          ENTRANCE(IKANA_CANYON, 15), RR_STONE_TOWER_TEMPLE_BOSS_ROOM, ACTOR_BOSS_02 },
+    } };
+    return lairs;
+}
+
+constexpr int kFirstMmBoss = 8;
+
+// Lairs are one-way: a fall in, a warp out. The temple's front door is the safe checkpoint, and Odolwa's
+// warp into the Deku Princess's prison stays inside the temple, so it is its own recovery point.
+void AppendBossLairs(std::vector<Dungeon>& catalogue) {
+    for (size_t index = 0; index < BossLairs().size(); index++) {
+        const BossLair& lair = BossLairs()[index];
+        Dungeon arena{ std::string("boss:") + lair.owner,
+                       { kMm, lair.entrance },
+                       { kMm, lair.templeEntrance },
+                       { kMm, lair.templeEntrance } };
+        arena.pool = Pool::Boss;
+        arena.boss = kFirstMmBoss + static_cast<int>(index);
+        arena.owner = lair.owner;
+        arena.hasReverse = false;
+        arena.escapeExits = { { kMm, lair.warpExit } };
+        arena.warpReturn = Endpoint{ kMm, lair.warpExit };
+        if (lair.boss == ACTOR_BOSS_01) {
+            arena.warpCheckpoint = Endpoint{ kMm, lair.warpExit };
+        }
+        catalogue.push_back(std::move(arena));
     }
+}
+
+std::vector<Dungeon> Catalogue(const PoolOptions& options) {
     std::vector<Dungeon> dungeons;
     if (options.dungeons) {
         dungeons = { { "mm:woodfall",
@@ -83,6 +133,9 @@ std::vector<Dungeon> Catalogue(const PoolOptions& options) {
         dungeons[4].escapeExits = { { kMm, ENTRANCE(IKANA_CANYON, 15) } };
     }
     ComboCrossMmCatalogue::Append(dungeons, options);
+    if (options.bosses) {
+        AppendBossLairs(dungeons);
+    }
     Validate(dungeons);
     return dungeons;
 }
@@ -107,16 +160,19 @@ nlohmann::json FleetCrossDungeon_DumpCatalogueForSeed(const nlohmann::json& spoi
 
 void FleetCrossDungeon_SetSeed(const nlohmann::json& seed) {
     for (const Route& route : Decode(seed)) {
-        // The vanilla one-way Goht exit has no region of its own; it stays valid as a source.
-        const bool gohtEscape = route.phase == Phase::BeforeNative &&
-                                route.from == Endpoint{ kMm, ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7) };
-        if (route.from.game == kMm && !gohtEscape && RegionForEntrance(route.from.index) == RR_MAX) {
+        if (route.from.game == kMm && RegionForEntrance(route.from.index) == RR_MAX) {
             throw std::invalid_argument("cross-dungeon seed names unknown MM source " +
                                         std::to_string(route.from.index));
         }
         if (route.to.game == kMm && RegionForEntrance(route.to.index) == RR_MAX) {
             throw std::invalid_argument("cross-dungeon seed names unknown MM destination " +
                                         std::to_string(route.to.index));
+        }
+    }
+    for (const Passage& passage : DecodePassages(seed)) {
+        if (passage.from.game == kMm && RegionForEntrance(passage.from.index) == RR_MAX) {
+            throw std::invalid_argument("cross-game passage names unknown MM entrance " +
+                                        std::to_string(passage.from.index));
         }
     }
     sState.Install(seed);
@@ -141,13 +197,34 @@ nlohmann::json FleetCrossDungeon_GetExits() {
             }
         }
     }
+    for (const Passage& passage : sState.passages) {
+        if (passage.from.game == kMm && sLastReachable.contains(RegionForEntrance(passage.from.index))) {
+            exits.push_back(EndpointJson(passage.to));
+        }
+    }
     sSearching = previousSearching;
     return exits;
 }
 
+// Physical kills in 2Ship's lairs, judged on the last search; Fleet maps them to the doors that led there.
+uint16_t FleetCrossDungeon_GetBossDefeated() {
+    uint16_t defeated = 0;
+    for (size_t index = 0; index < BossLairs().size(); index++) {
+        const BossLair& lair = BossLairs()[index];
+        if (!sLastReachable.contains(lair.arena)) {
+            continue;
+        }
+        Rando::Logic::SetCurrentRegionTime(sLastTimeStates, lair.arena);
+        if (Rando::Logic::CanKillEnemy(lair.boss)) {
+            defeated |= 1u << (kFirstMmBoss + index);
+        }
+    }
+    return defeated;
+}
+
 // Raw owned half-days on purpose: time logic's synthetic day-one fallback does not count.
 bool FleetCrossDungeon_CanEnterArrival(int32_t entrance) {
-    if (entrance < 0 || entrance > 0xFFFF || Rando::Logic::GetRegionIdFromEntrance(entrance) == RR_MAX) {
+    if (entrance < 0 || entrance > 0xFFFF || RegionForEntrance(entrance) == RR_MAX) {
         return false;
     }
     uint8_t ownedHalfDays = 0;
@@ -169,9 +246,10 @@ FleetCrossDungeonSearch::~FleetCrossDungeonSearch() {
 
 // Without routes, or with the overworld open, the search starts from the game's own start. A cross arrival
 // keeps its native region's waiting restrictions, unlike that synthetic start.
-void FleetCrossDungeonSearch::Roots(std::set<RandoRegionId>& reachable,
-                                    std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState>& timeStates) const {
-    if (sState.routes.empty() || sState.overworld) {
+void FleetCrossDungeonSearch::Roots(
+    std::set<RandoRegionId>& reachable,
+    std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState>& timeStates) const {
+    if (!sState.HasLinks() || sState.overworld) {
         reachable.insert(RR_MAX);
         timeStates = Rando::Logic::InitializeRegionTimeStates(RR_MAX);
     }

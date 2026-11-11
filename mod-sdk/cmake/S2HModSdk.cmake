@@ -10,11 +10,6 @@ set(S2H_IMPORT_LIBRARY "${S2H_ROOT}/build/x64/mm/$<CONFIG>/2ship.lib" CACHE STRI
 set(S2H_GAME_DIR "" CACHE PATH "Game folder; when set, every built mod is copied into its mods/ folder")
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-file(STRINGS "${S2H_ROOT}/mm/2s2h/ModApi/ModApi.h" modApiMajorLine REGEX "^#define S2H_MOD_API_MAJOR [0-9]+$")
-string(REGEX REPLACE "^#define S2H_MOD_API_MAJOR " "" S2H_MODAPI_MAJOR "${modApiMajorLine}")
-if(NOT S2H_MODAPI_MAJOR MATCHES "^[0-9]+$")
-    message(FATAL_ERROR "ModApi.h does not define S2H_MOD_API_MAJOR")
-endif()
 
 if(WIN32)
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -103,7 +98,6 @@ function(s2h_add_mod name)
             --binary "$<TARGET_FILE:${name}>"
             --platform "${S2H_MOD_PLATFORM}"
             --output "${package}"
-            --modapi-major "${S2H_MODAPI_MAJOR}"
         VERBATIM
     )
     if(S2H_GAME_DIR)

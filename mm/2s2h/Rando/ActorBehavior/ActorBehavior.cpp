@@ -11,6 +11,10 @@ struct ActorRandoCheckId {
 };
 static ObjectExtension::Register<ActorRandoCheckId> ActorRandoCheckIdRegister;
 
+bool Rando::ActorBehavior::ShouldMatchContainerStyle() {
+    return GameInteractor_Should(VB_RANDO_MATCH_CONTAINER_STYLE, CVarGetInteger("gRando.CSMC", 0) != 0);
+}
+
 // This is kind of a catch-all for things that are simple enough to not need their own file.
 void MiscVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_list optionalArg) {
     switch (id) {

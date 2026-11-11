@@ -9,6 +9,7 @@
 #include "2s2h/BenGui/BenGui.hpp"
 #include "2s2h/Rando/Logic/Logic.h"
 #include "2s2h/ShipInit.hpp"
+#include "2s2h/Fleet/FleetRando.h"
 
 extern "C" {
 #include "overlays/actors/ovl_En_Sth/z_en_sth.h"
@@ -470,8 +471,15 @@ static void PoolCountSuffix(int count) {
     ImGui::TextColored(COUNT_TEXT_COLOR, "+%d", count);
 }
 
+static bool IsDrawnByFleet(RandoOptionId optionId) {
+    return FleetRando_IsOptionDrawnByFleet(Rando::StaticData::Options[optionId].cvar);
+}
+
 static bool CheckPoolCheckbox(const char* label, RandoOptionId optionId, RandoCheckType checkType, const char* tooltip,
                               int countOverride = -1) {
+    if (IsDrawnByFleet(optionId)) {
+        return false;
+    }
     bool changed =
         CVarCheckbox(label, Rando::StaticData::Options[optionId].cvar, CheckboxOptions({ { .tooltip = tooltip } }));
     if (countOverride >= 0) {
@@ -512,6 +520,9 @@ static const char* SEED_HEALTH_TOOLTIP =
     "- Restore checks on the Check Exclusions page";
 
 static void DrawSeedHealthStrip() {
+    if (FleetRando_IsOptionDrawnByFleet(FLEET_HIDDEN_SEED_HEALTH)) {
+        return;
+    }
     int importantItems = itemsInPool - junkInPool;
     float usage = 0.0f;
     if (checksInPool > 0) {
@@ -563,13 +574,7 @@ static void DrawSeedHealthStrip() {
     Tooltip(SEED_HEALTH_TOOLTIP);
 }
 
-static void DrawGeneralTab() {
-    ImGui::BeginChild("randoSettings");
-    ImGui::PushStyleColor(ImGuiCol_Text, DIM_TEXT_COLOR);
-    ImGui::TextWrapped(
-        "Explore the menus for various enhancements and time savers; most are not enabled by default in Rando.");
-    ImGui::PopStyleColor();
-
+static void DrawSeedGeneration() {
     ImGui::SeparatorText("Seed Generation");
     UIWidgets::CVarCheckbox("Enable Rando (Randomizes new files upon creation)", "gRando.Enabled");
 
@@ -599,13 +604,27 @@ static void DrawGeneralTab() {
 
     ImGui::SeparatorText("Seed Health");
     DrawSeedHealthStrip();
+}
+
+static void DrawGeneralTab() {
+    ImGui::BeginChild("randoSettings");
+    ImGui::PushStyleColor(ImGuiCol_Text, DIM_TEXT_COLOR);
+    ImGui::TextWrapped(
+        "Explore the menus for various enhancements and time savers; most are not enabled by default in Rando.");
+    ImGui::PopStyleColor();
+
+    if (!FleetRando_IsOptionDrawnByFleet(FLEET_HIDDEN_SEED_GENERATION)) {
+        DrawSeedGeneration();
+    }
 
     ImGui::SeparatorText("Live Options");
     ImGui::TextWrapped("These options can be changed on the fly, and are not tied to the seed generation.");
-    UIWidgets::CVarCheckbox(
-        "Container Style Matches Contents", "gRando.CSMC",
-        UIWidgets::CheckboxOptions().Tooltip("This will make the contents of a container match the container itself. "
-                                             "Eg chests, pots, crates, grass, etc."));
+    if (!FleetRando_IsOptionDrawnByFleet("gRando.CSMC")) {
+        UIWidgets::CVarCheckbox("Container Style Matches Contents", "gRando.CSMC",
+                                UIWidgets::CheckboxOptions().Tooltip(
+                                    "This will make the contents of a container match the container itself. "
+                                    "Eg chests, pots, crates, grass, etc."));
+    }
     UIWidgets::CVarCombobox(
         "Junk Items", "gRando.JunkItems", &junkItemsOptions,
         UIWidgets::ComboboxOptions()
@@ -619,9 +638,7 @@ static void DrawGeneralTab() {
     ImGui::SameLine();
 }
 
-static void DrawLogicConditionsTab() {
-    f32 columnWidth = ImGui::GetContentRegionAvail().x / 2 - (ImGui::GetStyle().ItemSpacing.x * 2);
-    ImGui::BeginChild("randoLogicColumn1", ImVec2(columnWidth, 0));
+static void DrawLogicCombobox() {
     if (UIWidgets::CVarCombobox("Logic", Rando::StaticData::Options[RO_LOGIC].cvar, &logicOptions)) {
         ClearIncompatibleSetting();
     }
@@ -636,6 +653,14 @@ static void DrawLogicConditionsTab() {
         "the Moon.\n\n"
         "Vanilla - The items are not shuffled.\n"
         "Not compatible with settings that add items to the pool, like Boss Souls or Plentiful Items.");
+}
+
+static void DrawLogicConditionsTab() {
+    f32 columnWidth = ImGui::GetContentRegionAvail().x / 2 - (ImGui::GetStyle().ItemSpacing.x * 2);
+    ImGui::BeginChild("randoLogicColumn1", ImVec2(columnWidth, 0));
+    if (!IsDrawnByFleet(RO_LOGIC)) {
+        DrawLogicCombobox();
+    }
     UIWidgets::CVarCombobox("Dungeon Access", Rando::StaticData::Options[RO_ACCESS_DUNGEONS].cvar,
                             &accessDungeonOptions);
     UIWidgets::Tooltip("Dungeon access requirements:\n\n"
@@ -917,6 +942,9 @@ static void DrawPriorityItemsPopup() {
 
 static bool ItemPoolCheckbox(const char* label, RandoOptionId optionId, const char* tooltip, int itemCount = 0,
                              const char* disabledReason = nullptr) {
+    if (IsDrawnByFleet(optionId)) {
+        return false;
+    }
     if (disabledReason == nullptr && IncompatibleWithLogicSetting(optionId)) {
         disabledReason = "Incompatible with current Logic Setting";
     }
@@ -926,6 +954,16 @@ static bool ItemPoolCheckbox(const char* label, RandoOptionId optionId, const ch
             { { .tooltip = tooltip, .disabled = disabledReason != nullptr, .disabledTooltip = disabledReason } }));
     PoolCountSuffix(itemCount);
     return changed;
+}
+
+static void DrawComingSoonItems() {
+    ImGui::PushStyleColor(ImGuiCol_Text, DIM_TEXT_COLOR);
+    ImGui::SeparatorText("Coming Soon");
+    ImGui::PopStyleColor();
+    for (const char* label : { "Deku Stick Bag", "Deku Nut Bag", "Child Wallet", "Infinite Upgrades" }) {
+        CVarCheckbox(label, "gPlaceholderBool",
+                     CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
+    }
 }
 
 static void DrawItemPoolTab() {
@@ -962,17 +1000,9 @@ static void DrawItemPoolTab() {
                                                 "Silver Rupee for 1 rupee). When enabled, those rupees can be "
                                                 "purchased any number of times per cycle; otherwise only once "
                                                 "per cycle." } }));
-    ImGui::PushStyleColor(ImGuiCol_Text, DIM_TEXT_COLOR);
-    ImGui::SeparatorText("Coming Soon");
-    ImGui::PopStyleColor();
-    CVarCheckbox("Deku Stick Bag", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
-    CVarCheckbox("Deku Nut Bag", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
-    CVarCheckbox("Child Wallet", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
-    CVarCheckbox("Infinite Upgrades", "gPlaceholderBool",
-                 CheckboxOptions({ { .disabled = true, .disabledTooltip = "Coming Soon" } }));
+    if (!FleetRando_IsOptionDrawnByFleet(FLEET_HIDDEN_COMING_SOON)) {
+        DrawComingSoonItems();
+    }
     UIWidgets::EndCard();
 
     UIWidgets::BeginCard("itemPoolSongs");
@@ -1099,20 +1129,24 @@ static void DrawItemPoolTab() {
 
     UIWidgets::BeginCard("itemPoolDungeonItems");
     ImGui::SeparatorText("Dungeon Items");
-    UIWidgets::CVarCombobox(
-        "Small Keys", Rando::StaticData::Options[RO_PLACEMENT_SMALL_KEYS].cvar, &dungeonItemPlacementOptions,
-        UIWidgets::ComboboxOptions().Tooltip(
-            "Where each dungeon's small keys may be placed.\n\n"
-            "Anywhere - Small keys can be found anywhere in the world.\n\n"
-            "Own Dungeon - Each dungeon's small keys are only found within that dungeon.\n\n"
-            "Start With - You begin with every dungeon's small keys, and none are added to the item pool."));
-    UIWidgets::CVarCombobox(
-        "Boss Keys", Rando::StaticData::Options[RO_PLACEMENT_BOSS_KEYS].cvar, &dungeonItemPlacementOptions,
-        UIWidgets::ComboboxOptions().Tooltip(
-            "Where each dungeon's boss key may be placed.\n\n"
-            "Anywhere - Boss keys can be found anywhere in the world.\n\n"
-            "Own Dungeon - Each dungeon's boss key is only found within that dungeon.\n\n"
-            "Start With - You begin with every dungeon's boss key, and none are added to the item pool."));
+    if (!IsDrawnByFleet(RO_PLACEMENT_SMALL_KEYS)) {
+        UIWidgets::CVarCombobox(
+            "Small Keys", Rando::StaticData::Options[RO_PLACEMENT_SMALL_KEYS].cvar, &dungeonItemPlacementOptions,
+            UIWidgets::ComboboxOptions().Tooltip(
+                "Where each dungeon's small keys may be placed.\n\n"
+                "Anywhere - Small keys can be found anywhere in the world.\n\n"
+                "Own Dungeon - Each dungeon's small keys are only found within that dungeon.\n\n"
+                "Start With - You begin with every dungeon's small keys, and none are added to the item pool."));
+    }
+    if (!IsDrawnByFleet(RO_PLACEMENT_BOSS_KEYS)) {
+        UIWidgets::CVarCombobox(
+            "Boss Keys", Rando::StaticData::Options[RO_PLACEMENT_BOSS_KEYS].cvar, &dungeonItemPlacementOptions,
+            UIWidgets::ComboboxOptions().Tooltip(
+                "Where each dungeon's boss key may be placed.\n\n"
+                "Anywhere - Boss keys can be found anywhere in the world.\n\n"
+                "Own Dungeon - Each dungeon's boss key is only found within that dungeon.\n\n"
+                "Start With - You begin with every dungeon's boss key, and none are added to the item pool."));
+    }
     UIWidgets::CVarCombobox(
         "Stray Fairies", Rando::StaticData::Options[RO_PLACEMENT_STRAY_FAIRIES].cvar, &dungeonItemPlacementOptions,
         UIWidgets::ComboboxOptions().Tooltip(
@@ -1151,18 +1185,22 @@ static void DrawItemPoolTab() {
                      "Major items, masks, and keys will have an extra copy added to the item pool. \n"
                      "Lesser items, stray fairies, and skulltula tokens will have a chance for an "
                      "extra copy to be added to the item pool.");
-    CVarCheckbox("Traps", Rando::StaticData::Options[RO_SHUFFLE_TRAPS].cvar,
-                 CheckboxOptions({ { .tooltip = "Add trapped items to the pool. Traps disguise themselves as items "
-                                                "you have not obtained yet." } }));
+    if (!IsDrawnByFleet(RO_SHUFFLE_TRAPS)) {
+        CVarCheckbox("Traps", Rando::StaticData::Options[RO_SHUFFLE_TRAPS].cvar,
+                     CheckboxOptions({ { .tooltip = "Add trapped items to the pool. Traps disguise themselves as "
+                                                    "items you have not obtained yet." } }));
+    }
     if (CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_TRAPS].cvar, 0)) {
-        CVarSliderInt("##trapcount", Rando::StaticData::Options[RO_TRAP_AMOUNT].cvar,
-                      IntSliderOptions({ { .tooltip = "How many Traps are shuffled into the Item Pool." } })
-                          .LabelPosition(LabelPosition::None)
-                          .Color(UIWidgets::Colors(CVarGetInteger("gSettings.Menu.Theme", 5)))
-                          .Format("Traps: %i")
-                          .Min(1)
-                          .Max(100)
-                          .DefaultValue(5));
+        if (!IsDrawnByFleet(RO_TRAP_AMOUNT)) {
+            CVarSliderInt("##trapcount", Rando::StaticData::Options[RO_TRAP_AMOUNT].cvar,
+                          IntSliderOptions({ { .tooltip = "How many Traps are shuffled into the Item Pool." } })
+                              .LabelPosition(LabelPosition::None)
+                              .Color(UIWidgets::Colors(CVarGetInteger("gSettings.Menu.Theme", 5)))
+                              .Format("Traps: %i")
+                              .Min(1)
+                              .Max(100)
+                              .DefaultValue(5));
+        }
         UIWidgets::CVarCombobox(
             "Trap Behavior", "gRando.TrapItems", &trapItemsOptions,
             UIWidgets::ComboboxOptions(
@@ -1193,6 +1231,9 @@ static void DrawItemPoolTab() {
         };
         if (ImGui::BeginTable("trapTypesTable", 2)) {
             for (const TrapType& trapType : trapTypes) {
+                if (FleetRando_IsOptionDrawnByFleet(trapType.cvar)) {
+                    continue;
+                }
                 ImGui::TableNextColumn();
                 CVarCheckbox(trapType.label, trapType.cvar, CheckboxOptions({ { .tooltip = trapType.tooltip } }));
             }
@@ -1211,11 +1252,13 @@ static void DrawStartingItemsTab() {
     ImGui::BeginChild("randoStartingOptions", ImVec2(0, 120.0f));
     ImGui::SeparatorText("Starting Options");
     if (ImGui::BeginTable("Starting Options", 3)) {
-        ImGui::TableNextColumn();
-        CVarCheckbox("Wallet Full", Rando::StaticData::Options[RO_STARTING_RUPEES].cvar,
-                     CheckboxOptions({ {
-                         .tooltip = "Start with a full wallet",
-                     } }));
+        if (!IsDrawnByFleet(RO_STARTING_RUPEES)) {
+            ImGui::TableNextColumn();
+            CVarCheckbox("Wallet Full", Rando::StaticData::Options[RO_STARTING_RUPEES].cvar,
+                         CheckboxOptions({ {
+                             .tooltip = "Start with a full wallet",
+                         } }));
+        }
 
         ImGui::TableNextColumn();
         CVarCheckbox("Consumables Full", Rando::StaticData::Options[RO_STARTING_CONSUMABLES].cvar,
@@ -1223,21 +1266,25 @@ static void DrawStartingItemsTab() {
                          .tooltip = "Start with full Deku Sticks and Deku Nuts",
                      } }));
 
-        ImGui::TableNextColumn();
-        CVarCheckbox("Maps and Compasses", Rando::StaticData::Options[RO_STARTING_MAPS_AND_COMPASSES].cvar,
-                     CheckboxOptions({ {
-                         .tooltip = "Enables maps and compasses everywhere",
-                     } }));
+        if (!IsDrawnByFleet(RO_STARTING_MAPS_AND_COMPASSES)) {
+            ImGui::TableNextColumn();
+            CVarCheckbox("Maps and Compasses", Rando::StaticData::Options[RO_STARTING_MAPS_AND_COMPASSES].cvar,
+                         CheckboxOptions({ {
+                             .tooltip = "Enables maps and compasses everywhere",
+                         } }));
+        }
 
-        ImGui::TableNextColumn();
-        CVarSliderInt("Health", Rando::StaticData::Options[RO_STARTING_HEALTH].cvar,
-                      IntSliderOptions()
-                          .Min(1)
-                          .Max(20)
-                          .DefaultValue(3)
-                          .LabelPosition(LabelPosition::None)
-                          .Format("%d Hearts")
-                          .Color(Colors::Red));
+        if (!IsDrawnByFleet(RO_STARTING_HEALTH)) {
+            ImGui::TableNextColumn();
+            CVarSliderInt("Health", Rando::StaticData::Options[RO_STARTING_HEALTH].cvar,
+                          IntSliderOptions()
+                              .Min(1)
+                              .Max(20)
+                              .DefaultValue(3)
+                              .LabelPosition(LabelPosition::None)
+                              .Format("%d Hearts")
+                              .Color(Colors::Red));
+        }
 
         ImGui::EndTable();
     }
@@ -1589,10 +1636,13 @@ static void DrawHintsTab() {
             { { .tooltip =
                     "Swamp Spider House: Hinted at his normal location within the Swamp Spider House\n\nOcean Spider "
                     "House: Hinted in South Clock Town day 1, by the main standing on the scaffolding." } }));
-    CVarCheckbox(
-        "Gossip Stone Static Hint", Rando::StaticData::Options[RO_HINTS_GOSSIP_STONES].cvar,
-        CheckboxOptions(
-            { { .tooltip = "Each gossip stone will give a static hint about the contents of a random location." } }));
+    if (!IsDrawnByFleet(RO_HINTS_GOSSIP_STONES)) {
+        CVarCheckbox(
+            "Gossip Stone Static Hint", Rando::StaticData::Options[RO_HINTS_GOSSIP_STONES].cvar,
+            CheckboxOptions(
+                { { .tooltip =
+                        "Each gossip stone will give a static hint about the contents of a random location." } }));
+    }
     CVarSliderInt("Gossip Stone Hint Strength", Rando::StaticData::Options[RO_HINTS_GOSSIP_STONE_STRENGTH].cvar,
                   IntSliderOptions().Min(0).Max(100).DefaultValue(50).Tooltip(
                       "Controls how strongly gossip stone hints are weighted toward important items.\n"

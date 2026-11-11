@@ -110,13 +110,12 @@ void CycleSlotPiece(uint8_t slot) {
     const char* wornKey = CustomEquipRegistry_GetWorn(slot);
     auto candidate = pieces.begin();
     if (wornKey != nullptr) {
-        candidate = std::find_if(pieces.begin(), pieces.end(),
-                                 [wornKey](const S2HCustomEquipDefinition* piece) {
-                                     return std::string(piece->key) == wornKey;
-                                 });
+        candidate = std::find_if(pieces.begin(), pieces.end(), [wornKey](const S2HCustomEquipDefinition* piece) {
+            return std::string(piece->key) == wornKey;
+        });
         candidate = candidate == pieces.end() ? pieces.end() : candidate + 1;
     }
-    while (candidate != pieces.end() && !CustomEquipRegistry_IsFormAllowed((*candidate)->key)) {
+    while (candidate != pieces.end() && !CustomEquipRegistry_IsUsableNow((*candidate)->key)) {
         ++candidate;
     }
 
@@ -167,7 +166,7 @@ void* KaleidoEquipManager_GetCellIcon(uint8_t row, uint8_t column) {
 
 bool KaleidoEquipManager_IsCellFormAllowed(uint8_t row, uint8_t column) {
     const S2HCustomEquipDefinition* claim = FindClaim(row, column);
-    return claim != nullptr && CustomEquipRegistry_IsFormAllowed(claim->key);
+    return claim != nullptr && CustomEquipRegistry_IsUsableNow(claim->key);
 }
 
 bool KaleidoEquipManager_IsCellEquipped(uint8_t row, uint8_t column) {
@@ -184,7 +183,7 @@ bool KaleidoEquipManager_EquipCell(PlayState* play, uint8_t row, uint8_t column)
     if (claim == nullptr) {
         return false;
     }
-    if (!CustomEquipRegistry_IsFormAllowed(claim->key)) {
+    if (!CustomEquipRegistry_IsUsableNow(claim->key)) {
         PlayPauseSfx(NA_SE_SY_ERROR);
         return true;
     }

@@ -320,6 +320,10 @@ void KaleidoScope_UpdateWorldMapCursor(PlayState* play);
 // Collect
 void KaleidoScope_DrawQuestStatus(PlayState* play);
 void KaleidoScope_UpdateQuestCursor(PlayState* play);
+void KaleidoScope_DrawQuestSongStaff(PlayState* play, Vtx* staffVtx);
+void KaleidoScope_SetupQuestSongPoint(PlayState* play, u8 songIndex);
+void KaleidoScope_RequestQuestSongPlayback(PauseContext* pauseCtx);
+void KaleidoScope_UpdateQuestSongPlaybackDelay(PlayState* play, u8 songIndex);
 
 // Item
 void KaleidoScope_SetCursorVtxPos(PauseContext* pauseCtx, u16 vtxIndex, Vtx* vtx);

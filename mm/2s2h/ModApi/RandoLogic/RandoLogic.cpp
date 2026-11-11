@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <functional>
 #include <list>
 #include <string>
@@ -12,6 +13,7 @@
 #include <spdlog/spdlog.h>
 
 #include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
+#include "2s2h/ModApi/Forms/FormRegistry.h"
 #include "2s2h/ModApi/RandoInfCustom/RandoInfCustom.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "2s2h/ModApi/RandoOptions/RandoOptions.h"
@@ -34,7 +36,6 @@ const char* const kCapabilityTokens[RLC_MAX] = {
     RANDO_LOGIC_CAPABILITIES(RANDO_LOGIC_CAPABILITY_TOKEN)
 #undef RANDO_LOGIC_CAPABILITY_TOKEN
 };
-
 
 struct Selector {
     uint32_t targets;
@@ -229,12 +230,6 @@ Grant ReadGrant(const S2HLogicGrant& source) {
     return grant;
 }
 
-void RemoveOwnerGrants(std::vector<Grant>& grants, const std::string& owner) {
-    grants.erase(
-        std::remove_if(grants.begin(), grants.end(), [&owner](const Grant& grant) { return grant.owner == owner; }),
-        grants.end());
-}
-
 class EntryScope {
   public:
     explicit EntryScope(const WorldEntry& entry) {
@@ -328,7 +323,7 @@ void IndexWorld() {
 }
 
 void WrapCondition(Condition& condition, const WorldEntry& entry, std::function<bool(bool)> resolve) {
-    sWrappedConditions.push_back({&condition, condition});
+    sWrappedConditions.push_back({ &condition, condition });
     const Condition original = condition;
     condition = [original, entry, resolve]() {
         EntryScope scope(entry);
@@ -338,23 +333,30 @@ void WrapCondition(Condition& condition, const WorldEntry& entry, std::function<
 void WrapWorld() {
     for (auto& [regionId, region] : Rando::Logic::Regions) {
         for (auto& [check, logic] : region.checks) {
-            WorldEntry entry{S2H_LOGIC_TARGET_LOCATIONS, check, regionId, region.sceneId, -1, GetCheckType(check), &logic.second};
-            WrapCondition(logic.first, entry, [check](bool result) { return RandoLogic_ResolveLocation(check, result); });
+            WorldEntry entry{ S2H_LOGIC_TARGET_LOCATIONS, check,        regionId, region.sceneId, -1,
+                              GetCheckType(check),        &logic.second };
+            WrapCondition(logic.first, entry,
+                          [check](bool result) { return RandoLogic_ResolveLocation(check, result); });
         }
         for (auto& event : region.events) {
             const auto id = event.first;
-            WorldEntry entry{S2H_LOGIC_TARGET_EVENTS, id, regionId, region.sceneId, -1, -1, &kNoCondition};
+            WorldEntry entry{ S2H_LOGIC_TARGET_EVENTS, id, regionId, region.sceneId, -1, -1, &kNoCondition };
             WrapCondition(event.second, entry, [id](bool result) { return RandoLogic_ResolveEvent(id, result); });
         }
         for (auto& [to, logic] : region.connections) {
-            WorldEntry entry{S2H_LOGIC_TARGET_ENTRANCES, -1, regionId, region.sceneId, to, -1, &logic.second};
-            WrapCondition(logic.first, entry, [regionId, to](bool result) { return RandoLogic_ResolveEntrance(regionId, to, result); });
+            WorldEntry entry{ S2H_LOGIC_TARGET_ENTRANCES, -1, regionId, region.sceneId, to, -1, &logic.second };
+            WrapCondition(logic.first, entry,
+                          [regionId, to](bool result) { return RandoLogic_ResolveEntrance(regionId, to, result); });
         }
         for (auto& [exit, regionExit] : region.exits) {
             const auto to = Rando::Logic::GetRegionIdFromEntrance(exit);
-            if (to == RR_MAX) continue;
-            WorldEntry entry{S2H_LOGIC_TARGET_ENTRANCES, -1, regionId, region.sceneId, to, -1, &regionExit.conditionString};
-            WrapCondition(regionExit.condition, entry, [regionId, to](bool result) { return RandoLogic_ResolveEntrance(regionId, to, result); });
+            if (to == RR_MAX) {
+                continue;
+            }
+            WorldEntry entry{ S2H_LOGIC_TARGET_ENTRANCES, -1, regionId, region.sceneId, to, -1,
+                              &regionExit.conditionString };
+            WrapCondition(regionExit.condition, entry,
+                          [regionId, to](bool result) { return RandoLogic_ResolveEntrance(regionId, to, result); });
         }
     }
 }
@@ -424,17 +426,70 @@ bool CanBecomeForm(PlayerTransformation form) {
     }
 }
 
+bool IsFormKeyAllowed(const S2HCustomItemDefinition& definition, const char* formKey) {
+    if (definition.allowedFormCount == 0) {
+        return true;
+    }
+    for (uint32_t index = 0; index < definition.allowedFormCount; index++) {
+        if (std::strcmp(definition.allowedForms[index], formKey) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool IsFormInMask(const S2HCustomItemDefinition& definition, PlayerTransformation form) {
+    return definition.formMask == 0 || (definition.formMask & S2H_CUSTOM_ITEM_FORM_BIT(form)) != 0;
+}
+
+// Ages are Human Link's, and without a registered form he is a child.
+bool CanUseInNativeForm(const S2HCustomItemDefinition& definition, PlayerTransformation form) {
+    const bool isChild = form == PLAYER_FORM_HUMAN;
+    const bool isAgeMet = definition.ageRequirement == S2H_CUSTOM_ITEM_AGE_ANY ||
+                          (isChild && definition.ageRequirement == S2H_CUSTOM_ITEM_AGE_CHILD);
+    return isAgeMet && IsFormInMask(definition, form) &&
+           IsFormKeyAllowed(definition, FormRegistry_GetNativeKey(form)) && CanBecomeForm(form);
+}
+
+// A registered form is worn by Human Link and is reachable once the item that turns him into it is.
+bool IsRegisteredFormReachable(const S2HFormDefinition& form) {
+    if (!CanBecomeForm(PLAYER_FORM_HUMAN)) {
+        return false;
+    }
+    if (form.item == nullptr) {
+        return true;
+    }
+    const int32_t formItem = RandoItems_GetRandoGet(form.item);
+    if (!RandoItems_IsModItem(formItem)) {
+        return CustomItemRegistry_IsOwned(form.item);
+    }
+    return RandoLogic_HasLogicItem(formItem);
+}
+
+bool CanUseInRegisteredForm(const S2HCustomItemDefinition& definition, const S2HFormDefinition& form) {
+    const bool wantsAdult = definition.ageRequirement == S2H_CUSTOM_ITEM_AGE_ADULT;
+    const bool isAgeMet = definition.ageRequirement == S2H_CUSTOM_ITEM_AGE_ANY || wantsAdult == form.isAdult;
+    return isAgeMet && IsFormInMask(definition, PLAYER_FORM_HUMAN) && IsFormKeyAllowed(definition, form.key) &&
+           IsRegisteredFormReachable(form);
+}
+
 bool CanAnyFormUseModItem(int32_t randoItem) {
     const S2HCustomItemDefinition* definition = CustomItemRegistry_Find(RandoItems_GetKey(randoItem));
     if (definition == nullptr) {
         return false;
     }
-    if (definition->formMask == 0) {
+    const bool isUnrestricted = definition->formMask == 0 && definition->allowedFormCount == 0 &&
+                                definition->ageRequirement == S2H_CUSTOM_ITEM_AGE_ANY;
+    if (isUnrestricted) {
         return true;
     }
     for (int32_t form = 0; form < PLAYER_FORM_MAX; form++) {
-        const bool isAllowed = (definition->formMask & S2H_CUSTOM_ITEM_FORM_BIT(form)) != 0;
-        if (isAllowed && CanBecomeForm(static_cast<PlayerTransformation>(form))) {
+        if (CanUseInNativeForm(*definition, static_cast<PlayerTransformation>(form))) {
+            return true;
+        }
+    }
+    for (uint32_t index = 0; index < FormRegistry_GetCount(); index++) {
+        if (CanUseInRegisteredForm(*definition, *FormRegistry_GetAt(index))) {
             return true;
         }
     }
@@ -452,6 +507,12 @@ bool EvaluateCapability(RandoLogicCapability capability) {
             return CAN_USE_MAGIC_ARROW(FIRE);
         case RLC_HasFireSourceWithTorch:
             return CAN_LIGHT_TORCH_NEAR_ANOTHER;
+        case RLC_CanUseFireArrow:
+            return CAN_USE_MAGIC_ARROW(FIRE);
+        case RLC_CanUseIceArrow:
+            return CAN_USE_MAGIC_ARROW(ICE);
+        case RLC_CanUseLightArrow:
+            return CAN_USE_MAGIC_ARROW(LIGHT);
         case RLC_CanHitSwitch:
             return CAN_USE_SWORD || CAN_USE_PROJECTILE || CAN_USE_EXPLOSIVE || CAN_BE_GORON;
         case RLC_CanUseSword:
@@ -465,6 +526,8 @@ bool EvaluateCapability(RandoLogicCapability capability) {
             return EvaluateCapability(RLC_CanAttack) || HAS_ITEM(ITEM_DEKU_STICK);
         case RLC_CanShield:
             return GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) > EQUIP_VALUE_SHIELD_NONE;
+        case RLC_CanReflectLight:
+            return HAS_MIRROR_SHIELD;
         case RLC_CanUseProjectile:
             return CAN_USE_PROJECTILE;
         case RLC_HookshotOrBoomerang:
@@ -510,36 +573,55 @@ bool RandoLogic_GrantCapability(const char* owner, const char* capability, S2HLo
 bool RandoLogic_Grant(const S2HLogicGrant* definition) {
     if (!definition || definition->structSize < sizeof(*definition) || !definition->owner || !definition->condition ||
         definition->includeCount > 4096 || definition->excludeCount > 4096 ||
-        (definition->includeCount && !definition->include) || (definition->excludeCount && !definition->exclude)) return false;
+        (definition->includeCount && !definition->include) || (definition->excludeCount && !definition->exclude)) {
+        return false;
+    }
     for (uint32_t i = 0; i < definition->includeCount + definition->excludeCount; ++i) {
-        const auto& selector = i < definition->includeCount ? definition->include[i] : definition->exclude[i - definition->includeCount];
-        if (selector.structSize < sizeof(selector) || selector.checkCount > 4096 || (selector.checkCount && !selector.checks)) return false;
+        const auto& selector =
+            i < definition->includeCount ? definition->include[i] : definition->exclude[i - definition->includeCount];
+        if (selector.structSize < sizeof(selector) || selector.checkCount > 4096 ||
+            (selector.checkCount && !selector.checks)) {
+            return false;
+        }
     }
     switch (definition->kind) {
         case S2H_LOGIC_GRANT_CAPABILITY: {
             int32_t index = FindCapability(definition->capability);
-            if (index < 0) return false;
+            if (index < 0) {
+                return false;
+            }
             sCapabilityGrants[index].push_back(ReadGrant(*definition));
             gRandoLogicHasCapabilityGrants = true;
             return true;
         }
         case S2H_LOGIC_GRANT_ITEM:
-            if (definition->value <= RI_UNKNOWN || definition->value > UINT16_MAX) return false;
+            if (definition->value <= RI_UNKNOWN || definition->value > UINT16_MAX) {
+                return false;
+            }
             sItemGrants[definition->value].push_back(ReadGrant(*definition));
             return true;
         case S2H_LOGIC_GRANT_ENEMY_KILL:
-            if (definition->value < 0 || definition->value > INT16_MAX) return false;
+            if (definition->value < 0 || definition->value > INT16_MAX) {
+                return false;
+            }
             sEnemyGrants[definition->value].push_back(ReadGrant(*definition));
             return true;
-        default: return false;
+        default:
+            return false;
     }
 }
-bool RandoLogic_IsItemGranted(int32_t item) { return AnyMappedGrantHolds(sItemGrants, item); }
-bool RandoLogic_IsEnemyGranted(int32_t enemy) { return AnyMappedGrantHolds(sEnemyGrants, enemy); }
+bool RandoLogic_IsItemGranted(int32_t item) {
+    return AnyMappedGrantHolds(sItemGrants, item);
+}
+bool RandoLogic_IsEnemyGranted(int32_t enemy) {
+    return AnyMappedGrantHolds(sEnemyGrants, enemy);
+}
 bool RandoLogic_IsNativeItemGranted(uint16_t item) {
     for (auto& [id, grants] : sItemGrants) {
         const auto found = Rando::StaticData::Items.find(static_cast<RandoItemId>(id));
-        if (found != Rando::StaticData::Items.end() && found->second.itemId == item && AnyGrantHolds(grants)) return true;
+        if (found != Rando::StaticData::Items.end() && found->second.itemId == item && AnyGrantHolds(grants)) {
+            return true;
+        }
     }
     return false;
 }
@@ -580,14 +662,16 @@ void RandoLogic_RemoveOwner(const char* name) {
         return;
     }
     const std::string owner = name;
-    for (auto* map : {&sItemGrants, &sEnemyGrants}) {
-        for (auto& [_, grants] : *map) std::erase_if(grants, [&owner](const Grant& grant) { return grant.owner == owner; });
+    for (auto* map : { &sItemGrants, &sEnemyGrants }) {
+        for (auto& [_, grants] : *map) {
+            std::erase_if(grants, [&owner](const Grant& grant) { return grant.owner == owner; });
+        }
     }
     sRules.remove_if([&owner](const Rule& rule) { return rule.name == owner; });
     for (std::vector<Grant>& grants : sCapabilityGrants) {
-        grants.erase(std::remove_if(grants.begin(), grants.end(),
-                                    [&owner](const Grant& grant) { return grant.owner == owner; }),
-                     grants.end());
+        grants.erase(
+            std::remove_if(grants.begin(), grants.end(), [&owner](const Grant& grant) { return grant.owner == owner; }),
+            grants.end());
     }
 }
 
@@ -624,10 +708,16 @@ bool RandoLogic_ResolveEvent(int32_t logicEvent, bool vanillaResult) {
 }
 
 bool RandoLogic_HasLogicItem(int32_t randoItem) {
-    if (RandoLogic_IsItemGranted(randoItem)) return true;
+    if (RandoLogic_IsItemGranted(randoItem)) {
+        return true;
+    }
     bool progressive = false;
-    if (ProgressiveItems_HasLogicItem(randoItem, &progressive)) return progressive;
-    if (DungeonRegistry_FindItem(randoItem) >= 0) { return DungeonRegistry_HasItem(randoItem); }
+    if (ProgressiveItems_HasLogicItem(randoItem, &progressive)) {
+        return progressive;
+    }
+    if (DungeonRegistry_FindItem(randoItem) >= 0) {
+        return DungeonRegistry_HasItem(randoItem);
+    }
     if (RandoItems_IsModItem(randoItem)) {
         return RandoItems_IsOwned(randoItem, RandoInfCustom_GetActiveBank());
     }
@@ -639,7 +729,9 @@ bool RandoLogic_HasLogicItem(int32_t randoItem) {
 }
 
 bool RandoLogic_CanUseItem(int32_t randoItem) {
-    if (DungeonRegistry_FindItem(randoItem) >= 0) { return DungeonRegistry_HasItem(randoItem); }
+    if (DungeonRegistry_FindItem(randoItem) >= 0) {
+        return DungeonRegistry_HasItem(randoItem);
+    }
     if (!RandoLogic_HasLogicItem(randoItem)) {
         return false;
     }

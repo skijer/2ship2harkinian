@@ -10,7 +10,6 @@ import lief
 
 # Mods import from the game module; it forwards libultraship's symbols to libultraship.dll.
 HOST_MODULE = '2ship.dll'
-MODAPI_MAJOR = 3
 
 
 def digest(path):
@@ -44,8 +43,8 @@ def main():
                 if archive.testzip() is not None:
                     problems.append('archive integrity failure')
                 manifest = json.loads(archive.read('manifest.json'))
-                if manifest.get('game') != 'mm' or manifest.get('modapi') != MODAPI_MAJOR:
-                    problems.append(f'expected game=mm, modapi={MODAPI_MAJOR}')
+                if manifest.get('game') != 'mm':
+                    problems.append('expected game=mm')
                 binary_path = manifest.get('binaries', {}).get('windows_x64')
                 binary = lief.PE.parse(list(archive.read(binary_path))) if binary_path else None
                 if binary is None:

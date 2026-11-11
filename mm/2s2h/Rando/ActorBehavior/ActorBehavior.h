@@ -10,6 +10,7 @@ namespace ActorBehavior {
 void Init();
 void OnFileLoad();
 
+bool ShouldMatchContainerStyle();
 RandoCheckId GetObjectRandoCheckId(void* actor);
 void SetObjectRandoCheckId(const void* object, RandoCheckId rc);
 

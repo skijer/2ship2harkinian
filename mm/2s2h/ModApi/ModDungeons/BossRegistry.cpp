@@ -23,13 +23,13 @@ struct Slot {
     s16 actor;
     const char* condition;
 };
-const std::array<Slot, S2H_BOSS_SLOT_MAX> slots = {{
+const std::array<Slot, S2H_BOSS_SLOT_MAX> slots = { {
     { "Odolwa", SCENE_MITURIN_BS, ACTOR_BOSS_01, "CanKillEnemy(ACTOR_BOSS_01)" },
     { "Goht", SCENE_HAKUGIN_BS, ACTOR_BOSS_HAKUGIN, "CanKillEnemy(ACTOR_BOSS_HAKUGIN)" },
     { "Gyorg", SCENE_SEA_BS, ACTOR_BOSS_03, "CanKillEnemy(ACTOR_BOSS_03)" },
     { "Twinmold", SCENE_INISIE_BS, ACTOR_BOSS_02, "CanKillEnemy(ACTOR_BOSS_02)" },
     { "Majora", SCENE_LAST_BS, ACTOR_BOSS_07, "CanKillEnemy(ACTOR_BOSS_07)" },
-}};
+} };
 struct Boss {
     std::string owner;
     std::string name;
@@ -91,12 +91,16 @@ const Assignment& Current() {
 }
 s32 FindSlot(s32 scene) {
     for (s32 slot = 0; slot < S2H_BOSS_SLOT_MAX; slot++) {
-        if (slots[slot].scene == scene) { return slot; }
+        if (slots[slot].scene == scene) {
+            return slot;
+        }
     }
     return -1;
 }
 Boss* Owner(s32 slot) {
-    if (slot < 0 || slot >= S2H_BOSS_SLOT_MAX) { return nullptr; }
+    if (slot < 0 || slot >= S2H_BOSS_SLOT_MAX) {
+        return nullptr;
+    }
     const auto found = bosses.find(Current()[slot]);
     if (found == bosses.end() || (!found->second.scene.empty() && !SceneDB_FindScene(found->second.scene))) {
         return nullptr;
@@ -123,17 +127,23 @@ nlohmann::json WriteAssignment() {
     nlohmann::json result = nlohmann::json::object();
     const auto& assignment = Current();
     for (s32 slot = 0; slot < S2H_BOSS_SLOT_MAX; slot++) {
-        if (!assignment[slot].empty()) { result[slots[slot].name] = assignment[slot]; }
+        if (!assignment[slot].empty()) {
+            result[slots[slot].name] = assignment[slot];
+        }
     }
     return result;
 }
 void ReadAssignment(const nlohmann::json& source) {
     saveAssignment = {};
     std::set<std::string> used;
-    if (!source.is_object()) { return; }
+    if (!source.is_object()) {
+        return;
+    }
     for (s32 slot = 0; slot < S2H_BOSS_SLOT_MAX; slot++) {
         const auto value = source.find(slots[slot].name);
-        if (value == source.end() || !value->is_string()) { continue; }
+        if (value == source.end() || !value->is_string()) {
+            continue;
+        }
         const std::string key = value->get<std::string>();
         const auto found = bosses.find(key);
         if (used.insert(key).second && (found == bosses.end() || Allowed(found->second, slot))) {
@@ -145,12 +155,11 @@ void ReadAssignment(const nlohmann::json& source) {
         }
     }
 }
-}
+} // namespace
 
 extern "C" bool BossRegistry_Register(const S2HBossDefinition* definition) {
-    if (definition == nullptr || definition->structSize < sizeof(S2HBossDefinition) ||
-        definition->key == nullptr || definition->key[0] == '\0' ||
-        (definition->allowedSlots & ((1u << S2H_BOSS_SLOT_MAX) - 1)) == 0) {
+    if (definition == nullptr || definition->structSize < sizeof(S2HBossDefinition) || definition->key == nullptr ||
+        definition->key[0] == '\0' || (definition->allowedSlots & ((1u << S2H_BOSS_SLOT_MAX) - 1)) == 0) {
         return false;
     }
     const auto existing = bosses.find(definition->key);
@@ -170,16 +179,22 @@ extern "C" bool BossRegistry_Register(const S2HBossDefinition* definition) {
     return true;
 }
 extern "C" int32_t BossRegistry_GetSlot(const char* key) {
-    if (key == nullptr || key[0] == '\0') { return -1; }
+    if (key == nullptr || key[0] == '\0') {
+        return -1;
+    }
     const auto& assignment = Current();
     for (s32 slot = 0; slot < S2H_BOSS_SLOT_MAX; slot++) {
-        if (assignment[slot] == key) { return slot; }
+        if (assignment[slot] == key) {
+            return slot;
+        }
     }
     return -1;
 }
 extern "C" const char* BossRegistry_GetSceneBoss(int16_t sceneId) {
     const s32 slot = FindSlot(sceneId);
-    if (slot < 0 || Owner(slot) == nullptr) { return nullptr; }
+    if (slot < 0 || Owner(slot) == nullptr) {
+        return nullptr;
+    }
     const auto found = bosses.find(Current()[slot]);
     return found == bosses.end() ? nullptr : found->first.c_str();
 }
@@ -190,14 +205,20 @@ extern "C" int32_t BossRegistry_ResolveSceneSource(int32_t sceneId) {
     const Boss* boss = Owner(FindSlot(sceneId));
     if (boss != nullptr && !boss->scene.empty()) {
         const auto scene = SceneDB_FindScene(boss->scene);
-        if (scene) { return *scene; }
+        if (scene) {
+            return *scene;
+        }
     }
     return sceneId;
 }
 extern "C" void BossRegistry_ReportDefeated(Actor* boss) {
-    if (boss == nullptr || gPlayState == nullptr) { return; }
+    if (boss == nullptr || gPlayState == nullptr) {
+        return;
+    }
     const s32 slot = FindSlot(gPlayState->sceneId);
-    if (slot < 0 || Owner(slot) == nullptr || !reported.insert(boss).second) { return; }
+    if (slot < 0 || Owner(slot) == nullptr || !reported.insert(boss).second) {
+        return;
+    }
     GameInteractor_ExecuteOnBossDefeated(slots[slot].actor);
 }
 void BossRegistry_SetCurrentMod(const std::string& name) {
@@ -215,13 +236,22 @@ void BossRegistry_ParseSpoiler(const nlohmann::json& spoiler) {
 }
 void BossRegistry_Init() {
     static const char* choices[] = { "Off", "On" };
-    S2HModRandoOption option = { sizeof(option), "unbound.bossShuffle", "Mod boss shuffle",
+    S2HModRandoOption option = {
+        sizeof(option),
+        "unbound.bossShuffle",
+        "Mod boss shuffle",
         "Assign registered bosses to random compatible MM boss slots; Off uses their preferred slots.",
-        choices, 2, 0, S2H_MOD_RANDO_WIDGET_COMBOBOX };
+        choices,
+        2,
+        0,
+        S2H_MOD_RANDO_WIDGET_COMBOBOX
+    };
     RandoOptions_Register(&option);
     SaveSections_Register("unboundBosses", WriteAssignment, ReadAssignment);
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s16 scene, s8 spawn) { reported.clear(); });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnActorDestroy>([](Actor* actor) { reported.erase(actor); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>(
+        [](s16 scene, s8 spawn) { reported.clear(); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnActorDestroy>(
+        [](Actor* actor) { reported.erase(actor); });
     for (s32 slot = 0; slot < S2H_BOSS_SLOT_MAX; slot++) {
         S2HLogicSelector selector = {};
         selector.structSize = sizeof(selector);

@@ -1005,7 +1005,8 @@ u8 sActionModelGroups[PLAYER_IA_MAX] = {
 };
 
 PlayerModelGroup Player_ActionToModelGroup(Player* player, PlayerItemAction itemAction) {
-    s32 modelGroup = sActionModelGroups[itemAction];
+    s32 modelGroup =
+        (itemAction == PLAYER_IA_CUSTOM) ? CustomItemRegistry_GetActiveModelGroup() : sActionModelGroups[itemAction];
 
     GameInteractor_ExecuteOnPlayerResolveModelGroup(player, itemAction, &modelGroup);
     if ((modelGroup == PLAYER_MODELGROUP_ONE_HAND_SWORD) && Player_IsGoronOrDeku(player)) {
@@ -1753,6 +1754,12 @@ s32 Player_IsHoldingTwoHandedWeapon(Player* player) {
     // Relies on the itemActions for two-handed weapons being contiguous.
     if ((player->heldItemAction >= PLAYER_IA_SWORD_TWO_HANDED) && (player->heldItemAction <= PLAYER_IA_DEKU_STICK)) {
         return true;
+    }
+    // A custom item held as the Great Fairy's Sword or a Deku Stick takes their two-handed stance.
+    if (player->heldItemAction == PLAYER_IA_CUSTOM) {
+        PlayerMeleeWeapon weapon = Player_GetMeleeWeaponHeld(player);
+
+        return (weapon == PLAYER_MELEEWEAPON_SWORD_TWO_HANDED) || (weapon == PLAYER_MELEEWEAPON_DEKU_STICK);
     }
 
     return false;

@@ -1,6 +1,7 @@
 #include "Network.h"
 #include <spdlog/spdlog.h>
 #include <libultraship/libultraship.h>
+#include <ship/GameRegistry.h>
 #include <chrono>
 
 // MARK: - Public
@@ -22,7 +23,11 @@ bool Network::Enable(const char* host, uint16_t port) {
         receiveThread.join();
     }
 
-    receiveThread = std::thread(&Network::ReceiveFromServer, this);
+    // Inside Fleet a new thread has no game: the handshake must read this game's settings, not the active game's.
+    receiveThread = std::thread([this, game = Ship::GameRegistry::GetCurrent()] {
+        Ship::GameScope scope(game);
+        ReceiveFromServer();
+    });
     return true;
 }
 

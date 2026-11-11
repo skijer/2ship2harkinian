@@ -1,6 +1,8 @@
 #include "ModLayout.h"
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <map>
 #include <string>
 
@@ -10,6 +12,7 @@
 #include <spdlog/spdlog.h>
 
 #include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
+#include "2s2h/ModApi/CustomItemRegistry/KaleidoItemManager.h"
 #include "2s2h/ModApi/CustomEquipRegistry/CustomEquipRegistry.h"
 
 extern "C" {
@@ -35,6 +38,12 @@ struct Page {
     uint8_t rows;
     uint8_t columns;
     uint16_t pageId;
+    std::map<uint8_t, S2HLayoutCell> cells;
+    std::array<std::string, 15> background;
+    std::array<void*, 15> backgroundPointers{};
+    uint16_t flags = 0;
+    std::array<std::string, 4> cursorCorners;
+    std::array<const char*, 4> cursorPointers{};
 };
 
 std::map<std::string, Page> sPages;
@@ -53,12 +62,14 @@ uint16_t CountPagesOfKind(uint8_t kind) {
 }
 
 bool IsValidPage(const S2HLayoutPage* definition) {
-    if (definition == nullptr || definition->structSize < sizeof(S2HLayoutPage) || definition->key == nullptr ||
-        definition->key[0] == '\0' || HasReservedPrefix(definition->key) || sPages.contains(definition->key)) {
+    if (definition == nullptr || definition->structSize < offsetof(S2HLayoutPage, backgroundSections) ||
+        definition->key == nullptr || definition->key[0] == '\0' || HasReservedPrefix(definition->key) ||
+        sPages.contains(definition->key)) {
         return false;
     }
     if (definition->kind == S2H_LAYOUT_EQUIPMENT) {
-        return definition->rows == 4 && definition->columns >= 1 && definition->columns <= 6 && CountPagesOfKind(S2H_LAYOUT_EQUIPMENT) < 224;
+        return definition->rows == 4 && definition->columns >= 1 && definition->columns <= 6 &&
+               CountPagesOfKind(S2H_LAYOUT_EQUIPMENT) < 224;
     }
     if (definition->kind == S2H_LAYOUT_COLLECTABLES) {
         return CountPagesOfKind(S2H_LAYOUT_COLLECTABLES) < QuestPageLimit;
@@ -74,7 +85,9 @@ uint16_t GetCellCount(const Page& page) {
 
 // Item pages lay their cells out in the pause grid's 6 columns; quest pages address the quest points directly.
 uint8_t GetSlot(const Page& page, uint8_t cell) {
-    if (page.kind == S2H_LAYOUT_EQUIPMENT) return (cell / page.columns) * 6 + cell % page.columns;
+    if (page.kind == S2H_LAYOUT_EQUIPMENT) {
+        return (cell / page.columns) * 6 + cell % page.columns;
+    }
     if (page.kind == S2H_LAYOUT_COLLECTABLES) {
         return cell;
     }
@@ -82,21 +95,9 @@ uint8_t GetSlot(const Page& page, uint8_t cell) {
 }
 
 bool PlaceOnPage(const S2HCustomItemDefinition& definition, uint16_t pageId, uint8_t slot) {
-    S2HCustomItemPlacement current;
-    if (!KaleidoItemManager_GetPlacement(definition.key, &current)) {
-        return false;
-    }
-    // A placement that already moved off the item's own preference is the player's choice and wins over a default.
-    const auto* equipment = CustomEquipRegistry_Find(definition.key);
-    const uint16_t defaultPage = equipment != nullptr && equipment->slot == S2H_EQUIP_SLOT_UPGRADE ? S2H_ITEM_PAGE_QUEST_VANILLA : equipment != nullptr ? S2H_ITEM_PAGE_EQUIPMENT_FIRST + (equipment->page == S2H_EQUIP_PAGE_VANILLA ? 0 : equipment->page) : definition.preferredPage;
-    const int upgradePoints[]={QUEST_SWORD,QUEST_SHIELD,QUEST_QUIVER,QUEST_BOMB_BAG};
-    const uint8_t defaultSlot = equipment != nullptr && equipment->slot == S2H_EQUIP_SLOT_UPGRADE ? upgradePoints[std::min<int>(equipment->row,3)] : equipment != nullptr ? equipment->row * 6 + equipment->column : definition.preferredSlot;
-    const bool isUntouched = current.page == defaultPage && current.slot == defaultSlot;
-    if (!isUntouched) {
-        return true;
-    }
+    // A mod's defaults live only for this session; saved user placements still win in GetPlacement.
     const S2HCustomItemPlacement placement = { pageId, slot };
-    return KaleidoItemManager_SetPlacement(definition.key, &placement);
+    return KaleidoItemManager_SetDefaultPlacement(definition.key, &placement);
 }
 
 } // namespace
@@ -106,23 +107,124 @@ bool ModLayout_RegisterPage(const S2HLayoutPage* definition) {
         return false;
     }
     const bool isQuestPage = definition->kind == S2H_LAYOUT_COLLECTABLES;
-    uint16_t pageId = isQuestPage ? S2H_ITEM_PAGE_QUEST_VANILLA + 1 :
-                      definition->kind == S2H_LAYOUT_EQUIPMENT ? S2H_ITEM_PAGE_EQUIPMENT_FIRST : 0;
-    for (;;) {
+    uint16_t pageId = isQuestPage                                ? S2H_ITEM_PAGE_QUEST_VANILLA + 1
+                      : definition->kind == S2H_LAYOUT_EQUIPMENT ? S2H_ITEM_PAGE_EQUIPMENT_FIRST
+                                                                 : 0;
+    const bool hasPresentation = definition->structSize >= offsetof(S2HLayoutPage, cursorCorners);
+    const bool fixed = hasPresentation && (definition->flags & S2H_LAYOUT_FIXED_PAGE);
+    if (fixed) {
+        if (definition->kind != S2H_LAYOUT_EQUIPMENT || definition->targetPage < S2H_ITEM_PAGE_EQUIPMENT_FIRST) {
+            return false;
+        }
+        pageId = definition->targetPage;
+        for (const auto& [key, page] : sPages) {
+            if (page.pageId == pageId) {
+                return false;
+            }
+        }
+    }
+    for (; !fixed;) {
         bool occupied = false;
-        for (const auto& [key, page] : sPages) occupied |= page.pageId == pageId;
+        for (const auto& [key, page] : sPages) {
+            occupied |= page.pageId == pageId;
+        }
         for (uint32_t i = 0; i < CustomItemRegistry_GetCount(); ++i) {
             S2HCustomItemPlacement placement;
-            if (KaleidoItemManager_GetPlacement(CustomItemRegistry_GetAt(i)->key, &placement)) occupied |= placement.page == pageId;
+            if (KaleidoItemManager_GetPlacement(CustomItemRegistry_GetAt(i)->key, &placement)) {
+                occupied |= placement.page == pageId;
+            }
         }
-        if (!occupied) break;
+        if (!occupied) {
+            break;
+        }
         ++pageId;
     }
     if ((definition->kind == S2H_LAYOUT_ITEMS && pageId >= S2H_ITEM_PAGE_QUEST_VANILLA) ||
-        (isQuestPage && pageId >= S2H_ITEM_PAGE_VANILLA) || pageId == UINT16_MAX) return false;
+        (isQuestPage && pageId >= S2H_ITEM_PAGE_VANILLA) || pageId == UINT16_MAX) {
+        return false;
+    }
     sPages.emplace(definition->key, Page{ definition->title ? definition->title : definition->key, definition->kind,
                                           definition->rows, definition->columns, pageId });
+    auto& registered = sPages.at(definition->key);
+    if (definition->cells != nullptr) {
+        for (uint8_t cell = 0; cell < std::min<uint16_t>(definition->cellCount, GetCellCount(registered)); ++cell) {
+            registered.cells.emplace(GetSlot(registered, cell), definition->cells[cell]);
+        }
+    }
+    if (hasPresentation) {
+        registered.flags = definition->flags;
+        if (definition->backgroundSections != nullptr) {
+            for (int i = 0; i < 15; ++i) {
+                if (definition->backgroundSections[i] != nullptr) {
+                    registered.background[i] = definition->backgroundSections[i];
+                }
+            }
+        }
+    }
+    if (definition->structSize >= sizeof(S2HLayoutPage) && definition->cursorCorners != nullptr) {
+        for (int i = 0; i < 4; ++i) {
+            if (definition->cursorCorners[i]) {
+                registered.cursorCorners[i] = definition->cursorCorners[i];
+            }
+        }
+    }
     return true;
+}
+
+const char* const* ModLayout_GetCursorCorners(uint16_t id) {
+    auto archives = Ship::Context::GetRawInstance()->GetResourceManager()->GetArchiveManager();
+    for (auto& [key, page] : sPages) {
+        if (page.pageId != id) {
+            continue;
+        }
+        for (int i = 0; i < 4; ++i) {
+            const auto& path = page.cursorCorners[i];
+            const char* resource = path.rfind("__OTR__", 0) == 0 ? path.c_str() + 7 : path.c_str();
+            if (path.empty() || !archives->HasFile(resource)) {
+                return nullptr;
+            }
+            page.cursorPointers[i] = path.c_str();
+        }
+        return page.cursorPointers.data();
+    }
+    return nullptr;
+}
+
+uint16_t ModLayout_GetFlags(uint16_t id) {
+    for (const auto& [key, page] : sPages) {
+        if (page.pageId == id) {
+            return page.flags;
+        }
+    }
+    return 0;
+}
+
+const char* ModLayout_GetPageKey(uint16_t id) {
+    for (const auto& [key, page] : sPages) {
+        if (page.pageId == id) {
+            return key.c_str();
+        }
+    }
+    return nullptr;
+}
+
+void** ModLayout_GetBackground(uint16_t id, void** fallback) {
+    auto archives = Ship::Context::GetRawInstance()->GetResourceManager()->GetArchiveManager();
+    for (auto& [key, page] : sPages) {
+        if (page.pageId != id) {
+            continue;
+        }
+        for (int i = 0; i < 15; ++i) {
+            const auto& path = page.background[i];
+            const char* resource = path.rfind("__OTR__", 0) == 0 ? path.c_str() + 7 : path.c_str();
+            if (path.empty() || !archives->HasFile(resource)) {
+                return fallback;
+            }
+            page.backgroundPointers[i] = const_cast<char*>(path.c_str());
+        }
+        return page.backgroundPointers.data();
+    }
+    return fallback;
 }
 
 bool ModLayout_PlaceItem(const char* itemKey, const char* pageKey, uint8_t cell) {
@@ -178,9 +280,12 @@ bool ModLayout_HasMods(void) {
 }
 
 void ModLayout_DrawEditor(uint8_t kind) {
-    if (kind == S2H_LAYOUT_EQUIPMENT) ImGui::TextUnformatted("Equipment pages appear over Masks, in four rows: swords, shields, tunics and boots.");
+    if (kind == S2H_LAYOUT_EQUIPMENT) {
+        ImGui::TextUnformatted("Equipment pages appear over Masks, in four rows: swords, shields, tunics and boots.");
+    }
     for (const auto& [key, page] : sPages) {
-        if (page.kind != kind || !ImGui::TreeNode(key.c_str(), "%s (%d cells)", page.title.c_str(), GetCellCount(page))) {
+        if (page.kind != kind ||
+            !ImGui::TreeNode(key.c_str(), "%s (%d cells)", page.title.c_str(), GetCellCount(page))) {
             continue;
         }
         for (uint8_t cell = 0; cell < GetCellCount(page); cell++) {
@@ -198,36 +303,64 @@ static std::string CellSetting(uint16_t page, uint8_t slot, const char* field) {
 }
 
 bool ModLayout_GetCell(uint16_t page, uint8_t slot, S2HLayoutCell* cell) {
-    if (cell == nullptr || slot >= 32) return false;
+    if (cell == nullptr || slot >= 32) {
+        return false;
+    }
     *cell = { static_cast<int16_t>(-96 + (slot % 6) * 32), static_cast<int16_t>(56 - (slot / 6) * 32), 28, 28 };
     if (page >= S2H_ITEM_PAGE_QUEST_VANILLA && page < S2H_ITEM_PAGE_VANILLA) {
         if (page == S2H_ITEM_PAGE_QUEST_VANILLA && slot < 23) {
-            const int x[] = { 45,78,10,45,80,11,-109,-87,-65,-41,-19,-18,-109,-87,-65,-41,-19,-18,-103,7,82,-110,-54 };
-            const int y[] = { 62,42,42,20,-9,-9,-20,-20,-20,-20,-20,-20,2,2,2,2,2,2,54,-44,-44,34,58 };
-            cell->x = x[slot]; cell->y = y[slot]; 
-            cell->width = sQuestVtxWidths[slot]; cell->height = sQuestVtxHeights[slot];
+            const int x[] = { 45,   78,  10,  45,  80,  11,  -109, -87, -65, -41,  -19, -18,
+                              -109, -87, -65, -41, -19, -18, -103, 7,   82,  -110, -54 };
+            const int y[] = { 62, 42, 42, 20, -9, -9, -20, -20, -20, -20, -20, -20,
+                              2,  2,  2,  2,  2,  2,  54,  -44, -44, 34,  58 };
+            cell->x = x[slot];
+            cell->y = y[slot];
+            cell->width = sQuestVtxWidths[slot];
+            cell->height = sQuestVtxHeights[slot];
         } else {
-            const int x[] = {74,74,46,18,18,46,-108,-90,-72,-54,-36,-18,-108,-90,-72,-54,-36,-18,20,46,72,-110,-86,-110,-54};
-            const int y[] = {38,6,-12,6,38,56,-20,-20,-20,-20,-20,-20,2,2,2,2,2,2,-46,-46,-46,58,58,34,58};
-            if (slot >= 25) return false;
-            *cell = { static_cast<int16_t>(x[slot]), static_cast<int16_t>(y[slot]), static_cast<uint16_t>(slot >= 6 && slot < 18 ? 16 : 24), 24 };
-            if (slot == 24) cell->width = cell->height = 48;
+            const int x[] = { 74,  74,  46,  18,  18,  46, -108, -90, -72,  -54, -36,  -18, -108,
+                              -90, -72, -54, -36, -18, 20, 46,   72,  -110, -86, -110, -54 };
+            const int y[] = { 38, 6, -12, 6, 38, 56,  -20, -20, -20, -20, -20, -20, 2,
+                              2,  2, 2,   2, 2,  -46, -46, -46, 58,  58,  34,  58 };
+            if (slot >= 25) {
+                return false;
+            }
+            *cell = { static_cast<int16_t>(x[slot]), static_cast<int16_t>(y[slot]),
+                      static_cast<uint16_t>(slot >= 6 && slot < 18 ? 16 : 24), 24 };
+            if (slot == 24) {
+                cell->width = cell->height = 48;
+            }
         }
     }
-    cell->x = CVarGetInteger(CellSetting(page,slot,"X").c_str(),cell->x);
-    cell->y = CVarGetInteger(CellSetting(page,slot,"Y").c_str(),cell->y);
-    cell->width = CVarGetInteger(CellSetting(page,slot,"Width").c_str(),cell->width);
-    cell->height = CVarGetInteger(CellSetting(page,slot,"Height").c_str(),cell->height);
+    for (const auto& [key, registered] : sPages) {
+        if (registered.pageId != page) {
+            continue;
+        }
+        if (registered.kind == S2H_LAYOUT_EQUIPMENT &&
+            (slot / 6 >= registered.rows || slot % 6 >= registered.columns)) {
+            return false;
+        }
+        const auto found = registered.cells.find(slot);
+        if (found != registered.cells.end()) {
+            *cell = found->second;
+        }
+    }
+    cell->x = CVarGetInteger(CellSetting(page, slot, "X").c_str(), cell->x);
+    cell->y = CVarGetInteger(CellSetting(page, slot, "Y").c_str(), cell->y);
+    cell->width = CVarGetInteger(CellSetting(page, slot, "Width").c_str(), cell->width);
+    cell->height = CVarGetInteger(CellSetting(page, slot, "Height").c_str(), cell->height);
     return true;
 }
 
 bool ModLayout_SetCell(uint16_t page, uint8_t slot, const S2HLayoutCell* cell) {
     if (cell == nullptr || slot >= 32 || cell->x < -128 || cell->x + cell->width > 128 || cell->y > 80 ||
-        cell->y - cell->height < -88 || cell->width < 8 || cell->width > 64 || cell->height < 8 || cell->height > 64) return false;
-    CVarSetInteger(CellSetting(page,slot,"X").c_str(),cell->x);
-    CVarSetInteger(CellSetting(page,slot,"Y").c_str(),cell->y);
-    CVarSetInteger(CellSetting(page,slot,"Width").c_str(),cell->width);
-    CVarSetInteger(CellSetting(page,slot,"Height").c_str(),cell->height);
+        cell->y - cell->height < -88 || cell->width < 8 || cell->width > 64 || cell->height < 8 || cell->height > 64) {
+        return false;
+    }
+    CVarSetInteger(CellSetting(page, slot, "X").c_str(), cell->x);
+    CVarSetInteger(CellSetting(page, slot, "Y").c_str(), cell->y);
+    CVarSetInteger(CellSetting(page, slot, "Width").c_str(), cell->width);
+    CVarSetInteger(CellSetting(page, slot, "Height").c_str(), cell->height);
     Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
     return true;
 }
@@ -235,7 +368,9 @@ bool ModLayout_SetCell(uint16_t page, uint8_t slot, const S2HLayoutCell* cell) {
 void ModLayout_ApplyCells(PlayState* play, uint16_t page, Vtx* vertices, uint8_t count) {
     for (uint8_t slot = 0; slot < count; ++slot) {
         S2HLayoutCell cell;
-        if (!ModLayout_GetCell(page,slot,&cell)) continue;
+        if (!ModLayout_GetCell(page, slot, &cell)) {
+            continue;
+        }
         for (int corner = 0; corner < 4; ++corner) {
             Vtx& v = vertices[slot * 4 + corner];
             v.v.ob[0] = cell.x + ((corner & 1) ? cell.width : 0);

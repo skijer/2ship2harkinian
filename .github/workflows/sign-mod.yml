@@ -81,8 +81,6 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
-    outputs:
-      modapi_major: ${{ steps.modapi.outputs.major }}
     steps:
     - name: Checkout the signing tools
       uses: actions/checkout@v6
@@ -103,11 +101,6 @@ jobs:
         ref: ${{ needs.request.outputs.commit }}
         path: submitted
         persist-credentials: false
-    - name: Read the mod API major
-      id: modapi
-      run: |
-        MAJOR=$(sed -n 's/^#define S2H_MOD_API_MAJOR \([0-9]*\)$/\1/p' external/Unbound/mm/2s2h/ModApi/ModApi.h)
-        echo "major=${MAJOR:-1}" >> "$GITHUB_OUTPUT"
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -332,7 +325,6 @@ jobs:
       id: plan
       env:
         ISSUE: ${{ needs.request.outputs.issue }}
-        MAJOR: ${{ needs.scan.outputs.modapi_major }}
         TRUSTED: ${{ needs.request.outputs.trusted }}
         APPROVED: ${{ needs.request.outputs.approved }}
         HELD: ${{ needs.request.outputs.held_permissions }}
@@ -342,7 +334,7 @@ jobs:
         [ "$TRUSTED" = true ] && FLAGS="$FLAGS --trusted"
         [ "$APPROVED" = true ] && FLAGS="$FLAGS --approved"
         python trusted/mod-sdk/tools/build_catalog.py plan --catalog current/payload.json --packages unsigned \
-               --source-hashes store-inputs/hashes.json --issue "$ISSUE" --modapi-major "$MAJOR" --game mm \
+               --source-hashes store-inputs/hashes.json --issue "$ISSUE" --game mm \
                --author "$AUTHOR" --held-permissions "$HELD" --output plan.json $FLAGS
         echo "held=$(python3 -c 'import json; p=json.load(open("plan.json")); print(",".join(sorted({x for v in p["held"].values() for x in v})))')" >> "$GITHUB_OUTPUT"
     - name: Sign and verify against the key compiled into the game
@@ -371,7 +363,6 @@ jobs:
         DIRECTORY: ${{ needs.request.outputs.directory }}
         COMMIT: ${{ needs.request.outputs.commit }}
         AUTHOR: ${{ needs.request.outputs.author }}
-        MAJOR: ${{ needs.scan.outputs.modapi_major }}
       run: |
         if ! gh release view "$STORE_RELEASE" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
           gh release create "$STORE_RELEASE" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false \
@@ -381,7 +372,7 @@ jobs:
         mkdir -p upload
         for package in signed/*.o2r; do
           [ -e "$package" ] || continue
-          cp "$package" "upload/$(basename "$package" .o2r)-mm-api$MAJOR.o2r"
+          cp "$package" "upload/$(basename "$package" .o2r)-mm.o2r"
         done
         if ls upload/*.o2r > /dev/null 2>&1; then
           gh release upload "$STORE_RELEASE" upload/*.o2r --repo "$GITHUB_REPOSITORY" --clobber

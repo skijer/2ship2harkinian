@@ -16,6 +16,8 @@
 
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ModApi/ConsoleArguments.h"
+#include "2s2h/ModApi/Forms/FormKeyList.h"
+#include "2s2h/ModApi/Forms/FormRegistry.h"
 #include "2s2h/SaveManager/SaveSections.h"
 
 extern "C" {
@@ -39,6 +41,7 @@ struct RegisteredEquip {
     std::string pauseText;
     std::string getItemText;
     std::string getItemModelPath;
+    FormKeyList allowedForms;
     S2HCustomEquipDefinition definition = {};
 };
 
@@ -84,8 +87,27 @@ bool IsFormAllowed(const S2HCustomEquipDefinition* definition) {
     if (definition == nullptr) {
         return false;
     }
-    return definition->formMask == 0 ||
-           (definition->formMask & S2H_CUSTOM_ITEM_FORM_BIT(gSaveContext.save.playerForm)) != 0;
+    return CustomItemRegistry_IsFormInMask(definition->formMask) &&
+           FormRegistry_IsCurrentFormIn(definition->allowedForms, definition->allowedFormCount);
+}
+
+bool IsUsableNow(const S2HCustomEquipDefinition* definition) {
+    return definition != nullptr && CustomItemRegistry_IsAgeMet(definition->ageRequirement) &&
+           IsFormAllowed(definition);
+}
+
+// Reads the host's copy, where a definition older than these fields left them zeroed.
+bool StoreUseRestrictions(RegisteredEquip& entry) {
+    S2HCustomEquipDefinition& definition = entry.definition;
+    const bool isAgeKnown = definition.ageRequirement <= S2H_CUSTOM_ITEM_AGE_ADULT;
+    if (!isAgeKnown || !FormKeyList::IsValid(definition.allowedForms, definition.allowedFormCount)) {
+        SPDLOG_ERROR("[CustomEquipRegistry] Equipment '{}' supplied an invalid age or form list", entry.key);
+        return false;
+    }
+    entry.allowedForms.Assign(definition.allowedForms, definition.allowedFormCount);
+    definition.allowedForms = entry.allowedForms.Data();
+    definition.allowedFormCount = entry.allowedForms.Count();
+    return true;
 }
 
 void WriteVanillaValue(uint8_t slot, uint16_t value) {
@@ -177,7 +199,8 @@ void SwitchWorn(uint8_t slot, RegisteredEquip* incoming, bool shouldRestoreVanil
             if (outgoingKey.empty()) {
                 sRestoreValue[slot] = ReadVanillaValue(slot);
             }
-            WriteVanillaValue(slot, incoming->definition.vanillaBase);
+            const bool isStandIn = (incoming->definition.presentationFlags & S2H_EQUIP_VANILLA_STAND_IN) != 0;
+            WriteVanillaValue(slot, isStandIn ? sRestoreValue[slot] : incoming->definition.vanillaBase);
         } else if (shouldRestoreVanilla) {
             WriteVanillaValue(slot, sRestoreValue[slot]);
         }
@@ -264,7 +287,13 @@ void ReadSection(const nlohmann::json& section) {
         sWorn[slot] = entry.value("key", "");
         sRestoreValue[slot] = entry.value("restore", 0);
         const RegisteredEquip* worn = Find(sWorn[slot]);
-        sAppliedValue[slot] = worn != nullptr ? worn->definition.vanillaBase : 0;
+        if (worn == nullptr) {
+            sAppliedValue[slot] = 0;
+        } else if (worn->definition.presentationFlags & S2H_EQUIP_VANILLA_STAND_IN) {
+            sAppliedValue[slot] = sRestoreValue[slot];
+        } else {
+            sAppliedValue[slot] = worn->definition.vanillaBase;
+        }
     }
     sIsSwordButtonDirty = !sWorn[S2H_EQUIP_SLOT_SWORD].empty();
 }
@@ -277,11 +306,33 @@ void MarkOwnedFromPickup(const char* key) {
 static void ToggleCompanionEquipment(PlayState* play, Player* player) {
     const char* key = CustomItemRegistry_GetEquippedKey(player->heldItemButton);
     const auto* equip = CustomEquipRegistry_Find(key);
-    if (equip == nullptr) return;
-    if (equip->slot == S2H_EQUIP_SLOT_UPGRADE) CustomEquipRegistry_SetToggle(key, !CustomEquipRegistry_IsToggleOn(key));
-    else if (CustomEquipRegistry_IsWorn(key)) CustomEquipRegistry_TakeOff(equip->slot);
-    else CustomEquipRegistry_Wear(key);
+    if (equip == nullptr) {
+        return;
+    }
+    if (equip->slot == S2H_EQUIP_SLOT_UPGRADE) {
+        CustomEquipRegistry_SetToggle(key, !CustomEquipRegistry_IsToggleOn(key));
+    } else if (CustomEquipRegistry_IsWorn(key)) {
+        CustomEquipRegistry_TakeOff(equip->slot);
+    } else {
+        CustomEquipRegistry_Wear(key);
+    }
     Audio_PlaySfx(NA_SE_SY_DECIDE);
+}
+
+// A sword on B is held like MM's own weapon of the same kind; without it Link's hand stays open and empty.
+uint8_t GetMeleeModelGroup(uint8_t meleeWeapon) {
+    switch (meleeWeapon) {
+        case PLAYER_MELEEWEAPON_SWORD_KOKIRI:
+        case PLAYER_MELEEWEAPON_SWORD_RAZOR:
+        case PLAYER_MELEEWEAPON_SWORD_GILDED:
+            return PLAYER_MODELGROUP_ONE_HAND_SWORD;
+        case PLAYER_MELEEWEAPON_SWORD_TWO_HANDED:
+            return PLAYER_MODELGROUP_TWO_HAND_SWORD;
+        case PLAYER_MELEEWEAPON_DEKU_STICK:
+            return PLAYER_MODELGROUP_DEKU_STICK;
+        default:
+            return PLAYER_MODELGROUP_DEFAULT;
+    }
 }
 
 bool RegisterCompanionItem(const RegisteredEquip& equip, const S2HCustomItemRandomizer* randomizer) {
@@ -297,23 +348,33 @@ bool RegisterCompanionItem(const RegisteredEquip& equip, const S2HCustomItemRand
     item.getItemModelPath = definition.getItemModelPath;
     item.randomizer = randomizer;
     item.formMask = definition.formMask;
+    item.ageRequirement = definition.ageRequirement;
+    item.allowedForms = definition.allowedForms;
+    item.allowedFormCount = definition.allowedFormCount;
     item.presentationFlags = S2H_ITEM_HIDE_FROM_SAVE_EDITOR;
     item.flags = S2H_CUSTOM_ITEM_WEARABLE | S2H_CUSTOM_ITEM_EQUIPPABLE | S2H_CUSTOM_ITEM_INSTANT |
                  S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD;
     item.init = ToggleCompanionEquipment;
-    item.preferredPage = definition.page == S2H_EQUIP_PAGE_VANILLA ? S2H_ITEM_PAGE_VANILLA :
-                         static_cast<uint8_t>(std::min<int>(2 + definition.page, S2H_ITEM_PAGE_QUEST_VANILLA - 1));
-    item.preferredSlot = static_cast<uint8_t>(std::min<int>(definition.row * 6 + definition.column, ITEM_NUM_SLOTS - 1));
+    item.preferredPage =
+        definition.page == S2H_EQUIP_PAGE_VANILLA
+            ? S2H_ITEM_PAGE_VANILLA
+            : static_cast<uint8_t>(std::min<int>(2 + definition.page, S2H_ITEM_PAGE_QUEST_VANILLA - 1));
+    item.preferredSlot =
+        static_cast<uint8_t>(std::min<int>(definition.row * 6 + definition.column, ITEM_NUM_SLOTS - 1));
     item.onReceive = MarkOwnedFromPickup;
+    // Drawing a sword runs init; the toggle would take the sword off the moment it leaves the sheath.
     if (definition.meleeWeapon != 0) {
+        item.init = nullptr;
         item.flags &= ~S2H_CUSTOM_ITEM_INSTANT;
         item.flags |= S2H_CUSTOM_ITEM_B_BUTTON;
         item.meleeWeapon = definition.meleeWeapon;
+        item.modelGroup = GetMeleeModelGroup(definition.meleeWeapon);
     }
     if (definition.presentationFlags & S2H_EQUIP_OWNERSHIP_ONLY) {
         item.flags = S2H_CUSTOM_ITEM_WEARABLE;
         item.init = nullptr;
         item.meleeWeapon = 0;
+        item.modelGroup = 0;
     }
     return CustomItemRegistry_Register(&item);
 }
@@ -328,11 +389,11 @@ bool IsValidDefinition(const S2HCustomEquipDefinition* definition) {
         SPDLOG_ERROR("[CustomEquipRegistry] Key '{}' is already registered", definition->key);
         return false;
     }
-    const bool hasMeleeWeapon = definition->structSize > offsetof(S2HCustomEquipDefinition, meleeWeapon) &&
-                                definition->meleeWeapon != 0;
+    const bool hasMeleeWeapon =
+        definition->structSize > offsetof(S2HCustomEquipDefinition, meleeWeapon) && definition->meleeWeapon != 0;
     const bool hasIcon = definition->iconPath != nullptr && definition->iconPath[0] != '\0';
-    if (hasMeleeWeapon && (definition->slot != S2H_EQUIP_SLOT_SWORD || definition->meleeWeapon >= PLAYER_MELEEWEAPON_MAX ||
-                           !hasIcon)) {
+    if (hasMeleeWeapon &&
+        (definition->slot != S2H_EQUIP_SLOT_SWORD || definition->meleeWeapon >= PLAYER_MELEEWEAPON_MAX || !hasIcon)) {
         SPDLOG_ERROR("[CustomEquipRegistry] '{}' needs a sword slot, a valid melee weapon and an icon to take B",
                      definition->key);
         return false;
@@ -378,7 +439,7 @@ bool CustomEquipRegistry_Register(const S2HCustomEquipDefinition* definition) {
     SetString(entry->definition.getItemText, entry->getItemText, definition->getItemText);
     SetString(entry->definition.getItemModelPath, entry->getItemModelPath, definition->getItemModelPath);
 
-    if (!RegisterCompanionItem(*entry, definition->randomizer)) {
+    if (!StoreUseRestrictions(*entry) || !RegisterCompanionItem(*entry, definition->randomizer)) {
         return false;
     }
     // The companion item copied the randomizer data; the caller's pointer must not outlive this call.
@@ -391,7 +452,9 @@ bool CustomEquipRegistry_Register(const S2HCustomEquipDefinition* definition) {
 const char* CustomEquipRegistry_GetWorn(uint8_t slot) {
     if (CustomItemRegistry_GetDrawingPlayer() != nullptr) {
         for (const auto& [key, equip] : sByKey) {
-            if (equip->definition.slot == slot && CustomItemRegistry_IsWorn(key.c_str())) return key.c_str();
+            if (equip->definition.slot == slot && CustomItemRegistry_IsWorn(key.c_str())) {
+                return key.c_str();
+            }
         }
         return nullptr;
     }
@@ -402,7 +465,9 @@ const char* CustomEquipRegistry_GetWorn(uint8_t slot) {
 }
 
 bool CustomEquipRegistry_IsWorn(const char* key) {
-    if (CustomItemRegistry_GetDrawingPlayer() != nullptr) return CustomItemRegistry_IsWorn(key);
+    if (CustomItemRegistry_GetDrawingPlayer() != nullptr) {
+        return CustomItemRegistry_IsWorn(key);
+    }
     if (key == nullptr) {
         return false;
     }
@@ -414,12 +479,20 @@ bool CustomEquipRegistry_IsOwned(const char* key) {
 }
 
 bool CustomEquipRegistry_SetOwned(const char* key, bool owned) {
-    if (key == nullptr || !key[0]) return false;
+    if (key == nullptr || !key[0]) {
+        return false;
+    }
     const bool changed = sOwned.contains(key) != owned;
-    if (changed) GameInteractor::Instance->ExecuteHooks<GameInteractor::OnCustomEquipOwnedChange>(key, owned);
+    if (changed) {
+        GameInteractor::Instance->ExecuteHooks<GameInteractor::OnCustomEquipOwnedChange>(key, owned);
+    }
     RegisteredEquip* entry = key == nullptr ? nullptr : Find(key);
     if (entry == nullptr) {
-        if (owned) sOwned.insert(key); else sOwned.erase(key);
+        if (owned) {
+            sOwned.insert(key);
+        } else {
+            sOwned.erase(key);
+        }
         return true;
     }
     CustomItemRegistry_SetOwned(entry->key.c_str(), owned);
@@ -437,7 +510,8 @@ bool CustomEquipRegistry_SetOwned(const char* key, bool owned) {
 
 bool CustomEquipRegistry_Wear(const char* key) {
     RegisteredEquip* entry = key == nullptr ? nullptr : Find(key);
-    if (entry == nullptr || (entry->definition.presentationFlags & S2H_EQUIP_OWNERSHIP_ONLY) || !CustomEquipRegistry_IsOwned(entry->key.c_str()) || !IsFormAllowed(&entry->definition)) {
+    if (entry == nullptr || (entry->definition.presentationFlags & S2H_EQUIP_OWNERSHIP_ONLY) ||
+        !CustomEquipRegistry_IsOwned(entry->key.c_str()) || !IsUsableNow(&entry->definition)) {
         return false;
     }
     if (entry->definition.slot == S2H_EQUIP_SLOT_UPGRADE) {
@@ -457,7 +531,8 @@ bool CustomEquipRegistry_IsToggleOn(const char* key) {
 
 bool CustomEquipRegistry_SetToggle(const char* key, bool on) {
     RegisteredEquip* entry = key == nullptr ? nullptr : Find(key);
-    if (entry == nullptr || (entry->definition.presentationFlags & S2H_EQUIP_OWNERSHIP_ONLY) || !CustomEquipRegistry_IsOwned(entry->key.c_str())) {
+    if (entry == nullptr || (entry->definition.presentationFlags & S2H_EQUIP_OWNERSHIP_ONLY) ||
+        !CustomEquipRegistry_IsOwned(entry->key.c_str())) {
         return false;
     }
     if (on && !entry->definition.toggles) {
@@ -494,6 +569,15 @@ bool CustomEquipRegistry_IsFormAllowed(const char* key) {
     return IsFormAllowed(CustomEquipRegistry_Find(key));
 }
 
+bool CustomEquipRegistry_IsAgeAllowed(const char* key) {
+    const S2HCustomEquipDefinition* definition = CustomEquipRegistry_Find(key);
+    return definition != nullptr && CustomItemRegistry_IsAgeMet(definition->ageRequirement);
+}
+
+bool CustomEquipRegistry_IsUsableNow(const char* key) {
+    return IsUsableNow(CustomEquipRegistry_Find(key));
+}
+
 void CustomEquipRegistry_Init(void) {
     SaveSections_Register(SaveSection, WriteSection, ReadSection);
 
@@ -522,8 +606,12 @@ void CustomEquipRegistry_SetCurrentMod(const std::string& name) {
 }
 
 uint16_t CustomEquipRegistry_GetVanillaBase(uint8_t slot) {
-    if (!IsVanillaSlot(slot)) return 0;
+    if (!IsVanillaSlot(slot)) {
+        return 0;
+    }
     return sWorn[slot].empty() ? ReadVanillaValue(slot) : sRestoreValue[slot];
 }
 
-std::vector<std::string> CustomEquipRegistry_ListOwned() { return {sOwned.begin(), sOwned.end()}; }
+std::vector<std::string> CustomEquipRegistry_ListOwned() {
+    return { sOwned.begin(), sOwned.end() };
+}

@@ -1,9 +1,13 @@
 #include "SaveManager.h"
 #include "SaveSections.h"
+#include "2s2h/Fleet/FleetGame.h"
 
 #include <fstream>
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 
 #include "BenJsonConversions.hpp"
 #include "BenPort.h"
@@ -33,6 +37,10 @@ extern FileSelectState* gFileSelectState;
 
 // Resolved on use: inside Fleet the app directory becomes 2ship's install only once it joins the host.
 static std::filesystem::path SavesFolderPath() {
+    const char* fleetDirectory = FleetGame_GetSaveDirectory();
+    if (fleetDirectory != nullptr) {
+        return std::filesystem::path(fleetDirectory) / "saves";
+    }
     return Ship::Context::GetPathRelativeToAppDirectory("saves", appShortName);
 }
 
@@ -108,6 +116,25 @@ int SaveManager_MigrateSave(nlohmann::json& j) {
         SPDLOG_ERROR("Failed to migrate save file");
         return -1;
     }
+}
+
+void SaveManager_WriteFleetSave(const std::filesystem::path& fileName, const nlohmann::json& save) {
+    std::filesystem::create_directories(SavesFolderPath());
+    const auto path = SavesFolderPath() / fileName;
+    const std::filesystem::path temporary = path.string() + ".fleet.tmp";
+    {
+        std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
+        stream.exceptions(std::ios::badbit | std::ios::failbit);
+        stream << save.dump(4);
+        stream.flush();
+    }
+#ifdef _WIN32
+    if (!MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        throw std::runtime_error("could not commit MM Fleet save");
+    }
+#else
+    std::filesystem::rename(temporary, path);
+#endif
 }
 
 void SaveManager_WriteSaveFile(const std::filesystem::path& fileName, nlohmann::json j) {
@@ -234,6 +261,9 @@ FlashSave SaveManager_GetFlashSaveFromPages(u32 pageNum, u32 pageCount) {
 }
 
 std::string SaveManager_GetFileName(int fileNum, bool isBackup) {
+    if (const char* file = FleetGame_GetSaveFilePath(fileNum - 1, isBackup)) {
+        return file;
+    }
     return "file" + std::to_string(fileNum) + (isBackup ? "backup" : "") + ".json";
 }
 
@@ -280,7 +310,7 @@ std::string SaveManager_GetFileNameFromFlashSave(FlashSave flashSave) {
                      flashSave == FLASH_SAVE_FILE_2_OWL_SAVE || flashSave == FLASH_SAVE_FILE_2_OWL_SAVE_BACKUP ||
                      flashSave == FLASH_SAVE_FILE_3_OWL_SAVE || flashSave == FLASH_SAVE_FILE_3_OWL_SAVE_BACKUP;
 
-    return "file" + std::to_string(fileNum) + (isBackup ? "backup" : "") + ".json";
+    return SaveManager_GetFileName(fileNum, isBackup);
 }
 
 bool SaveManager_HandleFileDropped(char* filePath) {
@@ -459,6 +489,7 @@ extern "C" void SaveManager_SysFlashrom_WriteData(u8* saveBuffer, u32 pageNum, u
                 j["type"] = "2S2H_SAVE";
 
                 SaveManager_WriteSaveFile(fileName, j);
+                FleetGame_CommitSave();
             } else {
                 // If IS_VALID_FILE fails, we should delete the save file, even if there is an owl save in it, because
                 // they just deleted the new cycle save
@@ -499,6 +530,7 @@ extern "C" void SaveManager_SysFlashrom_WriteData(u8* saveBuffer, u32 pageNum, u
                 j["type"] = "2S2H_SAVE";
 
                 SaveManager_WriteSaveFile(fileName, j);
+                FleetGame_CommitSave();
             } else {
                 // If IS_VALID_FILE fails, and there is still a new cycle save present, we just want to only remove the
                 // owl save and write the new cycle save back

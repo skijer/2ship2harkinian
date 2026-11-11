@@ -1,5 +1,6 @@
 #include "global.h"
 #include "z64horse.h"
+#include "2s2h/Fleet/FleetRuntimeBridge.h"
 #include "overlays/gamestates/ovl_file_choose/z_file_select.h"
 #include <string.h>
 #include "BenPort.h"
@@ -458,6 +459,7 @@ void Sram_ClearFlagsAtDawnOfTheFirstDay(void) {
  * Used by Song of Time (when clicking "Yes") and (indirectly) by the "Dawn of the New Day" cutscene
  */
 void Sram_SaveEndOfCycle(PlayState* play) {
+    FleetCycle_Capture();
     GameInteractor_ExecuteBeforeEndOfCycleSave();
     s16 sceneId;
     s32 j;
@@ -699,6 +701,7 @@ void Sram_SaveEndOfCycle(PlayState* play) {
 
     Horse_ResetHorseData(play);
     GameInteractor_ExecuteAfterEndOfCycleSave();
+    FleetCycle_Restore();
 }
 
 void Sram_IncrementDay(void) {
@@ -1371,6 +1374,11 @@ void Sram_PrepareLoadedSave(void) {
     gSaveContext.save.saveInfo.playerData.tatlTimer = 0;
 
     GameInteractor_ExecuteOnSaveLoad(gSaveContext.fileNum);
+    int32_t fleetRecovery = FleetRuntime_RecoveryEntrance();
+    if (fleetRecovery >= 0) {
+        gSaveContext.save.entrance = fleetRecovery;
+        gSaveContext.save.cutsceneIndex = 0;
+    }
 }
 
 void Sram_OpenSave(FileSelectState* fileSelect, SramContext* sramCtx) {

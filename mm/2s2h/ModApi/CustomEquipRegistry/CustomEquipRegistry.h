@@ -48,9 +48,15 @@ typedef struct {
     uint8_t meleeWeapon;
     // Optional tail field: presentation-only equipment cannot be worn or assigned to buttons.
     uint64_t presentationFlags;
+    uint8_t ageRequirement;
+    // Optional form keys that may wear the piece, as in S2HCustomItemDefinition; none means every form.
+    const char* const* allowedForms;
+    uint32_t allowedFormCount;
 } S2HCustomEquipDefinition;
 
 #define S2H_EQUIP_OWNERSHIP_ONLY UINT64_C(1)
+// The piece is the vanilla one itself: wearing it hands the slot back its own value instead of vanillaBase.
+#define S2H_EQUIP_VANILLA_STAND_IN UINT64_C(2)
 
 bool CustomEquipRegistry_Register(const S2HCustomEquipDefinition* definition);
 const char* CustomEquipRegistry_GetWorn(uint8_t slot);
@@ -81,7 +87,9 @@ void KaleidoEquipManager_DrawPoints(struct PlayState* play);
 uint32_t CustomEquipRegistry_GetCount(void);
 const S2HCustomEquipDefinition* CustomEquipRegistry_GetAt(uint32_t index);
 const S2HCustomEquipDefinition* CustomEquipRegistry_Find(const char* key);
+bool CustomEquipRegistry_IsAgeAllowed(const char* key);
 bool CustomEquipRegistry_IsFormAllowed(const char* key);
+bool CustomEquipRegistry_IsUsableNow(const char* key);
 void CustomEquipRegistry_Init(void);
 
 #ifdef __cplusplus

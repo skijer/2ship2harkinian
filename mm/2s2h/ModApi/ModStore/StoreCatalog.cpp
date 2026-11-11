@@ -1,8 +1,7 @@
 #include "StoreCatalog.h"
 
-#include <algorithm>
-#include <cctype>
 #include <regex>
+#include <set>
 
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -14,6 +13,9 @@ using Json = nlohmann::json;
 constexpr int CatalogFormat = 2;
 constexpr const char* StoreGame = "mm";
 constexpr int ReleaseFormat = 1;
+constexpr size_t MaxOptionsPerMod = 64;
+constexpr size_t MaxOptionNameBytes = 160;
+constexpr const char* ReservedPackId = "other";
 const std::regex ModId("^[a-z0-9_-]{1,64}$");
 const std::regex Hash("^[0-9a-f]{128}$");
 
@@ -56,6 +58,59 @@ std::optional<StoreDownload> ReadDownload(const Json& object) {
     return download;
 }
 
+bool ReadFlag(const Json& object, const char* key) {
+    const auto field = object.find(key);
+    return field != object.end() && field->is_boolean() && field->get<bool>();
+}
+
+std::vector<StoreOption> ReadOptions(const Json& object) {
+    std::vector<StoreOption> options;
+    const auto field = object.find("options");
+    if (field == object.end() || !field->is_array() || field->size() > MaxOptionsPerMod) {
+        return options;
+    }
+    std::set<std::string> seen;
+    for (const Json& option : *field) {
+        if (!option.is_object()) {
+            continue;
+        }
+        const std::string id = ReadString(option, "id");
+        const std::string name = ReadString(option, "name");
+        const bool named = !name.empty() && name.size() <= MaxOptionNameBytes;
+        if (std::regex_match(id, ModId) && named && seen.insert(id).second) {
+            options.push_back({ id, name });
+        }
+    }
+    return options;
+}
+
+// Keeps only the mods the catalog really lists, so a pack can be drawn without checking each id again.
+std::optional<StorePack> ReadPack(const Json& object, const std::map<std::string, StoreMod>& mods) {
+    if (!object.is_object() || object.value("game", std::string("oot")) != StoreGame) {
+        return std::nullopt;
+    }
+    StorePack pack;
+    pack.id = ReadString(object, "id");
+    pack.name = ReadString(object, "name");
+    pack.author = ReadString(object, "author");
+    pack.description = ReadString(object, "description");
+    pack.icon = ReadString(object, "icon");
+    pack.version = ReadString(object, "version");
+    if (!std::regex_match(pack.id, ModId) || pack.id == ReservedPackId || pack.name.empty()) {
+        return std::nullopt;
+    }
+    std::set<std::string> seen;
+    for (const std::string& id : ReadStrings(object, "mods")) {
+        if (mods.count(id) != 0 && seen.insert(id).second) {
+            pack.mods.push_back(id);
+        }
+    }
+    if (pack.mods.empty()) {
+        return std::nullopt;
+    }
+    return pack;
+}
+
 std::optional<StoreMod> ReadMod(const std::string& id, const Json& object) {
     if (!std::regex_match(id, ModId) || !object.is_object()) {
         return std::nullopt;
@@ -68,7 +123,9 @@ std::optional<StoreMod> ReadMod(const std::string& id, const Json& object) {
             metadata = &*variant;
         }
     }
-    if (!metadata->value("listed", true)) return std::nullopt;
+    if (!metadata->value("listed", true)) {
+        return std::nullopt;
+    }
     StoreMod mod;
     mod.id = id;
     mod.name = ReadString(*metadata, "name");
@@ -76,27 +133,21 @@ std::optional<StoreMod> ReadMod(const std::string& id, const Json& object) {
     mod.description = ReadString(*metadata, "description");
     mod.version = ReadString(*metadata, "version");
     mod.repository = ReadString(*metadata, "repository");
+    mod.icon = ReadString(*metadata, "icon");
+    mod.owner = ReadString(*metadata, "owner");
+    mod.dependencyOnly = ReadFlag(*metadata, "dependency_only");
+    mod.options = ReadOptions(*metadata);
     mod.permissions = ReadStrings(*metadata, "permissions");
     mod.dependencies = ReadStrings(*metadata, "dependencies");
     const auto builds = object.find("builds");
     if (builds == object.end() || !builds->is_object()) {
         return std::nullopt;
     }
-    for (const auto& [major, build] : builds->items()) {
-        auto download = ReadDownload(build);
-        const std::string prefix = std::string(StoreGame) + ":";
-        const bool scoped = major.rfind(prefix, 0) == 0;
-        // Numeric keys in the original catalog belong exclusively to OoT.
-        if (!scoped && std::string(StoreGame) != "oot") {
-            continue;
-        }
-        const std::string api = scoped ? major.substr(prefix.size()) : major;
-        const bool isMajor = !api.empty() && api.size() < 6 &&
-                             std::all_of(api.begin(), api.end(), [](unsigned char c) { return std::isdigit(c); });
-        if (download && isMajor && (scoped || !mod.builds.count(std::stoi(api)))) {
-            mod.builds[std::stoi(api)] = *download;
-        }
+    const auto build = ReadDownload(builds->value(StoreGame, Json()));
+    if (!build) {
+        return std::nullopt;
     }
+    mod.build = *build;
     if (mod.name.empty()) {
         mod.name = id;
     }
@@ -123,10 +174,14 @@ std::optional<StoreCatalog> ModStore_ParseCatalog(const std::string& payload) {
             }
         }
     }
-    for (const Json& object : root.value("packs", Json::array())) {
-        if (object.is_object() && object.value("game", std::string("oot")) == StoreGame) {
-            catalog.packs.push_back({ ReadString(object, "id"), ReadString(object, "name"),
-                                      ReadString(object, "author"), ReadStrings(object, "mods") });
+    const auto packs = root.find("packs");
+    std::set<std::string> packIds;
+    if (packs != root.end() && packs->is_array()) {
+        for (const Json& object : *packs) {
+            auto pack = ReadPack(object, catalog.mods);
+            if (pack && packIds.insert(pack->id).second) {
+                catalog.packs.push_back(std::move(*pack));
+            }
         }
     }
     for (const Json& object : root.value("links", Json::array())) {
@@ -152,7 +207,6 @@ std::optional<StoreRelease> ModStore_ParseRelease(const std::string& payload) {
     StoreRelease release;
     release.version = ReadString(root, "version");
     release.pageUrl = ReadString(root, "page");
-    release.modApiMajor = root.value("modapi", 0);
     const auto assets = root.find("assets");
     if (assets != root.end() && assets->is_object()) {
         for (const auto& [platform, object] : assets->items()) {
@@ -162,7 +216,7 @@ std::optional<StoreRelease> ModStore_ParseRelease(const std::string& payload) {
             }
         }
     }
-    if (release.version.empty() || release.modApiMajor <= 0 || !IsHttps(release.pageUrl)) {
+    if (release.version.empty() || !IsHttps(release.pageUrl)) {
         return std::nullopt;
     }
     return release;

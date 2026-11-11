@@ -1,5 +1,6 @@
 #include "2s2h/ModApi/ModStore/ModStore.h"
 #include "Anchor.h"
+#include "2s2h/Fleet/FleetGame.h"
 #include <libultraship/libultraship.h>
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "ShipUtils.h"
@@ -19,7 +20,7 @@ static const char* pvpModes[3] = { "Off", "On", "On + Friendly Fire" };
 static std::vector<const char*> teleportModes = { "None", "Team Only", "All" };
 static std::vector<const char*> showLocationsModes = { "None", "Team Only", "All" };
 
-void AnchorMainMenu(WidgetInfo& info) {
+void AnchorFormMenu(WidgetInfo& info) {
     auto anchor = Anchor::Instance;
 
     std::string host = CVarGetString("gNetwork.Anchor.Host", "anchor.hm64.org");
@@ -93,7 +94,7 @@ void AnchorMainMenu(WidgetInfo& info) {
         CVarSetString("gNetwork.Anchor.Host", "anchor.hm64.org");
         CVarSetInteger("gNetwork.Anchor.Port", 43383);
         CVarSetString("gNetwork.Anchor.TeamId", "default");
-        CVarSetString("gNetwork.Anchor.RoomId", "2ship-global");
+        CVarSetString("gNetwork.Anchor.RoomId", Anchor::GLOBAL_ROOM_ID.c_str());
         Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
     }
 
@@ -119,8 +120,16 @@ void AnchorMainMenu(WidgetInfo& info) {
     UIWidgets::PopStyleButton();
     ImGui::EndDisabled();
     ImGui::Spacing();
+}
+
+void AnchorRoomMenu(WidgetInfo& info) {
+    auto anchor = Anchor::Instance;
 
     if (!anchor->isEnabled) {
+        // Fleet draws this room under its own heading, away from the Enable button.
+        if (FleetGame_IsHosted()) {
+            ImGui::TextDisabled("Off");
+        }
         return;
     }
 
@@ -149,10 +158,9 @@ void AnchorMainMenu(WidgetInfo& info) {
 
 void AnchorAdminMenu(WidgetInfo& info) {
     auto anchor = Anchor::Instance;
-    bool isGlobalRoom = (std::string("2ship-global") == CVarGetString("gNetwork.Anchor.RoomId", ""));
 
     if (!anchor->isEnabled || !anchor->isConnected || anchor->roomState.ownerClientId != anchor->ownClientId ||
-        isGlobalRoom) {
+        Anchor::IsGlobalRoom()) {
         return;
     }
 
@@ -241,7 +249,12 @@ void RegisterAnchorMenu() {
 
     BenGui::mBenMenu->AddSidebarEntry("Network", "Anchor", 2);
     WidgetPath path = { "Network", "Anchor", SECTION_COLUMN_1 };
-    BenGui::mBenMenu->AddWidget(path, "AnchorMainMenu", WIDGET_CUSTOM).CustomFunction(AnchorMainMenu);
+    BenGui::mBenMenu->AddWidget(path, "AnchorFormMenu", WIDGET_CUSTOM)
+        .CustomFunction(AnchorFormMenu)
+        .HideInSearch(true);
+    BenGui::mBenMenu->AddWidget(path, "AnchorRoomMenu", WIDGET_CUSTOM)
+        .CustomFunction(AnchorRoomMenu)
+        .HideInSearch(true);
     path.column = SECTION_COLUMN_2;
     BenGui::mBenMenu->AddWidget(path, "AnchorAdminMenu", WIDGET_CUSTOM).CustomFunction(AnchorAdminMenu);
     BenGui::mBenMenu->AddWidget(path, "AnchorInstructionsMenu", WIDGET_CUSTOM).CustomFunction(AnchorInstructionsMenu);

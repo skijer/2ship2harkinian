@@ -34,7 +34,21 @@ typedef struct {
     uint8_t columns;
     uint8_t cellCount;
     const S2HLayoutCell* cells;
+    // Optional presentation tail. Background sections use Kaleido's 3 columns x 5 rows (IA8).
+    const char* const* backgroundSections;
+    uint16_t targetPage; // Used only with S2H_LAYOUT_FIXED_PAGE.
+    uint16_t flags;
+    // Optional 16x16 IA4 cursor corners: top-left, top-right, bottom-left, bottom-right.
+    const char* const* cursorCorners;
 } S2HLayoutPage;
+
+#define S2H_LAYOUT_FIXED_PAGE 1
+#define S2H_LAYOUT_EQUIP_CONTROLS 2
+
+void** ModLayout_GetBackground(uint16_t page, void** fallback);
+uint16_t ModLayout_GetFlags(uint16_t page);
+const char* ModLayout_GetPageKey(uint16_t page);
+const char* const* ModLayout_GetCursorCorners(uint16_t page);
 
 typedef struct {
     const char* key;
@@ -47,9 +61,8 @@ typedef struct {
 void ModLayout_ApplyCells(struct PlayState* play, uint16_t page, Vtx* vertices, uint8_t count);
 bool ModLayout_GetCell(uint16_t page, uint8_t slot, S2HLayoutCell* cell);
 bool ModLayout_SetCell(uint16_t page, uint8_t slot, const S2HLayoutCell* cell);
-// Item pages (at most 4 rows by 6 columns) and collectable pages are KaleidoItemManager pages, and the cell of an item
-// is its slot there. Cell geometry is ignored because the pause grid and the quest points have fixed positions.
-// Equipment templates are 4 x 4 grids on numbered Masks pages, with Link beside the columns.
+// Cells provide default geometry; user edits take precedence. Equipment pages are shown over Masks.
+// Existing callers without the optional presentation tail remain supported through structSize.
 bool ModLayout_RegisterPage(const S2HLayoutPage* page);
 // "vanilla" places on the vanilla item grid or quest page (by the item's own page) but never on native entries.
 bool ModLayout_PlaceItem(const char* itemKey, const char* pageKey, uint8_t cell);
