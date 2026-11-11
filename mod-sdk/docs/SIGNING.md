@@ -35,7 +35,7 @@ Requests are signed one at a time, oldest first. Your first request waits until 
 ### Updates
 
 After the first approval, a new version needs no new issue: publish a GitHub release in your repository (the
-workflow checks every two hours), or comment `/sign <tag, branch or commit>` on your issue. Only mods whose
+workflow checks once a week, on Mondays), or comment `/sign <tag, branch or commit>` on your issue. Only mods whose
 sources changed are signed again. A new version that asks for a permission its mod did not have before waits
 for a maintainer to add `approved` again, and so does changing the repository or folder in the issue.
 
