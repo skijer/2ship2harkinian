@@ -2,7 +2,9 @@
 #include "z64items.h"
 #include "2s2h/ModApi/Layout/ModLayout.h"
 #include "2s2h/ModApi/CustomEquipRegistry/CustomEquipRegistry.h"
+#include "2s2h/BenPort.h"
 #include "variables.h"
+
 static const char* const sCursorCorners[4] = {
     "__OTR__textures/nei_equipment/gPauseMenuCursorTopLeftTex",
     "__OTR__textures/nei_equipment/gPauseMenuCursorTopRightTex",
