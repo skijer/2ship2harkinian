@@ -273,8 +273,8 @@ static void Sw97_ArrowSoul_Charge(ArrowSoul* this, PlayState* play) {
     // NA_SE_EV_SPIRIT_STONE has no MM twin and NA_SE_NONE - SFX_FLAG is an invalid sfx id; MM has its own
     // magic-soul charge loop. Both go through the flagged helper: a plain Actor_PlaySfx with -SFX_FLAG queues a
     // corrupted id every frame.
-    Actor_PlaySfx_Flagged(&this->actor, NA_SE_PL_MAGIC_SOUL_NORMAL - SFX_FLAG);
-    Actor_PlaySfx_Flagged(&this->actor, NA_SE_EV_HEALING - SFX_FLAG);
+    Audio_PlaySfx_AtPos(&this->actor.projectedPos, NA_SE_PL_MAGIC_SOUL_NORMAL - SFX_FLAG);
+    Sw97_PlayLoopSfx(&this->actor, NA_SE_EV_HEALING);
 
     if (arrow->actor.parent == NULL) {
         this->unkPos = this->actor.world.pos;

@@ -1,4 +1,5 @@
 #include "z64items.h"
+#include "z64logic.h"
 #include "z64wheel.h"
 
 #include <libultraship/log/luslog.h>
@@ -90,15 +91,17 @@ static const Z64WheelEntry sWheelEntries[SLATE_RUNE_COUNT] = {
 };
 
 static const SlateRuneText sRuneTexts[SLATE_RUNE_COUNT] = {
-    { "", "Press a %yC button%w to draw the slate.", "" },
-    { "%bRemote Bomb%w", "A %yC button%w draws the slate, again for a&bomb, again to set it off.",
-      "A bomb of its own making, that waits&for your word and never for a fuse." },
-    { "%yStasis%w", "A %yC button%w draws the slate, again to hold&what you aim at still.",
-      "What it holds leaves time behind, and&keeps every blow you land until it&comes back." },
-    { "%bCryonis%w", "A %yC button%w draws the slate, again to aim;&%yA%w raises a platform of ice.",
-      "It pulls a platform of ice out of any&water, solid enough to climb." },
-    { "%gMaster Cycle Zero%w", "A %yC button%w draws the slate, again to call&the cycle.",
-      "An ancient machine that answers the&slate and outruns any horse." },
+    { "", "Press %y\xB2%w to draw the slate. Hold&%y\xB3%w for the rune wheel.", "" },
+    { "%bRemote Bomb%w",
+      "%y\xB2%w draws the slate, again for a&bomb, again to set it off. Hold %y\xB3%w&for the rune wheel.",
+      "A bomb of its own making, that&waits for your word and never&for a fuse." },
+    { "%yStasis%w", "%y\xB2%w draws the slate, again to hold&what you aim at still. Hold %y\xB3%w for&the rune wheel.",
+      "What it holds leaves time&behind, and keeps every blow&you land until it comes back." },
+    { "%bCryonis%w",
+      "%y\xB2%w draws the slate, again to aim;&%y\xB0%w raises a platform of ice. Hold %y\xB3%w&for the rune wheel.",
+      "It pulls a platform of ice out of&any water, solid enough to climb." },
+    { "%gMaster Cycle Zero%w", "%y\xB2%w draws the slate, again to call&the cycle. Hold %y\xB3%w for the rune&wheel.",
+      "An ancient machine that&answers the slate and outruns&any horse." },
 };
 
 static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,   BTN_CLEFT,   BTN_CDOWN, BTN_CRIGHT, 0,
@@ -243,8 +246,7 @@ static void DescribeRune(u8 rune) {
     if (sShownRune == rune) {
         return;
     }
-    snprintf(sPauseText, sizeof(sPauseText), "%%rSheikah Slate&%%w%s Hold %%yL%%w for the rune wheel.",
-             sRuneTexts[rune].castLine);
+    snprintf(sPauseText, sizeof(sPauseText), "%%rSheikah Slate&%%w%s", sRuneTexts[rune].castLine);
     Z64Items_UpdateText(sApi, SLATE_KEY, S2H_ITEM_TEXT_PAUSE, sPauseText);
     sShownRune = rune;
 }
@@ -261,12 +263,12 @@ static void AnnounceRune(u8 rune, bool isFirstSlate) {
     } else if (isFirstSlate) {
         snprintf(sPickupText, sizeof(sPickupText),
                  "You got the %%rSheikah Slate%%w!&An ancient tablet of the Sheikah, and&the %s rune wakes on its "
-                 "face.^%s^%s Hold %%yL%%w for the rune wheel.",
+                 "face.^%s^%s",
                  text->name, text->loreLine, text->castLine);
     } else {
         snprintf(sPickupText, sizeof(sPickupText),
-                 "Your %%rSheikah Slate%%w learned the&%s rune!^%s^%s Hold %%yL%%w for the rune wheel.", text->name,
-                 text->loreLine, text->castLine);
+                 "Your %%rSheikah Slate%%w learned the&%s rune!^%s^%s", text->name, text->loreLine,
+                 text->castLine);
     }
     Z64Items_UpdateText(sApi, SLATE_KEY, S2H_ITEM_TEXT_GET_ITEM, sPickupText);
 }
@@ -3242,6 +3244,19 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// The Remote Bomb rune is a native En_Bom without ammo, so it opens everything bombs do. Any rune pickup
+// owns the slate itself, so only the rune's own pickup answers for it.
+static void GrantSlateLogic(void) {
+    static const Z64LogicSource sBombRune = { "nei.slate.bomb" };
+    static const char* const sBombing[] = { "HasExplosives", "BlastOrSmash", "CanHitSwitch", "CanAttack",
+                                            "CanDamage", NULL };
+
+    if (!Z64Logic_Init(sApi)) {
+        return;
+    }
+    Z64Logic_GrantCapabilities(&sBombRune, sBombing);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     if (!S2H_MOD_API_HAS(sApi, SetCustomItemText)) {
         return;
@@ -3253,8 +3268,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetForms(&slate, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&slate, 0, 15, 0);
     Z64Items_SetTextbox(&slate, "You got the %rSheikah Slate%w!&An ancient tablet of the Sheikah.");
-    Z64Items_SetPauseText(&slate, "%rSheikah Slate&%wPress a %yC button%w to draw the slate,&hold %yL%w for the rune "
-                                  "wheel.");
+    Z64Items_SetPauseText(&slate, "%rSheikah Slate&%wPress %y\xB2%w to draw the slate, hold %y\xB3%w&"
+                                  "for the rune wheel.");
     Z64Items_SetAction(&slate, TakeOutSlate, HoldSlate);
     Z64Items_SetHeldCallbacks(&slate, CastRune, StowSlate, NULL);
     slate.modelGroup = PLAYER_MODELGROUP_DEFAULT;
@@ -3289,6 +3304,7 @@ S2H_MOD_EXPORT void ModInit(void) {
         pickup.randomizer = &randomizer;
         if (!Z64Items_RegisterPickup(sApi, &pickup)) return;
     }
+    GrantSlateLogic();
     sApi->RegisterVB(VB_THROW_OR_PUT_DOWN_HELD_ITEM, HoldOntoRemoteBomb);
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, RunSlate);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetRunes);

@@ -128,11 +128,12 @@ S2H_MOD_EXPORT void ModInit(void) {
 
     Z64Items_SetButtons(&mitts, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetPlacement(&mitts, 0, 13, 0);
-    Z64Items_SetTextbox(&mitts, "You got the %rMogma Mitts%w!\nDigging claws of the Mogma tribe,\ntough enough to "
-                                "bite into stone.\x10Press a %yC button%w to grip. A climber grips %yany wall%w.\x10"
-                                "The grip spends %gmagic%w while\nit holds.");
-    Z64Items_SetPauseText(&mitts, "%rMogma Mitts\n%wPress a %yC button%w to grip any wall.\nPress again to stop. "
-                                  "Drains magic.");
+    Z64Items_SetTextbox(&mitts, "You got the %rMogma Mitts%w!&Digging claws of the Mogma&"
+                                "tribe, tough enough to bite&into stone.^"
+                                "Press %y\xB2%w to grip. A climber&grips %yany wall%w.^"
+                                "The grip spends %gmagic%w while it&holds.");
+    Z64Items_SetPauseText(&mitts, "%rMogma Mitts&%wPress %y\xB2%w to grip any wall.&"
+                                  "Press again to stop. Drains magic.");
     Z64Items_SetAction(&mitts, ToggleGrip, NULL);
     Z64Items_SetGetItemModel(&mitts, sGiveDL);
     mitts.flags |= S2H_CUSTOM_ITEM_INSTANT;

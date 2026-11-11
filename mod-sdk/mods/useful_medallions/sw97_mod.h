@@ -81,6 +81,7 @@ void Sw97_SetElement(bool isSling, Sw97Element element);
 uint8_t Sw97_ElementCount(void);
 Sw97Element Sw97_ElementAt(uint8_t index);
 
+Actor* Sw97_SpawnIcePlatform(PlayState* play, f32 x, f32 y, f32 z);
 void Sw97_StartFairyMode(void);
 bool Sw97_IsFairyModeActive(void);
 

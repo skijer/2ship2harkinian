@@ -5,6 +5,27 @@
 
 #include "../../sw97_mod.h"
 
+#include "overlays/actors/ovl_Bg_Icefloe/z_bg_icefloe.h"
+void BgIcefloe_Init(Actor*, PlayState*);
+void BgIcefloe_Destroy(Actor*, PlayState*);
+void BgIcefloe_Update(Actor*, PlayState*);
+void BgIcefloe_Draw(Actor*, PlayState*);
+static s16 sIcePlatformId=-1;
+Actor* Sw97_SpawnIcePlatform(PlayState* play, f32 x, f32 y, f32 z) {
+    // Native spawning fails outside scenes that preload OBJECT_ICEFLOE.
+    // A mod-owned profile can run the same native callbacks with OTR resources.
+    if(sIcePlatformId<0){
+        S2HActorDefinition d={0}; d.structSize=sizeof(d);
+        d.key="nei.medallion.ice_platform"; d.description="Water Medallion ice platform";
+        d.category=ACTORCAT_BG; d.actorFlags=ACTOR_FLAG_UPDATE_CULLING_DISABLED;
+        d.objectId=GAMEPLAY_KEEP; d.instanceSize=sizeof(BgIcefloe);
+        d.init=BgIcefloe_Init;d.destroy=BgIcefloe_Destroy;d.update=BgIcefloe_Update;d.draw=BgIcefloe_Draw;
+        sIcePlatformId=gSw97Api->RegisterActor(&d);
+    }
+    return sIcePlatformId<0?NULL:Actor_Spawn(&play->actorCtx,play,sIcePlatformId,x,y,z,0,0,0,300);
+}
+
+
 // ============================================================
 // Struct (merged from z_magic_ice.h)
 // ============================================================
@@ -20,7 +41,8 @@ typedef struct MagicIce {
     /*        */ s16 actionTimer;
     /*        */ SkelCurve skelCurve;
     /*        */ Vec3f colliderScale;
-    /*        */ u8 floeSpawned; // one-shot guard for the ice-floe platform spawn
+    /*        */ u8 floeSpawned; // number of platforms created by this cast
+    u8 frozenSamples;
 } MagicIce;
 
 
@@ -516,6 +538,7 @@ static SkelCurveLimbList sIceLimbList = {
 void Sw97_MagicIce_Init(Actor* thisx, PlayState* play) {
     MagicIce* this = THIS;
 
+    this->floeSpawned = this->frozenSamples = 0;
     this->action = 0;
     this->actionTimer = 0;
     Collider_InitCylinder(play, &this->collider);
@@ -565,34 +588,34 @@ void Sw97_MagicIce_Update(Actor* thisx, PlayState* play) {
         Actor_Kill(&this->actor);
         return;
     }
-    if (this->action == ACTION_GROW_SLOWLY) {
-        this->collider.elem.atDmgInfo.damage = this->actionTimer + 25;
-    } else if (this->action == ACTION_STOP_GROWING) {
-        this->collider.elem.atDmgInfo.damage = this->actionTimer;
-    }
+    // MM multiplies this base damage by the enemy's Ice Arrow table entry.
+    // OoT's timer-based 25..55 damage is not portable to that system.
+    this->collider.elem.atDmgInfo.damage = 2;
     Collider_UpdateCylinder(&this->actor, &this->collider);
     this->collider.dim.radius = (this->colliderScale.x * 325.0f);
     this->collider.dim.height = (this->colliderScale.y * 450.0f);
     this->collider.dim.yShift = (this->colliderScale.y * -225.0f);
     CollisionCheck_SetAT(play, &play->colChkCtx, &this->collider.base);
 
-    // MM Ice Arrows freeze a water surface into a standable ice floe (en_arrow's water hit spawns Bg_Icefloe);
-    // the freeze bit above is enemy-only, so the spell replicates the platform once, over water at the caster's
-    // level.
-    if ((this->action >= ACTION_GROW_SLOWLY) && !this->floeSpawned) {
-        WaterBox* waterBox;
-        f32 waterY = player->actor.world.pos.y;
-
-        if (WaterBox_GetSurface1(play, &play->colCtx, player->actor.world.pos.x, player->actor.world.pos.z, &waterY,
-                                 &waterBox) &&
-            (waterY > (player->actor.world.pos.y - 80.0f))) {
-            Actor_Spawn(&play->actorCtx, play, ACTOR_BG_ICEFLOE, player->actor.world.pos.x, waterY,
-                        player->actor.world.pos.z, 0, 0, 0, 300);
-            this->floeSpawned = 1;
+    // Freeze water intersecting the expanding cylinder, including water beside
+    // a bank. Retry failed spawns and respect MM's three-platform limit.
+    if (this->action >= ACTION_GROW_SLOWLY && this->floeSpawned < 3) {
+        static const Vec3f samples[] = {{0,0,0},{80,0,0},{-80,0,0},{0,0,80},{0,0,-80}};
+        for (u8 i=0; i<ARRAY_COUNT(samples) && this->floeSpawned<3; ++i) {
+            if ((this->frozenSamples & (1<<i)) ||
+                SQ(samples[i].x)+SQ(samples[i].z)>SQ(this->collider.dim.radius)) continue;
+            f32 x=this->actor.world.pos.x+samples[i].x, z=this->actor.world.pos.z+samples[i].z;
+            f32 waterY=this->actor.world.pos.y;
+            WaterBox* waterBox;
+            f32 bottom=this->collider.dim.pos.y+this->collider.dim.yShift;
+            if (WaterBox_GetSurface1(play,&play->colCtx,x,z,&waterY,&waterBox) &&
+                waterY>=bottom && waterY<=bottom+this->collider.dim.height &&
+                Sw97_SpawnIcePlatform(play,x,waterY,z)) {
+                this->frozenSamples|=1<<i;
+                this->floeSpawned++;
+            }
         }
     }
-    // Freezing is enemy-side, like an ice arrow: each enemy's own damage table maps the bit to its freeze
-    // reaction, and pushing freezeTimer from here desynced them (frozen look, stunned logic).
 
     switch (this->action) {
         case ACTION_INITIALIZE:
@@ -639,9 +662,9 @@ void Sw97_MagicIce_Update(Actor* thisx, PlayState* play) {
 
     SkelCurve_Update(play, &this->skelCurve);
     if (this->actionTimer > 15) {
-        Actor_PlaySfx_Flagged(&this->actor, NA_SE_IT_EXPLOSION_ICE - SFX_FLAG);
+        Audio_PlaySfx_AtPos(&this->actor.projectedPos, NA_SE_IT_EXPLOSION_ICE - SFX_FLAG);
     }
-    Actor_PlaySfx_Flagged(&this->actor, NA_SE_EV_ICE_FREEZE - SFX_FLAG);
+    Sw97_PlayLoopSfx(&this->actor, NA_SE_EV_ICE_FREEZE);
 }
 
 static s32 Sw97_MagicIce_OverrideLimbDraw(PlayState* play, SkelCurve* skelCurve, s32 limbIndex, void* thisx) {

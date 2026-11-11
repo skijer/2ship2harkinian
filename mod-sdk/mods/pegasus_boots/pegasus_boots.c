@@ -6,6 +6,7 @@
 #include <math.h>
 
 #include "z64items.h"
+#include "soh/ResourceManagerHelpers.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -449,6 +450,72 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
+#define GI_DL_CAPACITY 512
+static const ALIGN_ASSET(2) char gGiHoverBootsDL[] = "__OTR__objects/nei_get_item/pegasus_boots/object_gi_hoverboots/gGiHoverBootsDL";
+static u32 CrimsonRamp(u32 rgba) {
+    u8 r = (rgba >> 24) & 0xFF;
+    u8 g = (rgba >> 16) & 0xFF;
+    u8 b = (rgba >> 8) & 0xFF;
+    f32 lum = 0.299f * r + 0.587f * g + 0.114f * b;
+
+    return ((u32)CLAMP_MAX(lum * 1.7f, 255.0f) << 24) | ((u32)(lum * 0.35f) << 16) | ((u32)(lum * 0.42f) << 8) |
+           (rgba & 0xFF);
+}
+
+static bool IsTwoWordCommand(u8 opcode) {
+    return opcode == 0x20 || opcode == 0x24 || opcode == 0x25 || opcode == 0x27 || opcode == 0x31 ||
+           opcode == 0x32 || opcode == 0x33 || opcode == 0x35 || opcode == 0x36 || opcode == 0x42;
+}
+
+static Gfx* BuildCrimsonBootsDL(void) {
+    static Gfx sDL[GI_DL_CAPACITY];
+    static bool sBuilt;
+    Gfx* source;
+    s32 count = 0;
+
+    if (sBuilt) {
+        return sDL;
+    }
+    source = ResourceMgr_LoadGfxByName(gGiHoverBootsDL);
+    if (source == NULL) {
+        return NULL;
+    }
+    while (count < GI_DL_CAPACITY) {
+        u8 opcode = (source[count].words.w0 >> 24) & 0xFF;
+
+        sDL[count] = source[count];
+        count++;
+        if (opcode == G_ENDDL) {
+            break;
+        }
+        if (IsTwoWordCommand(opcode) && count < GI_DL_CAPACITY) {
+            sDL[count] = source[count];
+            count++;
+            continue;
+        }
+        if (opcode == G_SETPRIMCOLOR || opcode == G_SETENVCOLOR) {
+            sDL[count - 1].words.w1 = CrimsonRamp((u32)sDL[count - 1].words.w1);
+        }
+    }
+    sBuilt = true;
+    return sDL;
+}
+
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    Gfx* boots = BuildCrimsonBootsDL();
+
+    if (boots == NULL) {
+        return;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, boots);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomEquipDefinition definition = { 0 };
 
@@ -456,13 +523,14 @@ S2H_MOD_EXPORT void ModInit(void) {
         sUpperBodyMap[limb] = true;
     }
 
+    definition.getItemEntry.drawFunc = DrawGetItem;
     definition.structSize = sizeof(definition);
     definition.key = PEGASUS_BOOTS_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rPegasus Boots&%wHold %y\xA0%w where a spin attack would charge and you dash instead. "
+    definition.pauseText = "%rPegasus Boots&%wHold %y\xB1%w where a spin attack would charge and you dash instead. "
                            "The wind in front costs magic.";
-    definition.getItemText = "You got the %rPegasus Boots%w!&Boots that never tire. Hold %y\xA0%w as a spin would "
+    definition.getItemText = "You got the %rPegasus Boots%w!&Boots that never tire. Hold %y\xB1%w as a spin would "
                              "charge and you run blade first, behind a wind that strikes whatever stands in the way.";
     definition.slot = S2H_EQUIP_SLOT_BOOTS;
     definition.page = 0;

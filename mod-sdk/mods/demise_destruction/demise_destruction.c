@@ -1,4 +1,5 @@
 #include "z64items.h"
+#include "z64logic.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -59,7 +60,7 @@ static ColliderCylinderInit sColliderInit = {
 
 static Color_RGBA8 sDustColor = { 60, 0, 0, 255 };
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnPlayerResolveItemActionInit" };
+static const char* const sRequiredHooks[] = { "ShouldActorUpdate", "OnPlayerUpdate", "OnPlayerResolveItemActionInit" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
@@ -391,18 +392,31 @@ static void PauseSpellWorld(Actor* actor, bool* should) {
     if (sPhase == DEMISE_WINDUP && actor->id != ACTOR_PLAYER) *should = false;
 }
 
+// A thrown boomerang: its explosive flag is a hit, not an En_Bom, so bombable walls and boulders ignore it.
+static void GrantDemiseLogic(void) {
+    static const Z64LogicSource sDemise = { DEMISE_KEY };
+    static const char* const sThrowing[] = { "CanUseProjectile", "HookshotOrBoomerang", "CanHitSwitch", "CanAttack",
+                                             "CanDamage", NULL };
+
+    if (Z64Logic_Init(sApi)) {
+        Z64Logic_GrantCapabilities(&sDemise, sThrowing);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
+    GrantDemiseLogic();
     S2HCustomItemDefinition demise = Z64Items_Define(DEMISE_KEY, sIconTex, sNameTex);
 
     Z64Items_SetButtons(&demise, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetPlacement(&demise, 0, 5, 0);
-    Z64Items_SetTextbox(&demise, "You got %rDemise Destruction%w!&The Demon King's storm, bound&into a spell you can "
-                                 "call.^"
-                                 "Press a %yC button%w with both feet on the&ground. The sky darkens, and&then the "
-                                 "earth splits around you.^"
-                                 "The blast breaks what a %rGoron's pound%w and a %rbomb%w break&and leaves the rest reeling. Uses&%gmagic%w.");
-    Z64Items_SetPauseText(&demise, "%rDemise Destruction&%wPress a %yC button%w on the ground to call&down the storm. "
-                                   "Uses magic.");
+    Z64Items_SetTextbox(&demise, "You got %rDemise Destruction%w!&The Demon King's boomerang&"
+                                 "attack, bound into a spell you&can call.^"
+                                 "Press %y\xB2%w with both feet on&the ground. The sky darkens,&"
+                                 "and then the earth splits&around you.^"
+                                 "The blast breaks what a&%rGoron's pound%w and a %rbomb%w break&"
+                                 "and leaves the rest reeling. Uses&%gmagic%w.");
+    Z64Items_SetPauseText(&demise, "%rDemise Destruction&%wPress %y\xB2%w on the ground to call&"
+                                   "down the storm. Uses magic.");
     Z64Items_SetCanUse(&demise, CanCast);
     Z64Items_SetAction(&demise, Cast, NULL);
     demise.flags |= S2H_CUSTOM_ITEM_INSTANT;

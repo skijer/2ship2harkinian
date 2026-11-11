@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64logic.h"
 void Player_AnimSfx_PlayVoice(Player* player, u16 sfxId);
 #include "z64aiming.h"
 
@@ -80,7 +81,7 @@ static ColliderCylinderInit sColliderInit = {
     { BEETLE_COLLIDER_RADIUS, BEETLE_COLLIDER_HEIGHT, 0, { 0, 0, 0 } },
 };
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnActorDrawEnd", "OnSceneInit",
+static const char* const sRequiredHooks[] = { "OnActorDestroy", "OnActorUpdate", "OnPlayDrawEnd", "OnPlayerUpdate", "OnActorDrawEnd", "OnSceneInit",
                                               "OnPlayerFilterInput", "OnPlayerResolveItemActionInit" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -534,7 +535,7 @@ static void UpdateAiming(Player* player, PlayState* play) {
 }
 
 // The return value is Link's "upper body is busy" flag: a beetle merely resting in his hand must not block
-// his rolls or his other items, and neither must one he has handed over — from the moment it flies on its
+// his rolls or his other items, and neither must one he has handed over - from the moment it flies on its
 // own he is free to fight while it finishes, which is the whole point of letting go of it.
 static int32_t UpdateBeetleInHand(Player* player, PlayState* play) {
     if (sPhase == BEETLE_IN_HAND || sPhase == BEETLE_STOWED || sIsAutonomous) {
@@ -741,7 +742,19 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// The aimed flier hits with the Zora boomerang's damage, so it reaches what MM's projectiles do.
+static void GrantBeetleLogic(void) {
+    static const Z64LogicSource sBeetle = { BEETLE_KEY };
+    static const char* const sFlying[] = { "CanUseProjectile", "HookshotOrBoomerang", "CanHitSwitch", "CanAttack",
+                                           "CanDamage", NULL };
+
+    if (Z64Logic_Init(sApi)) {
+        Z64Logic_GrantCapabilities(&sBeetle, sFlying);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
+    GrantBeetleLogic();
     if (!S2H_MOD_API_HAS(sApi, GetEquippedCustomItem)) {
         return;
     }
@@ -750,12 +763,14 @@ S2H_MOD_EXPORT void ModInit(void) {
 
     Z64Items_SetButtons(&beetle, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetPlacement(&beetle, 0, 8, 0);
-    Z64Items_SetTextbox(&beetle, "You got the %rBeetle%w!&A clockwork flier from the sky above the clouds, and it "
-                                 "answers to your hand. Hold a %yC button%w to aim and let go to fly it: steer with "
-                                 "the stick, hurry it with %yA%w, lock on with %gZ%w, or leave it to finish alone "
-                                 "with %yB%w. It carries %grupees%w home and knocks the wind out of what it hits.");
-    Z64Items_SetPauseText(&beetle, "%rBeetle&%wHold a %yC button%w to aim, release to fly. Steer with the stick, "
-                                   "%yA%w to hurry, %gZ%w to lock on.");
+    Z64Items_SetTextbox(&beetle, "You got the %rBeetle%w! A&clockwork flier from the sky&"
+                                 "above the clouds, and it&answers to your hand.^"
+                                 "Hold %y\xB2%w to aim and let go to fly&it: steer with the stick, hurry&"
+                                 "it with %y\xB0%w, lock on with %g\xB5%w, or&"
+                                 "leave it to finish alone with %y\xB1%w.^"
+                                 "It carries %grupees%w home and&knocks the wind out of what it&hits.");
+    Z64Items_SetPauseText(&beetle, "%rBeetle&%wHold %y\xB2%w to aim, release to fly.&"
+                                   "Steer with the stick, %y\xB0%w to hurry, %g\xB5%w&to lock on.");
     Z64Items_SetAction(&beetle, TakeOutBeetle, UpdateBeetleInHand);
     Z64Items_SetHeldCallbacks(&beetle, RequestAim, PutBeetleAway, NULL);
     Z64Items_SetGetItemModel(&beetle, sWholeDL);

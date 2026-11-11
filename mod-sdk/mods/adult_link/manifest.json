@@ -1,0 +1,14 @@
+{
+    "name": "adult_link",
+    "author": "Skijer",
+    "version": "1.0",
+    "description": "Adult Link: a form that gives Link his grown body from your own Ocarina of Time data, with adult reach, height and voice. Adult-only items and equipment work while he wears it.",
+    "display_name": "Adult Link",
+    "game": "mm",
+    "dependencies": [
+        "oot_assets"
+    ],
+    "requires": [
+        "objects/oot_object_link_boy/gLinkAdultSkel"
+    ]
+}

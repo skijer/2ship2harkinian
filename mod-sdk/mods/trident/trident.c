@@ -2127,6 +2127,18 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_RotateZF(M_PIf / 4.0f, MTXMODE_APPLY);
+    Matrix_Scale(GET_ITEM_SCALE, GET_ITEM_SCALE, GET_ITEM_SCALE, MTXMODE_APPLY);
+    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sEmptyDL);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sLanceDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomEquipDefinition definition = { 0 };
 
@@ -2138,11 +2150,12 @@ S2H_MOD_EXPORT void ModInit(void) {
     }
     sCharge.prevCharge = -1.0f;
 
+    definition.getItemEntry.drawFunc = DrawGetItem;
     definition.structSize = sizeof(definition);
     definition.key = TRIDENT_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rTrident&%wHold %y\xA0%w to charge. %y\xA3%w+%y\xA0%w dashes; hold %y\xA3%w+%y\x9F%w "
+    definition.pauseText = "%rTrident&%wHold %y\xB1%w to charge. %y\xB4%w+%y\xB1%w dashes; hold %y\xB4%w+%y\xB0%w "
                            "to fly.";
     definition.getItemText = "You got the %rTrident%w!&Phantom Ganon's lance. Charge it to call down his master's "
                              "magic, or hold it high and take to the air as he did.";

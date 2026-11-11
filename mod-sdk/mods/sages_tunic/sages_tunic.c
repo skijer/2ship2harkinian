@@ -174,9 +174,78 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
+static const ALIGN_ASSET(2) char gGiTunicCollarDL[] = "__OTR__objects/nei_get_item/sages_tunic/object_gi_clothes/gGiTunicCollarDL";
+static const ALIGN_ASSET(2) char gGiTunicDL[] = "__OTR__objects/nei_get_item/sages_tunic/object_gi_clothes/gGiTunicDL";
+static const ALIGN_ASSET(2) char gGiForestMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiForestMedallionFaceDL";
+static const ALIGN_ASSET(2) char gGiFireMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiFireMedallionFaceDL";
+static const ALIGN_ASSET(2) char gGiWaterMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiWaterMedallionFaceDL";
+static const ALIGN_ASSET(2) char gGiSpiritMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiSpiritMedallionFaceDL";
+static const ALIGN_ASSET(2) char gGiShadowMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiShadowMedallionFaceDL";
+static const ALIGN_ASSET(2) char gGiLightMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiLightMedallionFaceDL";
+static const ALIGN_ASSET(2) char gGiMedallionDL[] = "__OTR__objects/oot_object_gi_medal/gGiMedallionDL";
+static void DrawMedallionFountain(PlayState* play) {
+    static const char* const sMedallionFaces[SAGES_RESIST_MAX] = {
+        gGiForestMedallionFaceDL, gGiFireMedallionFaceDL,   gGiWaterMedallionFaceDL,
+        gGiSpiritMedallionFaceDL, gGiShadowMedallionFaceDL, gGiLightMedallionFaceDL,
+    };
+    const f32 launchSpeed = 1.5f;
+    const f32 lift = 1.5f;
+    const f32 gravity = 0.07f;
+    const s32 cycle = 40;
+    const s32 stagger = 7;
+    const f32 medallionScale = 0.35f;
+    const f32 depth = 14.0f;
+
+    OPEN_DISPS(play->state.gfxCtx);
+    for (s32 i = 0; i < SAGES_RESIST_MAX; i++) {
+        f32 t = (f32)((play->gameplayFrames + i * stagger) % cycle);
+        f32 theta = (M_PIf / 2.0f) + i * (f32)(M_PIf / 3.0f);
+        f32 scale = medallionScale;
+
+        if (t < 4.0f) {
+            scale *= t / 4.0f;
+        } else if (t >= cycle - 9.0f) {
+            scale *= (cycle - 1.0f - t) / 8.0f;
+        }
+        if (scale <= 0.001f) {
+            continue;
+        }
+        // The medallion display lists draw nothing under setup 25.
+        Gfx_SetupDL26_Opa(play->state.gfxCtx);
+        Matrix_Push();
+        Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+        Matrix_Translate(cosf(theta) * launchSpeed * t, (sinf(theta) * launchSpeed + lift) * t - 0.5f * gravity * t * t,
+                         depth, MTXMODE_APPLY);
+        Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+        Matrix_RotateYF(play->gameplayFrames * 0.09f + i, MTXMODE_APPLY);
+        MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sMedallionFaces[i]);
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gGiMedallionDL);
+        Matrix_Pop();
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    DrawMedallionFountain(play);
+
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPGrayscale(POLY_OPA_DISP++, true);
+    gDPSetGrayscaleColor(POLY_OPA_DISP++, 240, 244, 250, 255);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gGiTunicCollarDL);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gGiTunicDL);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomEquipDefinition definition = { 0 };
 
+    definition.getItemEntry.drawFunc = DrawGetItem;
     definition.structSize = sizeof(definition);
     definition.key = SAGES_TUNIC_KEY;
     definition.iconPath = sIcon;

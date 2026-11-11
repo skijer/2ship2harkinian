@@ -1124,7 +1124,7 @@ static bool RegisterCloneActor(void) {
 }
 
 static const char* const sRequiredHooks[] = {
-    "OnPlayerUpdate", "OnPlayerResolveLimbDraw", "OnCameraResolveView", "ShouldActorDraw",         "OnActorDrawEnd",
+    "OnActorDraw", "OnPlayerUpdate", "OnPlayerResolveLimbDraw", "OnCameraResolveView", "ShouldActorDraw",         "OnActorDrawEnd",
     "OnSceneInit",    "OnLoadFile",              "OnInterfaceDrawEnd",  "OnActorResolveGrayscale",
 };
 
@@ -1139,6 +1139,47 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// The same callback is used for MM's world drop and overhead cutscene. Track only
+// the custom pickup actor; gameplay sword/clone drawing keeps its own limb matrices.
+static Actor* sDrawingPickupActor;
+
+static void BeginPickupDraw(Actor* actor) {
+    sDrawingPickupActor = actor->params == ITEM00_NOTHING ? actor : NULL;
+}
+
+static void EndPickupDraw(Actor* actor, PlayState* play) {
+    if (sDrawingPickupActor == actor) sDrawingPickupActor = NULL;
+}
+
+static f32 PickupModelScale(void) {
+    const f32 sourceModelScale = 0.04f;
+    if (sDrawingPickupActor != NULL) {
+        // CustomItem00 in MM uses actor.scale * 30; OoT's drop uses .015 * 10,
+        // while Player_DrawGetItemImpl in OoT uses .2 for the receipt model.
+        const f32 parentScale = fabsf(sDrawingPickupActor->scale.x) * 30.0f;
+        const bool receiving = (sDrawingPickupActor->home.rot.x & (1 << 2)) &&
+                               ((EnItem00*)sDrawingPickupActor)->unk152 >= 20;
+        if (parentScale > 0.00001f) {
+            return sourceModelScale * (receiving ? 0.2f : 0.15f) / parentScale;
+        }
+    }
+    return sourceModelScale;
+}
+
+// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    Matrix_RotateZF(M_PIf / 4.0f, MTXMODE_APPLY);
+    f32 modelScale = PickupModelScale();
+    Matrix_Scale(modelScale, modelScale, modelScale, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sBladeDL);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sHiltDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomEquipDefinition definition = { 0 };
 
@@ -1149,14 +1190,15 @@ S2H_MOD_EXPORT void ModInit(void) {
         sUpperBodyMap[limb] = true;
     }
 
+    definition.getItemEntry.drawFunc = DrawGetItem;
     definition.structSize = sizeof(definition);
     definition.key = FOUR_SWORD_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rFour Sword&%wHold %y\xA3%w and %y\xA0%w to split in four. Hold %y\xA2%w to choose "
+    definition.pauseText = "%rFour Sword&%wHold %y\xB4%w and %y\xB1%w to split in four. Hold %y\xB3%w to choose "
                            "the formation.";
     definition.getItemText = "You got the %rFour Sword%w!&The blade that splits its bearer in four. Raise your shield "
-                             "and hold %y\xA0%w: three more of you fight at your side, and each formation has its "
+                             "and hold %y\xB1%w: three more of you fight at your side, and each formation has its "
                              "own trick.";
     definition.slot = S2H_EQUIP_SLOT_SWORD;
     definition.page = 0;
@@ -1172,6 +1214,8 @@ S2H_MOD_EXPORT void ModInit(void) {
         return;
     }
 
+    S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorDraw, ACTOR_EN_ITEM00, BeginPickupDraw);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorDrawEnd, ACTOR_EN_ITEM00, EndPickupDraw);
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, TickSword);
     S2H_REGISTER_HOOK(sApi, OnPlayerResolveLimbDraw, HoldFourSword);
     S2H_REGISTER_HOOK(sApi, OnCameraResolveView, WidenTotemCamera);

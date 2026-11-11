@@ -228,20 +228,43 @@ static const ALIGN_ASSET(2) char sAxeThrowAnim[]="__OTR__objects/oot_gameplay_ke
 static void AxeThrowAction(Player* p,PlayState* play){
  Player_ZeroSpeedXZ(p);if(LinkAnimation_Update(play,&p->skelAnime))func_80839FFC(p,play);
 }
+static bool AxeUsesTargetCamera(Player* p, PlayState* play) {
+ return p->focusActor != NULL || (play->state.input[0].cur.button & BTN_Z);
+}
+
 static void AxeAimAction(Player* p,PlayState* play){
  if((play->state.input[0].press.button&(BTN_CUP|BTN_A|BTN_B))||p->invincibilityTimer<0||Weapon(p)!=CH_HAMMER){
   play->state.input[0].press.button&=~BTN_CUP;Z64Aiming_Release(p,play);sAxeAiming=false;func_80839FFC(p,play);return;
  }
  // Like the rods, aiming rotates the held melee pose through Z64Aiming;
  // do not loop a ranged-item ready animation or run its upper action here.
- Z64Aiming_Update(p,play);Player_ZeroSpeedXZ(p);LinkAnimation_Update(play,&p->skelAnime);
+ if (AxeUsesTargetCamera(p, play)) {
+  Z64Aiming_Release(p, play);
+ } else {
+  if (!Z64Aiming_IsAiming()) Z64Aiming_Request(p, play);
+  Z64Aiming_Update(p, play);
+ }
+ Player_ZeroSpeedXZ(p);
+ LinkAnimation_Update(play, &p->skelAnime);
 }
 static void DrawAxeAim(void){
- if(!gPlayState||!sAxeAiming)return;
+ if(!gPlayState||!sAxeAiming||!Z64Aiming_IsAiming())return;
  Matrix_Push();Z64Aiming_DrawReticle(gPlayState,GET_PLAYER(gPlayState),600.0f,(Z64AimingReticleStyle){Z64AIMING_TOGGLE_BOOMERANG,Z64AIMING_TINT_LAUNCH});Matrix_Pop();
 }
 static void ThrowAxe(Player* p,PlayState* play){
- Vec3f at=p->bodyPartsPos[PLAYER_BODYPART_L_HAND];s16 yaw=p->actor.shape.rot.y,pitch=0;if(sAxeAiming){Z64Aiming_GetDirection(p,&yaw,&pitch);Z64Aiming_Release(p,play);sAxeAiming=false;}
+ Vec3f at = p->bodyPartsPos[PLAYER_BODYPART_L_HAND];
+ s16 yaw = p->actor.shape.rot.y, pitch = 0;
+ if (sAxeAiming) {
+  if (Z64Aiming_IsAiming()) {
+   Z64Aiming_GetDirection(p, &yaw, &pitch);
+  } else if (p->focusActor != NULL) {
+   Vec3f* point = &p->focusActor->focus.pos;
+   yaw = Actor_WorldYawTowardPoint(&p->actor, point);
+   pitch = Math_Vec3f_Pitch(&at, point);
+  }
+  Z64Aiming_Release(p, play);
+  sAxeAiming = false;
+ }
  if(sAxeActorId>=0)sThrownAxe=Actor_Spawn(&play->actorCtx,play,sAxeActorId,at.x,at.y,at.z,pitch,yaw,0,0);
  if(sThrownAxe){Player_SetupActionPreserveItemAction(play,p,AxeThrowAction,0);LinkAnimation_PlayOnce(play,&p->skelAnime,(LinkAnimationHeader*)sAxeThrowAnim);Audio_PlayActorSound2(&p->actor,NA_SE_IT_BOOMERANG_THROW);}else if(p->actionFunc==AxeAimAction)func_80839FFC(p,play);
 }
@@ -287,14 +310,13 @@ static void Update(void){
  if(c==CH_HAMMER){
   if(p->meleeWeaponState&&p->skelAnime.endFrame>0){float progress=p->skelAnime.curFrame/p->skelAnime.endFrame;p->skelAnime.playSpeed=.35f+1.15f*progress*progress;}
   if(!swing&&p->speedXZ>6)p->speedXZ=6;
-  Input* in=&play->state.input[0];if(!sThrownAxe&&!sAxeAiming&&!swing&&(in->press.button&BTN_CUP)){if(Z64Aiming_Request(p,play)){sAxeAiming=true;Player_SetupAction(play,p,AxeAimAction,1);Player_AnimPlayLoop(play,p,Player_GetIdleAnim(p));}}
-  if(sAxeAiming){
-   Z64Aiming_HoldState(p);
-   static const u32 buttons[]={BTN_B,BTN_CLEFT,BTN_CDOWN,BTN_CRIGHT,BTN_DUP,BTN_DDOWN,BTN_DLEFT,BTN_DRIGHT};
-   for(int b=1;b<8;b++){
-    const char* key=sApi->GetEquippedCustomItem(b<4?b:b+1);
-    if(key&&!strcmp(key,"nei.weapon.gerudo_axe")&&(in->press.button&buttons[b]))ThrowAxe(p,play);
-   }
+  Input* in=&play->state.input[0];if(!sThrownAxe&&!sAxeAiming&&!swing&&(in->press.button&BTN_CUP)){if(AxeUsesTargetCamera(p,play)||Z64Aiming_Request(p,play)){sAxeAiming=true;Player_SetupActionPreserveItemAction(play,p,AxeAimAction,0);Player_AnimPlayLoop(play,p,Player_GetIdleAnim(p));}}
+  if(sAxeAiming && Z64Aiming_IsAiming()) Z64Aiming_HoldState(p);
+  static const u32 buttons[]={BTN_B,BTN_CLEFT,BTN_CDOWN,BTN_CRIGHT,0,BTN_DRIGHT,BTN_DLEFT,BTN_DDOWN,BTN_DUP};
+  u8 button=p->heldItemButton;
+  // OoT Items swings the axe as the Hammer it upgrades; only the aimed throw belongs here.
+  if(sAxeAiming&&button<ARRAY_COUNT(buttons)&&(in->press.button&buttons[button])){
+   ThrowAxe(p,play);
   }
 
  }else if(sAxeAiming){Z64Aiming_Release(p,play);sAxeAiming=false;if(p->actionFunc==AxeAimAction)func_80839FFC(p,play);}

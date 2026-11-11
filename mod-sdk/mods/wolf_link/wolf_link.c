@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64logic.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -2131,10 +2132,21 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// The wolf bites and spins; his sword-flagged hits fight, but he holds no blade for MM's sword checks.
+static void GrantWolfLogic(void) {
+    static const Z64LogicSource sCrystal = { WOLF_CRYSTAL_KEY };
+    static const char* const sBiting[] = { "CanHitSwitch", "CanAttack", "CanDamage", NULL };
+
+    if (Z64Logic_Init(sApi)) {
+        Z64Logic_GrantCapabilities(&sCrystal, sBiting);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     for (s32 slot = 0; slot < VOICE_SLOTS; slot++) {
         sVoiceSlots[slot].sound = -1;
     }
+    GrantWolfLogic();
     RegisterCrystal();
     RegisterWolfForm();
     S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldActorDraw, ACTOR_PLAYER, DrawWolfBody);

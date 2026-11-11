@@ -3,6 +3,7 @@
 // light shots wake sun switches, as NEI's SW97 mode does.
 
 #include "z64items.h"
+#include "z64wheel.h"
 
 #include <string.h>
 
@@ -235,6 +236,9 @@ static EffectBlureInit2* ElementBlure(Sw97Element element) {
 
 // Which element a freshly spawned arrow belongs to, or none when it is not a SW97 shot at all.
 static Sw97Element ElementOfNewArrow(EnArrow* arrow, Player* player) {
+    const char* held=CustomItemRegistry_GetHeldKey();
+    if(arrow->actor.params==ARROW_TYPE_SLINGSHOT && held && !strcmp(held,"oot.slingshot"))
+        return Sw97_GetElement(true);
     if (arrow->actor.params >= ARROW_TYPE_NORMAL_LIT && arrow->actor.params <= ARROW_TYPE_LIGHT && IsPrimedBowShot(player)) return Sw97_GetElement(false);
     return SW97_ELEM_NONE;
 }
@@ -305,7 +309,9 @@ static void AimSeedEffect(TrackedArrow* tracked) {
     if (!tracked->isShot || tracked->arrow->actionFunc != func_8088ACE0) {
         return;
     }
-    seed->shape.rot.x = Math_Atan2S(seed->speed, -seed->velocity.y);
+    // NEI uses OoT Math_Atan2S(x,y). MM's base function takes (y,x);
+    // its XY adapter preserves OoT's pitch (horizontal flight must be 0, not 90 degrees).
+    seed->shape.rot.x = Math_Atan2S_XY(seed->speed, -seed->velocity.y);
     seed->shape.rot.y = seed->world.rot.y;
     seed->shape.rot.z = 0;
 }
@@ -348,6 +354,14 @@ static void UpdateTrackedArrow(Actor* actor) {
     AnnounceShot(play, tracked);
     if (tracked->isSeed) {
         AimSeedEffect(tracked);
+        // Seeds retain their native projectile type. Apply Ice Arrow water
+        // behavior explicitly rather than losing it with that identity.
+        if(tracked->isShot && tracked->element==SW97_ELEM_ICE){
+            WaterBox* box; f32 y=actor->world.pos.y;
+            if(WaterBox_GetSurface1(play,&play->colCtx,actor->world.pos.x,actor->world.pos.z,&y,&box) &&
+               actor->world.pos.y<y && actor->prevPos.y>=y &&
+               Sw97_SpawnIcePlatform(play,actor->world.pos.x,y,actor->world.pos.z))Actor_Kill(actor);
+        }
     }
     if (tracked->element == SW97_ELEM_DARK && (tracked->arrow->unk_261 & 1)) {
         StartLifesteal(tracked->arrow->collider.base.at);
@@ -489,7 +503,156 @@ static void ForgetArrowScene(void) {
     sLifestealCount = 0;
 }
 
+#define ARROW_WHEEL_OWNER "nei.arrow_wheel"
+static bool sArrowWheelOpen;
+static u32 sArrowWheelClosedFrame=(u32)-1;
+static bool sArrowWheelIsSling;
+static uint8_t sArrowChoices[8], sArrowChoiceCount, sArrowHighlight;
+void Player_UseItem(PlayState* play, Player* player, s32 item);
+static bool BombAvailable(void) {
+    bool (*available)(void) = (bool (*)(void))gSw97Api->FindService("nei.bomb_arrows.available");
+    return available != NULL && available();
+}
+static bool BombSelected(void) {
+    bool (*selected)(void)=(bool(*)(void))gSw97Api->FindService("nei.bomb_arrows.selected");
+    return selected && selected();
+}
+static void BombSelect(bool selected) {
+    void (*select)(bool) = (void (*)(bool))gSw97Api->FindService("nei.bomb_arrows.select");
+    if (select != NULL) { select(selected); }
+}
+static bool ArrowWheelCapturesInput(void) {
+    return sArrowWheelOpen || (gPlayState && sArrowWheelClosedFrame==gPlayState->state.frames);
+}
+static void HoldLoadedShot(Input* input) {
+    if(!ArrowWheelCapturesInput() || !gPlayState)return;
+    static const u16 buttons[S2H_ITEM_BUTTON_COUNT]={BTN_B,BTN_CLEFT,BTN_CDOWN,BTN_CRIGHT,0,BTN_DRIGHT,BTN_DLEFT,BTN_DDOWN,BTN_DUP};
+    Player* player=GET_PLAYER(gPlayState);
+    u16 held=(u32)player->heldItemButton<S2H_ITEM_BUTTON_COUNT?buttons[player->heldItemButton]:0;
+    input->cur.button=held;input->prev.button=held;
+    input->press.button=input->rel.button=0;
+    input->cur.stick_x=input->cur.stick_y=input->rel.stick_x=input->rel.stick_y=0;
+}
+static void CloseArrowWheel(bool commit) {
+    if(sArrowWheelOpen && gPlayState)sArrowWheelClosedFrame=gPlayState->state.frames;
+    if (sArrowWheelOpen && commit && gPlayState != NULL && sArrowChoiceCount != 0) {
+        Player* player = GET_PLAYER(gPlayState);
+        uint8_t chosen = sArrowChoices[sArrowHighlight];
+        Sw97_SetElement(sArrowWheelIsSling, chosen == 7 ? SW97_ELEM_NONE : (Sw97Element)chosen);
+        // Retune the loaded projectile without replacing the custom slingshot.
+        BombSelect(false);
+        if(!sArrowWheelIsSling){
+            // Native Fire/Ice/Light Arrow buttons must return to the bow as the
+            // weapon identity, or their old item action would override this choice.
+            u8 button=player->heldItemButton;
+            if(button<EQUIP_SLOT_MAX){
+                gSw97Api->UnequipCustomItem(button);
+                SET_CUR_FORM_BTN_ITEM(button,ITEM_BOW);
+                SET_CUR_FORM_BTN_SLOT(button,SLOT_BOW);
+                Interface_LoadItemIconImpl(gPlayState,button);
+            }else if(button>=S2H_ITEM_BUTTON_DPAD_FIRST && button<S2H_ITEM_BUTTON_COUNT){
+                gSw97Api->UnequipCustomItem(button);
+                DPAD_SET_CUR_FORM_BTN_ITEM(button-S2H_ITEM_BUTTON_DPAD_FIRST,ITEM_BOW);
+                DPAD_SET_CUR_FORM_BTN_SLOT(button-S2H_ITEM_BUTTON_DPAD_FIRST,SLOT_BOW);
+                Interface_Dpad_LoadItemIconImpl(gPlayState,button-S2H_ITEM_BUTTON_DPAD_FIRST);
+            }
+            Player_UseItem(gPlayState,player,ITEM_BOW);
+        }
+        Actor* held=player->heldActor;
+        if(held && held->id==ACTOR_EN_ARROW){
+            if(held->child){Actor_Kill(held->child);held->child=NULL;}
+            TrackedArrow* tracked=FindTrackedArrow(held);
+            if(tracked)tracked->arrow=NULL;
+            Sw97Element element=Sw97_GetElement(sArrowWheelIsSling);
+            if(!sArrowWheelIsSling)held->params=element>0&&element<=SW97_ELEM_LIGHT?ARROW_TYPE_FIRE+element-1:ARROW_TYPE_NORMAL;
+            ((EnArrow*)held)->collider.elem.atDmgInfo.dmgFlags=element?sElementDamage[element]:(sArrowWheelIsSling?DMG_DEKU_NUT:DMG_NORMAL_ARROW);
+            if(element)TrackNewArrow(held);
+        }
+        BombSelect(chosen == 7);
+        Z64Wheel_PlaySfx(NA_SE_SY_DECIDE);
+    }
+    gSw97Api->ReleasePlayerInput(ARROW_WHEEL_OWNER);
+    gSw97Api->ReleaseTimeControl(ARROW_WHEEL_OWNER);
+    sArrowWheelOpen = false;
+}
+static void TickArrowWheel(void) {
+    PlayState* play = gPlayState;
+    if (play == NULL || play->pauseCtx.state != 0 || play->msgCtx.msgMode != MSGMODE_NONE) { CloseArrowWheel(false); return; }
+    Player* player = GET_PLAYER(play);
+    const char* heldKey=CustomItemRegistry_GetHeldKey();
+    bool isSling = heldKey && !strcmp(heldKey,"oot.slingshot");
+    bool aiming = (player->stateFlags1 & PLAYER_STATE1_100000) &&
+        (isSling || (player->heldItemAction >= PLAYER_IA_BOW && player->heldItemAction <= PLAYER_IA_BOW_LIGHT));
+    Input* input = &play->state.input[0];
+    if (!aiming || (sArrowWheelOpen && isSling != sArrowWheelIsSling)) { CloseArrowWheel(false); return; }
+    if (!sArrowWheelOpen && (input->press.button & BTN_L)) {
+        sArrowWheelIsSling = isSling;
+        sArrowChoiceCount = 0; sArrowHighlight = 0;
+        for (uint8_t element = 0; element < SW97_ELEM_COUNT; ++element) {
+            if (IsElementOwned((Sw97Element)element)) {
+                if (element == Sw97_GetElement(sArrowWheelIsSling)) { sArrowHighlight = sArrowChoiceCount; }
+                sArrowChoices[sArrowChoiceCount++] = element;
+            }
+        }
+        if (BombAvailable()) {
+            if(BombSelected())sArrowHighlight=sArrowChoiceCount;
+            sArrowChoices[sArrowChoiceCount++]=7;
+        }
+        sArrowWheelOpen = true;
+        gSw97Api->BlockPlayerInput(ARROW_WHEEL_OWNER, Z64WHEEL_BLOCKED_BUTTONS, true);
+        gSw97Api->RequestTimeControl(ARROW_WHEEL_OWNER, 1000, 0.0f, true);
+        Z64Wheel_PlaySfx(NA_SE_SY_WIN_OPEN);
+    }
+    if (!sArrowWheelOpen) { return; }
+    if (input->press.button & BTN_B) { CloseArrowWheel(false); return; }
+    float x = input->cur.stick_x, y = input->cur.stick_y;
+    if (x*x+y*y > 400.0f) {
+        int slot = (int)lroundf(atan2f(x,y) * sArrowChoiceCount / 6.28318531f) % sArrowChoiceCount;
+        if (slot < 0) { slot += sArrowChoiceCount; }
+        if (slot != sArrowHighlight) { sArrowHighlight = slot; Z64Wheel_PlaySfx(NA_SE_SY_CURSOR); }
+    }
+    if (!(input->cur.button & BTN_L) || (input->press.button & BTN_A)) { CloseArrowWheel(true); }
+}
+static void DrawArrowWheel(PlayState* play) {
+    if (!sArrowWheelOpen) { return; }
+    static const ALIGN_ASSET(2) char icons[8][80] = {
+        "__OTR__icon_item_static_yar/gItemIconBowTex", "__OTR__icon_item_static_yar/gItemIconFireArrowTex",
+        "__OTR__icon_item_static_yar/gItemIconIceArrowTex", "__OTR__icon_item_static_yar/gItemIconLightArrowTex",
+        "__OTR__textures/icon_item_custom/gItemIconMedallionShadowTex", "__OTR__textures/icon_item_custom/gItemIconMedallionSpiritTex",
+        "__OTR__textures/icon_item_custom/gItemIconMedallionForestTex", "__OTR__textures/icon_item_custom/gItemIconBombArrowsTex"
+    };
+    Z64Wheel_DimScreen(play, 110);
+    for (uint8_t i = 0; i < sArrowChoiceCount; ++i) {
+        uint8_t element = sArrowChoices[i];
+        static const ALIGN_ASSET(2) char slingIcon[] = "__OTR__textures/oot_icon_item_static/gItemIconSlingshotTex";
+        const char* icon = element == 0 && sArrowWheelIsSling ? slingIcon : icons[element];
+        // Medallion icons take priority; vanilla arrows still unlock their entry when no medallion is owned.
+        if (element > 0 && element < SW97_ELEM_COUNT && gSw97Api->IsCustomItemOwned(sElementKeys[element])) {
+            static const ALIGN_ASSET(2) char medallionIcons[7][80] = {
+                "", "__OTR__textures/icon_item_custom/gItemIconMedallionFireTex",
+                "__OTR__textures/icon_item_custom/gItemIconMedallionWaterTex",
+                "__OTR__textures/icon_item_custom/gItemIconMedallionLightTex",
+                "__OTR__textures/icon_item_custom/gItemIconMedallionShadowTex",
+                "__OTR__textures/icon_item_custom/gItemIconMedallionSpiritTex",
+                "__OTR__textures/icon_item_custom/gItemIconMedallionForestTex"
+            };
+            icon = medallionIcons[element];
+        }
+        float angle = 6.28318531f * i / sArrowChoiceCount;
+        int size = i == sArrowHighlight ? 32 : 24;
+        Z64Wheel_DrawIcon(play, icon, (int16_t)(SCREEN_WIDTH/2 + sinf(angle)*52-size/2),
+            (int16_t)(SCREEN_HEIGHT/2 - cosf(angle)*52-size/2), size, 255, i==sArrowHighlight?255:170);
+    }
+}
+static void ForgetArrowWheel(void) { CloseArrowWheel(false);sArrowWheelClosedFrame=(u32)-1; }
+
 void Sw97_RegisterArrows(void) {
+    gSw97Api->PublishService("nei.arrow_wheel.captures_input",(void*)ArrowWheelCapturesInput);
+    S2H_REGISTER_HOOK(gSw97Api, OnPassPlayerInputs, HoldLoadedShot);
+    S2H_REGISTER_HOOK(gSw97Api, OnGameFrameUpdate, TickArrowWheel);
+    S2H_REGISTER_HOOK(gSw97Api, OnInterfaceDrawEnd, DrawArrowWheel);
+    S2H_REGISTER_HOOK(gSw97Api, OnPlayDestroy, ForgetArrowWheel);
+
     gSw97Api->RegisterVB(VB_PLAYER_ARROW_MAGIC_CONSUMPTION, WaiveElementalShotCost);
     gSw97Api->RegisterVB(VB_LIGHTSWITCH_OFF, KeepArrowLitSwitchOn);
     S2H_REGISTER_HOOK(gSw97Api, OnLoadFile, LoadElements);

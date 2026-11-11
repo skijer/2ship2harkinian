@@ -269,7 +269,7 @@ static void Sw97_ArrowWind_Charge(ArrowWind* this, PlayState* play) {
     this->actor.world.pos = arrow->actor.world.pos;
     this->actor.shape.rot = arrow->actor.shape.rot;
 
-    Actor_PlaySfx_Flagged(&this->actor, NA_SE_PL_MAGIC_WIND_NORMAL - SFX_FLAG);
+    Sw97_PlayLoopSfx(&this->actor, NA_SE_PL_MAGIC_WIND_NORMAL);
 
     if (arrow->actor.parent == NULL) {
         this->unkPos = this->actor.world.pos;

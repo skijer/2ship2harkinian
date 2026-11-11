@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64logic.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -1676,12 +1677,12 @@ static void RegisterMask(void) {
 
 // ---- form ----
 
-// A Gerudo's grip: heavy enough for the big blocks.
+// A Gerudo grips like a Zora; oot_collectables adds the strength upgrades on top.
 static void ResolveGerudoStrength(bool* should, va_list args) {
     s32* strength = va_arg(args, s32*);
 
     if (IsGerudo()) {
-        *strength = PLAYER_STRENGTH_GORON;
+        *strength = PLAYER_STRENGTH_ZORA;
     }
 }
 
@@ -1719,10 +1720,21 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// The Gerudo's scimitars carry sword damage, so they cut and fight wherever MM's logic asks for a sword.
+static void GrantGerudoLogic(void) {
+    static const Z64LogicSource sMask = { GERUDO_MASK_KEY };
+    static const char* const sSlashing[] = { "CanUseSword", "CanHitSwitch", "CanAttack", "CanDamage", NULL };
+
+    if (Z64Logic_Init(sApi)) {
+        Z64Logic_GrantCapabilities(&sMask, sSlashing);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     for (s32 slot = 0; slot < VOICE_SLOTS; slot++) {
         sVoiceSlots[slot].sample = -1;
     }
+    GrantGerudoLogic();
     LoadVoices();
     RegisterMask();
     RegisterForm();

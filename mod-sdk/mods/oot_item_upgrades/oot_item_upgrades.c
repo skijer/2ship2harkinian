@@ -32,12 +32,14 @@
 #define LOOK_CVAR "gMods.OotItemUpgrades.KokiriShape"
 enum { CH_HAMMER, CH_KOKIRI, CH_MASTER, CH_BGS, CH_HOOK, CH_COUNT };
 static const SOHModApi* sApi;
+static Actor* sHeldHammerPickup;
+static const char* sHeldHammerKey;
 static int sPendingGiveChain=-1;
 static const char* sGiveStatus="";
 static const char* sChain[CH_COUNT]={"nei.upgrades.hammer","nei.upgrades.kokiri","nei.upgrades.master","nei.upgrades.bgs","nei.upgrades.hookshot"};
 static const char* sPickup[CH_COUNT]={"nei.progressive.hammer","nei.progressive.kokiri_sword","nei.progressive.master_sword","nei.progressive.bgs","nei.progressive.hookshot"};
-static const char* const sHooks[]={"OnPlayerUpdate","OnPlayerResolveLimbDraw","OnPlayerPostLimbDraw","OnActorUpdate",
- "OnPlayDrawEnd","OnGetItemDraw","OnOpenText","OnActorDrawBegin","OnSaveEditorInventory","ShouldActorUpdate","OnBgCheckLineTest","OnInterfaceResolveButtonIcon","OnKaleidoResolveName","OnKaleidoResolveItemIcon","OnCollisionResolveDamage","OnResolveSwordDamage","OnSceneInit"};
+static const char* const sHooks[]={"OnActorDestroy","OnCustomItemReceive","OnLoadFile","OnCustomEquipOwnedChange","OnPlayerUpdate","OnPlayerResolveLimbDraw","OnPlayerPostLimbDraw","OnActorUpdate",
+ "OnPlayDrawEnd","OnGetItemDraw","OnOpenText","OnSaveEditorInventory","ShouldActorUpdate","OnBgCheckLineTest","OnInterfaceResolveButtonIcon","OnKaleidoResolveName","OnKaleidoResolveItemIcon","OnCollisionResolveDamage","OnResolveSwordDamage","OnSceneInit","OnResolveCustomGetItem"};
 static const SOHModRequirements sRequirements={sizeof(SOHModRequirements),sHooks,ARRAY_COUNT(sHooks)};
 static const ALIGN_ASSET(2) char sRazorBlade[]="__OTR__objects/gameplay_keep/gRazorSwordBladeDL";
 static const ALIGN_ASSET(2) char sRazorHandle[]="__OTR__objects/gameplay_keep/gRazorSwordHandleDL";
@@ -59,19 +61,19 @@ static const ALIGN_ASSET(2) char sHookIcon[]="__OTR__textures/oot_icon_item_stat
 static const ALIGN_ASSET(2) char sLongIcon[]="__OTR__textures/oot_icon_item_static/gItemIconLongshotTex";
 typedef struct {const char* key;int chain,level,gid;const char* icon;const char* text;const char* name;} Stage;
 static const Stage sStages[]={
- {"nei.weapon.megaton_hammer",CH_HAMMER,1,-1,sHammerIcon,"You got the %rMegaton Hammer%w!&Equip it to %y\xA1%w and press %y\xA1%w to&swing. Smash heavy obstacles!","Megaton Hammer"},
- {"nei.weapon.gerudo_axe",CH_HAMMER,2,-1,sAxeIcon,"You got the %yGerudo Axe%w!&A heavy axe with greater reach&and double Hammer damage.^Equip it to %y\xA1%w to swing.&Aim with %c\xA5%w, then press %y\xA1%w&to throw it and bring it back.","Gerudo Axe"},
- {"nei.weapon.kokiri_sword",CH_KOKIRI,1,GID_SWORD_KOKIRI,sKokiriIcon,"You got the %gKokiri Sword%w!&Equip it in Equipment.&Press %g\xA0%w to swing your sword.","Kokiri Sword"},
- {"nei.weapon.razor_sword",CH_KOKIRI,2,-1,sRazorIcon,"You got the %rRazor Sword%w!&Master Sword reach and power&for your Kokiri Sword.^Equip your Kokiri Sword&in Equipment. Press %g\xA0%w&to attack with the new blade.","Razor Sword"},
- {"nei.weapon.gilded_sword",CH_KOKIRI,3,-1,sGildedIcon,"You got the %yGilded Sword%w!&Master Sword reach with&Biggoron Sword power.^Equip your Kokiri Sword&in Equipment. Press %g\xA0%w&to attack with the new blade.","Gilded Sword"},
- {"nei.weapon.master_sword",CH_MASTER,1,GID_SWORD_BGS,sMasterIcon,"You got the %bMaster Sword%w!&Equip it in Equipment.&Press %g\xA0%w to swing your sword.","Master Sword"},
- {"nei.weapon.real_master_sword",CH_MASTER,2,GID_SWORD_BGS,sMasterIcon,"You got the %bReal Master Sword%w!&At full health, sword swings&launch sacred sword beams.^Equip the Master Sword&and press %g\xA0%w to attack.&The beams cost no magic.","Real Master Sword"},
- {"nei.weapon.giants_knife",CH_BGS,1,GID_SWORD_BGS,sKnifeIcon,"You got the %rGiant's Knife%w!&Equip it in Equipment.&Press %g\xA0%w for a two-handed slash.^This heavy blade can break.&Use it carefully!","Giant's Knife"},
- {"nei.weapon.biggoron_sword",CH_BGS,2,GID_SWORD_BGS,sBgsIcon,"You got %rBiggoron's Sword%w!&A mighty blade that&never breaks.^Equip it in Equipment.&Press %g\xA0%w for a powerful&two-handed slash.","Biggoron's Sword"},
- {"nei.weapon.great_fairy_sword",CH_BGS,3,-1,sGfsIcon,"You got the %pGreat Fairy's Sword%w!&Hits restore life and magic.^Equip your great sword&in Equipment. Press %g\xA0%w&to attack with the new blade.","Great Fairy's Sword"},
- {"nei.weapon.hookshot",CH_HOOK,1,GID_HOOKSHOT,sHookIcon,"You got the %rHookshot%w!&Equip it to %y\xA1%w. Hold %y\xA1%w to aim,&then release to fire the hook.","Hookshot"},
- {"nei.weapon.longshot",CH_HOOK,2,GID_LONGSHOT,sLongIcon,"You got the %rLongshot%w!&Its hook reaches farther&than the Hookshot.^Equip it to %y\xA1%w. Hold %y\xA1%w to aim,&then release to fire the hook.","Longshot"},
- {"nei.weapon.ultrashot",CH_HOOK,3,GID_LONGSHOT,sUltraIcon,"You got the %yUltrashot%w!&Four times Hookshot reach&and twice the speed!^Equip it to %y\xA1%w. Hold %y\xA1%w to aim,&then release to fire the hook.","Ultrashot"},
+ {"oot.hammer",CH_HAMMER,1,-1,sHammerIcon,"You got the %rMegaton Hammer%w!&Equip it to %y\xB2%w and press %y\xB2%w to&swing. Smash heavy obstacles!","Megaton Hammer"},
+ {"nei.weapon.gerudo_axe",CH_HAMMER,2,-1,sAxeIcon,"You got the %yGerudo Axe%w!&A heavy axe with greater reach&and double Hammer damage.^Equip it to %y\xB2%w to swing.&Aim with %c\xB6%w, then press %y\xB2%w&to throw it and bring it back.","Gerudo Axe"},
+ {"nei.weapon.kokiri_sword",CH_KOKIRI,1,GID_SWORD_KOKIRI,sKokiriIcon,"You got the %gKokiri Sword%w!&Equip it in Equipment.&Press %g\xB1%w to swing your sword.","Kokiri Sword"},
+ {"nei.weapon.razor_sword",CH_KOKIRI,2,-1,sRazorIcon,"You got the %rRazor Sword%w!&Master Sword reach and power&for your Kokiri Sword.^Equip your Kokiri Sword&in Equipment. Press %g\xB1%w&to attack with the new blade.","Razor Sword"},
+ {"nei.weapon.gilded_sword",CH_KOKIRI,3,-1,sGildedIcon,"You got the %yGilded Sword%w!&Master Sword reach with&Biggoron Sword power.^Equip your Kokiri Sword&in Equipment. Press %g\xB1%w&to attack with the new blade.","Gilded Sword"},
+ {"nei.weapon.master_sword",CH_MASTER,1,GID_SWORD_BGS,sMasterIcon,"You got the %bMaster Sword%w!&Equip it in Equipment.&Press %g\xB1%w to swing your sword.","Master Sword"},
+ {"nei.weapon.real_master_sword",CH_MASTER,2,GID_SWORD_BGS,sMasterIcon,"You got the %bReal Master Sword%w!&At full health, sword swings&launch sacred sword beams.^Equip the Master Sword&and press %g\xB1%w to attack.&The beams cost no magic.","Real Master Sword"},
+ {"nei.weapon.giants_knife",CH_BGS,1,GID_SWORD_BGS,sKnifeIcon,"You got the %rGiant's Knife%w!&Equip it in Equipment.&Press %g\xB1%w for a two-handed slash.^This heavy blade can break.&Use it carefully!","Giant's Knife"},
+ {"nei.weapon.biggoron_sword",CH_BGS,2,GID_SWORD_BGS,sBgsIcon,"You got %rBiggoron's Sword%w!&A mighty blade that&never breaks.^Equip it in Equipment.&Press %g\xB1%w for a powerful&two-handed slash.","Biggoron's Sword"},
+ {"nei.weapon.great_fairy_sword",CH_BGS,3,-1,sGfsIcon,"You got the %pGreat Fairy's Sword%w!&Hits restore life and magic.^Equip your great sword&in Equipment. Press %g\xB1%w&to attack with the new blade.","Great Fairy's Sword"},
+ {"nei.weapon.hookshot",CH_HOOK,1,GID_HOOKSHOT,sHookIcon,"You got the %rHookshot%w!&Equip it to %y\xB2%w. Hold %y\xB2%w to aim,&then release to fire the hook.","Hookshot"},
+ {"nei.weapon.longshot",CH_HOOK,2,GID_LONGSHOT,sLongIcon,"You got the %rLongshot%w!&Its hook reaches farther&than the Hookshot.^Equip it to %y\xB2%w. Hold %y\xB2%w to aim,&then release to fire the hook.","Longshot"},
+ {"nei.weapon.ultrashot",CH_HOOK,3,GID_LONGSHOT,sUltraIcon,"You got the %yUltrashot%w!&Four times Hookshot reach&and twice the speed!^Equip it to %y\xB2%w. Hold %y\xB2%w to aim,&then release to fire the hook.","Ultrashot"},
 };
 GetItemEntry ItemTable_Retrieve(int16_t getItemID);
 GetItemEntry ItemTable_RetrieveEntry(int16_t tableId,int16_t getItemID);
@@ -82,23 +84,48 @@ static GetItemEntry sOriginalMasterEntry;
 static uint16_t sOriginalMasterMessage;
 static const int sStart[CH_COUNT]={0,2,5,7,10};
 static const int sLength[CH_COUNT]={2,3,2,3,3};
+// The playable equipment definition is also the acquisition definition for its base stage.
+static const char* StagePickupKey(const Stage* stage) {
+ if(stage->chain==CH_MASTER && stage->level==1)return "oot.equip.master_sword";
+ if(stage->chain==CH_BGS && stage->level==1)return KNIFE_KEY;
+ if(stage->chain==CH_BGS && stage->level==2)return "oot.equip.biggoron_sword";
+ return stage->key;
+}
+static const Stage* StageForKey(const char* key) {
+ if(!key)return NULL;
+ for(int i=0;i<ARRAY_COUNT(sStages);i++)
+  if(!strcmp(key,sStages[i].key)||!strcmp(key,StagePickupKey(&sStages[i])))return &sStages[i];
+ return NULL;
+}
 static u16 Level(int c){return sApi->GetProgressiveLevel(sChain[c],SOH_RANDO_INF_SAVE);}
 static bool SaveBank(void) { return !RandoInfCustom_IsLogicSimulation(); }
-static u16 ReadHammer(const SaveContext* s) { return sApi->IsCustomItemOwned("oot.hammer") ? 1 : 0; }
+static u16 ReadHammer(const SaveContext* s) {
+    if (!SaveBank()) return 0;
+    return sApi->IsCustomItemOwned("nei.weapon.gerudo_axe") ? 2 : sApi->IsCustomItemOwned("oot.hammer") ? 1 : 0;
+}
 static u16 ReadKokiri(const SaveContext* s) {
     return s == &gSaveContext ? MIN(CustomEquipRegistry_GetVanillaBase(S2H_EQUIP_SLOT_SWORD), 3) :
            MIN(s->save.saveInfo.equips.equipment & 15, 3);
 }
-static u16 ReadMaster(const SaveContext* s) { return sApi->IsEquipmentOwned("oot.equip.master_sword") ? 1 : 0; }
+static u16 ReadMaster(const SaveContext* s) { return SaveBank() && sApi->IsEquipmentOwned("oot.equip.master_sword") ? 1 : 0; }
 static u16 ReadBgs(const SaveContext* s) {
     return s->save.saveInfo.inventory.items[SLOT_SWORD_GREAT_FAIRY] == ITEM_SWORD_GREAT_FAIRY ? 3 :
-           sApi->IsEquipmentOwned("oot.equip.biggoron_sword") ? 2 : sApi->IsEquipmentOwned(KNIFE_KEY) ? 1 : 0;
+           !SaveBank() ? 0 : sApi->IsEquipmentOwned("oot.equip.biggoron_sword") ? 2 : sApi->IsEquipmentOwned(KNIFE_KEY) ? 1 : 0;
 }
 static u16 ReadHook(const SaveContext* s) { return s->save.saveInfo.inventory.items[SLOT_HOOKSHOT] == ITEM_HOOKSHOT ? 1 : 0; }
+// OoT upgrades replace the item in its slot: the Gerudo Axe is oot.hammer with another look.
+static void SyncHammerIcon(void) {
+    const char* icon = sApi->IsCustomItemOwned("nei.weapon.gerudo_axe") ? sAxeIcon : sHammerIcon;
+    sApi->SetCustomItemIconPath("oot.hammer", icon);
+}
+
 static void ApplyHammer(SaveContext* s, u16 level) {
-    if (!SaveBank()) return;
+    if (!SaveBank()) {
+        return;
+    }
     sApi->SetCustomItemOwned("oot.hammer", level > 0);
     sApi->SetCustomItemOwned("nei.weapon.gerudo_axe", level >= 2);
+    SyncHammerIcon();
 }
 static void ApplyKokiri(SaveContext* s, u16 level) {
     s->save.saveInfo.equips.equipment = (s->save.saveInfo.equips.equipment & ~15) | level;
@@ -133,8 +160,11 @@ static bool HumanWeapon(Player* p) {
 }
 static int Weapon(Player* p) {
     if (!HumanWeapon(p)) return -1;
-    const char* held = CustomItemRegistry_GetHeldKey();
-    if (held) return !strcmp(held, "nei.weapon.gerudo_axe") && Level(CH_HAMMER) >= 2 ? CH_HAMMER : -1;
+    if (p->heldItemAction == PLAYER_IA_CUSTOM) {
+        const char* held = sApi->GetEquippedCustomItem(p->heldItemButton);
+        bool isAxe = held != NULL && strcmp(held, "oot.hammer") == 0 && Level(CH_HAMMER) >= 2;
+        return isAxe ? CH_HAMMER : -1;
+    }
     const char* sword = sApi->GetWornEquipment(S2H_EQUIP_SLOT_SWORD);
     if (sword && !strcmp(sword, "oot.equip.master_sword") && Level(CH_MASTER) >= 2) return CH_MASTER;
     if (p->heldItemId == ITEM_SWORD_GREAT_FAIRY && Level(CH_BGS) >= 3) return CH_BGS;
@@ -155,6 +185,7 @@ static void ResolveIcon(PlayState* play,u16 item,const char** path){
 }
 static const ALIGN_ASSET(2) char sUltraName[]="__OTR__textures/item_name_custom/gUltrashotNameTex";
 static const ALIGN_ASSET(2) char sAxeName[]="__OTR__textures/item_name_custom/gGerudoAxeNameTex";
+static const char sHammerName[]="__OTR__textures/oot_item_name_static/gMegatonHammerItemNameENGTex";
 static const ALIGN_ASSET(2) char sRazorName[]="__OTR__item_name_static/gItemNameRazorSwordENGTex";
 static const ALIGN_ASSET(2) char sGildedName[]="__OTR__item_name_static/gItemNameGildedSwordENGTex";
 static const ALIGN_ASSET(2) char sGfsName[]="__OTR__item_name_static/gItemNameGreatFairysSwordENGTex";
@@ -162,11 +193,17 @@ static void ResolveName(PlayState* play,u16 item,const char** name){
  if(item==ITEM_HOOKSHOT&&Level(CH_HOOK)==2)*name="__OTR__textures/oot_item_name_static/gLongshotItemNameENGTex";
  if(item==ITEM_SWORD_GILDED&&!GildedLook()&&Level(CH_KOKIRI)>=3)*name=sRazorName;
  if(item==ITEM_HAMMER&&Level(CH_HAMMER)>=2)*name=sAxeName;
+ if(item==ITEM_CUSTOM&&Level(CH_HAMMER)>=2&&*name&&!strcmp(*name,sHammerName))*name=sAxeName;
  if(item==ITEM_HOOKSHOT&&Level(CH_HOOK)>=3)*name=sUltraName;
  if(item==ITEM_SWORD_KOKIRI&&Level(CH_KOKIRI)>=2)*name=Level(CH_KOKIRI)>=3&&GildedLook()?sGildedName:sRazorName;
  if(item==ITEM_SWORD_BGS&&Level(CH_BGS)>=3)*name=sGfsName;
 }
-static void ResolveButtonIcon(PlayState* play,u8 button,u16 item,const char** path){if(sApi->GetEquippedCustomItem(button)==NULL)ResolveIcon(play,item,path);}
+static void ResolveButtonIcon(PlayState* play,u8 button,u16 item,const char** path){
+ if(sApi->GetEquippedCustomItem(button)!=NULL)return;
+ // A custom sword owns its icon even when its MM animation base is Kokiri/Razor/Gilded.
+ if(button==S2H_ITEM_BUTTON_B && sApi->GetWornEquipment(S2H_EQUIP_SLOT_SWORD)!=NULL)return;
+ ResolveIcon(play,item,path);
+}
 static void DrawPieces(int c,int l,PlayState* play){
  const char* first=NULL,*second=NULL;
  if(c==CH_HAMMER){first=l>=2?sAxe:"__OTR__objects/oot_object_gi_hammer/gGiHammerDL";Matrix_Translate(-100,-350,0,MTXMODE_APPLY);Matrix_RotateX(DEG_TO_RAD(90),MTXMODE_APPLY);Matrix_Scale(.15f,.15f,.15f,MTXMODE_APPLY);}
@@ -179,22 +216,52 @@ static void DrawPieces(int c,int l,PlayState* play){
  if(second)gSPDisplayList(POLY_OPA_DISP++,(Gfx*)second);
  CLOSE_DISPS(play->state.gfxCtx);
 }
+static void DrawAxeGetItem(PlayState* play, GetItemEntry* entry) {
+ OPEN_DISPS(play->state.gfxCtx);
+ Matrix_Push();
+ Matrix_RotateZF(DEG_TO_RAD(45), MTXMODE_APPLY);
+ Matrix_Scale(0.008f, 0.008f, 0.008f, MTXMODE_APPLY);
+ Gfx_SetupDL25_Opa(play->state.gfxCtx);
+ gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+ MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+ gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sAxe);
+ Matrix_Pop();
+ CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static void DrawStage(PlayState* play,GetItemEntry* entry){
- const SOHCustomItemDefinition* d=sApi->FindCustomItemByRuntimeId(entry->tableId);if(!d)return;
- const Stage* stage=NULL;
- for(int i=0;i<ARRAY_COUNT(sStages);i++)if(!strcmp(d->key,sStages[i].key))stage=&sStages[i];
- for(int c=0;c<CH_COUNT;c++)if(!strcmp(d->key,sPickup[c])){const char* next=sApi->GetNextProgressiveItem(sChain[c],SOH_RANDO_INF_SAVE);for(int i=0;i<ARRAY_COUNT(sStages);i++)if(next&&!strcmp(next,sStages[i].key))stage=&sStages[i];}
+ // drawItemId is this mod's explicit callback payload. MM does not assign OoT tableId values.
+ int index=entry->drawItemId;
+ const Stage* stage=index>=0&&index<ARRAY_COUNT(sStages)?&sStages[index]:NULL;
+ if(index>=ARRAY_COUNT(sStages)&&index<ARRAY_COUNT(sStages)+CH_COUNT)
+  stage=StageForKey(sApi->GetNextProgressiveItem(sChain[index-ARRAY_COUNT(sStages)],SOH_RANDO_INF_SAVE));
  if(!stage)return;
  Matrix_Push();
  int16_t vanilla=VanillaStageGetItem(stage);
  if(stage->chain==CH_MASTER){
+  // Use the equipment mod's complete pickup renderer for both progressive stages.
+  const SOHCustomItemDefinition* master=sApi->FindCustomItem("oot.equip.master_sword");
+  if(master && master->getItemEntry.drawFunc && master->getItemEntry.drawFunc!=DrawStage){
+   GetItemEntry pickup=master->getItemEntry;
+   master->getItemEntry.drawFunc(play,&pickup);
+   Matrix_Pop();
+   return;
+  }
   Matrix_Scale(0.05f, 0.05f, 0.05f, MTXMODE_APPLY);
   Matrix_RotateZ(2.1f, MTXMODE_APPLY);
   OPEN_DISPS(play->state.gfxCtx);
   Gfx_SetupDL_25Opa(play->state.gfxCtx);
   gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+  gSPSegment(POLY_OPA_DISP++,0x08,(uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx,0,play->state.frames,0,32,32,1,0,0,32,32));
   gSPDisplayList(POLY_OPA_DISP++, (Gfx*)"__OTR__objects/oot_object_toki_objects/object_toki_objects_DL_001BD0");
   CLOSE_DISPS(play->state.gfxCtx);
+ }else if(stage->chain==CH_BGS && stage->level<=2){
+  // Knife and Biggoron share the original complete get-item model/material.
+  const SOHCustomItemDefinition* bgs=sApi->FindCustomItem("oot.equip.biggoron_sword");
+  if(bgs && bgs->getItemEntry.drawFunc){
+   GetItemEntry pickup=bgs->getItemEntry;
+   bgs->getItemEntry.drawFunc(play,&pickup);
+  }
  }else if(vanilla!=GI_NONE){
   GetItemEntry original=ItemTable_Retrieve(vanilla);
   if(original.drawFunc)original.drawFunc(play,&original);else GetItem_Draw(play,original.gid);
@@ -208,7 +275,6 @@ static void DrawStage(PlayState* play,GetItemEntry* entry){
  }
  Matrix_Pop();
 }
-
 
 // Resolve world/drop previews against the live SAVE level. An actor may retain an
 // entry selected before another copy was acquired; drawing must not acquire it.
@@ -249,25 +315,15 @@ static const Stage* PreviewStage(const GetItemEntry* entry, bool receiving) {
  }
  return NULL;
 }
-static void BeginDropDraw(Actor* actor,PlayState* play){
- if(actor->id!=ACTOR_EN_ITEM00)return;
- const char* key=sApi->GetActorCustomItem(actor);
- const SOHCustomItemDefinition* definition=key?sApi->FindCustomItem(key):NULL;
- const GetItemEntry* entry=definition?&definition->getItemEntry:NULL;
- if (!entry) return;
- const Stage* stage=PreviewStage(entry,false);
- // The Axe's receipt/drop model is already doubled in DrawStage. Only the
- // native Hammer still needs this extra ground-drop multiplier.
- if(stage&&stage->chain==CH_HAMMER&&stage->level==1)Matrix_Scale(2.0f,2.0f,2.0f,MTXMODE_APPLY);
-}
 static void DrawProgressivePreview(PlayState* play,GetItemEntry* entry,bool* handled){
  if(*handled)return;
  Player* player=GET_PLAYER(play);
  const Stage* stage=PreviewStage(entry,player&&(player->stateFlags1&PLAYER_STATE1_GETTING_ITEM));
- if(!stage)return;
+ if(!stage || stage->chain==CH_HAMMER)return;
  const SOHCustomItemDefinition* d=sApi->FindCustomItem(stage->key);
  if(!d)return;
  GetItemEntry drawEntry=d->getItemEntry;
+ drawEntry.drawItemId=(int)(stage-sStages);
  DrawStage(play,&drawEntry);
  *handled=true;
 }
@@ -305,7 +361,7 @@ static void HandDraw(PlayState* play,Player* p,int32_t limb){
    Matrix_RotateZYX(-0x8000,0,0x4000,MTXMODE_APPLY);
    Matrix_Scale(5.0f,5.0f,5.0f,MTXMODE_APPLY);
   }
-  DrawPieces(c,Level(c),play);Matrix_Pop();
+  DrawPieces(c,c==CH_HAMMER?2:Level(c),play);Matrix_Pop();
   Color_RGB8 color=Player_GetTunicColor(OotCompat_CurrentTunic());
   OPEN_DISPS(play->state.gfxCtx);
   Gfx_SetupDL_25Opa(play->state.gfxCtx);
@@ -360,11 +416,13 @@ static bool RegisterKnife(void) {
     knife.iconPath = sKnifeIcon; knife.slot = S2H_EQUIP_SLOT_SWORD;
     knife.page = 0; knife.row = 0; knife.column = 5;
     knife.formMask = S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN);
-    knife.vanillaBase = EQUIP_VALUE_SWORD_GILDED;
+    knife.vanillaBase = EQUIP_VALUE_SWORD_NONE;
     knife.meleeWeapon = Z64ITEMS_MELEE_GREAT_FAIRY_SWORD;
     knife.pauseText = "%rGiant's Knife&%wA heavy two-handed blade.&Its edge breaks after eight hits.";
     knife.getItemText = sStages[sStart[CH_BGS]].text;
     knife.getItemModelPath = "__OTR__objects/oot_object_gi_longsword/gGiBiggoronSwordDL";
+    knife.getItemEntry.drawFunc = DrawStage;
+    knife.getItemEntry.drawItemId = sStart[CH_BGS];
     return CustomEquipRegistry_Register(&knife);
 }
 static void CollisionDamage(Actor* victim,ColliderInfo* attack,float* damage){
@@ -390,7 +448,7 @@ static void Update(void);
 static void UpdateActor(void* ptr);
 static void SmashProp(Actor* actor);
 static void AdvanceSwing(Player* player,PlayState* play);
-static void Forget(s16 scene, s8 spawn){sPrevSwing=false;sHealedCount=0;sPendingGiveChain=-1;sGiveStatus="";ResetProjectiles();ResetProps();}
+static void Forget(s16 scene, s8 spawn){sHeldHammerPickup=NULL;sHeldHammerKey=NULL;sPrevSwing=false;sHealedCount=0;sPendingGiveChain=-1;sGiveStatus="";ResetProjectiles();ResetProps();}
 
 // The registered beam and tomahawk actors are self-contained in this mod.
 #include "upgrade_projectiles.inc.c"
@@ -426,61 +484,65 @@ static bool RegisterOriginalMaster(void){
 
  return true;
 }
+// Keep direct stage debug gives equivalent to their playable equipment identities.
+static void ReceiveStageAlias(const char* key) {
+ const Stage* stage=StageForKey(key);
+ if(stage && strcmp(key,StagePickupKey(stage)))
+  CustomItemRegistry_ReceiveGetItem(StagePickupKey(stage));
+}
 static bool RegisterItems(void){
  for(int i=0;i<ARRAY_COUNT(sStages);i++){
   const Stage* stage=&sStages[i];SOHCustomItemDefinition d=Z64Items_Define(stage->key,stage->icon,NULL);
+  if(stage->chain==CH_HAMMER&&stage->level==1)continue; // OoT Items owns the playable Hammer definition.
   int16_t vanilla=VanillaStageGetItem(stage);
   if(vanilla!=GI_NONE)d.getItemEntry=ItemTable_Retrieve(vanilla);
   if(stage->chain==CH_MASTER){
    d.getItemEntry=sOriginalMasterEntry;d.getItemEntry.modIndex=MOD_NONE;
    d.getItemEntry.textId=stage->level==1?sOriginalMasterMessage:0;
   }
-  d.presentationFlags=SOH_ITEM_HIDE_FROM_KALEIDO|SOH_ITEM_HIDE_FROM_SAVE_EDITOR;d.getItemText=vanilla!=GI_NONE||(stage->chain==CH_MASTER&&stage->level==1)?NULL:stage->text;d.displayName=stage->name;d.getItemEntry.drawFunc=DrawStage;
+  d.presentationFlags=SOH_ITEM_HIDE_FROM_KALEIDO|SOH_ITEM_HIDE_FROM_SAVE_EDITOR;d.getItemText=stage->text;d.displayName=stage->name;d.getItemEntry.drawFunc=DrawStage;d.getItemEntry.drawItemId=i;
   if (stage->chain==CH_HAMMER && stage->level==2) {
-      d.presentationFlags=0;
-      d.flags=SOH_CUSTOM_ITEM_C_BUTTON|SOH_CUSTOM_ITEM_DPAD;
-      d.formMask=S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN);
-      d.preferredPage=2; d.preferredSlot=2; d.priority=-1;
-      d.meleeWeapon=Z64ITEMS_MELEE_GREAT_FAIRY_SWORD;
-      d.modelGroup=PLAYER_MODELGROUP_TWO_HAND_SWORD;
+      d.namePath=sAxeName;
+      d.getItemModelPath=sAxe;
+      d.getItemEntry.drawFunc=DrawAxeGetItem;
   }
+  if(strcmp(stage->key,StagePickupKey(stage)))d.onReceive=ReceiveStageAlias;
   if(!sApi->RegisterCustomItem(&d))return false;
  }
  for(int c=0;c<CH_COUNT;c++){
   sPools[c].structSize=sizeof(SOHCustomItemRandomizer);sPools[c].flags=SOH_CUSTOM_ITEM_RANDO_ADVANCEMENT|SOH_CUSTOM_ITEM_RANDO_PROGRESSIVE;
-  sPools[c].type=SOH_CUSTOM_ITEM_TYPE_ITEM;sPools[c].poolCount=c==CH_KOKIRI?2:1;sPools[c].progressionGroup=sChain[c];
+  sPools[c].type=SOH_CUSTOM_ITEM_TYPE_ITEM;sPools[c].poolCount=(c==CH_KOKIRI||c==CH_HOOK||c==CH_BGS)?2:1;sPools[c].progressionGroup=sChain[c];
 
   SOHCustomItemDefinition d=Z64Items_Define(sPickup[c],sStages[sStart[c]].icon,NULL);
-  const SOHCustomItemDefinition* first=sApi->FindCustomItem(sStages[sStart[c]].key);
+  const SOHCustomItemDefinition* first=sApi->FindCustomItem(StagePickupKey(&sStages[sStart[c]]));
   if(first)d.getItemEntry=first->getItemEntry;
-  d.presentationFlags=SOH_ITEM_HIDE_FROM_KALEIDO|SOH_ITEM_HIDE_FROM_SAVE_EDITOR;d.getItemText=NULL;d.displayName=sStages[sStart[c]].name;d.getItemEntry.drawFunc=DrawStage;d.randomizer=&sPools[c];
+  d.presentationFlags=SOH_ITEM_HIDE_FROM_KALEIDO|SOH_ITEM_HIDE_FROM_SAVE_EDITOR;d.getItemText=first&&first->getItemText?first->getItemText:sStages[sStart[c]].text;d.displayName=sStages[sStart[c]].name;d.getItemEntry.drawFunc=DrawStage;d.getItemEntry.drawItemId=ARRAY_COUNT(sStages)+c;d.randomizer=&sPools[c];
+  if(c==CH_HAMMER&&first){
+   d.getItemEntry=first->getItemEntry;
+   d.getItemText=first->getItemText;
+   d.getItemModelPath=first->getItemModelPath;
+   d.getItemScale=first->getItemScale;
+  }
   if(!sApi->RegisterCustomItem(&d))return false;
  }
  return true;
 }
-u8 Randomizer_GetSettingValue(RandomizerSettingKey);
-static u16 BgsFirstLevel(void){
- if(Randomizer_GetSettingValue(RSK_PROGRESSIVE_GORON_SWORD))return 1;
- u8 merchants=Randomizer_GetSettingValue(RSK_SHUFFLE_MERCHANTS);
- return (merchants==RO_SHUFFLE_MERCHANTS_ALL_BUT_BEANS||merchants==RO_SHUFFLE_MERCHANTS_ALL)&&
-        Randomizer_GetSettingValue(RSK_STARTING_BIGGORON_SWORD)==RO_STARTING_BGS_OFF?1:2;
-}
-static bool RegisterChains(void){
- static const SOHProgressiveAlias hammer[]={{-1,UINT16_MAX,1}};
- static const SOHProgressiveAlias kokiri[]={{-1,ITEM_SWORD_KOKIRI,1},{-1,ITEM_SWORD_RAZOR,2},{-1,ITEM_SWORD_GILDED,3}};
- static const SOHProgressiveAlias master[]={{-1,UINT16_MAX,1}};
- static const SOHProgressiveAlias bgs[]={{-1,ITEM_SWORD_GREAT_FAIRY,3}};
- static const SOHProgressiveAlias hook[]={{-1,ITEM_HOOKSHOT,1}};
- const SOHProgressiveAlias* aliases[]={hammer,kokiri,master,bgs,hook};const u16 aliasCount[]={1,3,1,1,1};
+static void RegisterChains(void){
+ static const SOHProgressiveAlias kokiri[]={{RI_SWORD_KOKIRI,ITEM_SWORD_KOKIRI,1},
+  {RI_SWORD_RAZOR,ITEM_SWORD_RAZOR,2},{RI_SWORD_GILDED,ITEM_SWORD_GILDED,3}};
+ // The Great Fairy's own sword is one more copy of the chain: Knife, then Biggoron's, then the healing GFS.
+ static const SOHProgressiveAlias bgs[]={{RI_GREAT_FAIRY_SWORD,ITEM_SWORD_GREAT_FAIRY,1}};
+ static const SOHProgressiveAlias hook[]={{RI_HOOKSHOT,ITEM_HOOKSHOT,1}};
+ const SOHProgressiveAlias* aliases[]={NULL,kokiri,NULL,bgs,hook};
+ const u16 aliasCount[]={0,ARRAY_COUNT(kokiri),0,ARRAY_COUNT(bgs),ARRAY_COUNT(hook)};
  SOHProgressiveReadLevel reads[]={ReadHammer,ReadKokiri,ReadMaster,ReadBgs,ReadHook};
  SOHProgressiveApplyLevel applies[]={ApplyHammer,ApplyKokiri,ApplyMaster,ApplyBgs,ApplyHook};
  for(int c=0;c<CH_COUNT;c++){
-  SOHProgressiveLevel levels[3];for(int l=0;l<sLength[c];l++)levels[l].itemKey=sStages[sStart[c]+l].key;
+  SOHProgressiveLevel levels[3];for(int l=0;l<sLength[c];l++)levels[l].itemKey=StagePickupKey(&sStages[sStart[c]+l]);
   SOHProgressiveChain d={0};d.structSize=sizeof(d);d.key=sChain[c];d.pickupKey=sPickup[c];d.levels=levels;
-  d.levelCount=sLength[c];d.firstLevel=c==CH_BGS?2:1;d.aliases=aliases[c];d.aliasCount=aliasCount[c];d.readLevel=reads[c];d.applyLevel=applies[c];d.readFirstLevel=c==CH_BGS?BgsFirstLevel:NULL;
-  if(!sApi->RegisterProgressiveChain(&d))return false;
+  d.levelCount=sLength[c];d.firstLevel=1;d.aliases=aliases[c];d.aliasCount=aliasCount[c];d.readLevel=reads[c];d.applyLevel=applies[c];
+  if(!sApi->RegisterProgressiveChain(&d))fprintf(stderr, "[oot_item_upgrades] Cannot register %s\n", d.key);
  }
- return true;
 }
 static bool sReticleQuery;
 static void ExtendReticle(CollisionContext* col,Vec3f* start,Vec3f* end,Vec3f* hit,CollisionPoly** poly,int32_t* bg,Actor* actor,uint32_t flags,bool* result){
@@ -523,17 +585,59 @@ SOH_MOD_EXPORT void ModSetApi(const SOHModApi* api){sApi=api;}
 SOH_MOD_EXPORT const SOHModRequirements* ModGetRequirements(void){return &sRequirements;}
 static void UpdatePlayer(Player* player) { Update(); }
 
+
+// Actor storage is recycled after a pickup; its address alone is not an identity.
+static void ForgetUpgradePickup(Actor* actor) {
+ if(actor==sHeldHammerPickup){sHeldHammerPickup=NULL;sHeldHammerKey=NULL;}
+}
+
+static void ResolveHammerPickup(Actor* actor, PlayState* play, S2HGetItemEntry* entry, const char** key) {
+ if(!key||!*key)return;
+ const Stage* stage=StageForKey(*key);
+ int chain=stage?stage->chain:-1;
+ for(int c=0;c<CH_COUNT;c++)if(!strcmp(*key,sPickup[c]))chain=c;
+ if(chain<0)return;
+ bool held=actor && (actor->parent || (actor->id==ACTOR_EN_ITEM00 && actor->params==ITEM00_NOTHING &&
+                                      ((EnItem00*)actor)->unk152>=0));
+ if(held && actor==sHeldHammerPickup){*key=sHeldHammerKey;return;}
+ const char* query=stage?StagePickupKey(stage):sPickup[chain];
+ const char* next=sApi->GetNextProgressiveItem(query,S2H_RANDO_INF_SAVE);
+ if(next)*key=next;
+ if(held){sHeldHammerPickup=actor;sHeldHammerKey=*key;}
+}
+
+// Randomizer gives enter through the registry before applying the progressive level.
+static void PrepareUpgradeMessage(const char* key) {
+ if(!SaveBank())return;
+ const Stage* stage=StageForKey(key);
+ int chain=stage?stage->chain:-1;
+ for(int c=0;c<CH_COUNT;c++)if(key&&!strcmp(key,sPickup[c]))chain=c;
+ if(chain<0)return;
+ const char* next=sApi->GetNextProgressiveItem(stage?StagePickupKey(stage):sPickup[chain],S2H_RANDO_INF_SAVE);
+ if(next)CustomItemRegistry_PrepareAcquisitionMessage(next);
+}
+
+static void LoadHammerLook(s32 fileNum) {
+    sHeldHammerPickup = NULL;
+    SyncHammerIcon();
+}
+
 SOH_MOD_EXPORT void ModInit(void){
  if(!SOH_MOD_API_HAS(sApi,RegisterProgressiveChain)||!SOH_MOD_API_HAS(sApi,GetProgressiveLevel)||!SOH_MOD_API_HAS(sApi,GetNextProgressiveItem)||!SOH_MOD_API_HAS(sApi,HasResource))return;
  if(!sApi->HasResource(sRazorBlade)||!sApi->HasResource(sGildedBlade)||!sApi->HasResource(sGfs))return;
  // Parse the packaged NEI mesh now, before its first world/hand draw.
  if(!ResourceMgr_LoadGfxByName(sAxe))return;
- if(!SOH_MOD_API_HAS(sApi,RegisterMessage)||!RegisterOriginalMaster()||!RegisterItems()||!RegisterKnife()||!RegisterChains())return;
+ if(!SOH_MOD_API_HAS(sApi,RegisterMessage)||!RegisterOriginalMaster()||!RegisterItems()||!RegisterKnife())return;
+ RegisterChains();
  RegisterProjectiles();Menu();LoadKnifeUses(0);
  SOH_REGISTER_HOOK(sApi,OnLoadFile,LoadKnifeUses);
  SOH_REGISTER_HOOK(sApi,OnCustomEquipOwnedChange,KnifeOwned);
  SOH_REGISTER_HOOK(sApi,OnGetItemDraw,DrawProgressivePreview_Mm);
- SOH_REGISTER_HOOK(sApi,OnActorDrawBegin,BeginDropDraw);SOH_REGISTER_HOOK(sApi,OnSaveEditorInventory,EasyGive);
+ SOH_REGISTER_HOOK(sApi,OnResolveCustomGetItem,ResolveHammerPickup);
+ SOH_REGISTER_HOOK(sApi,OnActorDestroy,ForgetUpgradePickup);
+ SOH_REGISTER_HOOK(sApi,OnCustomItemReceive,PrepareUpgradeMessage);
+ SOH_REGISTER_HOOK(sApi,OnLoadFile,LoadHammerLook);
+ SOH_REGISTER_HOOK(sApi,OnSaveEditorInventory,EasyGive);
  SOH_REGISTER_HOOK(sApi,OnBgCheckLineTest,ExtendReticle);
 
  SOH_REGISTER_HOOK(sApi,OnPlayDrawEnd,DrawAxeAim);

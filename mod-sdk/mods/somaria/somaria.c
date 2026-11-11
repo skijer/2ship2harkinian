@@ -1024,11 +1024,11 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&cane, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&cane, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&cane, 0, 21, 0);
-    Z64Items_SetTextbox(&cane, "You got the %rCane of Somaria%w!\nIt conjures what is not there,\nand holds only so much "
-                               "at once.\x10"
-                               "Press its %yC button%w to draw it, again to\nconjure. %yL%w picks what it makes.\x10"
-                               "Find another cane and it holds\nmore, and conjures more besides.");
-    Z64Items_SetPauseText(&cane, "%rCane of Somaria\n%wPress its %yC button%w to conjure, %yL%w to pick\nwhat it makes.");
+    Z64Items_SetTextbox(&cane, "You got the %rCane of Somaria%w!&It conjures what is not there,&"
+                               "and holds only so much at once.^"
+                               "Press %y\xB2%w to draw it, again to&conjure. %y\xB3%w picks what it makes.^"
+                               "Find another cane and it holds&more, and conjures more besides.");
+    Z64Items_SetPauseText(&cane, "%rCane of Somaria&%wPress %y\xB2%w to conjure, %y\xB3%w to pick&what it makes.");
     Z64Items_SetAction(&cane, TakeOutCane, UpdateCane);
     Z64Items_SetCanUse(&cane, CanUseCane);
     Z64Items_SetHeldCallbacks(&cane, PressCane, PutCaneAway, NULL);

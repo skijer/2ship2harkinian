@@ -66,6 +66,7 @@ void Sw97_MagicSoul_Init(Actor* thisx, PlayState* play) {
 void Sw97_MagicSoul_Destroy(Actor* thisx, PlayState* play) {
     // Fairy mode owns the camera and the magic meter once it has taken over.
     if (!Sw97_IsFairyModeActive()) {
+        Sw97_MagicSoul_DimLighting(play,0.0f);
         Camera_ChangeSetting(Play_GetCamera(play, CAM_ID_MAIN), CAM_SET_NORMAL0);
         func_800876C8(play);
         Audio_PlayActorSound2(thisx, NA_SE_EV_TRIFORCE_FLASH);
@@ -85,7 +86,7 @@ void Sw97_MagicSoul_DiamondUpdate(Actor* thisx, PlayState* play) {
         Sw97_MagicSoul_UpdateFlash(&this->actor, 0);
     }
 
-    Actor_PlaySfx_Flagged(&player->actor, NA_SE_PL_MAGIC_SOUL_NORMAL - SFX_FLAG);
+    Sw97_PlayLoopSfx(&player->actor, NA_SE_PL_MAGIC_SOUL_NORMAL);
 
     if (player->stateFlags1 & PLAYER_STATE1_10000000) {
         return;
@@ -99,9 +100,13 @@ void Sw97_MagicSoul_DiamondUpdate(Actor* thisx, PlayState* play) {
     Actor_Kill(thisx);
 }
 
-// MM's EnvironmentContext has no adjustable fog layer and rooms have no behaviorType1, so the screen-darken has
-// no equivalent; the spell plays without it.
+// OoT's adjusted fog maps to MM's AdjLightSettings.
 void Sw97_MagicSoul_DimLighting(PlayState* play, f32 intensity) {
+    intensity=CLAMP(intensity,0.0f,1.0f);
+    f32 nearFactor=MAX(intensity-0.2f,0.0f);
+    play->envCtx.adjLightSettings.fogNear=(850.0f-play->envCtx.lightSettings.fogNear)*nearFactor;
+    f32 colorFactor=MIN(intensity*5.0f,1.0f);
+    for(u8 i=0;i<3;i++)play->envCtx.adjLightSettings.fogColor[i]=-(s16)(play->envCtx.lightSettings.fogColor[i]*colorFactor);
 }
 
 void Sw97_MagicSoul_OrbUpdate(Actor* thisx, PlayState* play) {
@@ -110,7 +115,7 @@ void Sw97_MagicSoul_OrbUpdate(Actor* thisx, PlayState* play) {
     Player* player = PLAYER;
     player->stateFlags2 |= 0x100000; // keep navi out
 
-    Actor_PlaySfx_Flagged(&player->actor, NA_SE_PL_MAGIC_SOUL_BALL - SFX_FLAG);
+    Sw97_PlayLoopSfx(&player->actor, NA_SE_PL_MAGIC_SOUL_BALL);
     if (this->timer < 35) {
         Sw97_MagicSoul_UpdateFlash(&this->actor, 1);
         Sw97_MagicSoul_DimLighting(play, this->timer * (1 / 45.0f));

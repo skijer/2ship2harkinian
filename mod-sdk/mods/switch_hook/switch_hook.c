@@ -775,12 +775,13 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&hook, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&hook, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&hook, 0, 14, 0);
-    Z64Items_SetTextbox(&hook, "You got the %rSwitch Hook%w!\nA hook that trades places with whatever\nit catches."
-                               "\x10"
-                               "Face a %yfoe%w, a %ypot%w or a %ychest%w and it\nglows blue: press its %yC button%w "
-                               "and you\nstand where it stood.\x10It holds %g5 shots%w, and they come back\non their "
-                               "own.");
-    Z64Items_SetPauseText(&hook, "%rSwitch Hook\n%wPress its %yC button%w to trade places\nwith the blue target.");
+    Z64Items_SetTextbox(&hook, "You got the %rSwitch Hook%w! A&hook that trades places with&whatever it catches.^"
+                               "Face a %yfoe%w, a %ypot%w or a %ychest%w&and it glows blue: press %y\xB2%w and&"
+                               "you stand where it stood.^"
+                               "Press %y\xB6%w first to aim it by hand.^"
+                               "It holds %g5 shots%w, and they come&back on their own.");
+    Z64Items_SetPauseText(&hook, "%rSwitch Hook&%wPress %y\xB2%w to trade places with the&"
+                                 "blue target. %y\xB6%w aims it by hand.");
     Z64Items_SetCanUse(&hook, CanUseSwitchHook);
     Z64Items_SetAction(&hook, TakeOutSwitchHook, HoldSwitchHook);
     Z64Items_SetHeldCallbacks(&hook, AimOrFire, StowSwitchHook, NULL);

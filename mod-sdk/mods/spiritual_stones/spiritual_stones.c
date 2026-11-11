@@ -75,17 +75,17 @@ static const Gfx sEmptySegment[4] = {
 
 static const StoneInfo sStones[STONE_MAX] = {
     { "nei.spiritual_stone.kokiri", sStoneIcons[STONE_KOKIRI], sStoneNames[STONE_KOKIRI],
-      "You got the %gKokiri's Emerald%w!\nThe forest quickens your step\nwhile you carry it.\x10%rHold%w its "
-      "%yC button%w to plant an owl statue\nhere, and tap it to return to it.",
-      "%gKokiri's Emerald\n%wA toggles walking speed. Hold its %yC button%w to\nplant a warp, tap it to return." },
+      "You got the %gKokiri's Emerald%w!&The forest quickens your step&while you carry it.^"
+      "%rHold%w %y\xB2%w to plant an owl statue&here, and tap it to return to it.",
+      "%gKokiri's Emerald&%w%y\xB0%w toggles walking speed. Hold&%y\xB2%w to plant a warp, tap it to&return." },
     { "nei.spiritual_stone.goron", sStoneIcons[STONE_GORON], sStoneNames[STONE_GORON],
-      "You got the %rGoron's Ruby%w!\nThe mountain steadies your climb\nwhile you carry it.\x10%rHold%w its "
-      "%yC button%w to plant an owl statue\nhere, and tap it to return to it.",
-      "%rGoron's Ruby\n%wA toggles climbing speed. Hold its %yC button%w to\nplant a warp, tap it to return." },
+      "You got the %rGoron's Ruby%w! The&mountain steadies your climb&while you carry it.^"
+      "%rHold%w %y\xB2%w to plant an owl statue&here, and tap it to return to it.",
+      "%rGoron's Ruby&%w%y\xB0%w toggles climbing speed. Hold&%y\xB2%w to plant a warp, tap it to&return." },
     { "nei.spiritual_stone.zora", sStoneIcons[STONE_ZORA], sStoneNames[STONE_ZORA],
-      "You got the %bZora's Sapphire%w!\nThe lake carries you while you\ncarry it.\x10%rHold%w its %yC button%w to "
-      "plant an owl\nstatue here, and tap it to return to it.",
-      "%bZora's Sapphire\n%wA toggles swimming speed. Hold its %yC button%w to\nplant a warp, tap it to return." },
+      "You got the %bZora's Sapphire%w!&The lake carries you while you&carry it.^"
+      "%rHold%w %y\xB2%w to plant an owl statue&here, and tap it to return to it.",
+      "%bZora's Sapphire&%w%y\xB0%w toggles swimming speed. Hold&%y\xB2%w to plant a warp, tap it to&return." },
 };
 
 static const Color_RGB8 sStoneGlow[STONE_MAX] = {

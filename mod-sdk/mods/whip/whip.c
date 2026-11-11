@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64logic.h"
 #include "z64aiming.h"
 
 #include "align_asset_macro.h"
@@ -1247,7 +1248,18 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// The lash hits with the Zora boomerang's damage at arm's reach; its swing is too short to stand in for a hookshot.
+static void GrantWhipLogic(void) {
+    static const Z64LogicSource sWhip = { WHIP_KEY };
+    static const char* const sLashing[] = { "CanHitSwitch", "CanAttack", "CanDamage", NULL };
+
+    if (Z64Logic_Init(sApi)) {
+        Z64Logic_GrantCapabilities(&sWhip, sLashing);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
+    GrantWhipLogic();
     InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, GetEquippedCustomItem)) {
         return;
@@ -1258,13 +1270,15 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&whip, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&whip, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&whip, 0, 2, 0);
-    Z64Items_SetTextbox(&whip, "You got the %rWhip%w!&A snake-headed lash from the land of spirit tracks, and its "
-                               "fangs still bite. Take aim with a %yC button%w and press it again to crack it, or "
-                               "let %gZ%w send it straight at a foe. It bites into %ybeams%w, %ybars%w and %ytorch "
-                               "stands%w so you can swing where you cannot jump, and it drags %cKeese%w and "
-                               "%cBubbles%w to your feet.");
-    Z64Items_SetPauseText(&whip, "%rWhip&%wAim with a %yC button%w, press again to lash. Tilt the stick to swing, "
-                                 "let go with %yA%w or %yB%w.");
+    Z64Items_SetTextbox(&whip, "You got the %rWhip%w! A&snake-headed lash from the&"
+                               "land of spirit tracks, and its&fangs still bite.^"
+                               "Take aim with %y\xB2%w and press it&again to crack it, or let %g\xB5%w send&"
+                               "it straight at a foe.^"
+                               "It bites into %ybeams%w, %ybars%w and&%ytorch stands%w so you can swing&"
+                               "where you cannot jump,^"
+                               "and it drags %cKeese%w and %cBubbles%w&to your feet.");
+    Z64Items_SetPauseText(&whip, "%rWhip&%wAim with %y\xB2%w, press again to lash.&"
+                                 "Tilt the stick to swing, let go&with %y\xB0%w or %y\xB1%w.");
     Z64Items_SetAction(&whip, TakeOutWhip, UpdateWhipInHand);
     Z64Items_SetHeldCallbacks(&whip, RequestWhipAction, PutWhipAway, NULL);
     Z64Items_SetGetItemModel(&whip, sItemDL);

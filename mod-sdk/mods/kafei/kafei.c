@@ -9,6 +9,8 @@
 #include "macros.h"
 #include "variables.h"
 #include "2s2h/Rando/Types.h"
+#include "2s2h/ModApi/RandoInfCustom/RandoInfCustom.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h"
 #include "overlays/actors/ovl_En_Bom_Chu/z_en_bom_chu.h"
@@ -85,7 +87,7 @@ static const ALIGN_ASSET(2) char sLandmineSpikesDL[] = "__OTR__objects/object_la
 static const char* const sRequiredHooks[] = {
     "OnPlayerActionHandler", "OnPlayerResolveMotionScale", "OnPlayerPostLimbDraw", "OnPlayerResolveLimbDraw",
     "OnOcarinaInput",        "OnActorInit",                "OnActorUpdate",         "ShouldActorDraw",
-    "OnActorDrawEnd",        "OnSceneInit",
+    "OnActorDrawEnd",        "OnSceneInit",              "ShouldItemGive",
 };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -878,9 +880,24 @@ static void WearMask(PlayState* play, Player* player) {
     sApi->ToggleForm(KAFEI_FORM_KEY);
 }
 
+// The native mask is already in MM's pool. Keep the custom ID for older seeds.
 static const S2HCustomItemRandomizer sRandomizerItem = {
-    sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, KAFEI_MASK_KEY, KAFEI_MASK_KEY, "",
+    sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 0, KAFEI_MASK_KEY, KAFEI_MASK_KEY, "",
 };
+
+static void KeepMaskOutOfSaveDuringSimulation(const char* key) {
+    if (RandoInfCustom_IsLogicSimulation()) {
+        sApi->SetCustomItemOwned(key, false);
+    }
+}
+
+static void GiveMaskToSimulation(u8 item, bool* should) {
+    (void)item;
+    // The ID hook runs after the host's generic replacement hook.
+    if (RandoInfCustom_IsLogicSimulation()) {
+        *should = true;
+    }
+}
 
 static void RegisterMask(void) {
     S2HCustomItemDefinition mask = Z64Items_Define(KAFEI_MASK_KEY, sIconTex, sNameTex);
@@ -894,14 +911,17 @@ static void RegisterMask(void) {
     if (sApi->HasResource(sGetItemDL)) {
         Z64Items_SetGetItemModel(&mask, sGetItemDL);
     }
-    Z64Items_SetTextbox(&mask, "You got %rKafei's Mask%w!&The face of Anju's missing groom. Wear it with %y\xA1%w "
-                               "and you become Kafei: he sprints until he runs out of breath, whistles instead of "
-                               "playing the ocarina and lays %rlandmines%w instead of bombchus.");
-    Z64Items_SetPauseText(&mask, "%rKafei's Mask&%wPress %y\xA1%w to become Kafei. Hold %y\x9F%w to sprint; standing "
-                                 "still, his shield guards on its own.");
+    Z64Items_SetTextbox(&mask, "You got %rKafei's Mask%w! The face&of Anju's missing groom.^"
+                               "Wear it with %y\xB2%w and you become&Kafei: he sprints until he runs&"
+                               "out of breath,^"
+                               "whistles instead of playing the&ocarina and lays %rlandmines%w&"
+                               "instead of bombchus.");
+    Z64Items_SetPauseText(&mask, "%rKafei's Mask&%wPress %y\xB2%w to become Kafei. Hold %y\xB0%w&"
+                                 "to sprint; standing still, his shield&guards on its own.");
     Z64Items_SetCanUse(&mask, CanWearMask);
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);
+    mask.onAcquire = KeepMaskOutOfSaveDuringSimulation;
     Z64Items_Register(sApi, &mask);
 }
 
@@ -934,9 +954,26 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+static bool OwnsMaskForLogic(void* userData) {
+    (void)userData;
+    const int32_t item = RandoItems_GetRandoGet(KAFEI_MASK_KEY);
+    return item > 0 && sApi->LogicHasItem(item);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     LoadAnims();
     RegisterMask();
+    S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldItemGive, ITEM_MASK_KAFEIS_MASK, GiveMaskToSimulation);
+    if (S2H_MOD_API_HAS(sApi, GrantLogic) && S2H_MOD_API_HAS(sApi, LogicHasItem)) {
+        const S2HLogicGrant maskGrant = {
+            .structSize = sizeof(S2HLogicGrant),
+            .owner = KAFEI_MASK_KEY,
+            .kind = S2H_LOGIC_GRANT_ITEM,
+            .value = RI_MASK_KAFEIS_MASK,
+            .condition = OwnsMaskForLogic,
+        };
+        sApi->GrantLogic(&maskGrant);
+    }
     RegisterForm();
     S2H_REGISTER_HOOK_FOR_ID(sApi, OnPlayerResolveMotionScale, SOH_PLAYER_MOTION_STICK_SPEED, ScaleSprintSpeed);
     S2H_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, GuardWhileStill);

@@ -7,6 +7,7 @@
 #include <math.h>
 
 #include "z64items.h"
+#include "z64logic.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -914,17 +915,40 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
+#define GET_ITEM_SCALE 0.9f
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(GET_ITEM_SCALE, GET_ITEM_SCALE, GET_ITEM_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sShieldDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void GrantKiteShieldLogic(void) {
+    static const Z64LogicSource sShield = { KITE_SHIELD_KEY };
+    static const char* const sBlocking[] = { "CanShield", NULL };
+
+    if (Z64Logic_Init(sApi)) {
+        Z64Logic_GrantCapabilities(&sShield, sBlocking);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
+    GrantKiteShieldLogic();
     S2HCustomEquipDefinition definition = { 0 };
 
     definition.structSize = sizeof(definition);
     definition.key = KITE_SHIELD_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rKite Shield\n%wPress %yR%w in mid air to ride it. %yA%w hops, %yB%w spins, "
-                           "%yR%w + %yB%w gets off.";
-    definition.getItemText = "You got the %rKite Shield%w!\nLight enough to ride. Press %yR%w in mid air and it goes "
-                             "under your feet: slopes speed you up, and narrow ledges become rails.";
+    definition.pauseText = "%rKite Shield&%wPress %y\xB4%w in mid air to ride it. %y\xB0%w&"
+                           "hops, %y\xB1%w spins, %y\xB4%w + %y\xB1%w gets off.";
+    definition.getItemText = "You got the %rKite Shield%w! Light&enough to ride.^"
+                             "Press %y\xB4%w in mid air and it goes&under your feet: slopes speed&"
+                             "you up, and narrow ledges&become rails.";
     definition.slot = S2H_EQUIP_SLOT_SHIELD;
     definition.page = 0;
     definition.row = S2H_EQUIP_SLOT_SHIELD;
@@ -934,6 +958,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.toggles = 1;
     definition.onUnequip = HandBackPlayer;
     definition.getItemModelPath = sShieldDL;
+    definition.getItemEntry.drawFunc = DrawGetItem;
     if (!sApi->RegisterCustomEquipment(&definition)) {
         return;
     }

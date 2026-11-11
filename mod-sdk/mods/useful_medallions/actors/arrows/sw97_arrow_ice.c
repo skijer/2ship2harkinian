@@ -281,7 +281,7 @@ void Sw97_ArrowIce_Charge(ArrowIce* this, PlayState* play) {
     this->actor.world.pos = arrow->actor.world.pos;
     this->actor.shape.rot = arrow->actor.shape.rot;
 
-    Actor_PlaySfx_Flagged(&this->actor, NA_SE_PL_ARROW_CHARGE_ICE - SFX_FLAG);
+    Sw97_PlayLoopSfx(&this->actor, NA_SE_PL_ARROW_CHARGE_ICE);
 
     if (arrow->actor.parent == NULL) {
         this->unkPos = this->actor.world.pos;

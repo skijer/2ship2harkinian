@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64logic.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -558,7 +559,19 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// The spinning top rams with Goron pound and sword damage.
+static void GrantSpinnerLogic(void) {
+    static const Z64LogicSource sSpinner = { SPINNER_KEY };
+    static const char* const sRamming[] = { "BlastOrSmash", "CanHitSwitch", "CanAttack", "CanDamage", NULL };
+
+    if (Z64Logic_Init(sApi)) {
+        Z64Logic_GrantCapabilities(&sSpinner, sRamming);
+        Z64Logic_GrantBoulderSmashing(&sSpinner);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
+    GrantSpinnerLogic();
     if (!S2H_MOD_API_HAS(sApi, RegisterCustomItem)) {
         return;
     }
@@ -568,11 +581,13 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&spinner, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&spinner, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&spinner, 0, 1, 0);
-    Z64Items_SetTextbox(&spinner, "You got the %rSpinner%w!\nAn ancient spinning top that\nrides on its own grinding "
-                                  "force.\x10Hold a %yC button%w to wind it up, then let go\nto ride. Press it again to "
-                                  "%rspin\nattack%w.\x10Let go while %yZ-targeting%w and it\nhomes in on your foe.");
-    Z64Items_SetPauseText(&spinner, "%rSpinner\n%wHold a %yC button%w to charge, release to ride.\nPress it again to "
-                                    "spin attack.");
+    Z64Items_SetTextbox(&spinner, "You got the %rSpinner%w! An&ancient spinning top that rides&"
+                                  "on its own grinding force.^"
+                                  "Hold %y\xB2%w to wind it up, then let&go to ride. Press %y\xB2%w again to&"
+                                  "%rspin attack%w.^"
+                                  "Let go while %y\xB5%w-targeting and it&homes in on your foe.");
+    Z64Items_SetPauseText(&spinner, "%rSpinner&%wHold %y\xB2%w to charge, release to ride.&"
+                                    "Press %y\xB2%w to spin attack.");
     Z64Items_SetCanUse(&spinner, CanUseSpinner);
     Z64Items_SetAction(&spinner, TakeOutSpinner, UpdateSpinnerInHand);
     Z64Items_SetHeldCallbacks(&spinner, RideOrAttack, PutSpinnerAway, NULL);

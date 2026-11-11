@@ -44,8 +44,9 @@ typedef struct {
 static Z64EquipmentPiece sZ64EquipmentPieces[Z64EQUIPMENT_MAX_PIECES];
 static u32 sZ64EquipmentPieceCount;
 static bool sZ64EquipmentIronApplied;
-static s16 sZ64EquipmentHoverFrame = -1;
-static f32 sZ64EquipmentHoverHeight;
+static s16 sZ64EquipmentHoverBudget;
+static bool sZ64EquipmentIsWalkingOnAir;
+static bool sZ64EquipmentIsHovering;
 
 static inline bool Z64Equipment_SetRole(const char* key, Z64EquipmentRole role) {
     if (key == NULL || sZ64EquipmentPieceCount >= Z64EQUIPMENT_MAX_PIECES) {
@@ -141,29 +142,37 @@ static void Z64Equipment_UpdateIronBoots(PlayState* play, Player* player) {
     }
 }
 
-// Walking off a ledge holds Link's height for Z64EQUIPMENT_HOVER_FRAMES; a jump spends the glide.
-static void Z64Equipment_UpdateHoverBoots(Player* player) {
-    bool grounded = (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) != 0;
+// Asked while Link walks past a ledge, before MM starts the fall or the ledge hop.
+static void Z64Equipment_WalkOnAir(bool* should, va_list args) {
+    Player* player = va_arg(args, Player*);
 
-    if (!Z64Equipment_IsRoleWorn(player, Z64EQUIPMENT_BOOTS_HOVER) || (player->stateFlags1 & PLAYER_STATE1_8000000)) {
-        sZ64EquipmentHoverFrame = -1;
+    if (gPlayState == NULL || player != GET_PLAYER(gPlayState) || sZ64EquipmentHoverBudget <= 0 ||
+        (player->stateFlags1 & PLAYER_STATE1_8000000) || !Z64Equipment_IsRoleWorn(player, Z64EQUIPMENT_BOOTS_HOVER)) {
         return;
     }
-    if (grounded) {
-        sZ64EquipmentHoverFrame = 0;
-        sZ64EquipmentHoverHeight = player->actor.world.pos.y;
+    *should = true;
+    sZ64EquipmentIsWalkingOnAir = true;
+}
+
+// OoT's hoverBootsTimer: refilled on the ground and spent in the air, jumps included.
+static void Z64Equipment_UpdateHoverBoots(Player* player) {
+    sZ64EquipmentIsHovering = sZ64EquipmentIsWalkingOnAir;
+    sZ64EquipmentIsWalkingOnAir = false;
+    if (!Z64Equipment_IsRoleWorn(player, Z64EQUIPMENT_BOOTS_HOVER)) {
+        sZ64EquipmentHoverBudget = 0;
         return;
     }
-    bool canGlide = (sZ64EquipmentHoverFrame >= 0) && (sZ64EquipmentHoverFrame < Z64EQUIPMENT_HOVER_FRAMES) &&
-                    (player->actor.velocity.y <= 0.0f) && !(player->stateFlags1 & PLAYER_STATE1_40000);
-    if (!canGlide) {
-        sZ64EquipmentHoverFrame = -1;
+    if (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) {
+        sZ64EquipmentHoverBudget = Z64EQUIPMENT_HOVER_FRAMES;
         return;
     }
-    player->actor.world.pos.y = sZ64EquipmentHoverHeight;
-    player->actor.velocity.y = 0.0f;
-    player->fallStartHeight = (s16)sZ64EquipmentHoverHeight;
-    sZ64EquipmentHoverFrame++;
+    if (sZ64EquipmentHoverBudget > 0) {
+        sZ64EquipmentHoverBudget--;
+    }
+    if (sZ64EquipmentIsHovering) {
+        player->fallStartHeight = (s16)player->actor.world.pos.y;
+        Actor_PlaySfx_Flagged2(&player->actor, NA_SE_PL_HOBBERBOOTS_LV - SFX_FLAG);
+    }
 }
 
 static void Z64Equipment_OnPlayerUpdate(Player* player) {
@@ -204,11 +213,10 @@ static void Z64Equipment_OnShieldBlocked(PlayState* play, Player* player, Actor*
 
 static void Z64Equipment_DrawHoverRing(Actor* actor, PlayState* play) {
     Player* player = GET_PLAYER(play);
-    if (actor != &player->actor || sZ64EquipmentHoverFrame <= 0 ||
-        !ResourceMgr_FileExists(Z64EQUIPMENT_HOVER_RING_DL)) {
+    if (actor != &player->actor || !sZ64EquipmentIsHovering || !ResourceMgr_FileExists(Z64EQUIPMENT_HOVER_RING_DL)) {
         return;
     }
-    u8 alpha = (u8)(255 * (Z64EQUIPMENT_HOVER_FRAMES - sZ64EquipmentHoverFrame) / Z64EQUIPMENT_HOVER_FRAMES);
+    u8 alpha = (u8)(255 * sZ64EquipmentHoverBudget / Z64EQUIPMENT_HOVER_FRAMES);
 
     OPEN_DISPS(play->state.gfxCtx);
     Matrix_Push();
@@ -232,6 +240,7 @@ static inline bool Z64Equipment_Install(const S2HModApi* api) {
         return false;
     }
     api->RegisterVB(VB_PLAYER_USE_FORM_ABILITY, Z64Equipment_LendFormAbility);
+    api->RegisterVB(VB_PLAYER_WALK_ON_AIR, Z64Equipment_WalkOnAir);
     S2H_REGISTER_HOOK(api, OnPlayerUpdate, Z64Equipment_OnPlayerUpdate);
     S2H_REGISTER_HOOK(api, OnCollisionResolveDamage, Z64Equipment_OnResolveDamage);
     S2H_REGISTER_HOOK(api, OnPlayerShieldBlocked, Z64Equipment_OnShieldBlocked);

@@ -13,6 +13,7 @@
 
 #include "z64items.h"
 #include "z64aiming.h"
+#include "z64logic.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -39,6 +40,8 @@
 #define ROD_BOLT_SPARK_SCALE 0.4f
 #define ROD_BOLT_COLLIDER_SCALE 0.6f
 #define ROD_FREEZE_FRAMES 60
+// Bit index of DMG_ICE_ARROW, the slot of a damage table that holds the ice arrow's damage and effect.
+#define ROD_ICE_ARROW_DAMAGE_INDEX 12
 #define ROD_STUN_FRAMES 60
 #define ROD_BACKFIRE_INVINCIBILITY 20
 #define ROD_HELD_SCALE 0.05f
@@ -263,9 +266,17 @@ static void HitFire(PlayState* play, Player* player, Actor* hitActor, Vec3f* pos
     EffectSsBomb2_SpawnLayered(play, pos, &zero, &zero, 10, 5);
 }
 
+// Octoroks turning into platforms, Chuchus and the rest freeze through their own ice-arrow damage effect, which
+// the bolt's DMG_ICE_ARROW triggers; the generic freeze would stop their update and cancel it.
+static bool HasNativeIceReaction(Actor* actor) {
+    const DamageTable* table = actor->colChkInfo.damageTable;
+
+    return table != NULL && (table->attack[ROD_ICE_ARROW_DAMAGE_INDEX] >> 4) != 0;
+}
+
 static void HitIce(PlayState* play, Player* player, Actor* hitActor, Vec3f* pos) {
     EffectSsIcePiece_SpawnBurst(play, pos, 1.0f);
-    if (hitActor != NULL) {
+    if (hitActor != NULL && !HasNativeIceReaction(hitActor)) {
         FreezeActor(play, hitActor);
     }
 }
@@ -1575,39 +1586,61 @@ static bool RegisterRod(const RodConfig* cfg, u8 slot, S2HCustomItemInitFunc tak
     return Z64Items_Register(sApi, &rod);
 }
 
+// Aimed bolts carry the magic arrows' damage flags, which is what frozen ice, Goht, sun blocks, light switches and
+// freezable enemies test; an ice bolt entering water raises the arrow's own Bg_Icefloe.
+static void GrantRodLogic(void) {
+    static const Z64LogicSource sFire = { FIRE_ROD_KEY, 0, true };
+    static const Z64LogicSource sIce = { ICE_ROD_KEY, 0, true };
+    static const Z64LogicSource sLight = { LIGHT_ROD_KEY, 0, true };
+    static const char* const sFireCasting[] = { "CanUseFireArrow", "HasFireSource", "HasFireSourceWithTorch",
+                                                "CanUseProjectile", "CanHitSwitch", "CanAttack", "CanDamage", NULL };
+    static const char* const sIceCasting[] = { "CanUseIceArrow", "CanUseProjectile", "CanHitSwitch", "CanAttack",
+                                               "CanDamage", NULL };
+    static const char* const sLightCasting[] = { "CanUseLightArrow", "CanUseProjectile", "CanHitSwitch", "CanAttack",
+                                                 "CanDamage", NULL };
+
+    if (!Z64Logic_Init(sApi)) {
+        return;
+    }
+    Z64Logic_GrantCapabilities(&sFire, sFireCasting);
+    Z64Logic_GrantCapabilities(&sIce, sIceCasting);
+    Z64Logic_GrantCapabilities(&sLight, sLightCasting);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     if (!S2H_MOD_API_HAS(sApi, KeepCustomItemHeld)) {
         return;
     }
 
     if (!RegisterRod(&sFireRod, 4, TakeOutFireRod, StowFireRod,
-                     "You got the %rFire Rod%w!&A magic weapon that channels fire.^%ySwing%w for three "
-                     "fireballs,&%ystab%w for one long shot,&%yjump%w to lay a flame trail.^%rHold%w its %yC "
-                     "button%w to charge a fire wave,&%cC-Up%w to aim in first person.^Without magic the fire burns "
-                     "%rYOU%w.",
-                     "%rFire Rod&%wSwing to cast, hold its %yC button%w to&charge. %cC-Up%w aims.")) {
+                     "You got the %rFire Rod%w! A magic&weapon that channels fire.^"
+                     "%ySwing%w for three fireballs, %ystab%w&for one long shot, %yjump%w to lay&a flame trail.^"
+                     "%rHold%w %y\xB2%w to charge a fire wave, %c\xB6%w&to aim in first person. Without&"
+                     "magic the fire burns %rYOU%w.",
+                     "%rFire Rod&%wSwing to cast, hold %y\xB2%w to charge, %c\xB6%w&to aim.")) {
         return;
     }
     if (!RegisterRod(&sIceRod, 10, TakeOutIceRod, StowIceRod,
-                     "You got the %cIce Rod%w!&A magic weapon that channels ice.^%ySwing%w for three "
-                     "iceballs,&%ystab%w for one long shot,&%yjump%w to lay an ice trail.^%rHold%w its %yC "
-                     "button%w to charge an ice wave,&%cC-Up%w to aim in first person.^It freezes what it hits, "
-                     "and melts the ice blocks in its way.",
-                     "%cIce Rod&%wSwing to cast, hold its %yC button%w to&charge. %cC-Up%w aims.")) {
+                     "You got the %cIce Rod%w! A magic&weapon that channels ice.^"
+                     "%ySwing%w for three iceballs, %ystab%w&for one long shot, %yjump%w to lay&an ice trail.^"
+                     "%rHold%w %y\xB2%w to charge an ice wave, %c\xB6%w&to aim in first person. It&"
+                     "freezes what it hits, and melts&the ice blocks in its way.",
+                     "%cIce Rod&%wSwing to cast, hold %y\xB2%w to charge, %c\xB6%w&to aim.")) {
         return;
     }
     if (!RegisterRod(&sLightRod, 16, TakeOutLightRod, StowLightRod,
-                     "You got the %yLight Rod%w!&A magic weapon that channels light.^%ySwing%w for three "
-                     "light balls,&%ystab%w for one long shot,&%yjump%w to lay a trail of light.^%rHold%w its %yC "
-                     "button%w to charge a light wave,&%cC-Up%w to aim in first person.^The undead freeze where they "
-                     "stand.",
-                     "%yLight Rod&%wSwing to cast, hold its %yC button%w to&charge. %cC-Up%w aims.")) {
+                     "You got the %yLight Rod%w! A&magic weapon that channels&light.^"
+                     "%ySwing%w for three light balls,&%ystab%w for one long shot, %yjump%w&"
+                     "to lay a trail of light.^%rHold%w %y\xB2%w to charge a light wave,&"
+                     "%c\xB6%w to aim in first person. The&undead freeze where they&stand.",
+                     "%yLight Rod&%wSwing to cast, hold %y\xB2%w to charge, %c\xB6%w&to aim.")) {
         return;
     }
 
     for (s32 i = 0; i < ARRAY_COUNT(sRods); i++) {
         sRods[i]->state->blureIdx = -1;
     }
+    GrantRodLogic();
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, TickRods);
     S2H_REGISTER_HOOK(sApi, OnPlayDrawEnd, DrawRodEffects);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, DropRodsOnSceneInit);

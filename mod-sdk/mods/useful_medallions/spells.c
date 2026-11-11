@@ -127,14 +127,14 @@ static const MedallionInfo sMedallions[SW97_SPELL_COUNT] = {
       "You got the %rFire Medallion%w!&A column of flame that burns&harder the longer it stands.",
       "%rFire Medallion&%wFire spell, 12 MP. A column of flame&that burns harder the longer it stands." },
     { "nei.medallion.water", SW97_SPELL_ICE, sWaterIcon, sWaterName,
-      "You got the %cWater Medallion%w!&Freezes every enemy it touches&for 6 seconds.",
-      "%cWater Medallion&%wIce spell, 12 MP. Freezes every enemy&it touches for 6 seconds." },
+      "You got the %bWater Medallion%w!&Freezes targets with Ice Arrow magic&and creates ice platforms on water.",
+      "%bWater Medallion&%wIce spell, 12 MP. Freezes targets&and water with Ice Arrow magic." },
     { "nei.medallion.spirit", SW97_SPELL_SOUL, sSpiritIcon, sSpiritName,
       "You got the %ySpirit Medallion%w!&Turns you into a fairy until&you cast it again.",
       "%ySpirit Medallion&%wSoul spell, 24 MP. Turns you into a&fairy until you cast it again." },
     { "nei.medallion.shadow", SW97_SPELL_DARK, sShadowIcon, sShadowName,
-      "You got the %pShadow Medallion%w!&A shield that blocks all damage&for a minute.",
-      "%pShadow Medallion&%wDark spell, 24 MP. A shield that blocks&all damage for a minute. Hold the C&button to trade 3 hearts for magic." },
+      "You got the %pShadow Medallion%w!&Enemies lose sight of you&for a minute.",
+      "%pShadow Medallion&%wDark spell, 24 MP. Enemies lose sight&of you for a minute. Hold the C&button to trade 3 hearts for magic." },
     { "nei.medallion.light", SW97_SPELL_LIGHT, sLightIcon, sLightName,
       "You got the %yLight Medallion%w!&Undead freeze and you heal&6 hearts.",
       "%yLight Medallion&%wLight spell, 24 MP. Undead freeze for&30 seconds and you heal 6 hearts." },
@@ -191,16 +191,24 @@ static void PlayCastAnim(PlayState* play, Player* player, const char* animation,
 static void StartCast(PlayState* play, Player* player, Sw97Spell spell) {
     bool isFast = IsFastFarores(spell);
 
+    if (!Magic_Consume(play, sSpellCosts[spell], MAGIC_CONSUME_WAIT_PREVIEW)) {
+        return;
+    }
     Player_SetAction_PreserveItemAction(play, player, CastAction, 0);
     player->av1.actionVar1 = spell;
     player->av2.actionVar2 = 0;
-    Magic_Consume(play, sSpellCosts[spell], MAGIC_CONSUME_WAIT_PREVIEW);
+    // NEI covers the charge too: a hit there would strand the magic reservation.
+    player->stateFlags1 |= CAST_BLOCKING_STATES;
     PlayCastAnim(play, player, sTameAnim, isFast);
     func_8082DAD4(player);
 }
 
+// A spell that never spawned leaves its WAIT_PREVIEW reservation flashing; live spells reset magic themselves.
 static void LeaveCast(Player* player, PlayState* play) {
-    gSw97Api->ReleaseTimeControl("medallion.cast");
+    if (gSaveContext.magicState == MAGIC_STATE_METER_FLASH_2) {
+        Magic_Reset(play);
+    }
+    player->stateFlags1 &= ~CAST_BLOCKING_STATES;
     func_80836988(player, play);
     Camera_SetFinishedFlag(Play_GetCamera(play, CAM_ID_MAIN));
 }
@@ -244,7 +252,6 @@ static void PlayCastSounds(Player* player, PlayState* play, Sw97Spell spell, boo
 static void CastAction(Player* player, PlayState* play) {
     s8 spell = (s8)player->av1.actionVar1;
     bool isFast = IsFastFarores(spell);
-    player->invincibilityTimer = MAX(player->invincibilityTimer, 2);
 
     if (PlayerAnimation_Update(play, &player->skelAnime)) {
         if (spell < 0) {
@@ -278,6 +285,7 @@ static void PressForest(PlayState* play, Player* player) {
 }
 
 static void PressSpirit(PlayState* play, Player* player) {
+    if(Sw97_IsFairyModeActive())return;
     PressMedallion(SW97_SPELL_SOUL);
 }
 
@@ -364,22 +372,44 @@ static void TickSpells(Player* player) {
         return;
     }
     StartPendingCast(player, play);
-    if (player->actionFunc == CastAction) {
-        gSw97Api->RequestTimeControl("medallion.cast", 90, 1.0f, true);
-    } else {
-        gSw97Api->ReleaseTimeControl("medallion.cast");
-    }
     TickShadowExchange(player, play);
 }
 
 static void ForgetSpellState(s16 fileNum) {
-    gSw97Api->ReleaseTimeControl("medallion.cast");
     sPendingSpell = -1;
     ResetShadowExchange();
 }
 
-static bool RegisterMedallion(const MedallionInfo* medallion, uint8_t index, S2HCustomItemInitFunc press) {
+// OoT GetItem_DrawEggOrMedallion: the colored face, then the shared medallion rim.
+static void DrawMedallionGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    static const char* const sFaces[] = {
+        "__OTR__objects/oot_object_gi_medal/gGiForestMedallionFaceDL",
+        "__OTR__objects/oot_object_gi_medal/gGiFireMedallionFaceDL",
+        "__OTR__objects/oot_object_gi_medal/gGiWaterMedallionFaceDL",
+        "__OTR__objects/oot_object_gi_medal/gGiSpiritMedallionFaceDL",
+        "__OTR__objects/oot_object_gi_medal/gGiShadowMedallionFaceDL",
+        "__OTR__objects/oot_object_gi_medal/gGiLightMedallionFaceDL",
+    };
+    static const char sRim[] = "__OTR__objects/oot_object_gi_medal/gGiMedallionDL";
+    const char* face = sFaces[entry->drawItemId % ARRAY_COUNT(sFaces)];
+    if (!gSw97Api->HasResource(face) || !gSw97Api->HasResource(sRim)) {
+        return;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL26_Opa(play->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)face);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sRim);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// Sw97Spell order (Wind, Soul, Dark, Ice, Light, Fire) to OoT's quest order (Forest, Fire, Water, Spirit,
+// Shadow, Light), which the OoT page points and the loader tables below follow.
+static const uint8_t sOotQuestIndex[SW97_SPELL_COUNT] = { 0, 3, 4, 2, 5, 1 };
+
+static bool RegisterMedallion(const MedallionInfo* medallion, uint8_t spell, S2HCustomItemInitFunc press) {
     S2HCustomItemDefinition item = Z64Items_Define(medallion->key, medallion->iconPath, medallion->namePath);
+    uint8_t index = sOotQuestIndex[spell];
 
     static const char* const loaderIcons[] = {
         "__OTR__textures/oot_item_icons/gItemIconMedallionForestTex",
@@ -398,18 +428,11 @@ static bool RegisterMedallion(const MedallionInfo* medallion, uint8_t index, S2H
         "__OTR__textures/oot_item_name_static/gShadowMedallionItemNameENGTex",
         "__OTR__textures/oot_item_name_static/gLightMedallionItemNameENGTex",
     };
-    static const char* const loaderModels[] = {
-        "__OTR__objects/oot_loader_models/gForestMedallionDL",
-        "__OTR__objects/oot_loader_models/gFireMedallionDL",
-        "__OTR__objects/oot_loader_models/gWaterMedallionDL",
-        "__OTR__objects/oot_loader_models/gSpiritMedallionDL",
-        "__OTR__objects/oot_loader_models/gShadowMedallionDL",
-        "__OTR__objects/oot_loader_models/gLightMedallionDL",
-    };
     if (gSw97Api->HasResource(loaderNames[index])) {
         item.namePath = loaderNames[index];
-        Z64Items_SetGetItemModel(&item, loaderModels[index]);
     }
+    item.getItemEntry.drawItemId = index;
+    item.getItemEntry.drawFunc = DrawMedallionGetItem;
     Z64Items_SetButtons(&item, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&item, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&item, SPELL_ITEM_PAGE, SPELL_ITEM_FIRST_SLOT + index, 0);
@@ -418,12 +441,6 @@ static bool RegisterMedallion(const MedallionInfo* medallion, uint8_t index, S2H
     Z64Items_SetAction(&item, press, NULL);
     item.flags |= S2H_CUSTOM_ITEM_INSTANT;
     return Z64Items_Register(gSw97Api, &item);
-}
-
-static void PauseCastWorld(Actor* actor, bool* should) {
-    if (gPlayState == NULL) return;
-    Player* player = GET_PLAYER(gPlayState);
-    if (player->actionFunc == CastAction && actor->id != ACTOR_PLAYER && actor->id < ACTOR_ID_MAX) *should = false;
 }
 
 bool Sw97_RegisterSpells(void) {
@@ -437,7 +454,6 @@ bool Sw97_RegisterSpells(void) {
         }
     }
     S2H_REGISTER_HOOK(gSw97Api, OnPlayerUpdate, TickSpells);
-    S2H_REGISTER_HOOK(gSw97Api, ShouldActorUpdate, PauseCastWorld);
     S2H_REGISTER_HOOK(gSw97Api, OnSaveLoad, ForgetSpellState);
     return true;
 }

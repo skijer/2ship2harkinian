@@ -42,7 +42,7 @@
 
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__icon_item_static_yar/gItemIconPendantOfMemoriesTex";
 static const ALIGN_ASSET(2) char sName[] = "__OTR__item_name_static/gItemNamePendantOfMemoriesENGTex";
-static const ALIGN_ASSET(2) char sGetItemDL[] = "__OTR__objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL";
+
 
 static const ALIGN_ASSET(2) char sDrawAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_fighter_power_kiru_start";
 static const ALIGN_ASSET(2) char sPlantAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_fighter_power_kiru_wait";
@@ -586,18 +586,32 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
+static const ALIGN_ASSET(2) char sGetItemDL[] = "__OTR__objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL";
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(0.9f, 0.9f, 0.9f, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sGetItemDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomEquipDefinition definition = { 0 };
 
+    definition.getItemEntry.drawFunc = DrawGetItem;
     definition.structSize = sizeof(definition);
     definition.key = PENDANT_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rPendant of Memories\n%w%yB%w near an enemy with your sword sheathed draws and "
-                           "strikes. %yB%w in mid air slams down. Locked on, three side hops then %yB%w leap "
-                           "over the foe. %yA%w in pause toggles it on or off.";
-    definition.getItemText = "You got the %rPendant of Memories%w!\nA keepsake from Kafei, proof of his promise. "
-                             "It remembers the moves of heroes from other tales, and they answer to %yB%w.";
+    definition.pauseText = "%rPendant of Memories&%w%y\xB1%w near an enemy with your sword&"
+                           "sheathed draws and strikes. %y\xB1%w in&mid air slams down.^"
+                           "Locked on, three side hops and&then %y\xB1%w leap over the foe.^"
+                           "%y\xB0%w on this slot in the pause&menu turns it on or off.";
+    definition.getItemText = "You got the %rPendant of&Memories%w! A keepsake from&Kafei, proof of his promise.^"
+                             "It remembers the moves of&heroes from other tales, and&they answer to %y\xB1%w.";
     definition.slot = S2H_EQUIP_SLOT_UPGRADE;
     definition.page = 0;
     definition.row = 1;

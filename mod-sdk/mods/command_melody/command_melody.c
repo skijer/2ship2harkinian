@@ -10,16 +10,16 @@
 #include "z64oot_names.h"
 
 #define COMMAND_SONG "nei.mm_song_command_melody"
-// In Ship mm_collectables registers the song and closes the ocarina; MM has no such mod, so this one does.
-#define COMMAND_SONG_CLOSE_FRAMES 8
+// Covers the song's replay and its "You played" box, which must close before a companion is taken over.
+#define COMMAND_SONG_WAIT_FRAMES 600
 static const ALIGN_ASSET(2) char sSongIcon[] = "__OTR__textures/icon_item_custom/gItemIconCommandMelodyTex";
 static const ALIGN_ASSET(2) char sSongName[] = "__OTR__textures/item_name_custom/gCommandMelodyNameTex";
 #define MAX_PARTNERS 8
 static const SOHModApi* sApi;
 static NeiPartnerV1 sPartners[MAX_PARTNERS];
 static s32 sCount, sActive = -1;
-static u8 sNotes[6], sNoteCount, sPending, sRelease;
-static u16 sPendingTimeout, sNoteAge;
+static u8 sPending, sRelease;
+static u16 sPendingTimeout;
 static s16 sCamera = CAM_ID_NONE, sParentCamera = CAM_ID_MAIN, sYaw;
 static Input sInput;
 static s16 sHealth;
@@ -28,7 +28,7 @@ static ActorFunc sPlayerDraw;
 static s8 sInvincibility;
 static u8 sShadowAlpha;
 static bool sWasMidair,sTracking;
-static const char* sHooks[] = { "OnOcarinaNote", "OnGameFrameUpdate", "OnPlayerFilterInput", "OnSceneInit",
+static const char* sHooks[] = { "OnGameFrameUpdate", "OnPlayerFilterInput", "OnSceneInit",
                                "OnLoadGame", "OnExitGame", "OnInterfaceDrawEnd" };
 static const SOHModRequirements sRequirements = { sizeof(SOHModRequirements), sHooks, ARRAY_COUNT(sHooks) };
 s32 Player_SetupAction(PlayState*, Player*, PlayerActionFunc, s32);
@@ -123,17 +123,10 @@ static bool Begin(PlayState* play, s32 index) {
     return true;
 }
 
-static void Notes(u8 note, f32 modulator, s8 bend) {
-    if (!gPlayState || note==OCARINA_PITCH_NONE || sActive>=0) return;
-    static const u8 melody[6]={0x02,0x02,0x0E,0x09,0x0B,0x05};
-    memmove(sNotes,sNotes+1,5); sNotes[5]=note;
-    sNoteAge=0;
-    if (sNoteCount<6) ++sNoteCount;
-    if (sNoteCount==6 && !memcmp(sNotes,melody,6) && sApi->IsCustomItemOwned(COMMAND_SONG)) {
-        sPending=12; sNoteCount=0; sPendingTimeout=120;
-        Audio_PlaySfx(NA_SE_SY_CORRECT_CHIME);
-        gPlayState->msgCtx.ocarinaMode=OCARINA_MODE_END;
-        AudioOcarina_SetInstrument(OCARINA_INSTRUMENT_OFF);
+static void PlayedSong(PlayState* play) {
+    if (sActive < 0) {
+        sPending = 2;
+        sPendingTimeout = COMMAND_SONG_WAIT_FRAMES;
     }
 }
 
@@ -155,7 +148,6 @@ static void Tick(void) {
     if (!play) return;
     Player* player=GET_PLAYER(play);
     if (!player || !player->actor.update) return;
-    if (sNoteCount && ++sNoteAge>120) sNoteCount=0;
     if (sActive>=0) {
         Actor* partner=sPartners[sActive].actor(play);
         if (!Exists(play,partner) || player->actionFunc!=HoldLink || gSaveContext.save.saveInfo.playerData.health<sHealth ||
@@ -185,7 +177,6 @@ static void Tick(void) {
         sInput.press.button=sInput.rel.button=0;
     } else if (sPending) {
         if (!sPendingTimeout || --sPendingTimeout==0) { sPending=0; return; }
-        if (sPending==COMMAND_SONG_CLOSE_FRAMES && play->msgCtx.msgMode!=MSGMODE_NONE) Message_CloseTextbox(play);
         if (--sPending) return;
         if (play->pauseCtx.state || play->msgCtx.msgMode!=MSGMODE_NONE || play->csCtx.state!=CS_STATE_IDLE ||
             player->stateFlags1&(PLAYER_STATE1_IN_CUTSCENE|PLAYER_STATE1_DEAD|PLAYER_STATE1_TALKING)) {
@@ -205,18 +196,60 @@ static void Tick(void) {
     }
 }
 
-static void Reset(void) { sActive=-1; sCamera=CAM_ID_NONE; sTracking=false;sPending=sNoteCount=sRelease=0; sNoteAge=sPendingTimeout=0; }
+static void Reset(void) { sActive=-1; sCamera=CAM_ID_NONE; sTracking=false;sPending=sRelease=0; sPendingTimeout=0; }
 static void Scene(s16 sceneId, s8 spawnNum) { Reset(); }
+
+// NEI draws its custom songs as plain white notes, like the OoT page's Song of Time and Epona's Song.
+static const ALIGN_ASSET(2) char sOotNoteIcon[] = "__OTR__textures/oot_icon_item_static/gItemIconOotSongCustomTex";
+static const ALIGN_ASSET(2) char sSongNoteDL[] = "__OTR__objects/object_gi_melody/gGiSongNoteDL";
+
+static void DrawSongNote(PlayState* play, S2HGetItemEntry* entry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sSongNoteDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
 
 // An item, not a song: MM's song pool has no room for it.
 static void RegisterSong(void) {
     static const SOHCustomItemRandomizer randomizer = {
         sizeof(SOHCustomItemRandomizer), 0, SOH_CUSTOM_ITEM_TYPE_ITEM, 0, 1, COMMAND_SONG, COMMAND_SONG, "",
     };
-    SOHCustomItemDefinition song = Z64Items_Define(COMMAND_SONG, sSongIcon, sSongName);
-    Z64Items_SetPlacement(&song, S2H_ITEM_PAGE_QUEST_VANILLA + 1, 0, 0);
+    const char* icon = sApi->HasResource(sOotNoteIcon) ? sOotNoteIcon : sSongIcon;
+    SOHCustomItemDefinition song = Z64Items_Define(COMMAND_SONG, icon, sSongName);
+    song.getItemEntry.drawFunc = DrawSongNote;
+    // NEI gives the Command Melody the OoT page's Song of Time row (quest point 16).
+    Z64Items_SetPlacement(&song, S2H_ITEM_PAGE_QUEST_VANILLA + 1, 16, 0);
     Z64Items_SetLogic(&song, &randomizer);
     Z64Items_Register(sApi, &song);
+}
+
+// A A C-up C-right C-left C-down at Song of Time's tempo; the rest splits the repeated A, as MM's own songs do.
+static const OcarinaNote sMelody[] = {
+    { OCARINA_PITCH_D4, 37, 86 }, { OCARINA_PITCH_NONE, 3, 86 }, { OCARINA_PITCH_D4, 40, 86 },
+    { OCARINA_PITCH_D5, 40, 88 }, { OCARINA_PITCH_A4, 80, 90 },  { OCARINA_PITCH_B4, 40, 86 },
+    { OCARINA_PITCH_F4, 120, 90 }, { OCARINA_PITCH_NONE, 0, 90 },
+};
+
+static void RegisterMelody(void) {
+    if (!SOH_MOD_API_HAS(sApi, RegisterOcarinaSong) || !SOH_MOD_API_HAS(sApi, RegisterMessage)) {
+        return;
+    }
+    SOHModMessage played = { 0 };
+    played.structSize = sizeof(played);
+    played.key = "nei.mm_song_command_melody.played";
+    played.text = "You played the %rCommand Melody%w.";
+    played.textboxType = TEXTBOX_TYPE_3;
+
+    S2HOcarinaSongDefinition definition = { 0 };
+    definition.itemKey = COMMAND_SONG;
+    definition.notes = sMelody;
+    definition.playedMessageId = sApi->RegisterMessage(&played);
+    definition.effectActorId = ACTOR_OCEFF_WIPE4;
+    definition.onPlayed = PlayedSong;
+    sApi->RegisterOcarinaSong(&definition);
 }
 static void Load(s32 file) { Reset(); }
 static void Exit(s32 file) { Reset(); }
@@ -249,6 +282,7 @@ static void EndControl(void){if(sActive>=0)End(gPlayState,true);}
 SOH_MOD_EXPORT void ModInit(void) {
     if (!SOH_MOD_API_HAS(sApi,PublishService)) return;
     RegisterSong();
+    RegisterMelody();
     if (SOH_MOD_API_HAS(sApi,SetCustomItemText)) {
         sApi->SetCustomItemText(COMMAND_SONG,SOH_ITEM_TEXT_GET_ITEM,
             "You learned the %rCommand Melody%w!&Play it to control a nearby&companion. Target one to choose.^"
@@ -260,7 +294,6 @@ SOH_MOD_EXPORT void ModInit(void) {
     sApi->PublishService("nei.partner.register.v1",(void*)RegisterPartner);
     sApi->PublishService("nei.partner.begin.v1",(void*)BeginByKey);
     sApi->PublishService("nei.partner.end.v1",(void*)EndControl);
-    SOH_REGISTER_HOOK(sApi,OnOcarinaNote,Notes);
     SOH_REGISTER_HOOK(sApi,OnPlayerFilterInput,Filter);
     SOH_REGISTER_HOOK(sApi,OnGameFrameUpdate,Tick);
     SOH_REGISTER_HOOK(sApi,OnSceneInit,Scene);

@@ -4,6 +4,7 @@
  */
 
 #include "z64items.h"
+#include "z64logic.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -139,14 +140,29 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    GetItem_Draw(play, GID_SHIELD_MIRROR);
+}
+
+// Worn, the shield is MM's own mirror value, so it reflects every native light beam.
+static void GrantIkanaShieldLogic(void) {
+    static const Z64LogicSource sShield = { IKANA_SHIELD_KEY };
+    static const char* const sReflecting[] = { "CanShield", "CanReflectLight", NULL };
+
+    if (Z64Logic_Init(sApi)) {
+        Z64Logic_GrantCapabilities(&sShield, sReflecting);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
+    GrantIkanaShieldLogic();
     S2HCustomEquipDefinition definition = { 0 };
 
     definition.structSize = sizeof(definition);
     definition.key = IKANA_SHIELD_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rShield of Ikana&%wBlock with %y\xA3%w right as you raise it to drain the attacker's "
+    definition.pauseText = "%rShield of Ikana&%wBlock with %y\xB4%w right as you raise it to drain the attacker's "
                            "soul. Once per area it holds death off.";
     definition.getItemText = "You got the %rShield of Ikana%w!&The mirror of a kingdom of ghosts. It drinks the soul of "
                              "whatever strikes it in time, and once in every place it will not let you fall.";
@@ -158,6 +174,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.vanillaBase = PLAYER_SHIELD_MIRROR_SHIELD;
     definition.toggles = 1;
     definition.onUnequip = ForgetGuard;
+    definition.getItemEntry.drawFunc = DrawGetItem;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }

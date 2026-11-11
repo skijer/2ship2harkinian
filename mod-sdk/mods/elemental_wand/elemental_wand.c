@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64logic.h"
 #include "z64wheel.h"
 
 #include "align_asset_macro.h"
@@ -1718,6 +1719,38 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// Mirrors SyncUnlockedRods against the seed's simulated inventory: which pickup lights the Meteor Rod depends
+// on the shuffle rule, which reads the seed's own value while it generates.
+static bool CanCallMeteorForLogic(void* userData) {
+    bool isLit;
+
+    switch (ShuffleRule()) {
+        case WAND_SHUFFLE_SINGLE:
+            isLit = Z64Logic_HasKey(WAND_KEY);
+            break;
+        case WAND_SHUFFLE_RODS:
+            isLit = Z64Logic_HasKey(sSeparateKeys[WAND_METEOR]);
+            break;
+        default:
+            isLit = Z64Logic_HasKey(sRods[WAND_METEOR].medallionKey) || Z64Logic_HasKey(sSeparateKeys[WAND_METEOR]);
+            break;
+    }
+    return isLit && sApi->LogicHasCapability("HasMagic");
+}
+
+// The Meteor Rod drops a native En_Bom on its target, so it opens everything bombs do.
+static void GrantWandLogic(void) {
+    static const char* const sBombing[] = { "HasExplosives", "BlastOrSmash", "CanHitSwitch", "CanAttack",
+                                            "CanDamage" };
+
+    if (!Z64Logic_Init(sApi)) {
+        return;
+    }
+    for (u32 i = 0; i < ARRAY_COUNT(sBombing); i++) {
+        sApi->GrantLogicCapability(sSeparateKeys[WAND_METEOR], sBombing[i], CanCallMeteorForLogic, NULL);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     S2HModRandoOption shuffle = { sizeof(S2HModRandoOption),
                                   WAND_SHUFFLE_OPTION,
@@ -1736,12 +1769,13 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&wand, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&wand, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&wand, 0, 3, 0);
-    Z64Items_SetTextbox(&wand, "You got the %rElemental Wand%w!&A staff that answers to six&elements, one at a "
-                               "time.^Press its %yC button%w to swing it and cast&the element it is tuned to.&Hold "
-                               "%yL%w to turn the wheel.^Every %gmedallion%w you carry adds&a rod the staff "
-                               "can become.");
-    Z64Items_SetPauseText(&wand, "%rElemental Wand&%wSix rods in one staff.&Its %yC button%w casts, %yL%w picks the "
-                                 "rod.");
+    Z64Items_SetTextbox(&wand, "You got the %rElemental Wand%w!&A staff that answers to six&"
+                               "elements, one at a time.^"
+                               "Press %y\xB2%w to swing it and cast&the element it is tuned to.&"
+                               "Hold %y\xB3%w to turn the wheel.^"
+                               "Every %gmedallion%w you carry adds&a rod the staff can become.");
+    Z64Items_SetPauseText(&wand, "%rElemental Wand&%wSix rods in one staff. %y\xB2%w casts, %y\xB3%w&"
+                                 "picks the rod.");
     Z64Items_SetAction(&wand, TakeOutWand, SwingWandUpper);
     Z64Items_SetHeldCallbacks(&wand, PressWand, PutWandAway, NULL);
     Z64Items_SetCanUse(&wand, CanUseWand);
@@ -1782,6 +1816,7 @@ S2H_MOD_EXPORT void ModInit(void) {
         if (!Z64Items_RegisterPickup(sApi, &pickup)) return;
     }
     sApi->RegisterRandoOption(&shuffle);
+    GrantWandLogic();
     Z64Wheel_Register(sApi, WAND_KEY, WAND_KEY, sWheelEntries, ARRAY_COUNT(sWheelEntries), false);
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, UpdateWand);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetSceneState);

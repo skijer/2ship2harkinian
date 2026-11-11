@@ -4,6 +4,7 @@
  */
 
 #include "z64items.h"
+#include "z64logic.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -166,14 +167,36 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// Get-item drawing ported from the authoritative OoT mod; preserve its materials, layers and scale.
+#define GET_ITEM_SCALE 0.9f
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(GET_ITEM_SCALE, GET_ITEM_SCALE, GET_ITEM_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sShieldDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void GrantDivineShieldLogic(void) {
+    static const Z64LogicSource sShield = { DIVINE_SHIELD_KEY };
+    static const char* const sBlocking[] = { "CanShield", NULL };
+
+    if (Z64Logic_Init(sApi)) {
+        Z64Logic_GrantCapabilities(&sShield, sBlocking);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
+    GrantDivineShieldLogic();
     S2HCustomEquipDefinition definition = { 0 };
 
     definition.structSize = sizeof(definition);
     definition.key = DIVINE_SHIELD_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rDivine Shield&%wBlock with %y\xA3%w right as you raise it and every enemy nearby freezes. "
+    definition.pauseText = "%rDivine Shield&%wBlock with %y\xB4%w right as you raise it and every enemy nearby freezes. "
                            "Fire cannot burn it.";
     definition.getItemText = "You got the %rDivine Shield%w!&Wood blessed by the goddess: flames will not take it, and "
                              "a guard raised just in time freezes whatever dares to strike it.";
@@ -186,6 +209,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.toggles = 1;
     definition.onUnequip = ForgetRaise;
     definition.getItemModelPath = sShieldDL;
+    definition.getItemEntry.drawFunc = DrawGetItem;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }

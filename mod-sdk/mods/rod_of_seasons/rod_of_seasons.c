@@ -558,10 +558,11 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&rod, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&rod, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&rod, 0, 23, 0);
-    Z64Items_SetTextbox(&rod, "You got the %rRod of Seasons%w!\nA staff the old spirits answer to.\x10Press a "
-                              "%yC button%w to turn the world through\nthe seasons it has woken to, or hold\n%yL%w "
-                              "to pick one.\x10It wakes to one more season each\ntime you find it again.");
-    Z64Items_SetPauseText(&rod, "%rRod of Seasons\n%wPress a %yC button%w for the next season,\n%yL%w to pick one.");
+    Z64Items_SetTextbox(&rod, "You got the %rRod of Seasons%w!&A staff the old spirits&answer to.^"
+                              "Press %y\xB2%w to turn the world&through the seasons it has&"
+                              "woken to, or hold %y\xB3%w to pick one.^"
+                              "It wakes to one more season&each time you find it again.");
+    Z64Items_SetPauseText(&rod, "%rRod of Seasons&%wPress %y\xB2%w for the next season, %y\xB3%w to&pick one.");
     Z64Items_SetAction(&rod, TakeOutRod, HoldRod);
     Z64Items_SetHeldCallbacks(&rod, TurnSeason, StowRod, NULL);
     Z64Items_SetGetItemModel(&rod, sRodDL);

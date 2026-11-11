@@ -1220,12 +1220,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&hourglass, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&hourglass, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&hourglass, 0, 17, 0);
-    Z64Items_SetTextbox(&hourglass, "You got the %rPhantom Hourglass%w!&Sand that remembers where&everything has "
-                                    "been.^Press a %yC button%w to hold the world still,&look at something and press "
-                                    "again:&it walks its own path backwards.^Hold %yR%w while it is up and %gyou%w "
-                                    "go&back instead. It spends %gmagic%w.");
-    Z64Items_SetPauseText(&hourglass, "%rPhantom Hourglass&%wPress a %yC button%w to stop time and aim,&again to "
-                                      "recall. %yR%w rewinds you.");
+    Z64Items_SetTextbox(&hourglass, "You got the %rPhantom&Hourglass%w! Sand that&remembers where everything&"
+                                    "has been.^"
+                                    "Press %y\xB2%w to hold the world still,&look at something and press&"
+                                    "again: it walks its own path&backwards.^"
+                                    "Hold %y\xB4%w while it is up and %gyou%w go&"
+                                    "back instead. It spends %gmagic%w.");
+    Z64Items_SetPauseText(&hourglass, "%rPhantom Hourglass&%wPress %y\xB2%w to stop time and aim,&"
+                                      "again to recall. %y\xB4%w rewinds you.");
     // The glass answers the button from its own tick, which runs after the engine has finished with the
     // press: an item action would fire in the same frame and read that press a second time as the confirm.
     hourglass.flags |= S2H_CUSTOM_ITEM_INSTANT;

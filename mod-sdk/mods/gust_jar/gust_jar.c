@@ -724,12 +724,13 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&jar, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&jar, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&jar, 0, 12, 0);
-    Z64Items_SetTextbox(&jar, "You got the %rGust Jar%w!&A Minish jar that breathes in&whatever it can swallow.^"
-                              "Hold a %yC button%w to pull in grass, pots&and small foes. Anything that&reaches the "
-                              "mouth is cut down.^%yC-Up%w aims it. %yL%w turns the&wheel: every %gmedallion%w adds&a "
-                              "breath of its own to blow.");
-    Z64Items_SetPauseText(&jar, "%rGust Jar&%wHold a %yC button%w to suck things in.&%yC-Up%w aims, %yL%w picks the "
-                                "breath.");
+    Z64Items_SetTextbox(&jar, "You got the %rGust Jar%w! A&Minish jar that breathes in&whatever it can swallow.^"
+                              "Hold %y\xB2%w to pull in grass, pots&and small foes. Anything that&"
+                              "reaches the mouth is cut down.^"
+                              "%y\xB6%w aims it. %y\xB3%w turns the&wheel: every %gmedallion%w adds&"
+                              "a breath of its own to blow.");
+    Z64Items_SetPauseText(&jar, "%rGust Jar&%wHold %y\xB2%w to suck things in. %y\xB6%w aims,&"
+                                "%y\xB3%w picks the breath.");
     Z64Items_SetAction(&jar, TakeOutJar, UseJar);
     Z64Items_SetHeldCallbacks(&jar, NULL, PutJarAway, NULL);
     Z64Items_SetGetItemModel(&jar, sJarDL);

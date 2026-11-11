@@ -10,6 +10,8 @@
 #include "macros.h"
 #include "variables.h"
 #include "2s2h/Rando/Types.h"
+#include "2s2h/ModApi/RandoInfCustom/RandoInfCustom.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 #define GARO_MASK_KEY "nei.garo_form_mask"
@@ -259,7 +261,7 @@ static const s16 sRodLevelRays[ROD_LEVELS] = { 0, BIG_MAGIC_RAYS_MAX / 2, BIG_MA
 static const char* const sRequiredHooks[] = {
     "OnPlayerActionHandler",  "OnPlayerResolveLimbDraw", "OnPlayerFilterInput", "OnActorPlaySfx",
     "OnBgCheckRaycastFloor",  "OnSceneInit",             "ShouldActorDraw",     "OnCollisionResolveDamage",
-    "OnOcarinaInput",
+    "OnOcarinaInput",          "ShouldItemGive",
 };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -2097,18 +2099,33 @@ static void WearMask(PlayState* play, Player* player) {
     sApi->ToggleForm(GARO_FORM_KEY);
 }
 
-// A light ninja's body, the Zora's grip: bushes and bomb flowers, nothing heavier.
+// A light ninja's body lifts like a Human; oot_collectables adds the strength upgrades on top.
 static void ResolveGaroStrength(bool* should, va_list args) {
     s32* strength = va_arg(args, s32*);
 
     if (IsGaro()) {
-        *strength = PLAYER_STRENGTH_ZORA;
+        *strength = PLAYER_STRENGTH_HUMAN;
     }
 }
 
+// The native mask is already in MM's pool. Keep the custom ID for older seeds.
 static const S2HCustomItemRandomizer sRandomizerItem = {
-    sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, GARO_MASK_KEY, GARO_MASK_KEY, "",
+    sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 0, GARO_MASK_KEY, GARO_MASK_KEY, "",
 };
+
+static void KeepMaskOutOfSaveDuringSimulation(const char* key) {
+    if (RandoInfCustom_IsLogicSimulation()) {
+        sApi->SetCustomItemOwned(key, false);
+    }
+}
+
+static void GiveMaskToSimulation(u8 item, bool* should) {
+    (void)item;
+    // The ID hook runs after the host's generic replacement hook.
+    if (RandoInfCustom_IsLogicSimulation()) {
+        *should = true;
+    }
+}
 
 static void RegisterMask(void) {
     S2HCustomItemDefinition mask = Z64Items_Define(GARO_MASK_KEY, sIconTex, sNameTex);
@@ -2127,6 +2144,7 @@ static void RegisterMask(void) {
     Z64Items_SetCanUse(&mask, CanWearMask);
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);
+    mask.onAcquire = KeepMaskOutOfSaveDuringSimulation;
     Z64Items_Register(sApi, &mask);
 }
 
@@ -2204,9 +2222,26 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+static bool OwnsMaskForLogic(void* userData) {
+    (void)userData;
+    const int32_t item = RandoItems_GetRandoGet(GARO_MASK_KEY);
+    return item > 0 && sApi->LogicHasItem(item);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     LoadAnims();
     RegisterMask();
+    S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldItemGive, ITEM_MASK_GARO, GiveMaskToSimulation);
+    if (S2H_MOD_API_HAS(sApi, GrantLogic) && S2H_MOD_API_HAS(sApi, LogicHasItem)) {
+        const S2HLogicGrant maskGrant = {
+            .structSize = sizeof(S2HLogicGrant),
+            .owner = GARO_MASK_KEY,
+            .kind = S2H_LOGIC_GRANT_ITEM,
+            .value = RI_MASK_GARO,
+            .condition = OwnsMaskForLogic,
+        };
+        sApi->GrantLogic(&maskGrant);
+    }
     RegisterForm();
     S2H_REGISTER_HOOK(sApi, OnPlayerResolveLimbDraw, HideLinkBody);
     S2H_REGISTER_HOOK(sApi, OnPlayerFilterInput, HandleIncomingHit);

@@ -66,8 +66,8 @@
 
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__textures/icon_item_custom/gItemIconCaneOfByrnaTex";
 static const ALIGN_ASSET(2) char sName[] = "__OTR__textures/item_name_custom/gCaneOfByrnaNameTex";
-static const ALIGN_ASSET(2) char sCaneDL[] = "__OTR__objects/object_somaria/g_byrna_cane_dl";
-static const ALIGN_ASSET(2) char sCaneGiveDL[] = "__OTR__objects/object_somaria/g_byrna_cane_give_dl";
+static const ALIGN_ASSET(2) char sCaneDL[] = "__OTR__objects/object_byrna/g_byrna_cane_dl";
+static const ALIGN_ASSET(2) char sCaneGiveDL[] = "__OTR__objects/object_byrna/g_byrna_cane_give_dl";
 
 // Imported by address: compared against the player's actionFunc, which holds the real function.
 extern HOST_DATA void Player_Action_84(Player* player, PlayState* play);
@@ -957,6 +957,7 @@ static void DrawCane(Player* player, int32_t limbIndex) {
         }
     }
     OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
     Matrix_Push();
     ApplyCaneMatrix();
     Matrix_Scale(CANE_SCALE_X, CANE_SCALE_Y, CANE_SCALE_Z, MTXMODE_APPLY);
@@ -1005,6 +1006,16 @@ static void PutCaneAway(const char* key) {
     sGlaive.comboStep = 0;
 }
 
+// Match the source mod's pickup presentation; the registry's generic model scale is different.
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(0.20f, 0.20f, 0.20f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sCaneGiveDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static const char* const sRequiredHooks[] = {
     "OnPlayerUpdate",       "OnPlayerActionHandler",  "OnPlayerFilterInput", "OnPlayerResolveAnim",
     "OnPlayerResolveModelGroup", "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw", "ShouldActorDraw",
@@ -1029,8 +1040,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.key = BYRNA_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rCane of Byrna&%wHold %y\xA3%w and press %y\xA0%w to vault. In the air, %y\xA0%w "
-                           "strikes, %y\x9F%w evades and %y\xA3%w+%y\xA0%w drives the cane down.";
+    definition.pauseText = "%rCane of Byrna&%wHold %y\xB4%w and press %y\xB1%w to vault. In the air, %y\xB1%w "
+                           "strikes, %y\xB0%w evades and %y\xB4%w+%y\xB1%w drives the cane down.";
     definition.getItemText = "You got the %rCane of Byrna%w!&A glaive that vaults its wielder skyward. Every blow "
                              "that lands in the air lifts you for another.";
     definition.slot = S2H_EQUIP_SLOT_SWORD;
@@ -1042,6 +1053,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.toggles = 1;
     definition.onUnequip = PutCaneAway;
     definition.getItemModelPath = sCaneGiveDL;
+    definition.getItemEntry.drawFunc = DrawGetItem;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }

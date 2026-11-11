@@ -31,9 +31,8 @@ void Sw97_MagicDark_DiamondDraw(Actor* thisx, PlayState* play);
 
 void Sw97_MagicDark_DimLighting(PlayState* play, f32 intensity);
 
-static u64 sDiamondTex[] = {
-    0x0000000000000000, /* placeholder - needs actual SW97 diamond texture data */
-};
+static const ALIGN_ASSET(2) char sDiamondTex[] =
+    "__OTR__overlays/oot_ovl_Magic_Dark/sDiamondTex";
 
 static Vtx sDiamondVerts[] = {
     VTX(0, 0, 64, 1024, 512, 0x00, 0x00, 0x78, 0xFF),    VTX(55, 0, 32, 1707, 512, 0x67, 0x00, 0x3C, 0xFF),
@@ -118,14 +117,13 @@ void Sw97_MagicDark_DiamondUpdate(Actor* thisx, PlayState* play) {
     }
 
     if (nayrusLoveTimer >= 1200) {
-        player->invincibilityTimer = 0;
         gSaveContext.nayrusLoveTimer = 0;
         Sw97_MagicDark_DimLighting(play, 0);
         Actor_Kill(thisx);
         return;
     }
 
-    player->invincibilityTimer = -100;
+    // NEI's Shadow is the Stone Mask's stealth only; unlike Nayru's Love it does not stop damage.
     thisx->scale.x = thisx->scale.z = this->scale;
 
     if (this->timer < 20) {
@@ -166,11 +164,19 @@ void Sw97_MagicDark_DiamondUpdate(Actor* thisx, PlayState* play) {
     } else {
         Sw97_MagicDark_DimLighting(play, -0.0075f * (-1199.0f + nayrusLoveTimer));
     }
+    Sw97_PlayLoopSfx(thisx, NA_SE_PL_ZORA_SPARK_BARRIER);
 }
 
-// MM's EnvironmentContext has no adjustable fog layer and rooms have no behaviorType1, so the screen-darken has
-// no equivalent; the spell plays without it.
 void Sw97_MagicDark_DimLighting(PlayState* play, f32 intensity) {
+    EnvironmentContext* env = &play->envCtx;
+    intensity = CLAMP(intensity, 0.0f, 1.0f);
+    f32 fogScale = (intensity < 0.2f) ? 0.0f : intensity - 0.2f;
+    env->adjLightSettings.fogNear = (850.0f - env->lightSettings.fogNear) * fogScale;
+    f32 colorScale = MIN(intensity * 5.0f, 1.0f);
+    for (s32 i = 0; i < ARRAY_COUNT(env->adjLightSettings.fogColor); i++) {
+        env->adjLightSettings.fogColor[i] =
+            (intensity == 0.0f) ? 0 : -(s16)(env->lightSettings.fogColor[i] * colorScale);
+    }
 }
 
 void Sw97_MagicDark_OrbUpdate(Actor* thisx, PlayState* play) {
@@ -178,7 +184,7 @@ void Sw97_MagicDark_OrbUpdate(Actor* thisx, PlayState* play) {
     s32 pad;
     Player* player = PLAYER;
 
-    Actor_PlaySfx_Flagged(&this->actor, NA_SE_PL_MAGIC_SOUL_BALL - SFX_FLAG);
+    Sw97_PlayLoopSfx(&this->actor, NA_SE_PL_MAGIC_SOUL_BALL);
     if (this->timer < 35) {
         Sw97_MagicDark_DimLighting(play, this->timer * (1 / 45.0f));
         Math_SmoothStepToF(&thisx->scale.x, this->scale * (1 / 12.000001f), 0.05f, 0.01f, 0.0001f);

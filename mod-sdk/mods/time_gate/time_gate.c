@@ -11,6 +11,8 @@
 #define TIME_GATE_PROMPT_DELAY 10
 #define TIME_GATE_ITEM_FRAME 10.0f
 #define TIME_GATE_HELD_SCALE 0.008f
+#define TIME_GATE_FLASH_ALPHA 255.0f
+#define TIME_GATE_FLASH_FADE 17.0f
 
 // MM's textbox needs this set while a prompt is up, like the picto box does.
 #define TIME_GATE_FREEZE_FLAG PLAYER_STATE1_20000000
@@ -48,6 +50,7 @@ static bool sIsGateInHand;
 static f32 sPortalAlpha;
 static f32 sPortalScale;
 static f32 sPortalScroll;
+static f32 sFlashAlpha;
 
 s32 Player_SetAction(PlayState* play, Player* this, PlayerActionFunc actionFunc, s32 arg3);
 void Player_StopHorizontalMovement(Player* this);
@@ -59,8 +62,22 @@ static bool IsCasting(Player* player) {
     return player->actionFunc == TimeGateAction;
 }
 
-// Majora's Mask has no ages, so there is nothing for the gate to swap; the cast, the prompt and the flash stay.
+// Majora's Mask has no ages: adult Link is the form the adult_link mod registers. Called while the prompt
+// still freezes Link, the form swaps at once instead of playing the mask cutscene; the flash covers the swap.
 static void SwitchAge(void) {
+    sApi->ToggleForm(S2H_FORM_KEY_ADULT);
+}
+
+static void FadeTimeFlash(PlayState* play) {
+    if (sFlashAlpha <= 0.0f) {
+        return;
+    }
+    sFlashAlpha = MAX(sFlashAlpha - TIME_GATE_FLASH_FADE, 0.0f);
+    play->envCtx.fillScreen = sFlashAlpha > 0.0f;
+    play->envCtx.screenFillColor[0] = 255;
+    play->envCtx.screenFillColor[1] = 255;
+    play->envCtx.screenFillColor[2] = 255;
+    play->envCtx.screenFillColor[3] = (u8)sFlashAlpha;
 }
 
 static void PlayOnce(PlayState* play, Player* player, const char* animation, f32 morph) {
@@ -190,8 +207,9 @@ static void TravelThroughTime(Player* player, PlayState* play) {
     Magic_Consume(play, TIME_GATE_MAGIC_COST, MAGIC_CONSUME_NOW);
     Rumble_Request(400.0f, 200, 30, 100);
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_SY_WHITE_OUT_T);
-    ReleasePlayer(player, play);
     SwitchAge();
+    sFlashAlpha = TIME_GATE_FLASH_ALPHA;
+    ReleasePlayer(player, play);
 }
 
 static void StartCancelling(Player* player, PlayState* play) {
@@ -266,6 +284,7 @@ static void UpdateGateOutsideCast(Player* player) {
     if (play == NULL) {
         return;
     }
+    FadeTimeFlash(play);
     StartPendingCast(player, play);
     if (sPhase == TIME_GATE_IDLE || IsCasting(player)) {
         return;
@@ -355,7 +374,7 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
-    if (!S2H_MOD_API_HAS(sApi, ShowTextbox)) {
+    if (!S2H_MOD_API_HAS(sApi, ToggleForm)) {
         return;
     }
 

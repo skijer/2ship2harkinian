@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64logic.h"
 void Player_AnimSfx_PlayVoice(Player* player, u16 sfxId);
 #include "z64aiming.h"
 s32 Player_GetMovementSpeedAndYaw(Player* player, f32* speed, s16* yaw, f32 mode, PlayState* play);
@@ -915,7 +916,19 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// The ball lands Goron punches and, at foot level, pounds.
+static void GrantBallLogic(void) {
+    static const Z64LogicSource sBall = { BALL_KEY };
+    static const char* const sSmashing[] = { "BlastOrSmash", "CanHitSwitch", "CanAttack", "CanDamage", NULL };
+
+    if (Z64Logic_Init(sApi)) {
+        Z64Logic_GrantCapabilities(&sBall, sSmashing);
+        Z64Logic_GrantBoulderSmashing(&sBall);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
+    GrantBallLogic();
     if (!S2H_MOD_API_HAS(sApi, RegisterCustomItem)) {
         return;
     }
@@ -924,14 +937,15 @@ S2H_MOD_EXPORT void ModInit(void) {
 
     Z64Items_SetButtons(&ball, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetPlacement(&ball, 0, 9, 0);
-    Z64Items_SetTextbox(&ball, "You got the %rBall and Chain%w!&A massive iron ball that only the&strongest arms "
-                               "can swing.^Press a %yC button%w again and hold it to spin&the ball, then let go to "
-                               "%rhurl%w it.^Its weight roots you where %ywind%w&would move anyone else, and&it "
-                               "crushes %yarmor%w and shatters %cice%w.^Stronger forms carry it "
-                               "farther:&the %gZora%w frees your feet&and your aim, and the %gGoron%w swings it "
-                               "one-handed to %rguard%w you.");
-    Z64Items_SetPauseText(&ball, "%rBall and Chain&%wHold a %yC button%w to spin, release to throw.&%gZ%w or "
-                                 "%yC-Up%w to aim.");
+    Z64Items_SetTextbox(&ball, "You got the %rBall and Chain%w! A&massive iron ball that only the&"
+                               "strongest arms can swing.^"
+                               "Press %y\xB2%w again and hold it to&spin the ball, then let go to&%rhurl%w it.^"
+                               "Its weight roots you where&%ywind%w would move anyone else,&"
+                               "and it crushes %yarmor%w and&shatters %cice%w.^"
+                               "Stronger forms carry it&farther: the %gZora%w frees your&feet and your aim,^"
+                               "and the %gGoron%w swings it&one-handed to %rguard%w you.");
+    Z64Items_SetPauseText(&ball, "%rBall and Chain&%wHold %y\xB2%w to spin, release to throw. %g\xB5%w&"
+                                 "or %y\xB6%w to aim.");
     Z64Items_SetCanUse(&ball, CanLiftBall);
     Z64Items_SetAction(&ball, TakeOutBall, UpdateBallInHand);
     Z64Items_SetHeldCallbacks(&ball, StartSpinning, PutBallAway, NULL);

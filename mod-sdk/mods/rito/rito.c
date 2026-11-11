@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64logic.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -322,6 +323,15 @@ static bool TryAirBow(PlayState* play, Player* player);
 
 static bool IsRito(void) {
     return sApi != NULL && sApi->IsFormActive(RITO_FORM_KEY);
+}
+
+// A Rito's light frame lifts like a Deku; oot_collectables adds the strength upgrades on top.
+static void ResolveRitoStrength(bool* should, va_list args) {
+    s32* strength = va_arg(args, s32*);
+
+    if (IsRito()) {
+        *strength = PLAYER_STRENGTH_DEKU;
+    }
 }
 
 static bool IsGrounded(Player* player) {
@@ -1837,7 +1847,18 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// The Rito fires native arrows of his own, without the Bow or a quiver.
+static void GrantRitoLogic(void) {
+    static const Z64LogicSource sMask = { RITO_MASK_KEY };
+    static const char* const sShooting[] = { "CanUseProjectile", "CanHitSwitch", "CanAttack", "CanDamage", NULL };
+
+    if (Z64Logic_Init(sApi)) {
+        Z64Logic_GrantCapabilities(&sMask, sShooting);
+    }
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
+    GrantRitoLogic();
     RegisterMask();
     RegisterForm();
     S2H_REGISTER_HOOK(sApi, OnPlayerResolveAnim, ResolveLanding);
@@ -1847,4 +1868,5 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetScene);
     sApi->RegisterVB(VB_EXECUTE_PLAYER_ACTION_FUNC, DriveSink);
     sApi->RegisterVB(VB_CHANGE_HELD_ITEM_AND_USE_ITEM, NoteAirThrow);
+    sApi->RegisterVB(VB_USE_STRENGTH_UPGRADE, ResolveRitoStrength);
 }

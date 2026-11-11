@@ -272,10 +272,13 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&shovel, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&shovel, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&shovel, 0, 22, 0);
-    Z64Items_SetTextbox(&shovel, "You got %rDampe's Shovel%w!&The old gravekeeper's tool,&worn smooth by years of work.^"
-                                 "Press a %yC button%w to dig. A %yhidden grotto%w&opens where the ground rings hollow.^"
-                                 "Loose earth turns up %grupees%w and&%gbombs%w, and once in a while a&%cfairy%w.");
-    Z64Items_SetPauseText(&shovel, "%rDampe's Shovel&%wPress a %yC button%w to dig. Hidden grottos&and loose soil hide the most.");
+    Z64Items_SetTextbox(&shovel, "You got %rDampe's Shovel%w! The&old gravekeeper's tool, worn&"
+                                 "smooth by years of work.^"
+                                 "Press %y\xB2%w to dig. A %yhidden&grotto%w opens where the&"
+                                 "ground rings hollow.^"
+                                 "Loose earth turns up %grupees%w&and %gbombs%w, and once in a while&a %cfairy%w.");
+    Z64Items_SetPauseText(&shovel, "%rDampe's Shovel&%wPress %y\xB2%w to dig. Hidden grottos&"
+                                   "and loose soil hide the most.");
     Z64Items_SetCanUse(&shovel, CanDig);
     Z64Items_SetAction(&shovel, TakeOutShovel, NULL);
     Z64Items_SetHeldCallbacks(&shovel, UseShovel, StopDigging, NULL);

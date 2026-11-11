@@ -281,7 +281,7 @@ void Sw97_ArrowFire_Charge(ArrowFire* this, PlayState* play) {
     this->actor.world.pos = arrow->actor.world.pos;
     this->actor.shape.rot = arrow->actor.shape.rot;
 
-    Actor_PlaySfx_Flagged(&this->actor, NA_SE_PL_ARROW_CHARGE_FIRE - SFX_FLAG);
+    Sw97_PlayLoopSfx(&this->actor, NA_SE_PL_ARROW_CHARGE_FIRE);
 
     // if arrow has no parent, player has fired the arrow
     if (arrow->actor.parent == NULL) {

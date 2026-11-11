@@ -18,13 +18,13 @@
     ]
   },
   "display_lists": {
-    "gCuccoTailAndUndersideDL": 3,
-    "gCuccoLeftFootDL": 0,
-    "gCuccoLeftWingDL": 1,
-    "gCuccoRightFootDL": 0,
-    "gCuccoRightWingDL": 1,
-    "gCuccoNeckDL": 1,
-    "gCuccoHeadDL": 5
+    "gCuccoTailAndUndersideDL": 6,
+    "gCuccoLeftFootDL": 2,
+    "gCuccoLeftWingDL": 2,
+    "gCuccoRightFootDL": 2,
+    "gCuccoRightWingDL": 2,
+    "gCuccoNeckDL": 2,
+    "gCuccoHeadDL": 10
   },
   "eye_background_pixels": 180,
   "limbs": [

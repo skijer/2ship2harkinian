@@ -24,11 +24,62 @@ static bool PropHit(Actor* actor,int hits,float range){
  CollisionCheck_SpawnShieldParticlesMetal(gPlayState,&actor->world.pos);
  if(slot->hits<hits)return false;slot->actor=NULL;return true;
 }
+// NEI's IKAxe_SwingBreakSweep: the Power Keg's obstacles also fall to the axe (heavy blocks 5 hits, rocks 1).
+#define HEAVY_BLOCK_PIECE_BIG 2
+#define HEAVY_BLOCK_PIECE_SMALL 3
+
+static void BreakBoulder(Actor* actor, bool dropsItem) {
+    PlayState* play = gPlayState;
+
+    if (dropsItem) {
+        Vec3f dropPos = { actor->world.pos.x, actor->world.pos.y + 30.0f, actor->world.pos.z };
+        Item_DropCollectibleRandom(play, NULL, &dropPos, 0);
+    }
+    SoundSource_PlaySfxAtFixedWorldPos(play, &actor->world.pos, 40, NA_SE_EV_WALL_BROKEN);
+    Actor_Kill(actor);
+}
+
+static void SmashHeavyBlock(Actor* actor) {
+    const s32 type = actor->params & 0xFF;
+
+    if (type != HEAVY_BLOCK_PIECE_BIG && type != HEAVY_BLOCK_PIECE_SMALL && PropHit(actor, 5, 180.0f)) {
+        Actor_Kill(actor);
+    }
+}
+
+static void SmashSilverBoulder(Actor* actor);
+
 static void SmashProp(Actor* actor) {
-    if (!actor->update || actor->id != ACTOR_EN_ISHI) return;
+    if (!actor->update) {
+        return;
+    }
+    switch (actor->id) {
+        case ACTOR_EN_ISHI:
+            SmashSilverBoulder(actor);
+            break;
+        case ACTOR_BG_HEAVY_BLOCK:
+            SmashHeavyBlock(actor);
+            break;
+        case ACTOR_OBJ_HAMISHI:
+        case ACTOR_OBJ_BOMBIWA:
+            if (PropHit(actor, 1, 250.0f)) {
+                BreakBoulder(actor, true);
+            }
+            break;
+        case ACTOR_EN_GOROIWA:
+            if (PropHit(actor, 1, 250.0f)) {
+                BreakBoulder(actor, false);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+static void SmashSilverBoulder(Actor* actor) {
     EnIshi* rock = (EnIshi*)actor;
     if (ENISHI_GET_SIZE_FLAG(actor) != ISHI_SIZE_SILVER_BOULDER ||
-        rock->actionFunc != EnIshi_Idle || !PropHit(actor, 3, 90.0f)) return;
+        rock->actionFunc != EnIshi_Idle || !PropHit(actor, 3, 250.0f)) return;
     PlayState* play = gPlayState;
     if (rock->flags & ISHI_FLAG_CUTSCENE_ROCK) {
         EnIshi_DropCollectable(rock, play);

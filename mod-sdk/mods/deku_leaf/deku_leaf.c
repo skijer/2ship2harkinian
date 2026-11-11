@@ -483,13 +483,13 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&leaf, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetPlacement(&leaf, 0, 6, 0);
     Z64Items_SetForms(&leaf, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
-    Z64Items_SetTextbox(&leaf, "You got the %rDeku Leaf%w!&A leaf of the Great Deku Tree,&wide enough to ride the "
-                               "wind.^"
-                               "On the ground, a %yC button%w beats it into a&%ggust%w that stuns what stands&ahead "
-                               "and hurls it away.^"
-                               "In the air, hold it to open the leaf&and %gglide%w. Every moment aloft&spends a "
-                               "little %gmagic%w.");
-    Z64Items_SetPauseText(&leaf, "%rDeku Leaf&%wPress a %yC button%w to fan a gust. Hold it&in midair to glide.");
+    Z64Items_SetTextbox(&leaf, "You got the %rDeku Leaf%w! A leaf&of the Great Deku Tree, wide&"
+                               "enough to ride the wind.^"
+                               "On the ground, %y\xB2%w beats it into&a %ggust%w that stuns what stands&"
+                               "ahead and hurls it away.^"
+                               "In the air, hold %y\xB2%w to open it and&%gglide%w. Every moment aloft&"
+                               "spends a little %gmagic%w.");
+    Z64Items_SetPauseText(&leaf, "%rDeku Leaf&%wPress %y\xB2%w to fan a gust. Hold it in&midair to glide.");
     Z64Items_SetCanUse(&leaf, CanSwingLeaf);
     leaf.flags |= S2H_CUSTOM_ITEM_INSTANT;
     Z64Items_SetGetItemModel(&leaf, sLeafDL);

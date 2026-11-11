@@ -8,6 +8,8 @@
 #include "macros.h"
 #include "variables.h"
 #include "2s2h/Rando/Types.h"
+#include "2s2h/ModApi/RandoInfCustom/RandoInfCustom.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 #define KEATON_MASK_KEY "nei.keaton_form_mask"
@@ -146,7 +148,8 @@ static const char* const sRequiredHooks[] = { "OnPlayerPostLimbDraw",
                                               "OnActorPlaySfx",
                                               "OnPlayerFilterInput",
                                               "OnBgCheckResolveWallFlags",
-                                              "OnPlayerResolveLimbDraw" };
+                                              "OnPlayerResolveLimbDraw",
+                                              "ShouldItemGive" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
@@ -1485,12 +1488,12 @@ static void DrawKeatonParts(Player* player, s32 limbIndex) {
     }
 }
 
-// Un zorro ágil pero pequeño: arbustos y flores bomba, como el Zora; nada de rocas plateadas.
+// A small fox lifts like a Deku; oot_collectables adds the strength upgrades on top.
 static void ResolveKeatonStrength(bool* should, va_list args) {
     s32* strength = va_arg(args, s32*);
 
     if (sApi->IsFormActive(KEATON_FORM_KEY)) {
-        *strength = PLAYER_STRENGTH_ZORA;
+        *strength = PLAYER_STRENGTH_DEKU;
     }
 }
 
@@ -1593,9 +1596,24 @@ static void WearMask(PlayState* play, Player* player) {
 }
 
 // Shuffled once by the randomizer; no vanilla logic needs it.
+// The native mask is already in MM's pool. Keep the custom ID for older seeds.
 static const S2HCustomItemRandomizer sRandomizerItem = {
-    sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, KEATON_MASK_KEY, KEATON_MASK_KEY, "",
+    sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 0, KEATON_MASK_KEY, KEATON_MASK_KEY, "",
 };
+
+static void KeepMaskOutOfSaveDuringSimulation(const char* key) {
+    if (RandoInfCustom_IsLogicSimulation()) {
+        sApi->SetCustomItemOwned(key, false);
+    }
+}
+
+static void GiveMaskToSimulation(u8 item, bool* should) {
+    (void)item;
+    // The ID hook runs after the host's generic replacement hook.
+    if (RandoInfCustom_IsLogicSimulation()) {
+        *should = true;
+    }
+}
 
 static void RegisterMask(void) {
     S2HCustomItemDefinition mask = Z64Items_Define(KEATON_MASK_KEY, sIconTex, sNameTex);
@@ -1615,6 +1633,7 @@ static void RegisterMask(void) {
     Z64Items_SetAction(&mask, WearMask, NULL);
 
     Z64Items_SetLogic(&mask, &sRandomizerItem);
+    mask.onAcquire = KeepMaskOutOfSaveDuringSimulation;
     Z64Items_Register(sApi, &mask);
 }
 
@@ -1667,9 +1686,26 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+static bool OwnsMaskForLogic(void* userData) {
+    (void)userData;
+    const int32_t item = RandoItems_GetRandoGet(KEATON_MASK_KEY);
+    return item > 0 && sApi->LogicHasItem(item);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     LoadAnims();
     RegisterMask();
+    S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldItemGive, ITEM_MASK_KEATON, GiveMaskToSimulation);
+    if (S2H_MOD_API_HAS(sApi, GrantLogic) && S2H_MOD_API_HAS(sApi, LogicHasItem)) {
+        const S2HLogicGrant maskGrant = {
+            .structSize = sizeof(S2HLogicGrant),
+            .owner = KEATON_MASK_KEY,
+            .kind = S2H_LOGIC_GRANT_ITEM,
+            .value = RI_MASK_KEATON,
+            .condition = OwnsMaskForLogic,
+        };
+        sApi->GrantLogic(&maskGrant);
+    }
     RegisterForm();
     S2H_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, DrawKeatonParts);
     S2H_REGISTER_HOOK(sApi, OnPlayerResolveLimbDraw, ResolveKeatonBody);

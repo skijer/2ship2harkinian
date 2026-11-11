@@ -483,14 +483,31 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
+static const ALIGN_ASSET(2) char gGiTunicCollarDL[] = "__OTR__objects/nei_get_item/champion_tunic/object_gi_clothes/gGiTunicCollarDL";
+static const ALIGN_ASSET(2) char gGiTunicDL[] = "__OTR__objects/nei_get_item/champion_tunic/object_gi_clothes/gGiTunicDL";
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPGrayscale(POLY_OPA_DISP++, true);
+    gDPSetGrayscaleColor(POLY_OPA_DISP++, 0, 120, 215, 255);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gGiTunicCollarDL);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gGiTunicDL);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomEquipDefinition definition = { 0 };
 
+    definition.getItemEntry.drawFunc = DrawGetItem;
     definition.structSize = sizeof(definition);
     definition.key = CHAMPION_TUNIC_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rChampion's Tunic&%wLocked on, hop past an attack and swing %y\xA0%w for a flurry "
+    definition.pauseText = "%rChampion's Tunic&%wLocked on, hop past an attack and swing %y\xB1%w for a flurry "
                            "rush. Aim in mid air to slow time.";
     definition.getItemText = "You got the %rChampion's Tunic%w!&The blue of a knight chosen to guard the princess. "
                              "Dodge an attack at the last moment or aim while airborne, and the world slows for you.";

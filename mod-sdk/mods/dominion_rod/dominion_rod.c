@@ -651,12 +651,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&rod, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     // Shares the Shovel's cell, after it.
     Z64Items_SetPlacement(&rod, 0, 22, -1);
-    Z64Items_SetTextbox(&rod, "You got the %pDominion Rod%w!&An ancient artifact that can&possess and control "
-                              "enemies.^Hold a %yC button%w to aim and let go to fire&a golden orb. It possesses "
-                              "%rBeamos%w and %yArmos%w.^A possessed enemy %gcopies your steps%w. The same button "
-                              "makes it attack,&any other lets it go.");
-    Z64Items_SetPauseText(&rod, "%pDominion Rod&%wHold a %yC button%w to aim, release to fire.&A possessed foe copies "
-                                "your steps.");
+    Z64Items_SetTextbox(&rod, "You got the %pDominion Rod%w!&An ancient artifact that can&"
+                              "possess and control enemies.^"
+                              "Hold %y\xB2%w to aim and release it to&fire a golden orb. It possesses&"
+                              "%rBeamos%w and %yArmos%w.^"
+                              "A possessed enemy %gcopies your&steps%w. %y\xB2%w makes it attack; any&"
+                              "other button lets it go.");
+    Z64Items_SetPauseText(&rod, "%pDominion Rod&%wHold %y\xB2%w to aim, release to fire. A&"
+                                "possessed foe copies your steps.");
     Z64Items_SetAction(&rod, TakeOutRod, UpdateRodInHand);
     Z64Items_SetHeldCallbacks(&rod, RequestAim, PutRodAway, NULL);
     Z64Items_SetGetItemModel(&rod, sRodDL);

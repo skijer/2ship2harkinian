@@ -1,5 +1,5 @@
 <Root>
-    <File Name="link_animetion" Segment="7" OutName="oot_link_animetion" Game="OOT">
+    <File Name="link_animetion" Segment="7" OutName="link_animetion" Game="OOT">
         <PlayerAnimationData Name="gPlayerAnimData_000000" FrameCount="20" Offset="0x0" />
         <PlayerAnimationData Name="gPlayerAnimData_000A80" FrameCount="20" Offset="0xA80" />
         <PlayerAnimationData Name="gPlayerAnimData_001500" FrameCount="15" Offset="0x1500" />

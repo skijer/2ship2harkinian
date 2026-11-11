@@ -183,7 +183,7 @@ static ColliderCylinderInit sBurstColliderInit = {
     { 34, 40, -10, { 0, 0, 0 } },
 };
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnPlayDrawEnd", "OnSceneInit" };
+static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnPlayDrawEnd", "OnSceneInit", "OnActorDrawEnd" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
@@ -1092,6 +1092,33 @@ static void UpdatePacciWorld(Player* player) {
     TrackButton(play, player);
 }
 
+// The host draws generic held models on the left hand. Pacci explicitly owns the right-hand limb.
+static void DrawPacciInRightHand(Actor* actor, PlayState* play) {
+    Player* player = (Player*)actor;
+    if (player != GET_PLAYER(play) || sPhase == PACCI_STOWED) {
+        return;
+    }
+    Vec3f hand = player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND];
+    Vec3f arm = player->bodyPartsPos[PLAYER_BODYPART_RIGHT_FOREARM];
+    f32 dx = hand.x - arm.x;
+    f32 dy = hand.y - arm.y;
+    f32 dz = hand.z - arm.z;
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Translate(hand.x, hand.y, hand.z, MTXMODE_NEW);
+    Matrix_RotateYF(atan2f(dx, dz), MTXMODE_APPLY);
+    Matrix_RotateXF(-atan2f(dy, sqrtf(dx * dx + dz * dz)), MTXMODE_APPLY);
+    // Calibrated by the user in Ship on 2026-10-14; two decimal places retain the measured pose.
+    Matrix_Translate(1.64f, -0.75f, 19.51f, MTXMODE_APPLY);
+    Matrix_RotateXF(DEG_TO_RAD(83.14f), MTXMODE_APPLY);
+    Matrix_RotateYF(DEG_TO_RAD(62.96f), MTXMODE_APPLY);
+    Matrix_RotateZF(DEG_TO_RAD(1.08f), MTXMODE_APPLY);
+    Matrix_Scale(0.08f, 0.08f, 0.08f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sCaneDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static void DrawPacciEffects(void) {
     PlayState* play = gPlayState;
 
@@ -1137,14 +1164,13 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&cane, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     // Shares the Cane of Somaria's cell, after it.
     Z64Items_SetPlacement(&cane, 0, 21, -1);
-    Z64Items_SetTextbox(&cane, "You got the %yCane of Pacci%w!&Its magic %yflips%w what it touches&onto its back.^"
-                               "Hold its %yC button%w to %ylift%w it instead&and let go to throw it. How much it "
-                               "can&lift depends on your %rstrength%w.");
-    Z64Items_SetPauseText(&cane, "%yCane of Pacci&%wTap its %yC button%w to flip, hold to lift&and release to throw "
-                                 "at your %gZ%w target.");
+    Z64Items_SetTextbox(&cane, "You got the %yCane of Pacci%w! Its&magic %yflips%w what it touches&"
+                               "onto its back. Hold %y\xB2%w to %ylift%w it&instead and let go to throw it.^"
+                               "How much it can lift depends&on your %rstrength%w.");
+    Z64Items_SetPauseText(&cane, "%yCane of Pacci&%wTap %y\xB2%w to flip, hold to lift and&"
+                                 "release to throw at your %g\xB5%w target.");
     Z64Items_SetAction(&cane, TakeOutCane, UpdateCane);
     Z64Items_SetHeldCallbacks(&cane, PressCane, PutCaneAway, NULL);
-    Z64Items_SetHeldModel(&cane, sCaneDL, PLAYER_MODELGROUP_DEFAULT);
     Z64Items_SetGetItemModel(&cane, sCaneGiveDL);
 
     Z64Items_SetLogic(&cane, &sRandomizerItem);
@@ -1153,5 +1179,6 @@ S2H_MOD_EXPORT void ModInit(void) {
     }
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, UpdatePacciWorld);
     S2H_REGISTER_HOOK(sApi, OnPlayDrawEnd, DrawPacciEffects);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorDrawEnd, ACTOR_PLAYER, DrawPacciInRightHand);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetScene);
 }

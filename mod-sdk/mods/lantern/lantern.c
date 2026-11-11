@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64logic.h"
 #include "z64wheel.h"
 
 #include "align_asset_macro.h"
@@ -736,6 +737,18 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+// The lamp drinks a lit torch's flame and sets it down elsewhere, the Deku Stick's job in MM's logic.
+static void GrantLanternLogic(void) {
+    static const Z64LogicSource sLantern = { LANTERN_KEY };
+    static const char* const sBurning[] = { "HasFireSourceWithTorch", NULL };
+
+    if (!Z64Logic_Init(sApi)) {
+        return;
+    }
+    Z64Logic_GrantCapabilities(&sLantern, sBurning);
+    Z64Logic_GrantTorchLighting(&sLantern);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     if (!S2H_MOD_API_HAS(sApi, StorageSet)) {
         return;
@@ -746,11 +759,13 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&lantern, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&lantern, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&lantern, 0, 19, 0);
-    Z64Items_SetTextbox(&lantern, "You got the %rLantern%w!&A gravekeeper's lamp, empty and&waiting for a flame.^"
-                                  "Swing it at a fire with a %yC button%w to&drink the flame in: the lamp&lights your "
-                                  "way in that colour.^Swing it away from a fire to&set the flame down and burn what&it "
-                                  "finds. %yL%w picks your flames.");
-    Z64Items_SetPauseText(&lantern, "%rLantern&%wSwing it at a fire to catch it,&away from one to set it down.");
+    Z64Items_SetTextbox(&lantern, "You got the %rLantern%w! A&gravekeeper's lamp, empty and&waiting for a flame.^"
+                                  "Swing it at a fire with %y\xB2%w to&drink the flame in: the lamp&"
+                                  "lights your way in that colour.^"
+                                  "Swing it away from a fire to&set the flame down and burn&"
+                                  "what it finds. %y\xB3%w picks your&flames.");
+    Z64Items_SetPauseText(&lantern, "%rLantern&%wSwing %y\xB2%w at a fire to catch it, away&"
+                                    "from one to set it down.");
     Z64Items_SetAction(&lantern, TakeOutLantern, SwingLantern);
     Z64Items_SetHeldCallbacks(&lantern, NULL, PutLanternAway, NULL);
     Z64Items_SetGetItemModel(&lantern, sLanternDL);
@@ -762,6 +777,7 @@ S2H_MOD_EXPORT void ModInit(void) {
         return;
     }
     Z64Wheel_Register(sApi, LANTERN_KEY, LANTERN_KEY, sWheelEntries, ARRAY_COUNT(sWheelEntries), false);
+    GrantLanternLogic();
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, UpdateLantern);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetSceneState);
     S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorDrawEnd, ACTOR_PLAYER, DrawLantern);

@@ -42,6 +42,14 @@ typedef PlayState GlobalContext;
 // The names the SW97 actors were written against; MM spells them differently.
 #define Audio_PlayActorSound2(actor, sfxId) Actor_PlaySfx(actor, sfxId)
 #define Actor_PlaySfx_Flagged(actor, sfxId) Actor_PlaySfx_Flagged2(actor, sfxId)
+
+// Missing OoT sounds may resolve to NA_SE_NONE. Test the base ID before
+// removing SFX_FLAG: subtracting from zero creates bank 15, outside MM's banks.
+static inline void Sw97_PlayLoopSfx(Actor* actor, u16 baseId) {
+    if (baseId==NA_SE_NONE || !(baseId&SFX_FLAG) || SFX_BANK(baseId)>BANK_VOICE) return;
+    Actor_PlaySfx_Flagged2(actor,baseId-SFX_FLAG);
+}
+
 #define Gfx_SetupDL_25Xlu(gfxCtx) Gfx_SetupDL25_Xlu(gfxCtx)
 #define Gfx_SetupDL_25Opa(gfxCtx) Gfx_SetupDL25_Opa(gfxCtx)
 #define Matrix_NewMtx(gfxCtx, file, line) Matrix_Finalize(gfxCtx)

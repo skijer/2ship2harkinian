@@ -1,0 +1,16 @@
+{
+  "name": "oot_collectables",
+  "author": "Skijer",
+  "version": "1.0",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time strength: Ship's Power Bracelet, Goron's Bracelet and the Silver and Golden Gauntlets as a progressive upgrade that every form adds to.",
+  "requires": [
+    "objects/oot_object_gi_bracelet/gGiGoronBraceletDL",
+    "objects/oot_gameplay_keep/gEffUnknown11Tex",
+    "textures/oot_icon_item_static/gItemIconGoronsBraceletTex"
+  ],
+  "display_name": "Ocarina of Time: Strength",
+  "game": "mm"
+}

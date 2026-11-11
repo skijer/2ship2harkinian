@@ -29,6 +29,7 @@ static const SOHModApi* sApi;
 static Cojiro* sCojiro;
 static s16 sActorId=-1,sRecovery,sSpawnDelay;
 static bool sRegistered;
+static bool sIsCallPending;
 static const char* sHooks[]={"OnGameFrameUpdate","OnSceneInit","OnLoadGame","OnCustomEquipOwnedChange","OnPlayerUpdate"};
 static const SOHModRequirements sRequirements={sizeof(SOHModRequirements),sHooks,ARRAY_COUNT(sHooks)};
 static ColliderCylinderInit sCollider={
@@ -213,13 +214,23 @@ static void DrawGet(PlayState*play,GetItemEntry*entry){
     gSPDisplayList(POLY_OPA_DISP++,(Gfx*)gGiCojiroColorDL);gSPDisplayList(POLY_OPA_DISP++,(Gfx*)gGiChickenDL);
     gSPDisplayList(POLY_OPA_DISP++,(Gfx*)gGiChickenEyesDL);CLOSE_DISPS(play->state.gfxCtx);
 }
+// The host announces ownership before recording it, so a toggle set here would be refused.
 static void Owned(const char*key,bool owned){
-    if(!strcmp(key,COJIRO_KEY)&&owned)CustomEquipRegistry_SetToggle(COJIRO_KEY,true);
+    if(!strcmp(key,COJIRO_KEY)&&owned){
+        sIsCallPending=true;
+    }
+}
+static void CallNewCojiro(void){
+    if(sIsCallPending&&CustomEquipRegistry_SetToggle(COJIRO_KEY,true)){
+        sIsCallPending=false;
+    }
 }
 static void Scene(s16 sceneId,s8 spawnNum){sCojiro=NULL;sSpawnDelay=5;}
-static void Load(s32 file){sCojiro=NULL;sSpawnDelay=5;sRecovery=0;}
+static void Load(s32 file){sCojiro=NULL;sSpawnDelay=5;sRecovery=0;sIsCallPending=false;}
 static void Tick(void){
-    RegisterPartner();PlayState*play=gPlayState;if(!play||Busy(play))return;
+    RegisterPartner();
+    CallNewCojiro();
+    PlayState*play=gPlayState;if(!play||Busy(play))return;
     if(sCojiro&&!Live(play,&sCojiro->niw.actor))sCojiro=NULL;
     if(sRecovery>0){--sRecovery;return;}
     if(!Enabled()||sCojiro||sActorId<0)return;

@@ -3770,7 +3770,7 @@ u8 Pacci_UltrahandModeUpdate(PlayState* play, Player* player) {
         }
     }
 
-    // Z puts the orientation back to however the object was sitting when you grabbed it —
+    // Z puts the orientation back to however the object was sitting when you grabbed it -
     // TotK's ZL. Untangling a piece you have over-rotated is otherwise seven more presses.
     if (Pacci_IsHoldingUltrahand() && CHECK_BTN_ALL(input->press.button, BTN_Z)) {
         sUltrahand.baseRot = sUltrahand.grabRot;
@@ -3912,11 +3912,11 @@ static void RefreshTexts(void) {
 
     if (IsAssembled()) {
         snprintf(sGetItemText, UH_TEXT_SIZE,
-                 "The %%rUltrahand%%w is whole again!^Press a %%yC button%%w to reach out: %%yA%%w grabs,&the "
-                 "%%yB%%w button lets go.");
+                 "The %%rUltrahand%%w is whole again!^Press %%y\xB2%%w to reach out: %%y\xB0%%w grabs&"
+                 "and %%y\xB1%%w lets go.");
         snprintf(sPauseText, UH_TEXT_SIZE,
-                 "%%rUltrahand&%%wA %%yC button%%w to reach, %%yA%%w grab, %%yB%%w leave.&D-pad moves, L turns, R "
-                 "raises.");
+                 "%%rUltrahand&%%w%%y\xB2%%w reaches, %%y\xB0%%w grabs, %%y\xB1%%w lets go.&"
+                 "D-pad moves, %%y\xB3%%w turns, %%y\xB4%%w raises.");
     } else {
         snprintf(sGetItemText, UH_TEXT_SIZE, "You got a piece of the %%rUltrahand%%w!&%u of %u found.", sPieces,
                  required);
