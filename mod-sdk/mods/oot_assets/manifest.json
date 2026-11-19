@@ -1,9 +1,10 @@
 {
   "name": "oot_assets",
   "author": "Skijer",
-  "version": "1.0",
+  "version": "1.1",
   "description": "OoT Asset Loader: extracts item, collectable and spell assets from your own OoT NTSC ROM into namespaced resources for MM mods.",
   "permissions": [
     "files"
-  ]
+  ],
+  "dependency_only": true
 }

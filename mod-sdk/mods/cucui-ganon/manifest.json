@@ -1,7 +1,10 @@
 {
   "name": "cucui-ganon",
   "author": "Skijer",
-  "version": "0.10.1",
+  "version": "0.10.2",
+  "dependencies": [
+    "oot_assets"
+  ],
   "description": "Majora replacement: a custom Ganondorf actor with its own intro, two-phase dance fight, Spanish lyrics, Tatl hints and MM ending.",
   "game": "mm"
 }
