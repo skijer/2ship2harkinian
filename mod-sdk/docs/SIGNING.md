@@ -107,8 +107,9 @@ only). Replacing a key means `python mod-sdk/tools/mod_signature.py generate-key
 --private-key-output <file>`, storing the file as the secret, deleting it and committing the header.
 
 - **Build:** run **generate-builds** by hand, or push a `*unbound*` tag to build and publish a plain release.
-- **Release for the updater:** run **publish-release** with the id of a successful generate-builds run less than
-  a day old. It drafts the release with a signed `unbound-release.json` and publishes it as latest. Bump `PROJECT_FORK_VERSION` in `CMakeLists.txt` first.
+- **Release for the updater:** every successful generate-builds run goes to the fixed `nei-unbound-release` through
+  **update-downloads**, which adds a signed `unbound-release.json` and marks it latest. Bump `PROJECT_FORK_VERSION`
+  in `CMakeLists.txt` first.
 - **Approve a new author:** add `approved` to their issue; to skip approval from then on, add their login to
   `.github/mod-signing/trusted-authors.txt`.
 - **Block an author:** add their lowercase login to `kRevokedModAuthors` in
