@@ -1,9 +1,7 @@
-# Not Enough Bottles para MM
+# Not Enough Bottles for MM
 
-Los seis espacios quedan como `[1,5] [2,6] [3,7] [4,8] [Net] [Bottomless]`: ocho botellas normales, una red y una botella de varios usos. Las cuatro botellas extra comparten celda con las cuatro primeras mediante la rueda del inventario.
+The six bottle slots become `[1,5] [2,6] [3,7] [4,8] [Net] [Bottomless]`: eight bottles, a net and a multi-use bottle. The four extra bottles share a cell with the first four through the inventory wheel.
 
-Las botellas ya guardadas en los espacios cinco y seis se trasladan a botellas extra adquiridas, conservando su contenido. La red recoge peces, bichos y hadas normales; las mariposas se transforman en hadas. No captura a Tatl.
+Bottles already in slots five and six move to acquired extra bottles with their contents. The net catches fish, bugs and ordinary fairies, and turns butterflies into fairies; it never catches Tatl.
 
-Los contenidos usan las acciones nativas de MM, incluidos Chateau, huevos, princesa Deku y agua caliente. La Bottomless conserva un contador de usos; el agua caliente de botellas extra se enfría tras un minuto de juego. El contador de usos se dibuja con el HUD nativo.
-
-Compilación y enlace verificados. El usuario realiza las pruebas ingame.
+Contents use MM's native actions, including Chateau Romani, eggs, the Deku Princess and hot spring water. The Bottomless Bottle keeps a use counter drawn with the native HUD; hot spring water in extra bottles cools after one minute.

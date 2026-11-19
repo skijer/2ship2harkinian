@@ -1,7 +1,7 @@
-# Easy Equipment para MM
+# Easy Equipment for MM
 
-Asigna a C una pieza custom de escudo, túnica o botas desde la página de equipo. Un toque la pone o la quita; mantener C abre la rueda de piezas adquiridas de esa categoría. Selecciona con el stick y suelta C para equipar; B cancela.
+Assign a modded shield, tunic or boots to a C button from the equipment page. A tap puts it on or takes it off; holding C opens a wheel with the owned pieces of that category. Aim with the stick and release C to equip; B cancels.
 
-Al quitar una pieza, CustomEquipRegistry restaura el equipo nativo de MM. La rueda conserva las restricciones de forma y no concede equipo.
+Taking a piece off restores MM's native equipment. The wheel keeps form restrictions and never grants equipment.
 
-En Mods > Equipment se puede elegir Hold o Instant para abrir la rueda.
+**Mods → Equipment → Open equipment wheel** chooses **Hold** or **Instant**.

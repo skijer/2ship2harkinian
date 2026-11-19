@@ -1,7 +1,5 @@
 # useful_medallions: 2Ship port
 
-Built and linked in Release on 2026-10-12. Gameplay remains unverified.
-
 The six medallions register standalone custom items and spell actors. Spell animations are resolved from packaged/game resources. Fire, ice and light arrows use native MM arrow actions; dark, soul and wind effects attach custom SW97 actors to normal arrows. Trails use the native arrow drawing and destruction lifecycle.
 
 Select the bow in Kaleido and press A to cycle owned elemental medallions. The selected element appears in button icons and below the bow cell. The position follows the configured Kaleido placement.
