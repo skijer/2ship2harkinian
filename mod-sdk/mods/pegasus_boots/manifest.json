@@ -1,5 +1,6 @@
 {
     "name": "pegasus_boots",
+  "dependencies": ["oot_assets", "nei_equipment"],
     "author": "Skijer",
     "version": "1.0",
     "description": "Pegasus Boots: boots-slot equipment that turns the spin charge into a blade-first dash behind a wind cone."

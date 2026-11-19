@@ -1,5 +1,3 @@
-// The six medallions as spells: pressing one runs NEI's cast (the OoT magic-spell flow widened to six spells)
-// and spawns its SW97 actor. Holding the Shadow Medallion trades three hearts for magic.
 
 #include "z64items.h"
 
@@ -25,7 +23,6 @@
 #define ANIMSFX_TYPE_WALKING 8
 #define GAMEPLAY_KEEP_ANIM(name) "__OTR__objects/gameplay_keep/" name
 
-// Layout of z_player.c's private AnimSfxEntry.
 typedef struct {
     u16 sfxId;
     s16 data;
@@ -73,7 +70,6 @@ static const ALIGN_ASSET(2) char sSpiritName[] = "__OTR__textures/item_name_stat
 static const ALIGN_ASSET(2) char sShadowName[] = "__OTR__textures/item_name_static/gShadowMedallionItemNameENGTex";
 static const ALIGN_ASSET(2) char sLightName[] = "__OTR__textures/item_name_static/gLightMedallionItemNameENGTex";
 
-// NEI's six-spell tables: 0..2 keep vanilla's Farore/Din/Nayru rows, 3..5 are the SW97 additions.
 static const char* const sCastAnims[SW97_SPELL_COUNT] = {
     sKaze1Anim, sHonoo1Anim, sTamashii1Anim, sKaze1Anim, sTamashii1Anim, sHonoo1Anim,
 };
@@ -134,7 +130,8 @@ static const MedallionInfo sMedallions[SW97_SPELL_COUNT] = {
       "%ySpirit Medallion&%wSoul spell, 24 MP. Turns you into a&fairy until you cast it again." },
     { "nei.medallion.shadow", SW97_SPELL_DARK, sShadowIcon, sShadowName,
       "You got the %pShadow Medallion%w!&Enemies lose sight of you&for a minute.",
-      "%pShadow Medallion&%wDark spell, 24 MP. Enemies lose sight&of you for a minute. Hold the C&button to trade 3 hearts for magic." },
+      "%pShadow Medallion&%wDark spell, 24 MP. Enemies lose sight&of you for a minute. Hold the C&button to trade 3 "
+      "hearts for magic." },
     { "nei.medallion.light", SW97_SPELL_LIGHT, sLightIcon, sLightName,
       "You got the %yLight Medallion%w!&Undead freeze and you heal&6 hearts.",
       "%yLight Medallion&%wLight spell, 24 MP. Undead freeze for&30 seconds and you heal 6 hearts." },
@@ -155,19 +152,18 @@ static const MedallionInfo* FindMedallion(Sw97Spell spell) {
     return NULL;
 }
 
-// Water rides Farore's item action in NEI, so Fast Farore's Wind speeds it up too.
 static bool IsFastFarores(s8 spell) {
     return spell == SW97_SPELL_ICE && CVarGetInteger("gEnhancements.FastFarores", 0);
 }
 
-// The OoT cast clips live in the companion archive; without it the cast plays the idle pose instead of crashing.
 static PlayerAnimationHeader* LoadCastAnim(const char* path) {
     PlayerAnimationHeader* header = NULL;
     char loaderPath[160];
     const char* prefix = "__OTR__objects/gameplay_keep/";
     if (strncmp(path, prefix, strlen(prefix)) == 0) {
         snprintf(loaderPath, sizeof(loaderPath), "__OTR__objects/oot_gameplay_keep/%s", path + strlen(prefix));
-        if (gSw97Api->HasResource(loaderPath)) path = loaderPath;
+        if (gSw97Api->HasResource(loaderPath))
+            path = loaderPath;
     }
     if (gSw97Api->HasResource(path)) {
         header = (PlayerAnimationHeader*)ResourceMgr_LoadAnimByName(path);
@@ -197,13 +193,11 @@ static void StartCast(PlayState* play, Player* player, Sw97Spell spell) {
     Player_SetAction_PreserveItemAction(play, player, CastAction, 0);
     player->av1.actionVar1 = spell;
     player->av2.actionVar2 = 0;
-    // NEI covers the charge too: a hit there would strand the magic reservation.
     player->stateFlags1 |= CAST_BLOCKING_STATES;
     PlayCastAnim(play, player, sTameAnim, isFast);
     func_8082DAD4(player);
 }
 
-// A spell that never spawned leaves its WAIT_PREVIEW reservation flashing; live spells reset magic themselves.
 static void LeaveCast(Player* player, PlayState* play) {
     if (gSaveContext.magicState == MAGIC_STATE_METER_FLASH_2) {
         Magic_Reset(play);
@@ -248,7 +242,6 @@ static void PlayCastSounds(Player* player, PlayState* play, Sw97Spell spell, boo
     }
 }
 
-// The OoT spell action as NEI runs it for a medallion: every spell fires and forgets, none saves a warp.
 static void CastAction(Player* player, PlayState* play) {
     s8 spell = (s8)player->av1.actionVar1;
     bool isFast = IsFastFarores(spell);
@@ -270,8 +263,7 @@ static bool CanAffordSpell(Sw97Spell spell) {
            gSaveContext.save.saveInfo.playerData.magic >= sSpellCosts[spell];
 }
 
-// The press lands inside vanilla's item handling, which would replace the action func the same frame: the
-// cast starts at the end of the player's update instead.
+// The press lands inside vanilla's item handling, which would replace the action func the same frame.
 static void PressMedallion(Sw97Spell spell) {
     if (!CanAffordSpell(spell)) {
         Audio_PlaySfx(NA_SE_SY_ERROR);
@@ -285,7 +277,8 @@ static void PressForest(PlayState* play, Player* player) {
 }
 
 static void PressSpirit(PlayState* play, Player* player) {
-    if(Sw97_IsFairyModeActive())return;
+    if (Sw97_IsFairyModeActive())
+        return;
     PressMedallion(SW97_SPELL_SOUL);
 }
 
@@ -305,7 +298,6 @@ static void PressFire(PlayState* play, Player* player) {
     PressMedallion(SW97_SPELL_FIRE);
 }
 
-// Vanilla only casts from the ground or the water surface.
 static bool CanStartCast(Player* player, PlayState* play) {
     bool isGrounded = (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) != 0;
     bool isSwimming = (player->stateFlags1 & PLAYER_STATE1_8000000) != 0;
@@ -345,7 +337,6 @@ static void ResetShadowExchange(void) {
     sIsShadowExchanged = false;
 }
 
-// Outside the cast on purpose: the trade is what a player with an empty meter reaches for.
 static void TickShadowExchange(Player* player, PlayState* play) {
     uint32_t buttons = FindShadowButtons();
 
@@ -380,9 +371,9 @@ static void ForgetSpellState(s16 fileNum) {
     ResetShadowExchange();
 }
 
-// OoT GetItem_DrawEggOrMedallion: the colored face, then the shared medallion rim.
 static void DrawMedallionGetItem(PlayState* play, S2HGetItemEntry* entry) {
-    static const char* const sFaces[] = {
+    // Even rows: an odd display-list pointer is read as a segmented address.
+    static const ALIGN_ASSET(2) char sFaces[][64] = {
         "__OTR__objects/oot_object_gi_medal/gGiForestMedallionFaceDL",
         "__OTR__objects/oot_object_gi_medal/gGiFireMedallionFaceDL",
         "__OTR__objects/oot_object_gi_medal/gGiWaterMedallionFaceDL",
@@ -390,7 +381,7 @@ static void DrawMedallionGetItem(PlayState* play, S2HGetItemEntry* entry) {
         "__OTR__objects/oot_object_gi_medal/gGiShadowMedallionFaceDL",
         "__OTR__objects/oot_object_gi_medal/gGiLightMedallionFaceDL",
     };
-    static const char sRim[] = "__OTR__objects/oot_object_gi_medal/gGiMedallionDL";
+    static const ALIGN_ASSET(2) char sRim[] = "__OTR__objects/oot_object_gi_medal/gGiMedallionDL";
     const char* face = sFaces[entry->drawItemId % ARRAY_COUNT(sFaces)];
     if (!gSw97Api->HasResource(face) || !gSw97Api->HasResource(sRim)) {
         return;
@@ -403,8 +394,6 @@ static void DrawMedallionGetItem(PlayState* play, S2HGetItemEntry* entry) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Sw97Spell order (Wind, Soul, Dark, Ice, Light, Fire) to OoT's quest order (Forest, Fire, Water, Spirit,
-// Shadow, Light), which the OoT page points and the loader tables below follow.
 static const uint8_t sOotQuestIndex[SW97_SPELL_COUNT] = { 0, 3, 4, 2, 5, 1 };
 
 static bool RegisterMedallion(const MedallionInfo* medallion, uint8_t spell, S2HCustomItemInitFunc press) {
@@ -419,7 +408,9 @@ static bool RegisterMedallion(const MedallionInfo* medallion, uint8_t spell, S2H
         "__OTR__textures/oot_item_icons/gItemIconMedallionShadowTex",
         "__OTR__textures/oot_item_icons/gItemIconMedallionLightTex",
     };
-    if (gSw97Api->HasResource(loaderIcons[index])) item.iconPath = loaderIcons[index];
+    if (gSw97Api->HasResource(loaderIcons[index])) {
+        item.iconPath = loaderIcons[index];
+    }
     static const char* const loaderNames[] = {
         "__OTR__textures/oot_item_name_static/gForestMedallionItemNameENGTex",
         "__OTR__textures/oot_item_name_static/gFireMedallionItemNameENGTex",
@@ -431,6 +422,15 @@ static bool RegisterMedallion(const MedallionInfo* medallion, uint8_t spell, S2H
     if (gSw97Api->HasResource(loaderNames[index])) {
         item.namePath = loaderNames[index];
     }
+    static const char* const labels[] = {
+        "Forest Medallion", "Fire Medallion",   "Water Medallion",
+        "Spirit Medallion", "Shadow Medallion", "Light Medallion",
+    };
+    const S2HCustomItemRandomizer randomizer = {
+        sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, medallion->key, medallion->key, "",
+    };
+    item.displayName = labels[index];
+    Z64Items_SetLogic(&item, &randomizer);
     item.getItemEntry.drawItemId = index;
     item.getItemEntry.drawFunc = DrawMedallionGetItem;
     Z64Items_SetButtons(&item, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);

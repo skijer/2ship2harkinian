@@ -1,8 +1,3 @@
-/**
- * Trident: Phantom Ganon's lance, played as Monster Hunter's Gunlance. B chains three heavy strikes, holding B
- * charges three levels up to Ganondorf's big magic, R+B runs with the lance out front, and holding R+A takes
- * flight the way Phantom Ganon does.
- */
 
 #include <math.h>
 #include <stdlib.h>
@@ -22,7 +17,11 @@ void func_80833998(Player* player, s32 timer);
 static void SpawnLightBall(PlayState* play, Vec3f* pos, Vec3f* velocity, Vec3f* accel, s16 scale, u8 color) {
     Color_RGBA8 prim = { 200, 200, 255, 255 };
     Color_RGBA8 env = { 80, 80, 255, 0 };
-    if (color == 0) { prim.g = 80; env.r = 160; env.g = 0; }
+    if (color == 0) {
+        prim.g = 80;
+        env.r = 160;
+        env.g = 0;
+    }
     EffectSsKirakira_SpawnDispersed(play, pos, velocity, accel, &prim, &env, scale, 10);
 }
 
@@ -39,7 +38,6 @@ static void SpawnLightBall(PlayState* play, Vec3f* pos, Vec3f* velocity, Vec3f* 
 #define B_HOLD_TO_CHARGE 5
 #define STAB_LUNGE_SPEED 15.0f
 
-// Vanilla fills at 0.02 a frame; the spec wants five seconds. 0.85 is vanilla's own orange threshold.
 #define CHARGE_RATE 0.0085f
 #define CHARGE_LEVEL_2 0.85f
 #define CHARGE_LEVEL_3 0.995f
@@ -118,7 +116,6 @@ static void SpawnLightBall(PlayState* play, Vec3f* pos, Vec3f* velocity, Vec3f* 
 #define CHEST_UP 40.0f
 #define CHEST_FORWARD 22.0f
 
-// The lance rides the limb transform the Byrna cane was tuned against in NEI, then its own placement on top.
 #define LANCE_HELD_SCALE 0.1f
 #define LANCE_ROT_X (-53.5f)
 #define LANCE_ROT_Y (-7.1f)
@@ -148,23 +145,26 @@ static const ALIGN_ASSET(2) char sDomeTex[] = "__OTR__overlays/ovl_Magic_Fire/sT
 static const ALIGN_ASSET(2) char sDomeMaterialDL[] = "__OTR__overlays/ovl_Magic_Fire/sMaterialDL";
 static const ALIGN_ASSET(2) char sDomeModelDL[] = "__OTR__overlays/ovl_Magic_Fire/sModelDL";
 
-// Newest first: the draw walks the history back from the head.
 static const char* const sStreakDLs[TRAIL_DRAWN] = {
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak12DL", "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak11DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak10DL", "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak9DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak8DL",  "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak7DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak6DL",  "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak5DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak4DL",  "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak3DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak2DL",  "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak1DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak12DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak11DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak10DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak9DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak8DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak7DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak6DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak5DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak4DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak3DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak2DL",
+    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak1DL",
 };
 
 // The lance branches to segment 8 twice for Phantom Ganon's per-limb glow; unset, it jumps into garbage.
 static Gfx sEmptyDL[] = { gsSPEndDisplayList() };
 
-// Imported by address: compared against the player's actionFunc, which holds the real function.
 extern HOST_DATA void Player_Action_84(Player* player, PlayState* play);
 extern HOST_DATA void Player_Action_29(Player* player, PlayState* play);
-// The sword blade length the engine measures its quads and trail with, indexed by edge.
 extern HOST_DATA Vec3f D_801C0994[];
 PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeader(const char* animPath);
 s32 Player_SetAction(PlayState* play, Player* player, PlayerActionFunc actionFunc, s32 flags);
@@ -213,7 +213,6 @@ typedef enum {
     CLIP_MAX,
 } ClipId;
 
-// frames: the resampled length, which is the speed knob. HALF plays twice as fast, NATIVE as authored.
 #define HALF 0
 #define NATIVE (-1)
 
@@ -235,7 +234,6 @@ static const ClipSource sClipSources[CLIP_MAX] = {
     { GUNLANCE("BackwardMultiHitAerialThrust"), 19 },
     { GUNLANCE("BackwardHighAerialMultiHitSilkbindGunlanceStrike"), NATIVE },
     { GUNLANCE("BackwardRisingAerialMove_Variant06"), HALF },
-    // Walk and run share a phase but sample it at 29 and 20 frames; one length for both cuts the cycle short.
     { GUNLANCE("ForwardWeaponRun"), 29 },
     { GUNLANCE("ForwardWeaponRun"), 20 },
     { GUNLANCE("ForwardWeaponRun"), NATIVE },
@@ -259,7 +257,6 @@ typedef struct {
 
 static Clip sClips[CLIP_MAX];
 
-// Link's own frame: right +X, up +Y, forward +Z; pitch lays the box toward the floor.
 typedef struct {
     f32 right;
     f32 up;
@@ -275,7 +272,6 @@ static const AttackBox sSweepBox = { 0.0f, 38.0f, 52.0f, 56.0f, 46.0f, 0.75f };
 static const AttackBox sThrustBox = { 0.0f, 38.0f, 58.0f, 20.0f, 22.0f, 0.0f };
 static const AttackBox sGuardBox = { 30.0f, 40.0f, 10.0f, 22.0f, 30.0f, 0.0f };
 
-// Windows in the installed clip's frames, scaled from the source frames NEI's user tuned.
 typedef struct {
     ClipId clip;
     s8 row;
@@ -296,12 +292,15 @@ static const Swing sThrustSwing = { CLIP_THRUST, PLAYER_MWA_STAB_1H, 9, 26, &sTh
 
 static ColliderQuadInit sAttackQuadInit = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_QUAD },
-    { ELEM_MATERIAL_UNK2, { DMG_SWORD, 0x00, MELEE_DAMAGE }, { 0xFFCFFFFF, 0x00, 0x00 },
-      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL, ACELEM_NONE, OCELEM_NONE },
+    { ELEM_MATERIAL_UNK2,
+      { DMG_SWORD, 0x00, MELEE_DAMAGE },
+      { 0xFFCFFFFF, 0x00, 0x00 },
+      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL,
+      ACELEM_NONE,
+      OCELEM_NONE },
     { { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } } },
 };
 
-// Vanilla's own shield quad, so the flank bounces exactly what a raised shield bounces.
 static ColliderQuadInit sGuardQuadInit = {
     { COL_MATERIAL_METAL, AT_NONE, AC_ON | AC_HARD | AC_TYPE_ENEMY, OC1_NONE, OC2_TYPE_PLAYER, COLSHAPE_QUAD },
     { ELEM_MATERIAL_UNK2, { 0x00000000, 0x00, 0x00 }, { 0xDFCFFFFF, 0x00, 0x00 }, ATELEM_NONE, ACELEM_ON, OCELEM_NONE },
@@ -314,26 +313,36 @@ typedef enum {
     PROJECTILE_LIGHT,
 } ProjectileKind;
 
-// A real weapon bit so boss bumpers accept the hit; the hunters and the max ball add a fixed damage on top.
 static ColliderCylinderInit sBallColliderInit = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_CYLINDER },
-    { ELEM_MATERIAL_UNK2, { DMG_SWORD, 0x00, 0x01 }, { 0xFFCFFFFF, 0x00, 0x00 },
-      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL, ACELEM_NONE, OCELEM_NONE },
+    { ELEM_MATERIAL_UNK2,
+      { DMG_SWORD, 0x00, 0x01 },
+      { 0xFFCFFFFF, 0x00, 0x00 },
+      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL,
+      ACELEM_NONE,
+      OCELEM_NONE },
     { 30, 44, 0, { 0, 0, 0 } },
 };
 
 static ColliderCylinderInit sHunterColliderInit = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_CYLINDER },
-    { ELEM_MATERIAL_UNK2, { DMG_SWORD, 0x00, HUNTER_DAMAGE }, { 0xFFCFFFFF, 0x00, 0x00 },
-      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL, ACELEM_NONE, OCELEM_NONE },
+    { ELEM_MATERIAL_UNK2,
+      { DMG_SWORD, 0x00, HUNTER_DAMAGE },
+      { 0xFFCFFFFF, 0x00, 0x00 },
+      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL,
+      ACELEM_NONE,
+      OCELEM_NONE },
     { 14, 22, 0, { 0, 0, 0 } },
 };
 
-// A light arrow to every damage table, which is what makes it the counter against Ganon-class foes.
 static ColliderCylinderInit sLightColliderInit = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_CYLINDER },
-    { ELEM_MATERIAL_UNK2, { DMG_LIGHT_ARROW, 0x01, LIGHT_DAMAGE }, { 0xFFCFFFFF, 0x00, 0x00 },
-      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL, ACELEM_NONE, OCELEM_NONE },
+    { ELEM_MATERIAL_UNK2,
+      { DMG_LIGHT_ARROW, 0x01, LIGHT_DAMAGE },
+      { 0xFFCFFFFF, 0x00, 0x00 },
+      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL,
+      ACELEM_NONE,
+      OCELEM_NONE },
     { 22, 30, 0, { 0, 0, 0 } },
 };
 
@@ -422,7 +431,6 @@ static bool IsWorn(void) {
     return CustomEquipRegistry_IsWorn(TRIDENT_KEY);
 }
 
-// The lance and the big-magic lists are Ocarina of Time's; without that archive mounted the effects are skipped.
 static bool HasOotAssets(void) {
     static s8 sHasAssets = -1;
 
@@ -432,7 +440,6 @@ static bool HasOotAssets(void) {
     return sHasAssets;
 }
 
-// Player_GetMeleeWeaponHeld also counts the Deku Stick and the hammer, which keep their own models.
 static bool IsSwordAction(s32 itemAction) {
     return itemAction >= PLAYER_IA_SWORD_KOKIRI && itemAction <= PLAYER_IA_SWORD_GILDED;
 }
@@ -459,8 +466,6 @@ static bool IsDashState(u8 state) {
     return state == LANCE_DASH_START || state == LANCE_DASH_RUN;
 }
 
-// A copy with the root pinned to frame 0, so no clip slides Link on top of the movement OoT owns.
-// Nearest-frame resampling on purpose, since interpolating packed angles smears anything crossing the wrap.
 static PlayerAnimationHeader* LoadClip(ClipId id) {
     Clip* clip = &sClips[id];
     const ClipSource* source = &sClipSources[id];
@@ -511,7 +516,7 @@ static void PlayClip(PlayState* play, Player* player, ClipId id, bool isLooping,
         return;
     }
     PlayerAnimation_Change(play, &player->skelAnime, anim, 1.0f, 0.0f, Animation_GetLastFrame(anim),
-                         isLooping ? ANIMMODE_LOOP : ANIMMODE_ONCE, morph);
+                           isLooping ? ANIMMODE_LOOP : ANIMMODE_ONCE, morph);
     sLance.prevFrame = -1.0f;
 }
 
@@ -519,12 +524,10 @@ static bool IsPlayingClip(Player* player, ClipId id) {
     return sClips[id].frames != NULL && player->skelAnime.animation == &sClips[id].header;
 }
 
-// A point test drops the mark whenever a resampled clip steps by more than one frame.
 static bool HasCrossed(f32 prev, f32 current, f32 mark) {
     return current >= mark && prev < mark;
 }
 
-// The pose goes in behind whatever the actions loaded this frame, torso only.
 static void HoldUpperPose(PlayState* play, Player* player, ClipId id, u32 frame) {
     PlayerAnimationHeader* pose = LoadClip(id);
 
@@ -532,9 +535,9 @@ static void HoldUpperPose(PlayState* play, Player* player, ClipId id, u32 frame)
         return;
     }
     AnimTaskQueue_AddLoadPlayerFrame(play, pose, frame % pose->common.frameCount, player->skelAnime.limbCount,
-                                  sPoseBuffer);
+                                     sPoseBuffer);
     AnimTaskQueue_AddCopyUsingMap(play, player->skelAnime.limbCount, player->skelAnime.jointTable, sPoseBuffer,
-                                 sUpperBodyMap);
+                                  sUpperBodyMap);
 }
 
 static void InitQuads(PlayState* play, Player* player) {
@@ -567,8 +570,6 @@ static void PlaceQuad(ColliderQuad* quad, Player* player, const AttackBox* box) 
     Collider_SetQuadVertices(quad, &corners[0], &corners[1], &corners[2], &corners[3]);
 }
 
-// The shaft's own quads are a thin line; each step also gets a box where the strike points, and the chain
-// keeps a shield on Link's right the whole time.
 static void TickSwingVolumes(PlayState* play, Player* player, const Swing* swing, bool isHitting) {
     InitQuads(play, player);
     if (isHitting) {
@@ -604,7 +605,6 @@ static bool IsInLanceAction(Player* player) {
     return player->actionFunc == LanceAction;
 }
 
-// Chain rows morph into each other; a strike out of idle keeps the hard start vanilla gives every attack.
 static void StartSwing(PlayState* play, Player* player, const Swing* swing, bool isChained) {
     if (LoadClip(swing->clip) == NULL) {
         return;
@@ -638,7 +638,6 @@ static void EndLanceAction(PlayState* play, Player* player) {
     func_8083B1A0(player, play);
 }
 
-// Vanilla only opens the spin charge the frame after its own short swing; ours end here, B still down.
 static void FinishSwing(PlayState* play, Player* player) {
     player->meleeWeaponState = 0;
     if (sLance.isChainBuffered && sLance.comboStep != 0) {
@@ -693,7 +692,6 @@ static void LandFromFlight(PlayState* play, Player* player) {
     Player_RequestRumble(play, player, 120, 10, 100, 0);
 }
 
-// The ring goes on the floor under Link, large: EffectSsBlast is a flat textured quad and barely reads small.
 static void PoundTheGround(PlayState* play, Player* player) {
     Vec3f pos = player->actor.world.pos;
     Vec3f zero = { 0.0f, 0.0f, 0.0f };
@@ -726,7 +724,6 @@ static f32 GetClimbSpeed(Input* input) {
     return CHECK_BTN_ALL(input->cur.button, BTN_L) ? -FLY_CLIMB : 0.0f;
 }
 
-// Dust trailing opposite the motion: rising leaves it below, dropping above. Only there to say the air moves.
 static void KickUpWind(PlayState* play, Player* player, f32 vy) {
     static Color_RGBA8 prim = { 235, 240, 255, 140 };
     static Color_RGBA8 env = { 130, 160, 200, 0 };
@@ -743,7 +740,6 @@ static void KickUpWind(PlayState* play, Player* player, f32 vy) {
     EffectSsDust_Spawn(play, 0, &pos, &vel, &accel, &prim, &env, 60, 12, 8, 0);
 }
 
-// Stick to yaw and speed, camera-relative and capped at a walk; standing still with a lock-on faces it.
 static void SteerFlight(PlayState* play, Player* player) {
     f32 speed = 0.0f;
     s16 yaw = player->actor.shape.rot.y;
@@ -785,7 +781,6 @@ static Actor* FindLaunchTarget(PlayState* play, Player* player) {
     return (target != NULL && target->update != NULL) ? target : NULL;
 }
 
-// Solved once at entry, vy0 = dy/T + g*T/2, so the parabola lands on the target instead of beelining.
 static void AimLaunchArc(Player* player, Actor* target) {
     f32 dx = target->world.pos.x - player->actor.world.pos.x;
     f32 dz = target->world.pos.z - player->actor.world.pos.z;
@@ -817,7 +812,6 @@ static void StartLaunch(PlayState* play, Player* player) {
     EnterFlightState(play, player, LANCE_FLY_LAUNCH, CLIP_FLY_LAUNCH, false);
 }
 
-// R+B is tested before B: R is also the climb, so the slam must win or tapping B while rising would shoot.
 static f32 UpdateHover(PlayState* play, Player* player, Input* input) {
     bool isBPressed = CHECK_BTN_ALL(input->press.button, BTN_B);
 
@@ -858,8 +852,6 @@ static f32 UpdateShoot(PlayState* play, Player* player, Input* input, bool isCli
     return vy;
 }
 
-// Without a target the launch lasts as long as A is held, the clip ping-ponging across 10..16; curFrame is
-// written after the update, so it is what the next frame reads.
 static f32 UpdateStraightLaunch(PlayState* play, Player* player, Input* input, bool isClipDone) {
     player->yaw = player->actor.shape.rot.y;
     player->speedXZ = LAUNCH_SPEED;
@@ -881,14 +873,13 @@ static f32 UpdateStraightLaunch(PlayState* play, Player* player, Input* input, b
     return 0.0f;
 }
 
-// With a target the arc is committed: letting go halfway would drop Link out of the sky.
 static f32 UpdateArcLaunch(PlayState* play, Player* player, Actor* target) {
     Vec3f to = { target->world.pos.x - player->actor.world.pos.x,
                  (target->world.pos.y + target->focus.pos.y) * 0.5f - player->actor.world.pos.y,
                  target->world.pos.z - player->actor.world.pos.z };
     f32 distance = sqrtf(SQ(to.x) + SQ(to.y) + SQ(to.z));
-    bool isBladeHit = (player->meleeWeaponQuads[0].base.atFlags & AT_HIT) ||
-                      (player->meleeWeaponQuads[1].base.atFlags & AT_HIT);
+    bool isBladeHit =
+        (player->meleeWeaponQuads[0].base.atFlags & AT_HIT) || (player->meleeWeaponQuads[1].base.atFlags & AT_HIT);
 
     if (distance > 1.0f) {
         player->yaw = Math_Atan2S(to.z, to.x);
@@ -943,7 +934,6 @@ static bool IsCapeOwned(void) {
     return CustomEquipRegistry_IsOwned(MAGIC_CAPE_KEY);
 }
 
-// Four magic a second, free with the Magic Cape; running dry brings Link down.
 static bool PayForFlight(PlayState* play) {
     if (IsCapeOwned() || ++sLance.flyMagicTick < FLY_MAGIC_TICK) {
         return true;
@@ -952,7 +942,6 @@ static bool PayForFlight(PlayState* play) {
     return Magic_Consume(play, FLY_MAGIC_COST, MAGIC_CONSUME_NOW);
 }
 
-// The arc ends where its own case says; the slam's touchdown is the move itself.
 static void TouchDown(PlayState* play, Player* player, f32 vy) {
     if (sLance.state == LANCE_FLY_START || vy > 0.0f || !IsGrounded(player)) {
         return;
@@ -967,7 +956,6 @@ static void TouchDown(PlayState* play, Player* player, f32 vy) {
     }
 }
 
-// The flight hum is continuous: asked for every frame, it stops on its own the frame this stops running.
 static void UpdateFlight(PlayState* play, Player* player, Input* input) {
     bool isClipDone;
     f32 vy = 0.0f;
@@ -992,8 +980,7 @@ static void UpdateFlight(PlayState* play, Player* player, Input* input) {
             if ((play->gameplayFrames & 1) == 0) {
                 Vec3f zero = { 0.0f, 0.0f, 0.0f };
 
-                SpawnLightBall(play, &player->actor.world.pos, &zero, &zero, 110,
-                                                FHG_LIGHTBALL_BLUE);
+                SpawnLightBall(play, &player->actor.world.pos, &zero, &zero, 110, FHG_LIGHTBALL_BLUE);
             }
             if (isClipDone) {
                 EnterFlightState(play, player, LANCE_FLY_IDLE, CLIP_FLY_IDLE, true);
@@ -1044,7 +1031,6 @@ static void TakeOff(PlayState* play, Player* player) {
     EnterFlightState(play, player, LANCE_FLY_START, CLIP_FLY_START, false);
 }
 
-// The run cycle on the legs at its native length, the guard stance over the torso; stick X steers.
 static void UpdateDash(PlayState* play, Player* player, Input* input) {
     f32 speed = 0.0f;
     s16 yaw = player->actor.shape.rot.y;
@@ -1091,7 +1077,6 @@ static void StartDash(PlayState* play, Player* player) {
     Player_PlaySfx(player, NA_SE_VO_LI_SWORD_N);
 }
 
-// Its own action, so damage, water or a cutscene replace it the way they replace any vanilla one.
 static void LanceAction(Player* player, PlayState* play) {
     Input* input = &play->state.input[0];
 
@@ -1115,8 +1100,6 @@ static void LanceAction(Player* player, PlayState* play) {
     UpdateSwing(play, player, input);
 }
 
-// Magic is folded into a consume already running: the spin's own cost has magicState busy by now, and a
-// second request would be refused.
 static void PayForBall(PlayState* play) {
     s16 cost = BALL_MAGIC_COST;
 
@@ -1137,7 +1120,6 @@ static bool IsTargetUsable(Actor* target) {
     return target != NULL && target->update != NULL && target->colChkInfo.health > 0;
 }
 
-// Anything on screen is fair game at any range; anything off it has to be close.
 static bool IsReachable(Actor* actor, Vec3f* origin, f32 range) {
     return actor->isDrawn || Math_Vec3f_DistXYZ(origin, &actor->world.pos) <= range;
 }
@@ -1151,7 +1133,6 @@ static bool IsTaken(Actor* actor, Actor** taken, s32 takenCount) {
     return false;
 }
 
-// Bosses before enemies, and only the body of a split boss: Barinade's stumps and tentacles are bosses too.
 static Actor* FindNearestTarget(PlayState* play, Vec3f* origin, Actor** taken, s32 takenCount, bool isBossOnly) {
     static const u8 sCategories[] = { ACTORCAT_BOSS, ACTORCAT_ENEMY };
     s32 categoryCount = isBossOnly ? 1 : 2;
@@ -1192,8 +1173,8 @@ static void SpawnProjectile(PlayState* play, Vec3f* pos, ProjectileKind kind, Ve
     if (sProjectileActorId < 0) {
         return;
     }
-    projectile = (Projectile*)Actor_Spawn(&play->actorCtx, play, sProjectileActorId, pos->x, pos->y, pos->z, 0, 0, 0,
-                                          kind);
+    projectile =
+        (Projectile*)Actor_Spawn(&play->actorCtx, play, sProjectileActorId, pos->x, pos->y, pos->z, 0, 0, 0, kind);
     if (projectile == NULL) {
         return;
     }
@@ -1201,7 +1182,6 @@ static void SpawnProjectile(PlayState* play, Vec3f* pos, ProjectileKind kind, Ve
     projectile->target = target != NULL ? target : AcquireTarget(play, pos);
 }
 
-// Four seekers, each after a different nearest enemy; with fewer enemies than seekers the spares double up.
 static void SpawnHunters(PlayState* play, Vec3f* origin) {
     Actor* taken[HUNTER_COUNT];
     s32 takenCount = 0;
@@ -1230,15 +1210,13 @@ static void BurstBall(PlayState* play, Projectile* ball) {
     for (s32 i = 0; i < 8; i++) {
         Vec3f velocity = { Rand_CenteredFloat(12.0f), Rand_ZeroFloat(8.0f) + 2.0f, Rand_CenteredFloat(12.0f) };
 
-        SpawnLightBall(play, &ball->actor.world.pos, &velocity, &zero,
-                                        (s16)(Rand_ZeroOne() * 80.0f) + 150, FHG_LIGHTBALL_PURPLE);
+        SpawnLightBall(play, &ball->actor.world.pos, &velocity, &zero, (s16)(Rand_ZeroOne() * 80.0f) + 150,
+                       FHG_LIGHTBALL_PURPLE);
     }
     SpawnHunters(play, &ball->actor.world.pos);
     ball->burst = BALL_BURST_FRAMES;
 }
 
-// The ball ends a real boss outright: health is zeroed rather than damage piled on, since bosses cap what a
-// hit takes, and the hit still lands so the boss plays its own death.
 static void ResolveProjectileHit(PlayState* play, Projectile* projectile) {
     Actor* hit = projectile->collider.base.at;
 
@@ -1273,7 +1251,6 @@ static void SteerProjectile(Projectile* projectile, f32 speed, f32 homing) {
     projectile->velocity.z += (to.z / length * speed - projectile->velocity.z) * homing;
 }
 
-// Sampled after the move: position plus the heading it travels on, which orients each streak segment.
 static void RecordTrail(Projectile* projectile) {
     f32 horizontal = sqrtf(SQ(projectile->velocity.x) + SQ(projectile->velocity.z));
 
@@ -1295,7 +1272,6 @@ static void TrackProjectile(Projectile* projectile, bool isLive) {
     }
 }
 
-// A damage table would weigh a seeker or the max ball like any sword slash; theirs is exact.
 static void KeepFixedDamage(Actor* victim, ColliderElement* attack, float* damage) {
     for (s32 i = 0; i < ARRAY_COUNT(sLiveProjectiles); i++) {
         Projectile* projectile = sLiveProjectiles[i];
@@ -1366,7 +1342,7 @@ static void ProjectileUpdate(Actor* actor, PlayState* play) {
         RecordTrail(projectile);
     } else if ((projectile->lifetime & 3) == 0) {
         SpawnLightBall(play, &actor->world.pos, &zero, &zero, 120,
-                                        actor->params == PROJECTILE_BALL ? FHG_LIGHTBALL_PURPLE : FHG_LIGHTBALL_BLUE);
+                       actor->params == PROJECTILE_BALL ? FHG_LIGHTBALL_PURPLE : FHG_LIGHTBALL_BLUE);
     }
     Collider_UpdateCylinder(actor, &projectile->collider);
     CollisionCheck_SetAT(play, &play->colChkCtx, &projectile->collider.base);
@@ -1377,7 +1353,6 @@ static void ProjectileUpdate(Actor* actor, PlayState* play) {
     if (projectile->lifetime-- > 0) {
         return;
     }
-    // A ball that expires still bursts, so a miss reads as a miss rather than a blink.
     if (actor->params == PROJECTILE_BALL) {
         BurstBall(play, projectile);
     } else {
@@ -1385,10 +1360,7 @@ static void ProjectileUpdate(Actor* actor, PlayState* play) {
     }
 }
 
-// Ganondorf's big magic: flecks, background circle, dot, the light ball and a fan of rays. The ball Link charges
-// and the projectile it becomes both draw through here, so the release reads as that ball leaving.
-static void DrawBigMagic(PlayState* play, Vec3f* pos, f32 circleScale, f32 ballScale, f32 alpha, s32 rays,
-                         f32 spin) {
+static void DrawBigMagic(PlayState* play, Vec3f* pos, f32 circleScale, f32 ballScale, f32 alpha, s32 rays, f32 spin) {
     GraphicsContext* gfxCtx = play->state.gfxCtx;
     u32 frame = play->gameplayFrames;
     u8 opacity = (u8)CLAMP(alpha, 0.0f, 255.0f);
@@ -1401,8 +1373,8 @@ static void DrawBigMagic(PlayState* play, Vec3f* pos, f32 circleScale, f32 ballS
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 170, opacity);
     gDPSetEnvColor(POLY_XLU_DISP++, 200, 255, 0, 128);
     gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScrollEx(gfxCtx, 0, frame * -2, 0, 0x40, 0x40, 1, 0, frame * 0xA, 0x40, 0x40, -2,
-                                             0, 0, 0xA));
+               (uintptr_t)Gfx_TwoTexScrollEx(gfxCtx, 0, frame * -2, 0, 0x40, 0x40, 1, 0, frame * 0xA, 0x40, 0x40, -2, 0,
+                                             0, 0xA));
     Matrix_Translate(pos->x, pos->y, pos->z, MTXMODE_NEW);
     Matrix_ReplaceRotation(&play->billboardMtxF);
     Matrix_Scale(circleScale, circleScale, circleScale, MTXMODE_APPLY);
@@ -1414,8 +1386,8 @@ static void DrawBigMagic(PlayState* play, Vec3f* pos, f32 circleScale, f32 ballS
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sBigMagicCircleDL);
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 150, 170, 0, opacity);
     gSPSegment(POLY_XLU_DISP++, 0x0A,
-               (uintptr_t)Gfx_TwoTexScrollEx(gfxCtx, 0, 0, 0, 0x20, 0x20, 1, frame * 2, frame * -0x14, 0x40, 0x40, 0,
-                                             0, 2, -0x14));
+               (uintptr_t)Gfx_TwoTexScrollEx(gfxCtx, 0, 0, 0, 0x20, 0x20, 1, frame * 2, frame * -0x14, 0x40, 0x40, 0, 0,
+                                             2, -0x14));
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sBigMagicDotDL);
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
     gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 100, 0);
@@ -1446,8 +1418,6 @@ static void DrawBigMagic(PlayState* play, Vec3f* pos, f32 circleScale, f32 ballS
     CLOSE_DISPS(gfxCtx);
 }
 
-// The seekers carry the lit streak of the balls Ganondorf's light arrow turns back: twelve tapering quads along
-// the last twelve samples, their matrices in segment 0x0D where the streak lists index them.
 static void DrawStreak(Projectile* projectile, PlayState* play) {
     GraphicsContext* gfxCtx = play->state.gfxCtx;
     Mtx* matrices = GRAPH_ALLOC(gfxCtx, TRAIL_DRAWN * sizeof(Mtx));
@@ -1464,8 +1434,8 @@ static void DrawStreak(Projectile* projectile, PlayState* play) {
     for (s32 i = 0; i < TRAIL_DRAWN; i++) {
         s32 sample = (projectile->trailIndex - i + TRAIL_LENGTH) % TRAIL_LENGTH;
 
-        Matrix_Translate(projectile->trailPos[sample].x, projectile->trailPos[sample].y,
-                         projectile->trailPos[sample].z, MTXMODE_NEW);
+        Matrix_Translate(projectile->trailPos[sample].x, projectile->trailPos[sample].y, projectile->trailPos[sample].z,
+                         MTXMODE_NEW);
         Matrix_RotateYF(projectile->trailRot[sample].y, MTXMODE_APPLY);
         Matrix_RotateXF(-projectile->trailRot[sample].x, MTXMODE_APPLY);
         Matrix_Scale(STREAK_SCALE, STREAK_SCALE, STREAK_SCALE, MTXMODE_APPLY);
@@ -1485,7 +1455,6 @@ static void DrawStreak(Projectile* projectile, PlayState* play) {
     CLOSE_DISPS(gfxCtx);
 }
 
-// Phantom Ganon's own energy ball, drawn the way EnFhgFire_Draw does it.
 static void DrawLightBall(Projectile* projectile, PlayState* play) {
     Actor* actor = &projectile->actor;
 
@@ -1503,7 +1472,6 @@ static void DrawLightBall(Projectile* projectile, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// The burst swells to BALL_BURST_PEAK over its first BALL_BURST_RISE, then collapses while it fades.
 static void DrawBall(Projectile* projectile, PlayState* play) {
     f32 size = 1.0f;
     f32 alpha = 255.0f;
@@ -1516,8 +1484,8 @@ static void DrawBall(Projectile* projectile, PlayState* play) {
         size = MAX(size, 0.0f);
         alpha = 255.0f * (1.0f - t);
     }
-    DrawBigMagic(play, &projectile->actor.world.pos, BALL_CIRCLE_SCALE * size, BALL_DRAW_SCALE * size, alpha,
-                 RAYS_MAX, projectile->actor.shape.rot.z / (f32)0x8000 * M_PIf);
+    DrawBigMagic(play, &projectile->actor.world.pos, BALL_CIRCLE_SCALE * size, BALL_DRAW_SCALE * size, alpha, RAYS_MAX,
+                 projectile->actor.shape.rot.z / (f32)0x8000 * M_PIf);
 }
 
 static void ProjectileDraw(Actor* actor, PlayState* play) {
@@ -1542,8 +1510,6 @@ static void ProjectileDraw(Actor* actor, PlayState* play) {
     }
 }
 
-// Against a boss in range the ball goes after it for a fixed super hit; anything else, it breaks on the very
-// next frame and the burst is the payload.
 static void ReleaseMaxBall(PlayState* play, Player* player) {
     Vec3f pos = sCharge.isMagicActive ? sCharge.magicAnchor : sLance.lanceTip;
     Vec3f velocity = { Math_SinS(player->actor.shape.rot.y) * BALL_SPEED, 0.0f,
@@ -1573,8 +1539,6 @@ static void ReleaseMaxBall(PlayState* play, Player* player) {
     sCharge.magicRays = 0;
 }
 
-// The first frames are golden and untouchable: intangible, not invulnerable, since a knockback would tear the
-// release in half. From frame 25 the clip runs three times as fast, and the ball leaves at frame 64.
 static void TickMaxRelease(PlayState* play, Player* player) {
     f32 frame = player->skelAnime.curFrame;
     f32 prev = sCharge.prevReleaseFrame;
@@ -1612,7 +1576,7 @@ static void StartChargeRelease(PlayState* play, Player* player, ClipId clip) {
     sCharge.isBallArmed = false;
     sCharge.prevReleaseFrame = -1.0f;
     PlayerAnimation_Change(play, &player->skelAnime, anim, 1.0f, 0.0f, Animation_GetLastFrame(anim), ANIMMODE_ONCE,
-                         0.0f);
+                           0.0f);
     if (clip == CLIP_CHARGE_RELEASE) {
         sCharge.domeScale = sCharge.releaseLevel >= 2 ? DOME_SCALE_2 : DOME_SCALE_1;
         sCharge.domeTimer = DOME_FRAMES;
@@ -1621,7 +1585,6 @@ static void StartChargeRelease(PlayState* play, Player* player, ClipId clip) {
     }
 }
 
-// A heavy weapon hops short and low, and the landing lunges a step with a quake.
 static void ReskinJumpSlash(PlayState* play, Player* player, bool isLanding) {
     PlayerAnimationHeader* anim = LoadClip(isLanding ? CLIP_JUMP_FINISH : CLIP_JUMP_START);
 
@@ -1638,17 +1601,15 @@ static void ReskinJumpSlash(PlayState* play, Player* player, bool isLanding) {
         player->actor.velocity.y *= JUMP_Y_SCALE;
     }
     PlayerAnimation_Change(play, &player->skelAnime, anim, 1.0f, player->skelAnime.curFrame,
-                         Animation_GetLastFrame(anim), ANIMMODE_ONCE, -4.0f);
+                           Animation_GetLastFrame(anim), ANIMMODE_ONCE, -4.0f);
 }
 
-// Vanilla's spin release and jump slash, re-skinned; a clip vanilla puts back is re-skinned again.
 static void ReskinVanillaStrikes(PlayState* play, Player* player) {
     s8 row = player->meleeWeaponAnimation;
     bool isMelee = player->actionFunc == Player_Action_84;
     bool isSpin = row >= PLAYER_MWA_SPIN_ATTACK_1H && row <= PLAYER_MWA_BIG_SPIN_2H;
 
     if (isMelee && isSpin) {
-        // The level is spent here, so a quick spin with no charge behind it never inherits the last one.
         if (!IsPlayingClip(player, CLIP_CHARGE_MAX) && !IsPlayingClip(player, CLIP_CHARGE_RELEASE)) {
             StartChargeRelease(play, player, sCharge.releaseLevel >= 3 ? CLIP_CHARGE_MAX : CLIP_CHARGE_RELEASE);
             sCharge.releaseLevel = 0;
@@ -1666,7 +1627,6 @@ static void ReskinVanillaStrikes(PlayState* play, Player* player) {
     }
 }
 
-// The charge is a guard stance, so a shield comes up with it, the hands the way vanilla's walking shield sets them.
 static void RaiseShieldWhileCharging(Player* player) {
     if (player->currentShield == PLAYER_SHIELD_NONE || Player_IsHoldingTwoHandedWeapon(player)) {
         return;
@@ -1676,8 +1636,6 @@ static void RaiseShieldWhileCharging(Player* player) {
     sCharge.isShieldRaised = true;
 }
 
-// Vanilla fills the bar inside the action; it is pulled back here to the slower rate. Level 3 is the bar full
-// and then held there another second.
 static void TickCharging(PlayState* play, Player* player) {
     if (sCharge.prevCharge >= 0.0f && player->unk_B08 > sCharge.prevCharge + CHARGE_RATE) {
         player->unk_B08 = sCharge.prevCharge + CHARGE_RATE;
@@ -1695,7 +1653,6 @@ static void TickCharging(PlayState* play, Player* player) {
     sCharge.wasCharging = true;
 }
 
-// Hit while charging: vanilla already put its own reaction on, so the stagger goes on after it, once.
 static void EndCharging(PlayState* play, Player* player) {
     PlayerAnimationHeader* stagger;
 
@@ -1715,8 +1672,6 @@ static void EndCharging(PlayState* play, Player* player) {
     }
 }
 
-// The ball sits on the lance tip through the charge, drifts into Link's chest for the full release, and fades
-// wherever it is otherwise.
 static void TickChargeBall(Player* player, bool isCharging) {
     Vec3f want;
     f32 fill = MIN(player->unk_B08 / CHARGE_LEVEL_2, 1.0f);
@@ -1778,7 +1733,6 @@ static void TickCharge(PlayState* play, Player* player) {
     }
 }
 
-// Entering water puts the lance away through vanilla's own item change.
 static void SheatheInWater(PlayState* play, Player* player) {
     if ((player->stateFlags1 & PLAYER_STATE1_8000000) && IsWielding(player) &&
         !(player->stateFlags3 & PLAYER_STATE3_START_CHANGING_HELD_ITEM) &&
@@ -1791,7 +1745,6 @@ static bool CanTakeOff(Player* player) {
     return IsGrounded(player) && (IsCapeOwned() || gSaveContext.save.saveInfo.playerData.magic > 0);
 }
 
-// R+B is tested before the R+A hold, so a deliberate dash is never swallowed by the take-off counter.
 static void ReadGuardButtons(PlayState* play, Player* player) {
     Input* input = &play->state.input[0];
     bool isRHeld = CHECK_BTN_ALL(input->cur.button, BTN_R);
@@ -1860,7 +1813,6 @@ static void TickTrident(Player* player) {
     }
 }
 
-// With R+B from the guard the thrust is not a swing either.
 static void TakeMeleeButton(PlayState* play, Player* player, int32_t action, bool* consumed, bool* startedAction) {
     Input* input = &play->state.input[0];
     bool isThrust;
@@ -1881,8 +1833,6 @@ static void TakeMeleeButton(PlayState* play, Player* player, int32_t action, boo
     *startedAction = IsInLanceAction(player);
 }
 
-// R stays vanilla's shield; what stacks on it belongs to the dash and the take-off, and in flight every button
-// belongs to the lance.
 static void KeepButtonsFromVanilla(Player* player, Input* input) {
     u16 taken = 0;
 
@@ -1918,7 +1868,6 @@ static void GripLance(Player* player, int32_t limbIndex, Gfx** dList, Gfx* limbD
     }
 }
 
-// Rotations before the offset, so the offset runs along the lance's own axes whichever way the hand points.
 static void ApplyLanceMatrix(void) {
     Matrix_Translate(2028.26f, 267.2f, -33.82f, MTXMODE_APPLY);
     Matrix_RotateZYX(-0x8000, 0, 0x4000, MTXMODE_APPLY);
@@ -1929,7 +1878,6 @@ static void ApplyLanceMatrix(void) {
     Matrix_Translate(LANCE_OFF_X, LANCE_OFF_Y, LANCE_OFF_Z, MTXMODE_APPLY);
 }
 
-// The sword code lays its blade along +X; the lance's shaft is +Z, and the lance frame is half a limb unit wide.
 static void ApplyLanceTrailMatrix(void) {
     ApplyLanceMatrix();
     Matrix_RotateYF(-M_PIf / 2.0f, MTXMODE_APPLY);
@@ -1989,7 +1937,6 @@ static void HideSwingFromSwordHand(Actor* actor, bool* should) {
     player->meleeWeaponState = 0;
 }
 
-// Din's Fire's own sphere shrunk to Link, without MagicFire_Draw's writes into its shared vertex buffer.
 static void DrawDome(PlayState* play, Player* player) {
     GraphicsContext* gfxCtx = play->state.gfxCtx;
     u32 frame = play->gameplayFrames;
@@ -2049,21 +1996,18 @@ static void DrawChargeEffects(Actor* actor, PlayState* play) {
     }
 }
 
-// MM tints a model with the grayscale pass, not with the tunic colour, so the gold is a lerp over Link.
 static void GildLink(Actor* actor, PlayState* play, Color_RGBA8* grayscale) {
     if (IsWorn() && sCharge.goldTimer > 0) {
         *grayscale = (Color_RGBA8){ 255, 205, 40, 200 };
     }
 }
 
-// The lance is wielded with the vanilla shield; a custom one it replaces is not given back.
 static void TakeUpVanillaShield(const char* key) {
     if (CustomEquipRegistry_GetWorn(S2H_EQUIP_SLOT_SHIELD) != NULL) {
         CustomEquipRegistry_TakeOff(S2H_EQUIP_SLOT_SHIELD);
     }
 }
 
-// Spawned actors are gone by the next scene; the pointers are dropped, never followed.
 static void ForgetSceneState(s16 sceneId, s8 spawnNum) {
     sLance.state = LANCE_SWING;
     sLance.swing = NULL;
@@ -2111,8 +2055,8 @@ static bool RegisterProjectileActor(void) {
 }
 
 static const char* const sRequiredHooks[] = {
-    "OnPlayerUpdate",          "OnPlayerActionHandler", "OnPlayerFilterInput", "OnPlayerResolveAnim",
-    "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw",  "ShouldActorDraw",     "OnActorDrawEnd",
+    "OnPlayerUpdate",          "OnPlayerActionHandler",    "OnPlayerFilterInput", "OnPlayerResolveAnim",
+    "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw",     "ShouldActorDraw",     "OnActorDrawEnd",
     "OnActorResolveGrayscale", "OnCollisionResolveDamage", "OnSceneInit",
 };
 
@@ -2127,7 +2071,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
 static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
@@ -2169,6 +2112,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.onEquip = TakeUpVanillaShield;
     definition.onUnequip = PutLanceAway;
     definition.getItemModelPath = sLanceDL;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = TRIDENT_KEY,
+        .hintKey = TRIDENT_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }

@@ -1,4 +1,5 @@
 #include "2s2h/ModApi/ModApi.h"
+#include "shared_asset_archive.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -8,8 +9,11 @@
 static const S2HModApi* sApi;
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), nullptr, 0 };
 static bool HasExtractedAssets() {
-    if (!S2H_MOD_API_HAS(sApi, HasModArchiveFile) || !sApi->HasModArchiveFile("oot.o2r")) return false;
+    if (!S2H_MOD_API_HAS(sApi, HasModArchiveFile) || !sApi->HasModArchiveFile("oot.o2r"))
+        return false;
     const char* markers[] = {
+        "overlays/oot_ovl_Boss_Ganon/gGanondorfDotDL",
+        "textures/oot_icon_item_nes_static/gPauseEquipment10ENGTex",
         "textures/oot_icon_item_static/gItemIconSlingshotTex",
         "textures/oot_icon_item_nes_static/gPauseQuestStatus00ENGTex",
         "textures/oot_icon_item_nes_static/gPauseQuestStatus10ENGTex",
@@ -32,6 +36,8 @@ static bool HasExtractedAssets() {
         "objects/oot_object_gi_goddess/gGiNayrusLoveColorDL",
         "objects/oot_object_niw/gCuccoSkel",
         "objects/oot_object_gi_niwatori/gGiChickenDL",
+        "objects/oot_object_gi_egg/gGiEggDL",
+        "objects/oot_object_gi_map/gGiStoneOfAgonyDL",
         "objects/oot_object_ma1/gMalonChildSkel",
         "objects/oot_object_ma2/gMalonAdultSkel",
         "objects/oot_object_gi_bracelet/gGiGoronBraceletDL",
@@ -42,7 +48,9 @@ static bool HasExtractedAssets() {
         "overlays/oot_ovl_Magic_Dark/sDiamondModelDL",
         "overlays/oot_ovl_Magic_Wind/sSkel",
     };
-    for (const char* marker : markers) if (!sApi->HasResource(marker)) return false;
+    for (const char* marker : markers)
+        if (!sApi->HasResource(marker))
+            return false;
     return true;
 }
 
@@ -51,10 +59,12 @@ static uint32_t ReadBE(const uint8_t* data) {
 }
 
 static void ExtractAssets() {
-    if (!sApi->AskPlayer("OoT Asset Loader", "Extract Ocarina of Time item assets from your own ROM?")) return;
+    if (!sApi->AskPlayer("OoT Asset Loader", "Extract Ocarina of Time item assets from your own ROM?"))
+        return;
     S2HUserFile file = {};
     file.structSize = sizeof(file);
-    if (!sApi->PickUserFile("Select your Ocarina of Time ROM", "Nintendo 64 ROM", "*.z64 *.n64 *.v64", &file)) return;
+    if (!sApi->PickUserFile("Select your Ocarina of Time ROM", "Nintendo 64 ROM", "*.z64 *.n64 *.v64", &file))
+        return;
     if (file.data == nullptr || file.size < 0x40 || file.size > 64 * 1024 * 1024) {
         sApi->FreeUserFile(&file);
         sApi->TellPlayer("OoT Asset Loader", "That file is not a supported OoT ROM.");
@@ -66,7 +76,8 @@ static void ExtractAssets() {
     if (rom.size() >= 0x40 && rom.size() % 4 == 0) {
         uint32_t magic = ReadBE(rom.data());
         if (magic == 0x37804012) {
-            for (size_t i = 0; i < rom.size(); i += 2) std::swap(rom[i], rom[i + 1]);
+            for (size_t i = 0; i < rom.size(); i += 2)
+                std::swap(rom[i], rom[i + 1]);
         } else if (magic == 0x40123780) {
             for (size_t i = 0; i < rom.size(); i += 4) {
                 std::swap(rom[i], rom[i + 3]);
@@ -75,9 +86,15 @@ static void ExtractAssets() {
         }
         if (ReadBE(rom.data()) == 0x80371240) {
             switch (ReadBE(rom.data() + 0x10)) {
-                case 0xEC7011B7: version = "N64_NTSC_10"; break;
-                case 0xD43DA81F: version = "N64_NTSC_11"; break;
-                case 0x693BA2AE: version = "N64_NTSC_12"; break;
+                case 0xEC7011B7:
+                    version = "N64_NTSC_10";
+                    break;
+                case 0xD43DA81F:
+                    version = "N64_NTSC_11";
+                    break;
+                case 0x693BA2AE:
+                    version = "N64_NTSC_12";
+                    break;
             }
         }
     }
@@ -99,19 +116,72 @@ static void ExtractAssets() {
     request.outputFileName = "oot.o2r";
     if (sApi->ExtractRomToModsFolder(&request)) {
         sApi->RequestRestart("OoT item assets are ready. Restart to load them.");
-    } else sApi->TellPlayer("OoT Asset Loader", "Asset extraction failed. See the game log.");
+    } else
+        sApi->TellPlayer("OoT Asset Loader", "Asset extraction failed. See the game log.");
+}
+
+struct SharedAsset {
+    const char* target;
+    const char* source;
+};
+
+static const SharedAsset kSharedAssets[] = {
+#include "shared_assets.inc.h"
+};
+
+static bool KeepResource(const char*, const uint8_t* data, uint64_t size, void* userData) {
+    static_cast<std::vector<uint8_t>*>(userData)->assign(data, data + size);
+    return false;
+}
+
+static std::vector<uint8_t> ReadResource(const char* path) {
+    std::vector<uint8_t> resource;
+    sApi->ReadArchiveFiles(path, KeepResource, &resource);
+    return resource;
+}
+
+// Fleet's seed generator has no window to ask from, so only a game opened on its own writes this archive.
+static void CreateSharedAssets() {
+    if (S2H_MOD_API_HAS(sApi, FindService) && sApi->FindService("fleet.hosted") != nullptr) {
+        return;
+    }
+    static const std::vector<SharedAssetArchive::SongTint> kQuestSongTints = {
+        { "Minuet", 150, 255, 100 }, { "Bolero", 255, 80, 40 },     { "Serenade", 100, 150, 255 },
+        { "Requiem", 255, 160, 0 },  { "Nocturne", 255, 100, 255 }, { "Prelude", 255, 240, 100 },
+        { "Lullaby", 255, 20, 20 },  { "Custom", 255, 255, 255 },
+    };
+    bool isAssetMissing = !sApi->HasResource("textures/oot_icon_item_static/gItemIconOotSongMinuetTex");
+    std::vector<SharedAssetArchive::ArchiveFile> files =
+        SharedAssetArchive::MakeSongNoteIcons(ReadResource("textures/oot_icon_item_static/gSongNoteTex"),
+                                              "textures/oot_icon_item_static/gItemIconOotSong", kQuestSongTints);
+    for (const SharedAsset& asset : kSharedAssets) {
+        if (sApi->HasResource(asset.source)) {
+            isAssetMissing = isAssetMissing || !sApi->HasResource(asset.target);
+            files.push_back({ asset.target, ReadResource(asset.source) });
+        }
+    }
+    if (isAssetMissing && !files.empty()) {
+        const std::vector<uint8_t> archive = SharedAssetArchive::BuildStoredZip(files);
+        sApi->SaveToModsFolder("oot_shared_assets.o2r", archive.data(), archive.size());
+    }
 }
 
 static void DrawLoaderMenu() {
     bool extract = false;
     ModUI_Text("OoT Asset Loader: use your own NTSC 1.0, 1.1 or 1.2 ROM.");
-    if (ModUI_Checkbox("Extract OoT assets now", &extract) && extract) ExtractAssets();
+    if (ModUI_Checkbox("Extract OoT assets now", &extract) && extract)
+        ExtractAssets();
 }
 
-extern "C" S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) { sApi = api; }
-extern "C" S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements() { return &sRequirements; }
+extern "C" S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
+    sApi = api;
+}
+extern "C" S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements() {
+    return &sRequirements;
+}
 extern "C" S2H_MOD_EXPORT void ModInit() {
-    if (!S2H_MOD_API_HAS(sApi, RequestRestart)) return;
+    if (!S2H_MOD_API_HAS(sApi, RequestRestart))
+        return;
     S2HModMenuWidget button = {};
     button.structSize = sizeof(button);
     button.section = "Enhancements";
@@ -121,5 +191,9 @@ extern "C" S2H_MOD_EXPORT void ModInit() {
     button.onChange = DrawLoaderMenu;
     sApi->RegisterMenuSidebar("Enhancements", "OoT Asset Loader", "gMods.OotAssets.Menu", 1);
     sApi->RegisterMenuWidget(&button);
-    if (!HasExtractedAssets()) ExtractAssets();
+    if (!HasExtractedAssets()) {
+        ExtractAssets();
+        return;
+    }
+    CreateSharedAssets();
 }

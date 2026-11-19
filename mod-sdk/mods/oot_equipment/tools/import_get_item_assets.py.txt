@@ -1,0 +1,113 @@
+"""Import pickup resources from the player's existing OoT archive into private mod paths.
+
+Preserves the original vertices/materials and rewrites every hashed DL dependency,
+including markers. No original OoT/MM resource path is replaced by a package.
+"""
+import argparse
+from pathlib import Path
+import struct
+import zipfile
+
+ROOTS = {
+    "climb_boots": ["object_gi_boots_2/gGiIronBootsDL", "object_gi_boots_2/gGiIronBootsRivetsDL"],
+    "pegasus_boots": ["object_gi_hoverboots/gGiHoverBootsDL"],
+    "roc_boots": ["object_gi_hoverboots/gGiHoverBootsDL"],
+    "champion_tunic": ["object_gi_clothes/gGiTunicCollarDL", "object_gi_clothes/gGiTunicDL"],
+    "magic_tunic": ["object_gi_clothes/gGiTunicCollarDL", "object_gi_clothes/gGiTunicDL"],
+    "sages_tunic": ["object_gi_clothes/gGiTunicCollarDL", "object_gi_clothes/gGiTunicDL"],
+    "oot_equipment": [
+        "object_gi_boots_2/gGiIronBootsDL", "object_gi_boots_2/gGiIronBootsRivetsDL",
+        "object_gi_hoverboots/gGiHoverBootsDL", "object_gi_clothes/gGiTunicCollarDL",
+        "object_gi_clothes/gGiTunicDL", "object_gi_clothes/gGiGoronCollarColorDL",
+        "object_gi_clothes/gGiGoronTunicColorDL", "object_gi_clothes/gGiZoraCollarColorDL",
+        "object_gi_clothes/gGiZoraTunicColorDL", "object_gi_shield_1/gGiDekuShieldDL",
+        "object_gi_shield_3/gGiMirrorShieldDL", "object_gi_shield_3/gGiMirrorShieldSymbolDL",
+        "object_gi_longsword/gGiBiggoronSwordDL", "object_toki_objects/object_toki_objects_DL_001BD0",
+    ],
+}
+DL_TYPE = 0x4F444C54
+EXPANDED = {0x20, 0x31, 0x32, 0x33, 0x35, 0x36, 0x42}
+MASK = (1 << 64) - 1
+
+
+def crc_table():
+    table = []
+    for i in range(256):
+        value = i << 56
+        for _ in range(8):
+            value = ((value << 1) ^ (0x42F0E1EBA9EA3693 if value >> 63 else 0)) & MASK
+        table.append(value)
+    return table
+
+
+TABLE = crc_table()
+
+
+def crc64(path):
+    value = MASK
+    for byte in path.encode():
+        value = TABLE[(value >> 56) ^ byte] ^ ((value << 8) & MASK)
+    return value
+
+
+def dependencies(data):
+    """Yield hash word offsets, using the runtime's binary DL v0 layout."""
+    if len(data) < 64 or struct.unpack_from("<I", data, 4)[0] != DL_TYPE:
+        return
+    assert data[0] == 0 and struct.unpack_from("<I", data, 8)[0] == 0
+    offset = 72  # 64-byte resource header, ucode byte, then 8-byte alignment.
+    while offset + 8 <= len(data):
+        word0, _ = struct.unpack_from("<II", data, offset)
+        opcode = word0 >> 24
+        offset += 8
+        if opcode in EXPANDED:
+            high, low = struct.unpack_from("<II", data, offset)
+            yield offset, (high << 32) | low
+            offset += 8
+        if opcode == 0xDF:
+            return
+    raise ValueError("Unterminated display list")
+
+
+def import_assets(archive, mods):
+    with zipfile.ZipFile(archive) as source:
+        index = {crc64(name): name for name in source.namelist()}
+        for mod, roots in ROOTS.items():
+            resources = {}
+            pending = ["objects/" + root for root in roots]
+            while pending:
+                name = pending.pop()
+                if name in resources:
+                    continue
+                data = source.read(name)
+                resources[name] = data
+                for _, hashed in dependencies(data):
+                    if hashed not in index:
+                        raise ValueError(f"{name}: missing dependency {hashed:016x}")
+                    pending.append(index[hashed])
+            paths = {name: f"objects/nei_get_item/{mod}/" + name.removeprefix("objects/")
+                     for name in resources}
+            rewritten = 0
+            for name, data in resources.items():
+                converted = bytearray(data)
+                for offset, hashed in dependencies(data):
+                    replacement = crc64(paths[index[hashed]])
+                    struct.pack_into("<II", converted, offset, replacement >> 32, replacement & 0xFFFFFFFF)
+                    rewritten += 1
+                target = mods / mod / "assets" / paths[name]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(converted)
+            # Re-read the finished files: every hashed reference must resolve inside this package.
+            private_hashes = {crc64(path) for path in paths.values()}
+            for path in paths.values():
+                for _, hashed in dependencies((mods / mod / "assets" / path).read_bytes()):
+                    assert hashed in private_hashes, path
+            print(f"{mod}: {len(resources)} private resources, {rewritten} references verified")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("archive", type=Path)
+    parser.add_argument("--mods", type=Path, default=Path(__file__).resolve().parents[2])
+    args = parser.parse_args()
+    import_assets(args.archive, args.mods)

@@ -18,7 +18,6 @@
 
 #define HOURGLASS_KEY "nei.phantom_hourglass"
 #define HOURGLASS_TIME_OWNER HOURGLASS_KEY
-// Permafrost stops the world outright and must win; the hourglass only holds it while aiming.
 #define HOURGLASS_TIME_PRIORITY 50
 #define HOURGLASS_MAGIC_ACTIVATION 1
 #define HOURGLASS_DRAIN_INTERVAL 40
@@ -40,15 +39,13 @@
 #define HOURGLASS_RIBBON_STEP 4
 #define HOURGLASS_RIBBON_QUADS (HOURGLASS_FRAMES / HOURGLASS_RIBBON_STEP)
 #define HOURGLASS_RIBBON_HALF_WIDTH 6.0f
-// The model spans 276 units tall, so this is a hand-sized glass and a get-item-sized one.
 #define HOURGLASS_HELD_SCALE 0.07f
+#define HOURGLASS_GIVE_SCALE 0.16f
 #define HOURGLASS_HAND_DROP 2.0f
-// The wav cues are 16 kHz mono against a 32 kHz stereo buffer, so one output frame is half a sample.
 #define HOURGLASS_MIXER_ADVANCE 0.5f
 #define HOURGLASS_MIXER_FADE_STEP 0.002f
 #define HOURGLASS_MIXER_ALIVE_CALLS 30
 
-// Majora's Mask keeps Ship's bit layout but names a ledge climb with three bits.
 #define HOURGLASS_LEDGE_STATES (PLAYER_STATE1_4 | PLAYER_STATE1_2000 | PLAYER_STATE1_4000)
 #define HOURGLASS_ITEM_CUTSCENE_STATE PLAYER_STATE1_10000000
 #define HOURGLASS_GETTING_ITEM_STATE PLAYER_STATE1_400
@@ -57,9 +54,8 @@
 #define HOURGLASS_HORSE_STATE PLAYER_STATE1_800000
 #define HOURGLASS_FIRST_PERSON_STATE PLAYER_STATE1_100000
 #define HOURGLASS_DISABLE_DRAW_STATE PLAYER_STATE2_20000000
-// The bare aim state: no cutscene flag, because rewinding a descending elevator is the point.
-#define HOURGLASS_BLOCKING_STATES                                                                              \
-    (PLAYER_STATE1_DEAD | PLAYER_STATE1_1 | HOURGLASS_ITEM_CUTSCENE_STATE | PLAYER_STATE1_TALKING |           \
+#define HOURGLASS_BLOCKING_STATES                                                                               \
+    (PLAYER_STATE1_DEAD | PLAYER_STATE1_1 | HOURGLASS_ITEM_CUTSCENE_STATE | PLAYER_STATE1_TALKING |             \
      HOURGLASS_GETTING_ITEM_STATE | HOURGLASS_DAMAGED_STATE | HOURGLASS_LEDGE_STATES | HOURGLASS_LADDER_STATE | \
      HOURGLASS_HORSE_STATE)
 
@@ -103,13 +99,12 @@ static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/gPhantomHourglassNameTex";
 static const ALIGN_ASSET(2) char sCastAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_hook_shot_ready";
 
-// Bosses are not here: a boss fight is not something to undo. Link owns his own slot.
-static const u8 sTrackedCategories[] = { ACTORCAT_SWITCH, ACTORCAT_BG,         ACTORCAT_EXPLOSIVES, ACTORCAT_NPC,
-                                         ACTORCAT_ENEMY,  ACTORCAT_PROP,       ACTORCAT_ITEMACTION, ACTORCAT_MISC,
+static const u8 sTrackedCategories[] = { ACTORCAT_SWITCH, ACTORCAT_BG,   ACTORCAT_EXPLOSIVES, ACTORCAT_NPC,
+                                         ACTORCAT_ENEMY,  ACTORCAT_PROP, ACTORCAT_ITEMACTION, ACTORCAT_MISC,
                                          ACTORCAT_DOOR,   ACTORCAT_CHEST };
 
-static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,   BTN_CLEFT,   BTN_CDOWN, BTN_CRIGHT, 0,
-                                                         BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN,  BTN_DUP };
+static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
+                                                         BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
 static ColliderCylinderInit sImpactColliderInit = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_CYLINDER },
@@ -151,11 +146,7 @@ void func_8083B1A0(Player* player, PlayState* play);
 static RecordedActor* StalestSlot(void);
 static void AimAction(Player* player, PlayState* play);
 
-// The glass brings its own cues in its archive as plain PCM, and mixes them into the finished audio buffer
-// itself: the sequence player carries one song per player and cannot lay a cue over the music.
-//
-// The two threads share only these fields, one writer each. The game thread raises wantCue, loopWant and
-// volume; the audio thread owns every cursor. Worst case a cue starts a buffer early.
+// The game thread raises wantCue, loopWant and volume; the audio thread owns every cursor.
 typedef struct {
     s16* samples;
     s32 count;
@@ -204,8 +195,6 @@ static void StopCueLoop(void) {
     sWantLoop = 0;
 }
 
-// Read on the audio thread, so it is refreshed from the item's own tick: a paused or stalled game stops
-// refreshing it and the bed fades out on its own instead of ringing forever.
 static void KeepMixerAlive(void) {
     sMixerVolume =
         CVarGetFloat("gSettings.Audio.MasterVolume", 1.0f) * CVarGetFloat("gSettings.Audio.SoundEffectsVolume", 1.0f);
@@ -301,8 +290,7 @@ static bool HasMagic(s16 amount) {
            gSaveContext.save.saveInfo.playerData.magic >= amount;
 }
 
-// Magic_RequestChange refuses while the meter is already animating a request, and a drain that reads that
-// refusal as "out of magic" cuts the rewind off mid-flight. The meter is simply debited instead.
+// Magic_RequestChange refuses while the meter animates a request, so the meter is debited directly.
 static bool SpendMagic(PlayState* play, s16 amount) {
     if (!HasMagic(amount)) {
         return false;
@@ -320,9 +308,6 @@ static size_t GetInstanceSize(Actor* actor) {
     return profile == NULL ? 0 : profile->instanceSize;
 }
 
-// Once a skeleton is found, only its memory is re-checked each frame: a live actor rewrites its animation,
-// its length and its current frame every time it changes clip, and dropping the pointer over that would
-// cost the pose for the rest of the actor's life.
 static bool IsPoseInsideInstance(Actor* actor, SkelAnime* skelAnime) {
     size_t size = GetInstanceSize(actor);
     uintptr_t base = (uintptr_t)actor;
@@ -337,8 +322,6 @@ static bool IsPoseInsideInstance(Actor* actor, SkelAnime* skelAnime) {
     return joints + skelAnime->limbCount * sizeof(Vec3s) <= base + size;
 }
 
-// The skeleton lives somewhere inside the actor's own instance; only a candidate that fits entirely
-// inside it and reads as a sane animation can be trusted as the one to record.
 static bool IsUsableSkelAnime(Actor* actor, SkelAnime* skelAnime) {
     if (actor == NULL || skelAnime == NULL) {
         return false;
@@ -420,8 +403,6 @@ static bool HasPose(RecordedActor* slot) {
     return slot->skelAnime != NULL && IsPoseInsideInstance(slot->actor, slot->skelAnime);
 }
 
-// A body that animates where it stands — a wind-up, an idle, a door on its hinge — moves its limbs and not
-// its position, so the pose counts as movement: banking only the position would leave nothing to replay.
 static bool IsWorthBanking(RecordedActor* slot, RecordedFrame* newest) {
     if (newest == NULL || HasMoved(&newest->pos, &slot->actor->world.pos)) {
         return true;
@@ -434,7 +415,6 @@ static void RecordFrame(RecordedActor* slot) {
     RecordedFrame* newest = FrameAt(slot, 0);
     RecordedFrame* frame;
 
-    // Standing perfectly still is never banked, so a lift that came down in a cutscene stays recallable.
     if (!IsWorthBanking(slot, newest)) {
         slot->idleFrames = MIN(slot->idleFrames + 1, HOURGLASS_FRAMES * 2);
         return;
@@ -454,8 +434,6 @@ static void RecordFrame(RecordedActor* slot) {
     slot->count = MIN(slot->count + 1, HOURGLASS_FRAMES);
 }
 
-// The actor is put back where it was, with the engine told not to read the jump as a sweep into a wall.
-// Its home position is left alone: that is the anchor its own AI patrols around.
 static void ApplyFrame(RecordedActor* slot, RecordedFrame* frame) {
     Actor* actor = slot->actor;
 
@@ -481,8 +459,6 @@ static void BindSlot(RecordedActor* slot, Actor* actor) {
     slot->isUsed = true;
 }
 
-// Tatl follows Link everywhere and is never something the world did: she would take a slot from whatever
-// actually moved, and sending her back where she hovered a moment ago means nothing.
 static bool IsRecallable(Player* player, Actor* actor) {
     return actor->id != ACTOR_EN_ELF && actor != player->tatlActor;
 }
@@ -493,7 +469,6 @@ static bool IsWorthRecording(Player* player, Actor* actor) {
            Math_Vec3f_DistXYZ(&player->actor.world.pos, &actor->world.pos) < HOURGLASS_TRACK_RANGE;
 }
 
-// Nothing free left, but something out there is moving: it takes the slot of whatever has sat still longest.
 static void StealSlotForNewcomer(PlayState* play, Player* player) {
     for (u8 index = 0; index < ARRAY_COUNT(sTrackedCategories); index++) {
         for (Actor* actor = play->actorCtx.actorLists[sTrackedCategories[index]].first; actor != NULL;
@@ -526,8 +501,8 @@ static void RefillPool(PlayState* play, Player* player) {
                  actor = actor->next) {
                 f32 distance = Math_Vec3f_DistXYZ(&player->actor.world.pos, &actor->world.pos);
 
-                if (actor->update == NULL || FindSlot(actor) != NULL ||
-                    !HasMoved(&actor->world.pos, &actor->prevPos) || SQ(distance) >= nearestDistance) {
+                if (actor->update == NULL || FindSlot(actor) != NULL || !HasMoved(&actor->world.pos, &actor->prevPos) ||
+                    SQ(distance) >= nearestDistance) {
                     continue;
                 }
                 nearestDistance = SQ(distance);
@@ -545,8 +520,7 @@ static void RefillPool(PlayState* play, Player* player) {
     }
 }
 
-// Actor memory is pooled, so a slot is only kept while its actor is still in a live list: a stale
-// pointer could already be a different actor.
+// Actor memory is pooled: a stale pointer could already be a different actor.
 static void DropDeadSlots(PlayState* play) {
     for (u8 slotIndex = 1; slotIndex < HOURGLASS_SLOTS; slotIndex++) {
         RecordedActor* slot = &sSlots[slotIndex];
@@ -569,7 +543,6 @@ static void DropDeadSlots(PlayState* play) {
     }
 }
 
-// Only a slot that has sat still long enough to be worth nothing is offered up; one being rewound never is.
 static RecordedActor* StalestSlot(void) {
     RecordedActor* stalest = NULL;
 
@@ -586,21 +559,15 @@ static RecordedActor* StalestSlot(void) {
     return stalest;
 }
 
-// A frozen actor keeps a stale previous position, so recording while time is stopped would only bank
-// duplicates and eat the history the recall needs.
 static void RecordEveryone(PlayState* play, Player* player) {
     RecordedActor* linkSlot = &sSlots[HOURGLASS_LINK_SLOT];
 
-    // Both of these run even while time is stopped: a slot may be pointing at an actor the world already
-    // freed, and actor memory is pooled, so a stale pointer can come back as a different actor entirely.
     if (linkSlot->actor != &player->actor) {
         ClearSlot(linkSlot);
         linkSlot->actor = &player->actor;
         linkSlot->isUsed = true;
     }
     DropDeadSlots(play);
-    // No check for stopped time here: a frozen actor does not move, and a frame is only banked against the
-    // last one banked, so the freeze cannot bank duplicates and cannot starve the history either.
     RefillPool(play, player);
     for (u8 index = 0; index < HOURGLASS_SLOTS; index++) {
         RecordedActor* slot = &sSlots[index];
@@ -622,7 +589,6 @@ static bool BeginScrub(Actor* actor) {
     return true;
 }
 
-// Everything after the release point is a future that never happened, so it is dropped.
 static void EndScrub(Actor* actor) {
     RecordedActor* slot = FindSlot(actor);
 
@@ -652,7 +618,6 @@ static bool ScrubBack(Actor* actor) {
     if (slot == NULL || !slot->isScrubbing) {
         return false;
     }
-    // Link is never frozen: his own update is what reads the button holding the rewind down.
     if (slot->cursor + 1 >= slot->count) {
         frame = FrameAt(slot, slot->cursor);
         if (frame != NULL) {
@@ -750,8 +715,6 @@ static bool WasHurt(Player* player) {
     return isHurt;
 }
 
-// Every refusal says why in the log: the glass fails silently otherwise, and what it knows about the world
-// lives entirely inside this mod.
 static void Report(const char* what) {
     LUSLOG_INFO("%s", what);
 }
@@ -828,15 +791,12 @@ static void RaiseHourglass(PlayState* play, Player* player) {
     sState = HOURGLASS_AIMING;
     Player_SetAction(play, player, AimAction, 1);
     Player_StopHorizontalMovement(player);
-    // Vanilla aims the same way: the ready clip plays once over the upper body while the legs hold the idle.
     PlayerAnimation_PlayOnce(play, &player->skelAnimeUpper, (PlayerAnimationHeader*)sCastAnim);
     Player_Anim_PlayLoop(play, player, Player_GetIdleAnim(player));
     sApi->RequestTimeControl(HOURGLASS_TIME_OWNER, HOURGLASS_TIME_PRIORITY, 0.0f, true);
     PlayCue(HOURGLASS_CUE_ACTIVATE);
 }
 
-// Link holds the glass out the way he holds the hookshot, on the upper body alone so his legs keep walking.
-// A one-shot, never a loop: the engine takes the upper skeleton back when the clip ends.
 static void StartCastPose(Player* player, PlayState* play) {
     PlayerAnimation_PlayOnce(play, &player->skelAnimeUpper, (PlayerAnimationHeader*)sCastAnim);
     sCastPoseFrames = HOURGLASS_CAST_POSE_FRAMES;
@@ -873,7 +833,6 @@ static void BeginRecall(Player* player, PlayState* play, Actor* target) {
     Rumble_Request(300.0f, 150, 20, 60);
 }
 
-// Holding R rewinds Link himself, watched from behind, while the world stays stopped around him.
 static bool TickSelfRewind(Player* player, PlayState* play) {
     if (!(play->state.input[0].cur.button & BTN_R)) {
         if (sIsSelfRewinding) {
@@ -899,14 +858,11 @@ static bool TickSelfRewind(Player* player, PlayState* play) {
     }
     player->invincibilityTimer = -HOURGLASS_SELF_IFRAMES;
     Player_StopHorizontalMovement(player);
-    // Running out of history does not end the hold: Link stays pinned at his oldest frame until R is let go.
     ScrubBack(&player->actor);
     SpawnSand(play, &player->actor);
     return true;
 }
 
-// Z-targeting is left alone: whatever Link has locked onto is what the glass offers, so the two ways of
-// pointing at something agree instead of fighting.
 static Actor* OfferedActor(Player* player, PlayState* play) {
     Actor* locked = player->focusActor;
 
@@ -916,8 +872,6 @@ static Actor* OfferedActor(Player* player, PlayState* play) {
     return ScanForTarget(play, player, player->actor.focus.rot.y);
 }
 
-// First person draws whatever the right hand holds for the form. The glass is what he is holding up, so it
-// takes the right hand for as long as the aim lasts.
 static void ResolveAimingHand(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
     if (sState == HOURGLASS_AIMING && !sIsSelfRewinding && limbIndex == PLAYER_LIMB_RIGHT_HAND &&
         (player->stateFlags1 & HOURGLASS_FIRST_PERSON_STATE)) {
@@ -925,12 +879,9 @@ static void ResolveAimingHand(Player* player, s32 limbIndex, Gfx** dList, Gfx* l
     }
 }
 
-// The aim owns the player the way the switch hook's does: its own action func, so no vanilla action fights
-// the first-person flags underneath it.
 static void AimAction(Player* player, PlayState* play) {
     u16 buttonMask = FindEquippedButtons();
 
-    // An empty meter means nothing the glass could still do, so it goes away instead of holding the world.
     if (buttonMask == 0 || !HasMagic(HOURGLASS_MAGIC_ACTIVATION) || IsLinkBusy(player) || WasHurt(player) ||
         (play->state.input[0].press.button & (BTN_B | BTN_CUP))) {
         Stow(player, play);
@@ -979,8 +930,6 @@ static void TickRecalling(Player* player, PlayState* play, u16 buttonMask) {
     TickCastPose(player, play);
     StrikeWhatItPassesThrough(play, sTarget, &before);
     SpawnSand(play, sTarget);
-    // The aim action confirms earlier in this same frame, so its press is still on the pad and would read
-    // here as the cancel, ending the recall one step after it began.
     if (sRecallStartFrame == play->state.frames) {
         return;
     }
@@ -1019,24 +968,17 @@ static void TickHourglass(Player* player) {
     }
     KeepMixerAlive();
     RecordEveryone(play, player);
-    // Anything that takes the player — a sword swing, a hit, a cutscene — replaces the aim action without
-    // telling it, and the glass would stay raised for the rest of the session, the world frozen with it.
     if (sState == HOURGLASS_AIMING && player->actionFunc != AimAction) {
         Stow(player, play);
         return;
     }
-    // Aiming has its own action func and runs from there; this only starts it and carries the recall.
-    // One press does one thing: the frame that raises the glass never also reads the press as a confirm.
     if (sState == HOURGLASS_RECALLING) {
         TickRecalling(player, play, buttonMask);
-    } else if (sState == HOURGLASS_IDLE && (play->state.input[0].press.button & buttonMask) &&
-               !IsLinkBusy(player)) {
+    } else if (sState == HOURGLASS_IDLE && (play->state.input[0].press.button & buttonMask) && !IsLinkBusy(player)) {
         RaiseHourglass(play, player);
     }
 }
 
-// Aiming greys out only what the glass is offering to recall; the recall greys out everything but its
-// target, which is what makes the one live thing in a still world read at a glance.
 static bool IsDrawnGray(Actor* actor) {
     if (sIsSelfRewinding) {
         return actor == NULL || actor->category != ACTORCAT_PLAYER;
@@ -1076,7 +1018,6 @@ static Actor* PathActor(void) {
     return sState == HOURGLASS_RECALLING ? sTarget : NULL;
 }
 
-// The ribbon is the path the target is about to retrace, one camera-facing quad every few recorded frames.
 static s32 BuildRibbon(PlayState* play, Actor* target) {
     RecordedActor* slot = FindSlot(target);
     Vec3f* eye = &GET_ACTIVE_CAM(play)->eye;
@@ -1192,12 +1133,21 @@ static void DrawHourglass(Actor* actor, PlayState* play) {
     }
 }
 
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    (void)entry;
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(HOURGLASS_GIVE_SCALE, HOURGLASS_GIVE_SCALE, HOURGLASS_GIVE_SCALE, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, gPhantomHourglassDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static void ForgetSceneState(s16 sceneId, s8 spawnNum) {
     ResetState();
     sSceneId = sceneId;
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, HOURGLASS_KEY, HOURGLASS_KEY, "",
 };
@@ -1228,9 +1178,9 @@ S2H_MOD_EXPORT void ModInit(void) {
                                     "back instead. It spends %gmagic%w.");
     Z64Items_SetPauseText(&hourglass, "%rPhantom Hourglass&%wPress %y\xB2%w to stop time and aim,&"
                                       "again to recall. %y\xB4%w rewinds you.");
-    // The glass answers the button from its own tick, which runs after the engine has finished with the
-    // press: an item action would fire in the same frame and read that press a second time as the confirm.
+    // An item action would fire in the same frame and read the press a second time as the confirm.
     hourglass.flags |= S2H_CUSTOM_ITEM_INSTANT;
+    hourglass.getItemEntry.drawFunc = DrawGetItem;
 
     Z64Items_SetLogic(&hourglass, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &hourglass)) {

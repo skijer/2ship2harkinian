@@ -36,7 +36,6 @@ void EnSnowman_SetupMelt(EnSnowman* snowman);
 #define BALL_GOLDEN_DAMAGE 16
 #define BALL_HOLD_DROP 5.0f
 #define BALL_CHARGE_MAX 60
-// The ball has to have built up a swing before it can be aimed or hurled; a tap only lifts it.
 #define BALL_CHARGE_MIN 15
 #define BALL_SPIN_RADIUS 20.0f
 #define BALL_SPIN_HEIGHT_MIN 50.0f
@@ -46,7 +45,6 @@ void EnSnowman_SetupMelt(EnSnowman* snowman);
 #define BALL_STICK_DEADZONE 5.0f
 #define BALL_LEAN_TILT 40.0f
 #define BALL_THROW_LEAN 3000
-// The swing pulls Link 1 degree off balance at rest and 5 at full charge, in the ball's own direction.
 #define BALL_LEAN_MIN 182.0f
 #define BALL_LEAN_MAX 910.0f
 #define BALL_HOLD_POSE_FRAME 8
@@ -67,7 +65,6 @@ void EnSnowman_SetupMelt(EnSnowman* snowman);
 #define BALL_THROW_TIMEOUT 200
 #define BALL_HELD_SCALE 0.06f
 #define BALL_SWUNG_SCALE 0.1f
-// The chain model is one strand 100 units long at scale 1.0, the length the hookshot stretches it by.
 #define BALL_CHAIN_STRAND_SPAN 100.0f
 #define BALL_CHAIN_STRAND_MAX 8
 #define BALL_CHAIN_THICKNESS 0.02f
@@ -83,16 +80,12 @@ typedef enum {
     BALL_RETRACTING,
 } BallPhase;
 
-// Majora's Mask has no gauntlet upgrades; each form's own strength takes their place: the Human lifts and
-// throws forward, the Zora frees feet and aim, the Goron swings it one-handed in a circle that guards Link.
-
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/gItemIconBallAndChainTex";
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/gBallAndChainNameTex";
 static const ALIGN_ASSET(2) char sBallDL[] = "__OTR__objects/object_nei_ball_and_chain/gBallDL";
 static const ALIGN_ASSET(2) char sGiveDL[] = "__OTR__objects/object_nei_ball_and_chain/g_ball_and_chain_dl";
 static const ALIGN_ASSET(2) char sChainLinkDL[] = "__OTR__objects/gameplay_keep/gHookshotChainDL";
 
-// Vanilla carries: the ball rides in front of Link while he holds it, and overhead once he swings it.
 static const ALIGN_ASSET(2) char sHoldPoseAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_normal_carryB_free";
 static const ALIGN_ASSET(2) char sSpinPoseAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_normal_carryB_wait";
 
@@ -193,19 +186,8 @@ static bool IsOneHanded(void) {
 
 static void StartTrail(PlayState* play) {
     EffectBlureInit2 init = {
-        0,
-        8,
-        0,
-        { 255, 255, 255, 255 },
-        { 200, 220, 255, 128 },
-        { 255, 255, 255, 0 },
-        { 200, 220, 255, 0 },
-        4,
-        0,
-        2,
-        0,
-        { 235, 235, 245, 200 },
-        { 180, 190, 210, 96 },
+        0, 8, 0, { 255, 255, 255, 255 }, { 200, 220, 255, 128 }, { 255, 255, 255, 0 }, { 200, 220, 255, 0 }, 4,
+        0, 2, 0, { 235, 235, 245, 200 }, { 180, 190, 210, 96 },
     };
 
     Effect_Add(play, &sTrailIndex, EFFECT_BLURE2, 0, 0, &init);
@@ -228,7 +210,6 @@ static void EndTrail(PlayState* play) {
     }
 }
 
-// Ground-level strikes count as the Goron's pound, which is what floor switches and stakes answer to.
 static void StrikeWithBall(Player* player, PlayState* play) {
     bool isAtFootLevel = sBallPos.y - player->actor.world.pos.y < 30.0f;
 
@@ -251,8 +232,6 @@ static void BurstIce(PlayState* play, Vec3f* pos) {
     Audio_PlaySfx_AtPos(pos, NA_SE_EV_ICE_BROKEN);
 }
 
-// Red meltable ice melts on a fire hit or when its switch flag is set: setting the flag drives its own native
-// shatter, which also opens the path it gates. Decorative ice with no flag has nothing to gate.
 static void MeltRedIce(PlayState* play, Actor* actor) {
     ObjIcePoly* ice = (ObjIcePoly*)actor;
 
@@ -288,7 +267,6 @@ static void BreakIceActor(PlayState* play, Actor* actor) {
         case ACTOR_OBJ_ICEBLOCK: {
             ObjIceblock* block = (ObjIceblock*)actor;
 
-            // The iceberg variant is a platform you stand on; only a block that is not melting yet is tripped.
             if (IsBallNear(actor, BALL_BIGICE_REACH) && !ICEBLOCK_GET_ICEBERG(actor) && block->meltTimer > 0) {
                 block->meltTimer = 0;
             }
@@ -297,7 +275,6 @@ static void BreakIceActor(PlayState* play, Actor* actor) {
         case ACTOR_EN_FZ: {
             EnFz* freezard = (EnFz*)actor;
 
-            // A non-zero unk_BD8 marks one that is already dying.
             if (IsBallNear(actor, BALL_ICE_REACH) && freezard->unk_BD8 == 0) {
                 freezard->actor.colChkInfo.damageEffect = 2;
                 freezard->collider1.base.acFlags |= AC_HIT;
@@ -305,7 +282,6 @@ static void BreakIceActor(PlayState* play, Actor* actor) {
             break;
         }
         case ACTOR_EN_SNOWMAN:
-            // AC_ON is cleared by the melt setup, so this only fires once per Eeno.
             if (IsBallNear(actor, BALL_ICE_REACH) && (((EnSnowman*)actor)->collider.base.acFlags & AC_ON)) {
                 EnSnowman_SetupMelt((EnSnowman*)actor);
             }
@@ -315,7 +291,6 @@ static void BreakIceActor(PlayState* play, Actor* actor) {
     }
 }
 
-// A fast ball tunnels through thin ice between frames, so it melts on proximity, not on contact.
 static void BreakWhatTheBallReaches(PlayState* play) {
     static const u8 sCategories[] = { ACTORCAT_PROP, ACTORCAT_BG, ACTORCAT_ITEMACTION, ACTORCAT_ENEMY };
 
@@ -346,7 +321,6 @@ static void StrikeAndBreak(Player* player, PlayState* play) {
     BreakWhatTheBallReaches(play);
 }
 
-// Goron strength holds the ball in the throwing hand alone; weaker arms need both.
 static void HoldBallInHands(Player* player) {
     Vec3f* left = &player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND];
     Vec3f* right = &player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND];
@@ -361,7 +335,6 @@ static void HoldBallInHands(Player* player) {
     sBallPos.z = (left->z + right->z) * 0.5f;
 }
 
-// The engine's own speed resolution, so Link keeps his turning and his animations and only loses pace.
 static void WeighDownPlayer(Player* player, s32 kind, f32* scale) {
     if (sPhase == BALL_IDLE || IsBallAway()) {
         return;
@@ -415,7 +388,6 @@ static void ReturnBallToHands(Player* player, PlayState* play) {
     }
 }
 
-// Aimed throws lead the arc so gravity lands the ball on the mark; a plain throw only goes where Link faces.
 static void LaunchTowards(Vec3f* mark, f32 launchSpeed) {
     f32 dx = mark->x - sBallPos.x;
     f32 dy = mark->y - sBallPos.y;
@@ -470,8 +442,6 @@ static void ThrowBall(Player* player, PlayState* play) {
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_IT_SWORD_SWING_HARD);
 }
 
-// Goron strength swings the ball one-handed and wide, so it circles Link at chest height and guards him
-// instead of riding over his head.
 static void OrbitBallAround(Player* player) {
     f32 chargeRatio = (f32)sCharge / BALL_CHARGE_MAX;
     f32 radius = BALL_GUARD_RADIUS_MIN + (BALL_GUARD_RADIUS_MAX - BALL_GUARD_RADIUS_MIN) * chargeRatio;
@@ -522,8 +492,6 @@ static void UpdateSpinning(Player* player, PlayState* play) {
     ThrowBall(player, play);
 }
 
-// The return value is Link's "upper body is busy" flag: only the spin claims it, or the ball merely carried
-// in hand would block his rolls and his other item buttons.
 static int32_t UpdateBallInHand(Player* player, PlayState* play) {
     if ((player->stateFlags1 & PLAYER_STATE1_8000000) || player->invincibilityTimer < 0) {
         sPhase = BALL_HOLDING;
@@ -748,8 +716,7 @@ static void PutBallAway(Player* player, PlayState* play) {
     AudioSfx_StopById(NA_SE_PL_WALK_GROUND);
 }
 
-// The queued frame lands in sPoseJoints when the animation queue runs, which is after every actor update and
-// before any actor is drawn: posing an arm during the update itself is undone by Link's own animation.
+// Posing an arm during the update is undone by Link's own animation; the queued frame lands before any draw.
 static void RequestArmPose(PlayState* play) {
     bool isHeld = sPhase == BALL_HOLDING;
 
@@ -758,7 +725,6 @@ static void RequestArmPose(PlayState* play) {
                                      sPoseJoints);
 }
 
-// Goron strength swings it with the throwing arm alone, so the left arm keeps whatever Link is animating.
 static void ApplyArmPose(Player* player) {
     u32 first = IsOneHanded() ? ARRAY_COUNT(sArmLimbs) / 2 : 0;
 
@@ -767,18 +733,14 @@ static void ApplyArmPose(Player* player) {
     }
 }
 
-// Iron Boots are what vanilla checks before a fan or a current may push Link: the ball weighs at least as much.
 static void AnchorAgainstWind(Player* player) {
     player->pushedSpeed = 0.0f;
 }
 
-// The overhead spin orbits in Link's own frame, the one-handed guard orbits in world space.
 static s16 GetBallBearing(Player* player) {
     return IsOneHanded() ? (s16)(sSpinAngle - player->actor.shape.rot.y) : sSpinAngle;
 }
 
-// The ball drags Link a few degrees after it, harder the faster it goes. Weaker arms take the pull in the
-// torso; Goron strength holds its ground and only the swinging shoulder gives.
 static void LeanIntoSwing(Player* player) {
     s16 bearing = GetBallBearing(player);
     f32 pull = BALL_LEAN_MIN + (BALL_LEAN_MAX - BALL_LEAN_MIN) * sCharge / BALL_CHARGE_MAX;
@@ -798,7 +760,6 @@ static void LeanIntoSwing(Player* player) {
     player->upperLimbRot.y = 0;
 }
 
-// Runs just before Link is drawn, the only point in the frame where the joint table is his final pose.
 static void PoseArmsAroundBall(Actor* actor, bool* should) {
     Player* player = (Player*)actor;
 
@@ -834,8 +795,6 @@ static void KeepBallStateSane(Player* player) {
     RequestArmPose(play);
 }
 
-// A and B stop the swing, and vanilla would read the same press as "roll" or "draw the sword". The mod reads
-// the raw input, so taking them off Link's copy for those frames costs it nothing.
 static void KeepSwingButtons(Player* player, Input* input) {
     if (sPhase == BALL_IDLE || sPhase == BALL_HOLDING) {
         return;
@@ -844,7 +803,6 @@ static void KeepSwingButtons(Player* player, Input* input) {
     input->press.button &= ~(BTN_A | BTN_B | BTN_R);
 }
 
-// Whole strands laid end to end keep the links their own size and leave no gap between them.
 static void DrawChain(PlayState* play, Vec3f* from, Vec3f* to) {
     f32 dx = to->x - from->x;
     f32 dy = to->y - from->y;
@@ -898,12 +856,12 @@ static void DrawBallAndChain(Actor* actor, PlayState* play) {
     if (sPhase == BALL_IDLE || (player->stateFlags2 & PLAYER_STATE2_20000000)) {
         return;
     }
-    DrawChain(play, &player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND], &player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND]);
+    DrawChain(play, &player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND],
+              &player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND]);
     DrawChain(play, &player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND], &sBallPos);
     DrawBall(play);
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, BALL_KEY, BALL_KEY, "",
 };
@@ -916,7 +874,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// The ball lands Goron punches and, at foot level, pounds.
 static void GrantBallLogic(void) {
     static const Z64LogicSource sBall = { BALL_KEY };
     static const char* const sSmashing[] = { "BlastOrSmash", "CanHitSwitch", "CanAttack", "CanDamage", NULL };
@@ -941,7 +898,7 @@ S2H_MOD_EXPORT void ModInit(void) {
                                "strongest arms can swing.^"
                                "Press %y\xB2%w again and hold it to&spin the ball, then let go to&%rhurl%w it.^"
                                "Its weight roots you where&%ywind%w would move anyone else,&"
-                               "and it crushes %yarmor%w and&shatters %cice%w.^"
+                               "and it crushes %yarmor%w and&shatters %bice%w.^"
                                "Stronger forms carry it&farther: the %gZora%w frees your&feet and your aim,^"
                                "and the %gGoron%w swings it&one-handed to %rguard%w you.");
     Z64Items_SetPauseText(&ball, "%rBall and Chain&%wHold %y\xB2%w to spin, release to throw. %g\xB5%w&"

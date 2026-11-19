@@ -1,0 +1,7 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_gi_eye_lotion" Segment="6" OutName="oot_object_gi_eye_lotion" Game="OOT">
+        <DList Name="gGiEyeDropsBottleDL" Offset="0x0768" />
+        <DList Name="gGiEyeDropsCapDL" Offset="0x0680" />
+    </File>
+</Root>

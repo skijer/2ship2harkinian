@@ -1,0 +1,97 @@
+"""Check the actual packaged pickup resource graphs, metadata, and cursor textures."""
+import argparse
+import json
+from pathlib import Path
+import re
+import struct
+import xml.etree.ElementTree as ET
+import zipfile
+
+from import_get_item_assets import ROOTS, crc64, dependencies
+
+CUSTOM_ROOTS = {
+    "oot_collectables": ["objects/object_gi_grab/gGiGrabDL"],
+    "divine_shield": ["objects/object_nei_divine_shield/g_divine_shield_dl"],
+    "kite_shield": ["objects/object_nei_kite_shield/g_kite_shield_dl"],
+    "four_sword": ["objects/object_nei_four_sword/gNeiFourSwordBladeDL",
+                   "objects/object_nei_four_sword/gNeiFourSwordHiltDL"],
+    "magic_cape": ["objects/object_nei_magic_cape/gNeiMagicCapeDL",
+                   "objects/object_nei_magic_cape/gNeiMagicCapeWaveDL"],
+    "pendant": ["objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL"],
+    "byrna": ["objects/object_byrna/g_byrna_cane_give_dl", "objects/object_byrna/g_byrna_cane_dl"],
+    "trident": ["objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298"],
+}
+
+
+def verify(packages, game):
+    factory = (game / "libultraship/src/fast/resource/factory/DisplayListFactory.cpp").read_text()
+    supported_nodes = set(re.findall(r'childName == "([^"]+)"', factory))
+    all_files = {}
+    package_files = {}
+    for archive in sorted(packages.glob("*.o2r")):
+        with zipfile.ZipFile(archive) as package:
+            files = {name: package.read(name) for name in package.namelist()}
+            package_files[archive.stem] = files
+            all_files.update(files)
+    native = game / "x64/Release/mm.o2r"
+    with zipfile.ZipFile(native) as package:
+        for name in package.namelist():
+            if name not in all_files:
+                all_files[name] = package.read(name)
+    visited = set()
+    hashes = {crc64(name): name for name in all_files}
+
+    def check_xml(path):
+        if path in visited:
+            return
+        visited.add(path)
+        assert path in all_files, f"Missing resource: {path}"
+        data = all_files[path]
+        if not data.startswith(b"<"):
+            for _, hashed in dependencies(data):
+                assert hashed in hashes, f"Unresolved binary dependency: {path}: {hashed:016x}"
+                check_xml(hashes[hashed])
+            return
+        root = ET.fromstring(data)
+        assert path + ".meta" in all_files, f"Missing explicit metadata: {path}"
+        metadata = json.loads(all_files[path + ".meta"])
+        assert metadata["format"] == "XML" and metadata["type"] == root.tag, path
+        for node in root:
+            if root.tag == "DisplayList":
+                assert node.tag in supported_nodes, f"Unsupported DL command: {path}: {node.tag}"
+            child = node.get("Path")
+            if child and not child.startswith(">"):
+                check_xml(child.removeprefix("__OTR__"))
+
+    references = 0
+    for mod, roots in ROOTS.items():
+        files = package_files[mod]
+        private = {crc64(path): path for path in files if path.startswith(f"objects/nei_get_item/{mod}/")}
+        for root in roots:
+            assert f"objects/nei_get_item/{mod}/{root}" in files, (mod, root)
+        for path in private.values():
+            for _, hashed in dependencies(files[path]):
+                assert hashed in private, f"Unresolved private reference: {mod}: {path}: {hashed:016x}"
+                references += 1
+        print(f"{mod}: private pickup graph verified")
+    for mod, roots in CUSTOM_ROOTS.items():
+        for root in roots:
+            assert root in package_files[mod], (mod, root)
+            check_xml(root)
+        print(f"{mod}: custom pickup graph verified")
+    for mod in ["oot_equipment", "nei_equipment"]:
+        for corner in ["TopLeft", "TopRight", "BottomLeft", "BottomRight"]:
+            path = f"textures/{mod}/gPauseMenuCursor{corner}Tex"
+            data = package_files[mod][path]
+            # Native texture v0 payload: type, width, height, data length.
+            assert struct.unpack_from("<IIII", data, 64) == (7, 16, 16, 128), path
+        print(f"{mod}: four 16x16 IA4 cursor corners verified")
+    print(f"Verified {references} private DL references and {len(visited)} custom resources.")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--packages", type=Path, required=True)
+    parser.add_argument("--game", type=Path, required=True)
+    args = parser.parse_args()
+    verify(args.packages, args.game)

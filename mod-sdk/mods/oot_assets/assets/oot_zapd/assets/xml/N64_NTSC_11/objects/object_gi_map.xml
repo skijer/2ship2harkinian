@@ -1,0 +1,8 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_gi_map" Segment="6" OutName="oot_object_gi_map" Game="OOT">
+        <DList Name="gGiDungeonMapDL" Offset="0x03C0" />
+        <DList Name="gGiStoneOfAgonyDL" Offset="0x0B70" />
+        <Texture Name="object_gi_mapTex_000D60" Offset="0xD60" Format="i8" Width="32" Height="32" />
+    </File>
+</Root>

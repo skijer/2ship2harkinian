@@ -1,10 +1,21 @@
 {
   "name": "oot_equipment",
-  "author": "2Ship Unbound",
-  "version": "0.1",
-  "description": "OoT equipment registered for MM: custom sword and shield pieces, Goron and Zora tunics, Iron and Hover Boots.",
+  "display_name": "Ocarina of Time: Equipment",
+  "author": "Skijer",
+  "version": "0.2",
+  "description": "Ocarina of Time's swords, shields, tunics and boots on their own equipment page. Choose which pieces join your game.",
   "game": "mm",
   "dependencies": [
     "oot_assets"
+  ],
+  "options": [
+    { "id": "master_sword", "name": "Master Sword" },
+    { "id": "biggoron_sword", "name": "Biggoron's Sword" },
+    { "id": "deku_shield", "name": "Deku Shield" },
+    { "id": "mirror_shield", "name": "Mirror Shield" },
+    { "id": "goron_tunic", "name": "Goron Tunic" },
+    { "id": "zora_tunic", "name": "Zora Tunic" },
+    { "id": "iron_boots", "name": "Iron Boots" },
+    { "id": "hover_boots", "name": "Hover Boots" }
   ]
 }

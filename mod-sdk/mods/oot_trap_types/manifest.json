@@ -1,0 +1,8 @@
+{
+    "name": "oot_trap_types",
+    "author": "Skijer",
+    "version": "1.0",
+    "display_name": "Ocarina of Time: Trap Types",
+    "game": "mm",
+    "description": "Ship's additional trap types join the randomizer's traps: Speed, Void, Ammo, Death and Teleport."
+}

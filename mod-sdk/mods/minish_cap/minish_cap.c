@@ -1,7 +1,3 @@
-/**
- * The Minish Cap: shrinks Link to Minish size and back. The pod-soil warp map of the Ocarina of Time version has
- * no counterpart in Majora's Mask, so only the size change is ported.
- */
 
 #include "z64items.h"
 
@@ -48,8 +44,6 @@ static bool sIsUsePending;
 static s16 sLastScene = -1;
 static u32 sLastFrames;
 
-// Link's own properties with a Minish-sized wall radius; the vanilla ones are only resolved when the player is
-// created, so the mod swaps the pointer on him and hands it back when it is done.
 static PlayerAgeProperties sTinyAgeProperties;
 static PlayerAgeProperties* sVanillaAgeProperties;
 static s16 sVanillaCylinderRadius;
@@ -85,7 +79,6 @@ static void StartShrinking(Player* player) {
     Audio_PlaySfx(NA_SE_SY_CAMERA_ZOOM_UP);
 }
 
-// Growing back under a low ceiling would bury normal-sized Link in the rock above him.
 static void StartGrowing(Player* player, PlayState* play) {
     Vec3f checkPos = player->actor.world.pos;
     CollisionPoly* ceilingPoly;
@@ -102,8 +95,7 @@ static void StartGrowing(Player* player, PlayState* play) {
     Audio_PlaySfx(NA_SE_SY_CAMERA_ZOOM_DOWN);
 }
 
-// The per-frame code recomputes the cylinder height from the skeleton but never its radius, so Minish Link
-// would keep a hitbox ten times his body.
+// The per-frame code never recomputes the cylinder radius, so it is set here.
 static void ApplyTinyBody(Player* player) {
     player->cylinder.dim.radius = MINISH_BODY_EXTENT;
     player->cylinder.dim.height = MINISH_BODY_EXTENT;
@@ -139,7 +131,6 @@ static void ResolveMotionScale(Player* player, s32 kind, f32* scale) {
         *scale *= MINISH_SPEED_FACTOR;
         return;
     }
-    // The cap the engine measured against the wall he faces: at Minish size he is next to one everywhere.
     *scale = R_RUN_SPEED_LIMIT / 100.0f;
 }
 
@@ -155,8 +146,6 @@ static void ResolveCameraView(Camera* camera, Vec3f* eye, Vec3f* at, Vec3f* up) 
     if (camera->focalActor != &player->actor) {
         return;
     }
-    // The whole rig shrinks toward Link with him, so the zoom eases in and out with the animation. The floor
-    // keeps the eye outside the near plane.
     rigScale = player->actor.scale.x / PLAYER_SCALE_NORMAL;
     if (rigScale >= 0.999f) {
         return;
@@ -185,8 +174,6 @@ static void UseCap(PlayState* play, Player* player) {
     sIsUsePending = true;
 }
 
-// A press resolves here, at the end of the player's update, so nothing the rest of the frame chooses runs over
-// the size change.
 static void StartPendingUse(Player* player, PlayState* play) {
     if (!sIsUsePending) {
         return;
@@ -203,7 +190,6 @@ static void StartPendingUse(Player* player, PlayState* play) {
     if (sSizePhase != MINISH_SIZE_NORMAL) {
         return;
     }
-    // A form owns Link's scale; two owners would fight over it every frame.
     if (sApi->GetActiveForm() != NULL) {
         Audio_PlaySfx(NA_SE_SY_ERROR);
         return;
@@ -239,7 +225,6 @@ static void UpdateMinishCap(Player* player) {
     }
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, MINISH_CAP_KEY, MINISH_CAP_KEY, "",
 };
@@ -268,6 +253,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetCanUse(&cap, CanUseCap);
     Z64Items_SetAction(&cap, UseCap, NULL);
     Z64Items_SetGetItemModel(&cap, sCapDL);
+    cap.getItemScale = 0.4f;
     cap.flags |= S2H_CUSTOM_ITEM_INSTANT;
 
     Z64Items_SetLogic(&cap, &sRandomizerItem);

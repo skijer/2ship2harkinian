@@ -1,7 +1,10 @@
 {
   "name": "nei_equipment",
-  "author": "2Ship Unbound",
-  "version": "1.0",
-  "description": "NEI equipment pause-page layout and presentation, declared by a mod.",
-  "game": "mm"
+  "dependencies": ["oot_assets"],
+  "display_name": "NEI Equipment Page",
+  "author": "Skijer",
+  "version": "1.1",
+  "description": "The pause page that shows NEI equipment. Installed with the equipment that needs it.",
+  "game": "mm",
+  "dependency_only": true
 }

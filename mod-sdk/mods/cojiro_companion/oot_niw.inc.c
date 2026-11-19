@@ -1,5 +1,3 @@
-// OoT's cucco, kept by this mod: MM's EnNiw has other fields and its limb animation is private to its overlay.
-// Cojiro's models replace OoT's 16 cucco limbs, so the OoT skeleton (oot_assets) and this animation go with them.
 #define OOT_NIW_LIMB_COUNT 16
 #define OOT_NIW_LIMB_LEFT_WING 7
 #define OOT_NIW_LIMB_RIGHT_WING 11
@@ -29,7 +27,6 @@ static void OotNiw_StepRotation(f32* rotation, f32 target, f32 scale, f32 step) 
     }
 }
 
-// OoT's func_80AB5BF8: state 0 idles, 1 runs, 2 flaps in the air.
 static void OotNiw_Animate(OotNiw* this, s16 state) {
     if (this->timer1 == 0) {
         this->targetRot[0] = (state == 0) ? 0.0f : -10000.0f;
@@ -72,7 +69,6 @@ static void OotNiw_Animate(OotNiw* this, s16 state) {
     OotNiw_StepRotation(&this->rightWingRot[0], this->targetRot[6], 0.8f, 7000.0f);
 }
 
-// OoT's EnNiw_OverrideLimbDraw.
 static void OotNiw_RotateLimb(OotNiw* this, s32 limbIndex, Vec3s* rot) {
     if (limbIndex == OOT_NIW_LIMB_NECK) {
         rot->y += (s16)this->neckRotY;

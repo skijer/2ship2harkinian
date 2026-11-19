@@ -39,20 +39,23 @@ static bool sIsArmed;
 void Player_UseItem(PlayState* play, Player* player, s32 item);
 static bool BombModeAvailable(void) {
     return sApi->IsCustomItemOwned(BOMB_ARROWS_KEY) ||
-        (SOH_MOD_API_HAS(sApi, GetRandoOption) && sApi->GetRandoOption("nei.bomb_arrows_auto") == 1 &&
-         CUR_UPG_VALUE(UPG_BOMB_BAG) > 0 && CUR_UPG_VALUE(UPG_QUIVER) > 0);
+           (SOH_MOD_API_HAS(sApi, GetRandoOption) && sApi->GetRandoOption("nei.bomb_arrows_auto") == 1 &&
+            CUR_UPG_VALUE(UPG_BOMB_BAG) > 0 && CUR_UPG_VALUE(UPG_QUIVER) > 0);
 }
 static void SelectBombMode(bool armed);
-static bool GetBombMode(void) { return sIsArmed; }
+static bool GetBombMode(void) {
+    return sIsArmed;
+}
 static void ClearBombOnNormalBow(int8_t action, PlayerItemActionInitFunc* init) {
-    if (action == PLAYER_IA_SLINGSHOT || (action >= PLAYER_IA_BOW && action <= PLAYER_IA_BOW_0E)) { sIsArmed = false; }
+    if (action == PLAYER_IA_SLINGSHOT || (action >= PLAYER_IA_BOW && action <= PLAYER_IA_BOW_0E)) {
+        sIsArmed = false;
+    }
 }
 
 static TrackedArrow sTrackedArrows[BOMB_ARROWS_TRACKED];
 
 static void PlaySfxAt(u16 sfxId, Vec3f* pos) {
-    Audio_PlaySfxGeneral(sfxId, pos, 4, &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
-                           &gSfxDefaultReverb);
+    Audio_PlaySfxGeneral(sfxId, pos, 4, &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 }
 
 static TrackedArrow* FindTracked(Actor* arrow) {
@@ -74,8 +77,6 @@ static void TrackArrow(Actor* arrow) {
     slot->lastPos = arrow->world.pos;
 }
 
-// Vanilla builds the explosion sphere from the draw, which no longer runs once the bomb turns into its
-// blast on the very first update: its centre is placed here instead.
 static void BurstAt(PlayState* play, Vec3f* pos) {
     EnBom* bomb = (EnBom*)Actor_Spawn(&play->actorCtx, play, ACTOR_EN_BOM, pos->x, pos->y, pos->z, 0, 0, 0, BOMB_BODY);
 
@@ -87,7 +88,6 @@ static void BurstAt(PlayState* play, Vec3f* pos) {
     bomb->collider2.elements[0].dim.worldSphere.center.x = (s16)pos->x;
     bomb->collider2.elements[0].dim.worldSphere.center.y = (s16)pos->y;
     bomb->collider2.elements[0].dim.worldSphere.center.z = (s16)pos->z;
-    // Arrow damage on top of the bomb's own, so the blast reaches whatever answers to either.
     bomb->collider2.elements[0].base.atDmgInfo.dmgFlags |= BOMB_ARROWS_ARROW_DAMAGE;
 }
 
@@ -142,23 +142,24 @@ static void ArmArrow(Actor* actor) {
     TrackArrow(actor);
 }
 
-// Changing ammunition while aiming also updates the projectile already held by Link.
 static void SelectBombMode(bool armed) {
-    sIsArmed=armed && BombModeAvailable();
-    if(gPlayState==NULL)return;
-    Actor* held=GET_PLAYER(gPlayState)->heldActor;
-    if(held==NULL || held->id!=ACTOR_EN_ARROW)return;
-    TrackedArrow* tracked=FindTracked(held);
-    if(!sIsArmed && tracked!=NULL) {
-        tracked->arrow=NULL;
-        Inventory_ChangeAmmo(ITEM_BOMB,1);
-    } else if(sIsArmed && tracked==NULL)ArmArrow(held);
+    sIsArmed = armed && BombModeAvailable();
+    if (gPlayState == NULL)
+        return;
+    Actor* held = GET_PLAYER(gPlayState)->heldActor;
+    if (held == NULL || held->id != ACTOR_EN_ARROW)
+        return;
+    TrackedArrow* tracked = FindTracked(held);
+    if (!sIsArmed && tracked != NULL) {
+        tracked->arrow = NULL;
+        Inventory_ChangeAmmo(ITEM_BOMB, 1);
+    } else if (sIsArmed && tracked == NULL)
+        ArmArrow(held);
 }
 static void ForgetArrows(s16 sceneId, s8 spawnNum) {
     memset(sTrackedArrows, 0, sizeof(sTrackedArrows));
 }
 
-// A toggle, not a weapon of its own: the bow stays the bow, and every arrow it looses carries a bomb.
 static void ToggleBombArrows(PlayState* play, Player* player) {
     Player_UseItem(play, player, ITEM_BOW);
     sIsArmed = BombModeAvailable();
@@ -168,7 +169,6 @@ static bool CanArmBombArrows(Player* player, PlayState* play) {
     return sIsArmed || AMMO(ITEM_BOMB) > 0;
 }
 
-// Every shot spends a bomb, so the bombs left are the shots left.
 static int32_t GetBombArrowShots(const char* key) {
     return AMMO(ITEM_BOMB);
 }
@@ -183,7 +183,6 @@ static void DrawGetItem(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const SOHCustomItemRandomizer sRandomizerItem = {
     sizeof(SOHCustomItemRandomizer), 0, SOH_CUSTOM_ITEM_TYPE_ITEM, 0, 1, BOMB_ARROWS_KEY, BOMB_ARROWS_KEY, "",
 };
@@ -220,10 +219,18 @@ SOH_MOD_EXPORT void ModInit(void) {
         return;
     }
     static const char* const options[] = { "Obtained item", "Automatic: bomb bag + quiver" };
-    SOHModRandoOption option = { sizeof(SOHModRandoOption), "nei.bomb_arrows_auto", "Bomb Arrows",
+    SOHModRandoOption option = {
+        sizeof(SOHModRandoOption),
+        "nei.bomb_arrows_auto",
+        "Bomb Arrows",
         "Unlock bomb arrows from their item, or automatically when both bomb bag and quiver are owned.",
-        options, 2, 0 };
-    if (SOH_MOD_API_HAS(sApi, RegisterRandoOption)) { sApi->RegisterRandoOption(&option); }
+        options,
+        2,
+        0
+    };
+    if (SOH_MOD_API_HAS(sApi, RegisterRandoOption)) {
+        sApi->RegisterRandoOption(&option);
+    }
     if (SOH_MOD_API_HAS(sApi, PublishService)) {
         sApi->PublishService("nei.bomb_arrows.available", (void*)BombModeAvailable);
         sApi->PublishService("nei.bomb_arrows.select", (void*)SelectBombMode);

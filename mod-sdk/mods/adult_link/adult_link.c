@@ -13,9 +13,7 @@
 #define ADULT_ASSET(name) "__OTR__objects/oot_object_link_boy/" name
 #define ADULT_DL_PATH_SIZE 80
 #define ADULT_FACE_PATH_SIZE 64
-// Player_GetHeight's answer for the one adult-sized body MM has, Zora Link.
 #define ADULT_HEIGHT 68.0f
-// The Fierce Deity is adult Link drawn half as big again: his row holds adult Link's lengths times this.
 #define DEITY_SCALE 1.5f
 #define TUNIC_COLOR_CVAR "gCosmetic.Player.HumanTunic.Color"
 #define TUNIC_CHANGED_CVAR "gCosmetic.Player.HumanTunic.Changed"
@@ -26,7 +24,6 @@ typedef struct {
     char adultDL[ADULT_DL_PATH_SIZE];
 } LimbSwap;
 
-// Swords and shields are missing on purpose: MM's own hand keeps the piece Link really owns.
 static const LimbSwap sLimbSwaps[] = {
     { dgLinkHumanWaistDL, ADULT_ASSET("gLinkAdultWaistNearDL") },
     { dgLinkHumanLeftHandOpenDL, ADULT_ASSET("gLinkAdultLeftHandNearDL") },
@@ -43,7 +40,6 @@ static const LimbSwap sLimbSwaps[] = {
     { dobject_link_child_DL_017B40, ADULT_ASSET("gLinkAdultRightHandHoldingHookshotFarDL") },
 };
 
-// Both games index the face by the same animation data, so OoT's textures line up with MM's one to one.
 static const ALIGN_ASSET(2) char sAdultEyes[PLAYER_EYES_MAX][ADULT_FACE_PATH_SIZE] = {
     ADULT_ASSET("gLinkAdultEyesOpenTex"),      ADULT_ASSET("gLinkAdultEyesHalfTex"),
     ADULT_ASSET("gLinkAdultEyesClosedfTex"),   ADULT_ASSET("gLinkAdultEyesRollLeftTex"),
@@ -101,7 +97,6 @@ static f32* const sDeityLengths[] = {
     &sAdultBody.unk_9C,
 };
 
-// His voice, footsteps and climbing clips are adult Link's already; shadowScale and unk_34 he keeps unscaled.
 static void BuildAdultBody(void) {
     sAdultBody = sPlayerAgeProperties[PLAYER_FORM_FIERCE_DEITY];
     for (size_t i = 0; i < ARRAY_COUNT(sDeityLengths); i++) {
@@ -116,7 +111,6 @@ static FlexSkeletonHeader* GetAdultSkeleton(void) {
         return sSkeleton;
     }
     SkeletonHeader* header = ResourceMgr_LoadSkeletonByName(sAdultSkeletonPath, NULL);
-    // Link's joint table drives the limbs one to one, so only a skeleton with his limb count may stand in.
     if (header == NULL || header->segment == NULL || header->limbCount != PLAYER_LIMB_MAX - 1) {
         return NULL;
     }
@@ -140,7 +134,6 @@ static void RestoreChildSkeleton(void) {
     sDrawnPlayer = NULL;
 }
 
-// Only the draw sees the adult skeleton: the update keeps the one the player was built with.
 static void WearAdultSkeleton(Actor* actor, bool* should) {
     Player* player = (Player*)actor;
 
@@ -183,7 +176,6 @@ static const char* FindAdultDL(const char* childDL) {
     return NULL;
 }
 
-// MM's limb override swaps the waist and the hands for child Link's lists, by name, after the skeleton's own.
 static void ResolveAdultLimb(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
     if (player != sDrawnPlayer) {
         return;
@@ -208,7 +200,6 @@ static void SwapFaceTexture(const char** texture, const TexturePtr* childSet,
     }
 }
 
-// The hook names no player, so it only answers between the skeleton swap and its restore.
 static void ResolveAdultFace(const char** eyes, const char** mouth) {
     if (sDrawnPlayer == NULL) {
         return;
@@ -217,7 +208,6 @@ static void ResolveAdultFace(const char** eyes, const char** mouth) {
     SwapFaceTexture(mouth, sPlayerMouthTextures[PLAYER_FORM_HUMAN], sAdultMouths, PLAYER_MOUTH_MAX);
 }
 
-// The shadow is sized when the player actor is built, which a form change without the cutscene skips.
 static void EnterAdult(PlayState* play, Player* player) {
     player->actor.shape.shadowScale = sAdultBody.shadowScale;
 }
@@ -228,7 +218,6 @@ static void ExitAdult(PlayState* play, Player* player) {
     }
 }
 
-// No item owns the form: the Time Gate, the console and a cross-game sync all switch it by key.
 static void RegisterForm(void) {
     S2HFormDefinition adult = { 0 };
 

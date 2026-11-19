@@ -48,10 +48,9 @@ static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/gSpinnerNameTex";
 static const ALIGN_ASSET(2) char sSpinnerDL[] = "__OTR__objects/object_nei_spinner_tp/spinner_dl";
 
-static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,   BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
+static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
-// A Goron pound and a sword cut let small boulders break through their own vanilla logic, drops and all.
 static ColliderCylinderInit sAttackColliderInit = {
     {
         COL_MATERIAL_NONE,
@@ -127,8 +126,6 @@ static void HoldRidingFlags(Player* player) {
     player->stateFlags1 |= PLAYER_STATE1_CHARGING_SPIN_ATTACK;
 }
 
-// The ride drives Link's own skeleton, and his walking action func only picks an animation when its state
-// changes: leaving him mid-spin would keep that pose until something else replaced it.
 static void RestoreIdleAnimation(Player* player, PlayState* play) {
     player->skelAnime.playSpeed = 1.0f;
     Player_Anim_PlayLoop(play, player, Player_GetIdleAnim(player));
@@ -427,10 +424,7 @@ static bool WasDismountPressed(PlayState* play) {
     return (play->state.input[0].press.button & (BTN_A | BTN_B)) != 0;
 }
 
-// The upper action, the same slot vanilla items use: Link keeps his own action func and the spinner only
-// pins his speed, height and heading while the ride lasts.
-// The return value is Link's "upper body is busy" flag: claiming it while merely holding the spinner would
-// block his rolls and his other item buttons for as long as it stayed in hand.
+// The return value is Link's "upper body is busy" flag: claiming it while merely holding the spinner would block rolls.
 static int32_t UpdateSpinnerInHand(Player* player, PlayState* play) {
     if (!IsRiding()) {
         return 0;
@@ -470,7 +464,6 @@ static int32_t UpdateSpinnerInHand(Player* player, PlayState* play) {
     return 1;
 }
 
-// Taking the spinner out runs the item-change animation over the body, so the first ride waits for it.
 static void TakeOutSpinner(PlayState* play, Player* player) {
     if (!sIsColliderReady) {
         Collider_InitCylinder(play, &sAttackCollider);
@@ -514,8 +507,6 @@ static void MountWhenReady(Player* player) {
     }
 }
 
-// The ride hovers, and in the air vanilla reads A and B as "put the item away" or "draw the sword" on the
-// same frame the mod reads them to get off. They only stay off Link's copy while the ride lasts.
 static void KeepRideButtons(Input* input) {
     if (!IsRiding()) {
         return;
@@ -524,7 +515,6 @@ static void KeepRideButtons(Input* input) {
     input->press.button &= ~(BTN_A | BTN_B | BTN_R);
 }
 
-// The ride belongs to the scene that is ending: its phase must not outlive it holding buttons hostage.
 static void ForgetScene(s16 sceneId, s8 spawnNum) {
     sIsMountPending = false;
     sPhase = SPINNER_STOWED;
@@ -546,7 +536,6 @@ static void DrawSpinner(Actor* actor, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, SPINNER_KEY, SPINNER_KEY, "",
 };
@@ -559,7 +548,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// The spinning top rams with Goron pound and sword damage.
 static void GrantSpinnerLogic(void) {
     static const Z64LogicSource sSpinner = { SPINNER_KEY };
     static const char* const sRamming[] = { "BlastOrSmash", "CanHitSwitch", "CanAttack", "CanDamage", NULL };
@@ -592,6 +580,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetAction(&spinner, TakeOutSpinner, UpdateSpinnerInHand);
     Z64Items_SetHeldCallbacks(&spinner, RideOrAttack, PutSpinnerAway, NULL);
     Z64Items_SetGetItemModel(&spinner, sSpinnerDL);
+    spinner.getItemScale = 0.21f;
     spinner.modelGroup = PLAYER_MODELGROUP_DEFAULT;
 
     Z64Items_SetLogic(&spinner, &sRandomizerItem);

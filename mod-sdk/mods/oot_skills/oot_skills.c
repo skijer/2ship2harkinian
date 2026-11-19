@@ -1,7 +1,3 @@
-/**
- * Ship's skill shuffles in Majora's Mask. A chest or an NPC that the player may not use yet withdraws the
- * offer it just made to Link, as Ship's VB_OPEN_CHEST and VB_SPEAK do. Each form speaks its own language.
- */
 
 #include <float.h>
 #include <stdarg.h>
@@ -26,17 +22,12 @@
 #define SPEAK_OPTION "oot.shuffle_speak"
 #define EXTRA_SPEAK_OPTION "oot.shuffle_extra_speak"
 #define AGONY_OPTION "oot.csmc_agony"
-// Fleet's shared families (SharedItems.h) name MM's copy of each skill by these keys.
 #define OPEN_CHEST_KEY "nei.skill.open_chests"
 #define CLIMB_KEY "nei.skill.climb"
 #define STONE_OF_AGONY_KEY "oot.stone_of_agony"
 #define RESCUE_CVAR "gCheats.OoTSkills.Rescue"
 
 #define ICON(name) "__OTR__textures/icon_item_custom/" name
-
-static const char sChestModel[] = "__OTR__objects/object_gi_key/gGiSmallKeyDL";
-static const char sClimbModel[] = "__OTR__objects/object_gi_bean/gGiBeanDL";
-static const char sNutModel[] = "__OTR__objects/object_gi_nuts/gGiNutDL";
 
 static const char* const sRequiredHooks[] = { "OnActorUpdate" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
@@ -61,9 +52,7 @@ typedef struct {
     const char* nutKey;
     const char* nutName;
     const char* listener;
-    // Extra languages are free unless Extra Jabber Nuts is on.
     bool isExtra;
-    // A form that speaks it natively: a vanilla mask or a custom form mod's mask key.
     RandoItemId nativeMask;
     const char* nativeFormMask;
     s32 nativeForm;
@@ -71,23 +60,25 @@ typedef struct {
     const char* icon;
 } LanguageInfo;
 
+#define JABBER_NUT_ICON "__OTR__icon_item_static_yar/gItemIconDekuNutTex"
+
 static const LanguageInfo sLanguages[SPEECH_MAX] = {
-    [SPEECH_TERMINAN] = { "nei.skill.speak_terminan", "Terminan Jabber Nut", "the people of Termina", false,
-                          RI_UNKNOWN, "nei.mask_kafei", -1, "nei.kafei", ICON("gItemIconJabberNutTerminanTex") },
+    [SPEECH_TERMINAN] = { "nei.skill.speak_terminan", "Terminan Jabber Nut", "the people of Termina", false, RI_UNKNOWN,
+                          "nei.mask_kafei", -1, "nei.kafei", JABBER_NUT_ICON },
     [SPEECH_DEKU] = { "nei.skill.speak_deku", "Deku Jabber Nut", "the Deku", false, RI_MASK_DEKU, NULL,
-                      PLAYER_FORM_DEKU, NULL, ICON("gItemIconJabberNutDekuTex") },
+                      PLAYER_FORM_DEKU, NULL, JABBER_NUT_ICON },
     [SPEECH_GORON] = { "nei.skill.speak_goron", "Goron Jabber Nut", "the Gorons", false, RI_MASK_GORON, NULL,
-                       PLAYER_FORM_GORON, NULL, ICON("gItemIconJabberNutGoronTex") },
+                       PLAYER_FORM_GORON, NULL, JABBER_NUT_ICON },
     [SPEECH_ZORA] = { "nei.skill.speak_zora", "Zora Jabber Nut", "the Zoras", false, RI_MASK_ZORA, NULL,
-                      PLAYER_FORM_ZORA, NULL, ICON("gItemIconJabberNutZoraTex") },
+                      PLAYER_FORM_ZORA, NULL, JABBER_NUT_ICON },
     [SPEECH_GERUDO] = { "nei.skill.speak_gerudo", "Gerudo Jabber Nut", "the Gerudo", false, RI_UNKNOWN,
-                        "nei.gerudo_form_mask", -1, "nei.gerudo", ICON("gItemIconJabberNutGerudoTex") },
-    [SPEECH_KEATON] = { "nei.skill.speak_animal", "Animal Jabber Nut", "animals", true, RI_UNKNOWN,
-                        "nei.keaton_form_mask", -1, "nei.keaton", ICON("gItemIconJabberNutAnimalTex") },
-    [SPEECH_ANIMAL] = { "nei.skill.speak_animal", "Animal Jabber Nut", "animals", true, RI_UNKNOWN, NULL, -1, NULL,
-                        ICON("gItemIconJabberNutAnimalTex") },
+                        "nei.gerudo_form_mask", -1, "nei.gerudo", JABBER_NUT_ICON },
+    [SPEECH_KEATON] = { "nei.skill.speak_animal", "Animalese Jabber Nut", "animals", true, RI_UNKNOWN,
+                        "nei.keaton_form_mask", -1, "nei.keaton", JABBER_NUT_ICON },
+    [SPEECH_ANIMAL] = { "nei.skill.speak_animal", "Animalese Jabber Nut", "animals", true, RI_UNKNOWN, NULL, -1, NULL,
+                        JABBER_NUT_ICON },
     [SPEECH_GOSSIP] = { "nei.skill.speak_gossip", "Gossip Jabber Nut", "the Gossip Stones", true, RI_UNKNOWN,
-                        "nei.garo_form_mask", -1, "nei.garo", ICON("gItemIconJabberNutGossipTex") },
+                        "nei.garo_form_mask", -1, "nei.garo", JABBER_NUT_ICON },
 };
 
 static bool IsRandoSave(void) {
@@ -114,8 +105,7 @@ static bool IsSpeakingNatively(const LanguageInfo* info) {
     const bool hasCustomForm = customForm != NULL && customForm[0] != '\0';
 
     if (info->nativeCustomForm != NULL && hasCustomForm) {
-        return sApi->IsCustomItemOwned(info->nativeFormMask) &&
-               strcmp(customForm, info->nativeCustomForm) == 0;
+        return sApi->IsCustomItemOwned(info->nativeFormMask) && strcmp(customForm, info->nativeCustomForm) == 0;
     }
     return !hasCustomForm && info->nativeForm >= 0 && GET_PLAYER_FORM == info->nativeForm;
 }
@@ -150,7 +140,6 @@ static SpokenLanguage GetShopLanguage(Actor* actor) {
     }
 }
 
-// The Happy Mask Salesman, the Moon children and other story speakers stay free so no cycle can stall.
 static SpokenLanguage GetActorLanguage(Actor* actor) {
     switch (actor->id) {
         case ACTOR_EN_SOB1:
@@ -286,7 +275,6 @@ static SpokenLanguage GetActorLanguage(Actor* actor) {
     }
 }
 
-// Actors update after Player, so the offer an actor just made reaches Link on the next frame.
 static void WithdrawLockedOffer(Actor* actor) {
     if (gPlayState == NULL || !IsRandoSave()) {
         return;
@@ -314,7 +302,6 @@ static void WithdrawLockedOffer(Actor* actor) {
     }
 }
 
-// Ship's VB_CLIMB: without the skill Link holds on to a ladder or a wall but cannot climb up it.
 static void RestrictClimb(bool* should, va_list args) {
     if (!IsRandoSave() || CanClimbNow()) {
         return;
@@ -440,18 +427,10 @@ static const int32_t sTerminanChecks[] = {
 };
 
 static const int32_t sDekuChecks[] = {
-    RC_CLOCK_TOWN_SCRUB_DEED,
-    RC_DEKU_PLAYGROUND_ALL_DAYS,
-    RC_DEKU_PLAYGROUND_ANY_DAY,
-    RC_DEKU_SHRINE_MASK_OF_SCENTS,
-    RC_GORON_VILLAGE_SCRUB_BOMB_BAG,
-    RC_GORON_VILLAGE_SCRUB_DEED,
-    RC_IKANA_CANYON_SCRUB_HUGE_RUPEE,
-    RC_IKANA_CANYON_SCRUB_POTION_REFILL,
-    RC_SOUTHERN_SWAMP_SCRUB_BEANS,
-    RC_SOUTHERN_SWAMP_SCRUB_DEED,
-    RC_TERMINA_FIELD_GROTTO_SCRUB,
-    RC_ZORA_HALL_SCRUB_DEED,
+    RC_CLOCK_TOWN_SCRUB_DEED,         RC_DEKU_PLAYGROUND_ALL_DAYS,         RC_DEKU_PLAYGROUND_ANY_DAY,
+    RC_DEKU_SHRINE_MASK_OF_SCENTS,    RC_GORON_VILLAGE_SCRUB_BOMB_BAG,     RC_GORON_VILLAGE_SCRUB_DEED,
+    RC_IKANA_CANYON_SCRUB_HUGE_RUPEE, RC_IKANA_CANYON_SCRUB_POTION_REFILL, RC_SOUTHERN_SWAMP_SCRUB_BEANS,
+    RC_SOUTHERN_SWAMP_SCRUB_DEED,     RC_TERMINA_FIELD_GROTTO_SCRUB,       RC_ZORA_HALL_SCRUB_DEED,
     RC_ZORA_HALL_SCRUB_POTION_REFILL,
 };
 
@@ -468,11 +447,8 @@ static const int32_t sGoronChecks[] = {
 };
 
 static const int32_t sZoraChecks[] = {
-    RC_GREAT_BAY_COAST_MIKAU,
-    RC_ZORA_HALL_SCENE_LIGHTS,
-    RC_ZORA_SHOP_ITEM_01,
-    RC_ZORA_SHOP_ITEM_02,
-    RC_ZORA_SHOP_ITEM_03,
+    RC_GREAT_BAY_COAST_MIKAU, RC_ZORA_HALL_SCENE_LIGHTS, RC_ZORA_SHOP_ITEM_01,
+    RC_ZORA_SHOP_ITEM_02,     RC_ZORA_SHOP_ITEM_03,
 };
 
 static const int32_t sKeatonChecks[] = {
@@ -480,15 +456,9 @@ static const int32_t sKeatonChecks[] = {
 };
 
 static const int32_t sAnimalChecks[] = {
-    RC_CLOCK_TOWN_LAUNDRY_FROG,
-    RC_DEKU_KINGS_CHAMBER_MONKEY,
-    RC_GREAT_BAY_TEMPLE_GEKKO_FROG,
-    RC_MOUNTAIN_VILLAGE_FROG_CHOIR,
-    RC_PINNACLE_ROCK_REUNITE_SEAHORSE,
-    RC_SOUTHERN_SWAMP_FROG,
-    RC_WATERFALL_RAPIDS_BEAVER_RACE_01,
-    RC_WATERFALL_RAPIDS_BEAVER_RACE_02,
-    RC_WOODFALL_TEMPLE_GEKKO_FROG,
+    RC_CLOCK_TOWN_LAUNDRY_FROG,         RC_DEKU_KINGS_CHAMBER_MONKEY,       RC_GREAT_BAY_TEMPLE_GEKKO_FROG,
+    RC_MOUNTAIN_VILLAGE_FROG_CHOIR,     RC_PINNACLE_ROCK_REUNITE_SEAHORSE,  RC_SOUTHERN_SWAMP_FROG,
+    RC_WATERFALL_RAPIDS_BEAVER_RACE_01, RC_WATERFALL_RAPIDS_BEAVER_RACE_02, RC_WOODFALL_TEMPLE_GEKKO_FROG,
 };
 
 typedef struct {
@@ -507,9 +477,7 @@ static const SpeakChecks sSpeakChecks[] = {
     { OWNER ".speak_animal", SPEECH_ANIMAL, sAnimalChecks, ARRAY_COUNT(sAnimalChecks) },
 };
 
-// The host replaces a rule registered under a name it already holds, so every rule needs its own name.
-static void RequireAt(const char* name, const S2HLogicSelector* selector, S2HLogicCondition condition,
-                      void* userData) {
+static void RequireAt(const char* name, const S2HLogicSelector* selector, S2HLogicCondition condition, void* userData) {
     S2HLogicRule rule = { sizeof(S2HLogicRule) };
     rule.name = name;
     rule.effect = S2H_LOGIC_REQUIRE;
@@ -520,7 +488,6 @@ static void RequireAt(const char* name, const S2HLogicSelector* selector, S2HLog
     sApi->RegisterLogicRule(&rule);
 }
 
-// The host copies a rule's selectors, so the stack selectors here need not outlive the call.
 static void RegisterLogicRules(void) {
     S2HLogicSelector chests = Z64Logic_SelectAny();
     chests.targets = S2H_LOGIC_TARGET_LOCATIONS;
@@ -548,8 +515,8 @@ static const S2HModRandoOption sOptions[] = {
       "Each form speaks its own language. Jabber Nuts teach the others: Terminan, Deku, Goron, Zora and Gerudo.",
       sOffOn, 2, 0, S2H_MOD_RANDO_WIDGET_COMBOBOX },
     { sizeof(S2HModRandoOption), EXTRA_SPEAK_OPTION, "Extra Jabber Nuts",
-      "Animals, Keaton and the Gossip Stones need their own Jabber Nut too. Keaton and Garo speak with them.",
-      sOffOn, 2, 0, S2H_MOD_RANDO_WIDGET_COMBOBOX },
+      "Animals, Keaton and the Gossip Stones need their own Jabber Nut too. Keaton and Garo speak with them.", sOffOn,
+      2, 0, S2H_MOD_RANDO_WIDGET_COMBOBOX },
     { sizeof(S2HModRandoOption), AGONY_OPTION, "Containers of Agony",
       "Containers only match their contents once the Stone of Agony is found.", sOffOn, 2, 0,
       S2H_MOD_RANDO_WIDGET_COMBOBOX },
@@ -559,10 +526,15 @@ typedef struct {
     const char* key;
     const char* name;
     const char* icon;
-    const char* model;
+    s16 pickupDrawId;
     const char* text;
     const char* poolOption;
 } SkillItem;
+
+// MM's own draw fills the segments its models branch into; the nut's bare display list jumps through segment 8.
+static void DrawSkillPickup(PlayState* play, S2HGetItemEntry* entry) {
+    GetItem_Draw(play, entry->gid);
+}
 
 static bool RegisterSkillItem(const SkillItem* skill) {
     static S2HCustomItemRandomizer pools[SPEECH_MAX + 2];
@@ -583,9 +555,9 @@ static bool RegisterSkillItem(const SkillItem* skill) {
     S2HCustomItemDefinition definition = Z64Items_Define(skill->key, skill->icon, NULL);
     definition.presentationFlags = S2H_ITEM_HIDE_FROM_KALEIDO;
     definition.displayName = skill->name;
-    definition.getItemScale = 1.0f;
     Z64Items_SetTextbox(&definition, skill->text);
-    Z64Items_SetGetItemModel(&definition, skill->model);
+    definition.getItemEntry.gid = skill->pickupDrawId;
+    definition.getItemEntry.drawFunc = DrawSkillPickup;
     Z64Items_SetLogic(&definition, pool);
     return Z64Items_Register(sApi, &definition);
 }
@@ -605,10 +577,11 @@ static void RegisterJabberNuts(void) {
             continue;
         }
         registered[registeredCount++] = info->nutKey;
-        snprintf(texts[language], sizeof(texts[language]), "You got a %%r%s%%w!&Now you can speak with %s.",
+        const char* article = strchr("AEIOU", info->nutName[0]) != NULL ? "an" : "a";
+        snprintf(texts[language], sizeof(texts[language]), "You got %s %%r%s%%w!&Now you can speak with %s.", article,
                  info->nutName, info->listener);
-        const SkillItem nut = { info->nutKey, info->nutName, info->icon, sNutModel, texts[language],
-                                info->isExtra ? EXTRA_SPEAK_OPTION : SPEAK_OPTION };
+        const SkillItem nut = { info->nutKey,  info->nutName,   info->icon,
+                                GID_DEKU_NUTS, texts[language], info->isExtra ? EXTRA_SPEAK_OPTION : SPEAK_OPTION };
         RegisterSkillItem(&nut);
     }
 }
@@ -642,10 +615,18 @@ S2H_MOD_EXPORT void ModInit(void) {
     for (uint32_t i = 0; i < ARRAY_COUNT(sOptions); i++) {
         sApi->RegisterRandoOption(&sOptions[i]);
     }
-    const SkillItem openChest = { OPEN_CHEST_KEY, "Open Chests", ICON("gItemIconOpenChestsTex"), sChestModel,
-                                  "You got %rOpen Chests%w!&Now you can open treasure chests.", OPEN_CHEST_OPTION };
-    const SkillItem climb = { CLIMB_KEY, "Climb", ICON("gItemIconClimbTex"), sClimbModel,
-                              "You got %rClimb%w!&Now you can climb ladders and walls.", CLIMB_OPTION };
+    const SkillItem openChest = { OPEN_CHEST_KEY,
+                                  "Open Chests",
+                                  ICON("gItemIconOpenChestsTex"),
+                                  GID_KEY_SMALL,
+                                  "You got %rOpen Chests%w!&Now you can open treasure chests.",
+                                  OPEN_CHEST_OPTION };
+    const SkillItem climb = { CLIMB_KEY,
+                              "Climb",
+                              ICON("gItemIconClimbTex"),
+                              GID_MAGIC_BEANS,
+                              "You got %rClimb%w!&Now you can climb ladders and walls.",
+                              CLIMB_OPTION };
     RegisterSkillItem(&openChest);
     RegisterSkillItem(&climb);
     RegisterJabberNuts();

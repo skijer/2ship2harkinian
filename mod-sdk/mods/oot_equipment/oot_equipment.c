@@ -32,7 +32,6 @@
 #define ZORA_TUNIC_KEY "oot.equip.zora_tunic"
 #define IRON_BOOTS_KEY "oot.equip.iron_boots"
 #define HOVER_BOOTS_KEY "oot.equip.hover_boots"
-// Shipwright AgeDependentEquipment: instruction 79 of the adult BGS hand starts the baked adult fist.
 #define BGS_HAND_FIST_INSTRUCTION 79
 // Read from the extracted DL: the adult fist's gauntlet loads at 105, after the pipe sync at 104.
 #define MASTER_HAND_FIST_INSTRUCTION 104
@@ -42,7 +41,6 @@
 // Read from the extracted DL: the empty sheath and its black mouth sit between the handle (64) and the design (113).
 #define MIRROR_SHEATH_FIRST_INSTRUCTION 65
 #define MIRROR_SHEATH_END_INSTRUCTION 113
-// OoT child Link stands about three quarters of adult Link's height (ageProperties 40 vs 56 eye height).
 #define ADULT_TO_CHILD_SCALE 0.75f
 // Read from the extracted DLs: every adult boot loads its foot matrix (segment 0x0D) at instruction 2.
 #define BOOT_SKIN_MATRIX_INSTRUCTION 2
@@ -54,36 +52,32 @@ static const char* const sCursorCorners[4] = {
     "__OTR__textures/oot_equipment/gPauseMenuCursorBottomRightTex",
 };
 static const S2HModApi* sApi;
-static const char* const sHooks[] = { "OnGameFrameUpdate", "OnPlayerUpdate", "OnCollisionResolveDamage",
-    "OnPlayerShieldBlocked", "OnActorDrawEnd", "OnPlayerPostLimbDraw", "OnPlayerResolveLimbDraw", "OnLoadFile", "OnSaveInit",
-    "AfterKaleidoDrawPage" };
+static const char* const sHooks[] = { "OnGameFrameUpdate",       "OnPlayerUpdate", "OnCollisionResolveDamage",
+                                      "OnPlayerShieldBlocked",   "OnActorDrawEnd", "OnPlayerPostLimbDraw",
+                                      "OnPlayerResolveLimbDraw", "OnLoadFile",     "OnSaveInit",
+                                      "AfterKaleidoDrawPage" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sHooks, ARRAY_COUNT(sHooks) };
-// OoT z_kaleido_scope_PAL.c: equipment x positions -114,12,44,76 plus 2;
-// four rows start at 58 minus 2, with a 32-pixel stride and 28-pixel icons.
 static const S2HLayoutCell sEquipmentCells[16] = {
-    { -112, 56, 28, 28 }, { 14, 56, 28, 28 }, { 46, 56, 28, 28 }, { 78, 56, 28, 28 },
-    { -112, 24, 28, 28 }, { 14, 24, 28, 28 }, { 46, 24, 28, 28 }, { 78, 24, 28, 28 },
-    { -112, -8, 28, 28 }, { 14, -8, 28, 28 }, { 46, -8, 28, 28 }, { 78, -8, 28, 28 },
+    { -112, 56, 28, 28 },  { 14, 56, 28, 28 },  { 46, 56, 28, 28 },  { 78, 56, 28, 28 },
+    { -112, 24, 28, 28 },  { 14, 24, 28, 28 },  { 46, 24, 28, 28 },  { 78, 24, 28, 28 },
+    { -112, -8, 28, 28 },  { 14, -8, 28, 28 },  { 46, -8, 28, 28 },  { 78, -8, 28, 28 },
     { -112, -40, 28, 28 }, { 14, -40, 28, 28 }, { 46, -40, 28, 28 }, { 78, -40, 28, 28 },
 };
-static const char* const sEquipmentBackground[15] = {
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment00Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment01Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment02Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment03Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment04Tex",
-    "__OTR__textures/oot_equipment/gPauseEquipment10ENGTex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment11Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment12Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment13Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment14Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment20Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment21Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment22Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment23Tex",
-    "__OTR__textures/oot_icon_item_static/gPauseEquipment24Tex"
-};
-
+static const char* const sEquipmentBackground[15] = { "__OTR__textures/oot_icon_item_static/gPauseEquipment00Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment01Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment02Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment03Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment04Tex",
+                                                      "__OTR__textures/oot_equipment/gPauseEquipment10ENGTex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment11Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment12Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment13Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment14Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment20Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment21Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment22Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment23Tex",
+                                                      "__OTR__textures/oot_icon_item_static/gPauseEquipment24Tex" };
 
 typedef struct {
     const char* key;
@@ -100,11 +94,9 @@ typedef struct {
     bool isVanillaStandIn;
 } OotPiece;
 
-// Swords take B through their melee weapon and empty MM's sword slot while worn, so they never pass for MM's
-// own; shields stand for MM's by vanillaBase; tunics and boots act through z64equipment.
 static const OotPiece sPieces[] = {
-    { KOKIRI_SWORD_KEY, MM_KOKIRI_SWORD_ICON, MM_KOKIRI_SWORD_NAME, MM_KOKIRI_SWORD_TEXT, "",
-      S2H_EQUIP_SLOT_SWORD, 1, 0, PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_ROLE_NONE, false, true },
+    { KOKIRI_SWORD_KEY, MM_KOKIRI_SWORD_ICON, MM_KOKIRI_SWORD_NAME, MM_KOKIRI_SWORD_TEXT, "", S2H_EQUIP_SLOT_SWORD, 1,
+      0, PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_ROLE_NONE, false, true },
     { MASTER_SWORD_KEY, ICON("gItemIconSwordMasterTex"), NAME("gMasterSwordItemNameENGTex"),
       "%rMaster Sword&%wThe Blade of Evil's Bane. Its edge never dulls.",
       "You got the %rMaster Sword%w!&The sacred blade that seals the darkness. Unlike the Razor Sword, it never "
@@ -114,21 +106,20 @@ static const OotPiece sPieces[] = {
       "%rBiggoron's Sword&%wSwing it with %y\xB1%w using both hands. No shield can be held with it.",
       "You got %rBiggoron's Sword%w!&A masterpiece forged by the giant Goron smith. Its two-handed swing hits "
       "harder than any blade.",
-      S2H_EQUIP_SLOT_SWORD, 3, EQUIP_VALUE_SWORD_NONE, PLAYER_MELEEWEAPON_SWORD_TWO_HANDED,
-      Z64EQUIPMENT_ROLE_NONE },
+      S2H_EQUIP_SLOT_SWORD, 3, EQUIP_VALUE_SWORD_NONE, PLAYER_MELEEWEAPON_SWORD_TWO_HANDED, Z64EQUIPMENT_ROLE_NONE },
     { KOKIRI_TUNIC_KEY, ICON("gItemIconTunicKokiriTex"), NAME("gKokiriTunicItemNameENGTex"),
-      "%rKokiri Tunic&%wThe green clothes of the forest children.", "",
-      S2H_EQUIP_SLOT_TUNIC, 1, 0, PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_ROLE_NONE, true },
+      "%rKokiri Tunic&%wThe green clothes of the forest children.", "", S2H_EQUIP_SLOT_TUNIC, 1, 0,
+      PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_ROLE_NONE, true },
     { KOKIRI_BOOTS_KEY, ICON("gItemIconBootsKokiriTex"), NAME("gKokiriBootsItemNameENGTex"),
-      "%rKokiri Boots&%wComfortable boots for running anywhere.", "",
-      S2H_EQUIP_SLOT_BOOTS, 1, 0, PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_ROLE_NONE, true },
+      "%rKokiri Boots&%wComfortable boots for running anywhere.", "", S2H_EQUIP_SLOT_BOOTS, 1, 0,
+      PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_ROLE_NONE, true },
     { DEKU_SHIELD_KEY, ICON("gItemIconShieldDekuTex"), NAME("gDekuShieldItemNameENGTex"),
       "%rDeku Shield&%wHold %y\xB4%w to block. It burns if it blocks fire.",
-      "You got a %rDeku Shield%w!&A wooden shield from the forest. Fire will turn it to ash.",
-      S2H_EQUIP_SLOT_SHIELD, 1, EQUIP_VALUE_SHIELD_HERO, PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_SHIELD_WOOD },
+      "You got a %rDeku Shield%w!&A wooden shield from the forest. Fire will turn it to ash.", S2H_EQUIP_SLOT_SHIELD, 1,
+      EQUIP_VALUE_SHIELD_HERO, PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_SHIELD_WOOD },
     { HYLIAN_SHIELD_KEY, ICON("gItemIconShieldHylianTex"), NAME("gHylianShieldItemNameENGTex"),
-      "%rHylian Shield&%wThe Hero's Shield, made in Hyrule. Hold %y\xB4%w to block.", "",
-      S2H_EQUIP_SLOT_SHIELD, 2, 0, PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_ROLE_NONE, false, true },
+      "%rHylian Shield&%wThe Hero's Shield, made in Hyrule. Hold %y\xB4%w to block.", "", S2H_EQUIP_SLOT_SHIELD, 2, 0,
+      PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_ROLE_NONE, false, true },
     { MIRROR_SHIELD_KEY, ICON("gItemIconShieldMirrorTex"), NAME("gMirrorShieldItemNameENGTex"),
       "%rMirror Shield&%wHold %y\xB4%w to block and reflect light.",
       "You got the %rMirror Shield%w!&The polished shield of the Spirit Temple reflects light and magic.",
@@ -140,8 +131,8 @@ static const OotPiece sPieces[] = {
       S2H_EQUIP_SLOT_TUNIC, 2, 0, PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_TUNIC_HEAT },
     { ZORA_TUNIC_KEY, ICON("gItemIconTunicZoraTex"), NAME("gZoraTunicItemNameENGTex"),
       "%rZora Tunic&%wBreathe underwater. Press %y\xB0%w while swimming to speed ahead.",
-      "You got a %rZora Tunic%w!&Wear it and you can breathe underwater and swim like a Zora.",
-      S2H_EQUIP_SLOT_TUNIC, 3, 0, PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_TUNIC_WATER },
+      "You got a %rZora Tunic%w!&Wear it and you can breathe underwater and swim like a Zora.", S2H_EQUIP_SLOT_TUNIC, 3,
+      0, PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_TUNIC_WATER },
     { IRON_BOOTS_KEY, ICON("gItemIconBootsIronTex"), NAME("gIronBootsItemNameENGTex"),
       "%rIron Boots&%wSo heavy you sink in water and walk along the bottom. Currents cannot push you.",
       "You got the %rIron Boots%w!&Too heavy to run in, but they will take you to the bottom of deep water.",
@@ -152,31 +143,47 @@ static const OotPiece sPieces[] = {
       S2H_EQUIP_SLOT_BOOTS, 3, 0, PLAYER_MELEEWEAPON_NONE, Z64EQUIPMENT_BOOTS_HOVER },
 };
 
-// Native OoT pickup recipes from z_draw.c: collars precede cloth; rivets and mirror symbol use XLU.
-static const ALIGN_ASSET(2) char sGiMaster[] = "__OTR__objects/nei_get_item/oot_equipment/object_toki_objects/object_toki_objects_DL_001BD0";
-static const ALIGN_ASSET(2) char sGiBiggoron[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_longsword/gGiBiggoronSwordDL";
-static const ALIGN_ASSET(2) char sGiDekuShield[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_shield_1/gGiDekuShieldDL";
-static const ALIGN_ASSET(2) char sGiMirror[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_shield_3/gGiMirrorShieldDL";
-static const ALIGN_ASSET(2) char sGiMirrorSymbol[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_shield_3/gGiMirrorShieldSymbolDL";
-static const ALIGN_ASSET(2) char sGiCollar[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_clothes/gGiTunicCollarDL";
+static const ALIGN_ASSET(2) char sGiMaster[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_toki_objects/object_toki_objects_DL_001BD0";
+static const ALIGN_ASSET(2) char sGiBiggoron[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_longsword/gGiBiggoronSwordDL";
+static const ALIGN_ASSET(2) char sGiDekuShield[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_shield_1/gGiDekuShieldDL";
+static const ALIGN_ASSET(2) char sGiMirror[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_shield_3/gGiMirrorShieldDL";
+static const ALIGN_ASSET(2) char sGiMirrorSymbol[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_shield_3/gGiMirrorShieldSymbolDL";
+static const ALIGN_ASSET(2) char sGiCollar[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_clothes/gGiTunicCollarDL";
 static const ALIGN_ASSET(2) char sGiTunic[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_clothes/gGiTunicDL";
-static const ALIGN_ASSET(2) char sGiGoronCollar[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_clothes/gGiGoronCollarColorDL";
-static const ALIGN_ASSET(2) char sGiGoronTunic[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_clothes/gGiGoronTunicColorDL";
-static const ALIGN_ASSET(2) char sGiZoraCollar[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_clothes/gGiZoraCollarColorDL";
-static const ALIGN_ASSET(2) char sGiZoraTunic[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_clothes/gGiZoraTunicColorDL";
-static const ALIGN_ASSET(2) char sGiIron[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_boots_2/gGiIronBootsDL";
-static const ALIGN_ASSET(2) char sGiRivets[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_boots_2/gGiIronBootsRivetsDL";
-static const ALIGN_ASSET(2) char sGiHover[] = "__OTR__objects/nei_get_item/oot_equipment/object_gi_hoverboots/gGiHoverBootsDL";
+static const ALIGN_ASSET(2) char sGiGoronCollar[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_clothes/gGiGoronCollarColorDL";
+static const ALIGN_ASSET(2) char sGiGoronTunic[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_clothes/gGiGoronTunicColorDL";
+static const ALIGN_ASSET(2) char sGiZoraCollar[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_clothes/gGiZoraCollarColorDL";
+static const ALIGN_ASSET(2) char sGiZoraTunic[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_clothes/gGiZoraTunicColorDL";
+static const ALIGN_ASSET(2) char sGiIron[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_boots_2/gGiIronBootsDL";
+static const ALIGN_ASSET(2) char sGiRivets[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_boots_2/gGiIronBootsRivetsDL";
+static const ALIGN_ASSET(2) char sGiHover[] =
+    "__OTR__objects/nei_get_item/oot_equipment/object_gi_hoverboots/gGiHoverBootsDL";
 
 static void DrawPickup(PlayState* play, const char* a, const char* b, const char* c, const char* d,
                        const char* translucent) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    if (a) gSPDisplayList(POLY_OPA_DISP++, (Gfx*)a);
-    if (b) gSPDisplayList(POLY_OPA_DISP++, (Gfx*)b);
-    if (c) gSPDisplayList(POLY_OPA_DISP++, (Gfx*)c);
-    if (d) gSPDisplayList(POLY_OPA_DISP++, (Gfx*)d);
+    if (a)
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)a);
+    if (b)
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)b);
+    if (c)
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)c);
+    if (d)
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)d);
     if (translucent) {
         Gfx_SetupDL25_Xlu(play->state.gfxCtx);
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
@@ -185,19 +192,18 @@ static void DrawPickup(PlayState* play, const char* a, const char* b, const char
     CLOSE_DISPS(play->state.gfxCtx);
 }
 static void DrawMasterPickup(PlayState* play, S2HGetItemEntry* entry) {
-    // Shipwright Randomizer_DrawMasterSword's pickup transform and animated material.
     Matrix_Scale(0.05f, 0.05f, 0.05f, MTXMODE_APPLY);
     Matrix_RotateZF(2.1f, MTXMODE_APPLY);
     OPEN_DISPS(play->state.gfxCtx);
-    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx,
-        0, play->state.frames, 0, 32, 32, 1, 0, 0, 32, 32));
+    gSPSegment(POLY_OPA_DISP++, 0x08,
+               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, play->state.frames, 0, 32, 32, 1, 0, 0, 32, 32));
     CLOSE_DISPS(play->state.gfxCtx);
     DrawPickup(play, sGiMaster, NULL, NULL, NULL, NULL);
 }
 static void DrawBiggoronPickup(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(play->state.gfxCtx);
-    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx,
-        0, play->state.frames, 0, 32, 32, 1, 0, 0, 32, 32));
+    gSPSegment(POLY_OPA_DISP++, 0x08,
+               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, play->state.frames, 0, 32, 32, 1, 0, 0, 32, 32));
     CLOSE_DISPS(play->state.gfxCtx);
     DrawPickup(play, sGiBiggoron, NULL, NULL, NULL, NULL);
 }
@@ -205,6 +211,13 @@ static void DrawDekuPickup(PlayState* play, S2HGetItemEntry* entry) {
     DrawPickup(play, sGiDekuShield, NULL, NULL, NULL, NULL);
 }
 static void DrawMirrorPickup(PlayState* play, S2HGetItemEntry* entry) {
+    // gGiMirrorShieldDL branches into segment 0x08 for its scrolling sheen.
+    const u32 frames = play->state.frames;
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPSegment(
+        POLY_OPA_DISP++, 0x08,
+        (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, 0, (frames * 2) % 256, 64, 64, 1, 0, frames % 128, 32, 32));
+    CLOSE_DISPS(play->state.gfxCtx);
     DrawPickup(play, sGiMirror, NULL, NULL, NULL, sGiMirrorSymbol);
 }
 static void DrawGoronPickup(PlayState* play, S2HGetItemEntry* entry) {
@@ -218,6 +231,12 @@ static void DrawIronPickup(PlayState* play, S2HGetItemEntry* entry) {
 }
 static void DrawHoverPickup(PlayState* play, S2HGetItemEntry* entry) {
     DrawPickup(play, sGiHover, NULL, NULL, NULL, NULL);
+}
+
+static bool IsPieceEnabled(const OotPiece* piece) {
+    char option[96];
+    snprintf(option, sizeof(option), "gMods.Store.oot_equipment.%s", piece->key + strlen("oot.equip."));
+    return CVarGetInteger(option, 1) != 0;
 }
 
 static void RegisterWithRole(const S2HCustomEquipDefinition* definition, const OotPiece* piece) {
@@ -241,7 +260,6 @@ static void RegisterPiece(const OotPiece* piece) {
     definition.formMask = S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN);
     definition.vanillaBase = piece->vanillaBase;
     definition.meleeWeapon = piece->meleeWeapon;
-    // Equipment has no implicit randomizer contribution in MM.
     const S2HCustomItemRandomizer randomizer = {
         .structSize = sizeof(S2HCustomItemRandomizer),
         .flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT,
@@ -250,7 +268,6 @@ static void RegisterPiece(const OotPiece* piece) {
         .logicKey = piece->key,
         .hintKey = piece->key,
     };
-    // Starting pieces and the stand-in for MM's own sword never enter the pool.
     definition.randomizer = (piece->isStartingPiece || piece->isVanillaStandIn) ? NULL : &randomizer;
     definition.presentationFlags = piece->isVanillaStandIn ? S2H_EQUIP_VANILLA_STAND_IN : 0;
     if (piece->isVanillaStandIn) {
@@ -276,7 +293,6 @@ static void RegisterPiece(const OotPiece* piece) {
     RegisterWithRole(&definition, piece);
 }
 
-// The Kokiri Sword is MM's sword at any upgrade; the Hylian Shield is MM's Hero's Shield, which the Mirror replaces.
 static bool HasVanillaPiece(u8 slot) {
     const u16 value = CustomEquipRegistry_GetVanillaBase(slot);
     if (slot == S2H_EQUIP_SLOT_SWORD) {
@@ -285,7 +301,6 @@ static bool HasVanillaPiece(u8 slot) {
     return value == EQUIP_VALUE_SHIELD_HERO;
 }
 
-// A stand-in cell is owned while Link has MM's own piece, and worn while no other piece is.
 static void SyncStandIn(const char* key, u8 slot) {
     const bool hasVanillaPiece = HasVanillaPiece(slot);
     if (CustomEquipRegistry_IsOwned(key) != hasVanillaPiece) {
@@ -302,7 +317,6 @@ typedef struct {
     const char* pauseText;
 } SwordLevel;
 
-// Indexed by MM's sword value from Kokiri on: the cell is MM's own progressive sword, so it wears MM's art.
 static const SwordLevel sSwordLevels[] = {
     { MM_KOKIRI_SWORD_ICON, MM_KOKIRI_SWORD_NAME, MM_KOKIRI_SWORD_TEXT },
     { "__OTR__icon_item_static_yar/gItemIconRazorSwordTex", "__OTR__item_name_static/gItemNameRazorSwordENGTex",
@@ -326,7 +340,6 @@ static void ShowVanillaSwordLevel(void) {
     }
 }
 
-// As in OoT, Link always wears a tunic and boots: the Kokiri pair comes back whenever the slot empties.
 static void WearKokiriWhenBare(const char* key, u8 slot) {
     if (CustomEquipRegistry_IsOwned(key) && CustomEquipRegistry_GetWorn(slot) == NULL) {
         CustomEquipRegistry_Wear(key);
@@ -344,7 +357,6 @@ static void SyncStandIns(void) {
     ShowVanillaSwordLevel();
 }
 
-// A randomizer file takes its sword and shield from its own starting items instead.
 static void ApplyStartingEquipment(s16 fileNum) {
     if (gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO) {
         return;
@@ -381,7 +393,6 @@ static void RegisterMenu(void) {
                         "New files start without the Hero's Shield. Randomizer files use their starting items.");
 }
 
-// The Goron Tunic lends the Goron's guard: while R is held, a hit from any side is blocked like a shield's.
 static void GuardLikeGoron(Actor* victim, ColliderElement* attack, f32* damage) {
     if (gPlayState == NULL || attack == NULL) {
         return;
@@ -398,8 +409,6 @@ static void GuardLikeGoron(Actor* victim, ColliderElement* attack, f32* damage) 
     Actor_PlaySfx(&player->actor, NA_SE_IT_SHIELD_BOUND);
 }
 
-// MM's logic reads its own sword and shield slots, which a worn OoT piece no longer fills. Worn, the OoT Mirror
-// is MM's own mirror value, so it reflects every native light beam.
 static void GrantEquipmentLogic(void) {
     static const Z64LogicSource sSwords[] = { { MASTER_SWORD_KEY }, { BIGGORON_SWORD_KEY }, { GIANTS_KNIFE_KEY } };
     static const Z64LogicSource sDekuShield = { DEKU_SHIELD_KEY };
@@ -426,8 +435,6 @@ static void OwnStartingPieces(s32 fileNum) {
     }
 }
 
-// OoT sTunicColors: Goron {100, 20, 0}, Zora {0, 60, 100}. The Kokiri Tunic is Link's own, so it keeps the
-// colour the cosmetics editor gave him, else the host's default green.
 static void TintOotTunic(bool* should, va_list args) {
     va_arg(args, Player*);
     Color_RGB8* color = va_arg(args, Color_RGB8*);
@@ -472,7 +479,6 @@ static void KeepBootOnLoadedMatrix(const char* model) {
     sPatchedModels[sPatchedCount++] = model;
 }
 
-// OoT appends the boots after the skeleton; MM has no such point, so each boot seats on its live foot matrix.
 static void DrawOotBoots(Player* player, int32_t limbIndex) {
     if (!IsLocalHumanLink(player) || (limbIndex != PLAYER_LIMB_LEFT_FOOT && limbIndex != PLAYER_LIMB_RIGHT_FOOT)) {
         return;
@@ -497,7 +503,6 @@ static const ALIGN_ASSET(2) char sBgsHandDL[] = LINK_ADULT("gLinkAdultLeftHandHo
 static const ALIGN_ASSET(2) char sHumanLeftFistDL[] = "__OTR__objects/object_link_child/gLinkHumanLeftHandClosedDL";
 static const ALIGN_ASSET(2) char sDekuShieldHandDL[] = LINK_CHILD("gLinkChildRightFistAndDekuShieldNearDL");
 
-// Only an adult BGS hand exists; MM's own fist replaces the baked adult one.
 static bool PatchBgsHand(void) {
     static bool sIsPatched;
     if (sIsPatched) {
@@ -516,9 +521,11 @@ static bool PatchBgsHand(void) {
 
 static const ALIGN_ASSET(2) char sMirrorShieldHandDL[] = LINK_ADULT("gLinkAdultRightHandHoldingMirrorShieldNearDL");
 static const ALIGN_ASSET(2) char sHumanRightFistDL[] = "__OTR__objects/object_link_child/gLinkHumanRightHandClosedDL";
-static const ALIGN_ASSET(2) char sHeroShieldOnBackDL[] = "__OTR__objects/object_link_child/gLinkHumanHerosShieldWithMtxDL";
+static const ALIGN_ASSET(2) char sHeroShieldOnBackDL[] =
+    "__OTR__objects/object_link_child/gLinkHumanHerosShieldWithMtxDL";
 static const ALIGN_ASSET(2) char sDekuShieldOnBackDL[] = LINK_CHILD("gLinkChildDekuShieldWithMatrixDL");
-static const ALIGN_ASSET(2) char sMmMirrorShieldOnBackDL[] = "__OTR__objects/object_link_child/gLinkHumanMirrorShieldWithMtxDL";
+static const ALIGN_ASSET(2) char sMmMirrorShieldOnBackDL[] =
+    "__OTR__objects/object_link_child/gLinkHumanMirrorShieldWithMtxDL";
 static const ALIGN_ASSET(2) char sMirrorShieldOnBackDL[] = LINK_ADULT("gLinkAdultMirrorShieldAndSheathNearDL");
 static const ALIGN_ASSET(2) char sMasterSwordSheathedDL[] = LINK_ADULT("gLinkAdultMasterSwordAndSheathNearDL");
 static const ALIGN_ASSET(2) char sEmptySheathDL[] = LINK_ADULT("gLinkAdultSheathNearDL");
@@ -526,7 +533,6 @@ static Gfx sHiddenLimbDL[] = { gsSPEndDisplayList() };
 
 typedef char PatchName[32];
 
-// Patch names are kept by the resource manager, so the caller's storage must outlive the patch.
 static void SkipInstructions(const char* displayList, const char* prefix, s32 first, s32 end, PatchName* names) {
     for (s32 i = first; i < end; i++) {
         char* name = names[i - first];
@@ -536,7 +542,6 @@ static void SkipInstructions(const char* displayList, const char* prefix, s32 fi
     }
 }
 
-// The adult hand lies between the shield face (0-64) and its mirror design (146 on); MM's fist is drawn apart.
 static bool PatchMirrorShieldHand(void) {
     static bool sIsPatched;
     static PatchName sSkipNames[MIRROR_HAND_END_INSTRUCTION - MIRROR_HAND_FIRST_INSTRUCTION];
@@ -552,7 +557,6 @@ static bool PatchMirrorShieldHand(void) {
     return true;
 }
 
-// The adult fist follows the blade from 104 on; MM's fist is drawn apart.
 static bool PatchMasterSwordHand(void) {
     static bool sIsPatched;
     if (sIsPatched) {
@@ -572,7 +576,6 @@ typedef struct {
     bool isBuilt;
 } HeldAtChildScale;
 
-// The adult piece shrinks to the size it has on the back; MM's own fist around it keeps its size.
 static Gfx* GetHeldAtChildScale(HeldAtChildScale* held, const char* model, const char* fist) {
     static Mtx sChildScale;
     static bool sIsScaleReady;
@@ -597,7 +600,6 @@ static Gfx* GetHeldAtChildScale(HeldAtChildScale* held, const char* model, const
     return held->commands;
 }
 
-// OoT only bakes the Mirror on the back together with a sheath; without it, MM's own sheath stays the only one.
 static bool PatchMirrorShieldOnBack(void) {
     static bool sIsPatched;
     static PatchName sSkipNames[MIRROR_SHEATH_END_INSTRUCTION - MIRROR_SHEATH_FIRST_INSTRUCTION];
@@ -628,7 +630,6 @@ static bool IsOotMirrorOnBack(void) {
     return CustomEquipRegistry_IsWorn(MIRROR_SHIELD_KEY) && PatchMirrorShieldOnBack();
 }
 
-// MM draws the shield on Link's back from its own Hero's Shield list; the Deku Shield borrows that call.
 static void UpdateDekuShieldOnBack(void) {
     static bool sIsDekuOnBack;
     const bool shouldShowDeku = CustomEquipRegistry_IsWorn(DEKU_SHIELD_KEY) && sApi->HasResource(sDekuShieldOnBackDL);
@@ -647,7 +648,6 @@ static void UpdateDekuShieldOnBack(void) {
     ResourceMgr_PatchGfxByName(sHeroShieldOnBackDL, "ootEquipmentDekuBackEnd", 1, end);
 }
 
-// MM's own mirror on the back is emptied while the OoT one is drawn at the sheath limb in its place.
 static void UpdateMmMirrorOnBack(void) {
     static bool sIsHidden;
     const bool shouldHide = IsOotMirrorOnBack();
@@ -684,7 +684,6 @@ static void ReturnToSheathLimbMatrix(Player* player) {
     Matrix_Translate(-630.0f, -100.0f, 30.0f, MTXMODE_APPLY);
 }
 
-// Only adult models exist for these, so they are shrunk to child Link's size on his own sheath limb.
 static void DrawAdultModelAtChildScale(Player* player, const char* model) {
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Matrix_Push();
@@ -707,7 +706,6 @@ static void DrawMasterSwordSheath(Player* player, int32_t limbIndex) {
     }
 }
 
-// Same gate as MM's own shield on the back (Player_PostLimbDrawGameplay, sheath limb).
 static void DrawMirrorShieldOnBack(Player* player, int32_t limbIndex) {
     if (!IsLocalHumanLink(player) || limbIndex != PLAYER_LIMB_SHEATH || player->currentShield == PLAYER_SHIELD_NONE ||
         (player->sheathType != PLAYER_MODELTYPE_SHEATH_14 && player->sheathType != PLAYER_MODELTYPE_SHEATH_15) ||
@@ -717,7 +715,6 @@ static void DrawMirrorShieldOnBack(Player* player, int32_t limbIndex) {
     DrawAdultModelAtChildScale(player, sMirrorShieldOnBackDL);
 }
 
-// The child-only Master Sword hand is the pedestal grip, blade backwards; the adult one points it forward.
 static Gfx* GetHeldSwordModel(Player* player) {
     static HeldAtChildScale sMasterHeld;
     if (IsHoldingKey(player, MASTER_SWORD_KEY) && PatchMasterSwordHand()) {
@@ -750,11 +747,8 @@ static void DrawOotWeapons(Player* player, int32_t limbIndex, Gfx** displayList,
     }
 }
 
-// Native post-limb code resets the collider material from the Hero/Mirror base.
-// Apply the wooden material afterwards, without changing native reflection rules.
 static void SetDekuShieldMaterial(Player* player, int32_t limbIndex) {
-    if (gPlayState && player == GET_PLAYER(gPlayState) &&
-        player->transformation == PLAYER_FORM_HUMAN &&
+    if (gPlayState && player == GET_PLAYER(gPlayState) && player->transformation == PLAYER_FORM_HUMAN &&
         CustomEquipRegistry_IsWorn(DEKU_SHIELD_KEY)) {
         player->shieldQuad.base.colMaterial = COL_MATERIAL_WOOD;
     }
@@ -768,7 +762,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// OoT's pause Link quad (equipVtx at page x -64, top y 50, 64x112) in screen space, which is page space + (160, 120).
 static void ShowLinkInPanel(PauseContext* pauseCtx, u16 pauseIndex) {
     static const S2HPlayerPreview sPanel = { sizeof(S2HPlayerPreview), 96, 70, 64, 112 };
     if (gPlayState == NULL || pauseIndex != PAUSE_MASK || pauseIndex != pauseCtx->pageIndex ||
@@ -784,10 +777,12 @@ static void ShowLinkInPanel(PauseContext* pauseCtx, u16 pauseIndex) {
 static void PlaceEquipment(void) {
     static uint32_t knownCount;
     uint32_t count = CustomEquipRegistry_GetCount();
-    if (knownCount == count) return;
+    if (knownCount == count)
+        return;
     for (uint32_t i = 0; i < count; ++i) {
         const S2HCustomEquipDefinition* piece = CustomEquipRegistry_GetAt(i);
-        if ((strncmp(piece->key, "oot.equip.", 10) && strcmp(piece->key, "nei.equip.giants_knife")) || piece->row >= 4) continue;
+        if ((strncmp(piece->key, "oot.equip.", 10) && strcmp(piece->key, "nei.equip.giants_knife")) || piece->row >= 4)
+            continue;
         uint8_t column = piece->column > 3 ? 3 : piece->column;
         sApi->PlaceLayoutItem(piece->key, OOT_EQUIPMENT_PAGE_KEY, piece->row * 4 + column);
     }
@@ -795,15 +790,26 @@ static void PlaceEquipment(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
-    const S2HLayoutPage page = { sizeof(S2HLayoutPage), OOT_EQUIPMENT_PAGE_KEY, "OoT Equipment",
-        S2H_LAYOUT_EQUIPMENT, 4, 4, 16, sEquipmentCells, sEquipmentBackground,
-        S2H_ITEM_PAGE_EQUIPMENT_FIRST + 1, S2H_LAYOUT_FIXED_PAGE | S2H_LAYOUT_EQUIP_CONTROLS, sCursorCorners };
+    const S2HLayoutPage page = { sizeof(S2HLayoutPage),
+                                 OOT_EQUIPMENT_PAGE_KEY,
+                                 "OoT Equipment",
+                                 S2H_LAYOUT_EQUIPMENT,
+                                 4,
+                                 4,
+                                 16,
+                                 sEquipmentCells,
+                                 sEquipmentBackground,
+                                 S2H_ITEM_PAGE_EQUIPMENT_FIRST + 1,
+                                 S2H_LAYOUT_FIXED_PAGE | S2H_LAYOUT_EQUIP_CONTROLS,
+                                 sCursorCorners };
     if (sApi->RegisterLayoutPage(&page)) {
         S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PlaceEquipment);
         S2H_REGISTER_HOOK(sApi, AfterKaleidoDrawPage, ShowLinkInPanel);
     }
     for (u32 i = 0; i < ARRAY_COUNT(sPieces); i++) {
-        RegisterPiece(&sPieces[i]);
+        if (IsPieceEnabled(&sPieces[i])) {
+            RegisterPiece(&sPieces[i]);
+        }
     }
     Z64Equipment_Install(sApi);
     S2H_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, SetDekuShieldMaterial);

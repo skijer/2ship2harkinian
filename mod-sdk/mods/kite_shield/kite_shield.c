@@ -1,8 +1,3 @@
-/**
- * Kite Shield: press R in mid air and the shield goes under Link's feet. Downhill builds speed with no cap, uphill
- * bleeds it; a narrow strip of floor becomes a grind rail he is pinned to. A hops, B spins, R + B gets off, and
- * C items keep working.
- */
 
 #include <math.h>
 
@@ -17,12 +12,10 @@
 
 #define KITE_SHIELD_KEY "nei.equip.kite_shield"
 #define DEG_TO_BINANG 182.04f
-// z_player.c's own name for the linear stick-to-speed mode of Player_GetMovementSpeedAndYaw.
 #define SPEED_MODE_LINEAR 0.0f
 // MM gates the action function with state flag 4 where Ship has a named flag.
 #define PLAYER_STATE3_PAUSE_ACTION_FUNC PLAYER_STATE3_4
 
-// The shield in hand and on the back is modelled in the shield limb's own space, about 6000 units across.
 #define SHIELD_SCALE 44.2f
 #define SHIELD_ROT_X (-95.0f * (M_PIf / 180.0f))
 #define SHIELD_ROT_Y (-27.0f * (M_PIf / 180.0f))
@@ -31,7 +24,6 @@
 #define SHIELD_OFF_Y (-372.0f)
 #define SHIELD_OFF_Z (-5.0f)
 
-// The board hangs off the ROOT limb, measured in human Link's limb space.
 #define BOARD_SCALE 46.95f
 #define BOARD_ROT_X 51.81f
 #define BOARD_ROT_Y 47.84f
@@ -40,7 +32,6 @@
 #define BOARD_OFF_Y (-885.38f)
 #define BOARD_OFF_Z (-225.91f)
 
-// The stance on top of the frozen slope-slide pose, in degrees.
 #define CROUCH_DEG (-13.31f)
 #define UPPER_ROT_X 9.08f
 #define UPPER_ROT_Y 10.15f
@@ -49,7 +40,6 @@
 #define LOWER_ROT_Y 30.44f
 #define LOWER_ROT_Z (-15.49f)
 #define UPPER_LEAN_DEG 5.0f
-// The lower body swings with the carve; the sign is part of the tuning, this limb's space does not map as expected.
 #define LOWER_TURN_X 30.0f
 #define LOWER_TURN_Y 0.0f
 #define LOWER_TURN_Z 0.0f
@@ -72,7 +62,6 @@
 #define TURN_SMOOTH 0.15f
 #define LEAN_SCALE 0.75f
 
-// Rail sizes are measured off the Hyrule Field fences: strips 20 to 40 units wide, 40 or more above the ground.
 #define RAIL_PROBE 100.27f
 #define RAIL_MAX_WIDTH 47.03f
 #define RAIL_EDGE_DROP 2.0f
@@ -81,10 +70,8 @@
 #define RAIL_PROBE_UP 30.0f
 #define RAIL_SAMPLES 8
 #define RAIL_RING 16
-// Must stay above half of RAIL_MAX_WIDTH or nothing is recognised.
 #define RAIL_RING_RADIUS 26.23f
 #define RAIL_RING_MAX_HITS 9
-// Entering stays fussy so a strip crossing his path does not yank him onto it; following allows real corners.
 #define RAIL_MAX_APPROACH 0x4000
 #define RAIL_MAX_TURN 0x5800
 #define RAIL_GAP_STEPS 3
@@ -175,11 +162,9 @@ static void KillMeleeState(Player* player, PlayState* play) {
     player->unk_B08 = 0.0f;
     Collider_ResetQuadAT(play, &player->meleeWeaponQuads[0].base);
     Collider_ResetQuadAT(play, &player->meleeWeaponQuads[1].base);
-    // Flag 1 keeps the shield up: he is standing on one.
     Player_SetAction(play, player, Player_Action_Idle, 1);
 }
 
-// The frozen first frame of the vanilla downhill slide: bent knees, low weight.
 static void HoldPose(Player* player, PlayState* play) {
     PlayerAnimationHeader* pose = ResourceMgr_LoadPlayerAnimAsHeader(sPoseAnim);
 
@@ -218,7 +203,6 @@ static void Abort(Player* player) {
     }
 }
 
-// Entry is always in mid air, so the pause is taken this very frame or the fall action steals him.
 static void StartSurf(Player* player, PlayState* play) {
     PlayerAnimationHeader* pose = ResourceMgr_LoadPlayerAnimAsHeader(sPoseAnim);
 
@@ -233,15 +217,12 @@ static void StartSurf(Player* player, PlayState* play) {
     Player_PlaySfx(player, NA_SE_IT_SHIELD_SWING);
 }
 
-// Only MM's named state flags: the rest of that enum is still numeric, and the cutscene and water cases are covered
-// by the idioms the engine tests itself. The board is measured on human Link's skeleton.
 static bool IsAllowed(Player* player) {
     return player->transformation == PLAYER_FORM_HUMAN &&
            !(player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_CARRYING_ACTOR)) &&
            player->csAction == PLAYER_CSACTION_NONE && !(player->actor.bgCheckFlags & BGCHECKFLAG_WATER);
 }
 
-// A rail is a narrow, long piece of floor. Every probe is a floor raycast looking for where the ground ends.
 static f32 FloorAt(PlayState* play, Player* player, f32 x, f32 z, CollisionPoly** outPoly) {
     Vec3f probe = { x, player->actor.world.pos.y + RAIL_PROBE_UP, z };
     s32 bgId = BGCHECK_SCENE;
@@ -250,8 +231,6 @@ static f32 FloorAt(PlayState* play, Player* player, f32 x, f32 z, CollisionPoly*
     return BgCheck_EntityRaycastFloor3(&play->colCtx, outPoly, &bgId, &probe);
 }
 
-// Measured against the plane under his feet, not a flat height: a ramped rail reads as zero deviation. Ground
-// well above the plane is an edge too, so a sunken channel or a path hugging a wall counts.
 static bool IsOnStrip(PlayState* play, Player* player, f32 x, f32 z, f32 drop) {
     CollisionPoly* ignored;
     f32 y = FloorAt(play, player, x, z, &ignored);
@@ -282,8 +261,6 @@ static bool IsOffPlane(PlayState* play, Player* player, CollisionPoly* poly, f32
     return fabsf(CollisionPoly_GetPointDistanceFromPlane(poly, &point)) > drop;
 }
 
-// The magnet: a rail one step to the side is invisible to the detection, so this drags him across onto it.
-// Horizontal only, and only for rails at his own height; hauling him up a fence side would launch him through it.
 static bool AttractToRail(Player* player, PlayState* play) {
     s32 stepAngle = 0x10000 / RAIL_ATTRACT_DIRS;
     s16 heading = player->actor.shape.rot.y;
@@ -326,7 +303,6 @@ static bool AttractToRail(Player* player, PlayState* play) {
     return true;
 }
 
-// How far out to one side the ground lasts before it ends; 0 when it never does, which is not a strip.
 static f32 GetEdgeDistance(PlayState* play, Player* player, s16 yaw, bool isRight) {
     f32 step = RAIL_PROBE / RAIL_SAMPLES;
     s16 side = yaw + (isRight ? 0x4000 : -0x4000);
@@ -339,9 +315,6 @@ static f32 GetEdgeDistance(PlayState* play, Player* player, s16 yaw, bool isRigh
     return 0.0f;
 }
 
-// A ring of floor probes finds the strip's own direction without using his heading, which is what lets a rail be
-// grabbed from any angle: on a strip the landing probes form two opposite arcs. The arc nearest his heading wins.
-// A second pass at half radius catches fences too thin for the first.
 static bool FindRailAxis(PlayState* play, Player* player, s16* outYaw) {
     bool hit[RAIL_RING];
     f32 radius = RAIL_RING_RADIUS;
@@ -368,7 +341,6 @@ static bool FindRailAxis(PlayState* play, Player* player, s16* outYaw) {
     if (hits == 0 || hits > RAIL_RING_MAX_HITS) {
         return false;
     }
-    // Walking from the start of an arc sees an arc that straddles index 0 whole.
     for (k = 0; k < RAIL_RING; k++) {
         if (hit[k] && !hit[(k + RAIL_RING - 1) % RAIL_RING]) {
             origin = k;
@@ -406,7 +378,6 @@ static bool FindRailAxis(PlayState* play, Player* player, s16* outYaw) {
 static bool DoesStripContinue(PlayState* play, Player* player, s16 axis) {
     f32 ahead = CLAMP(player->speedXZ * 2.0f, RAIL_AHEAD, RAIL_AHEAD_MAX);
 
-    // Several distances, so a seam or a post between fence segments does not end the run.
     for (s32 i = 1; i <= RAIL_GAP_STEPS; i++) {
         if (IsOnStripAt(play, player, axis, ahead * i / RAIL_GAP_STEPS, RAIL_EDGE_DROP)) {
             return true;
@@ -415,7 +386,6 @@ static bool DoesStripContinue(PlayState* play, Player* player, s16 axis) {
     return false;
 }
 
-// The whole lateral error is taken out every frame: a soft pull could always be outrun on a bend.
 static bool UpdateRail(Player* player, PlayState* play) {
     s16 axis;
     f32 left;
@@ -426,8 +396,6 @@ static bool UpdateRail(Player* player, PlayState* play) {
     if (!FindRailAxis(play, player, &axis)) {
         return false;
     }
-    // Published before the gates: on a corner the width test fails for a frame or two, and the grace window must
-    // coast on the new arm, not on the one he came in along.
     if (sSurf.state == SURF_RAIL) {
         sSurf.railAxisYaw = axis;
     }
@@ -463,13 +431,11 @@ static void ClampSpeedToWall(Player* player, PlayState* play) {
         poly == NULL) {
         return;
     }
-    // Only a wall he drives into: a curved rail's own outer side is not an obstacle.
     wallYaw = Math_Atan2S_XY(COLPOLY_GET_NORMAL(poly->normal.z), COLPOLY_GET_NORMAL(poly->normal.x));
     if (Math_CosS(wallYaw - player->actor.shape.rot.y) > -0.5f) {
         return;
     }
-    player->speedXZ =
-        MIN(player->speedXZ, MAX(sqrtf(SQ(hitPos.x - from.x) + SQ(hitPos.z - from.z)) - 10.0f, 0.0f));
+    player->speedXZ = MIN(player->speedXZ, MAX(sqrtf(SQ(hitPos.x - from.x) + SQ(hitPos.z - from.z)) - 10.0f, 0.0f));
 }
 
 static bool HitsWallHeadOn(Player* player) {
@@ -493,14 +459,12 @@ static void RunItemButtons(Player* player, PlayState* play) {
         return;
     }
     Player_UpdateItems(player, play);
-    // Whatever the items started has to play out: re-pausing next frame would freeze it half done and start it again.
     if (player->actionFunc != before) {
         sSurf.spinFrames = SPIN_FRAMES;
         sSurf.ownedAction = player->actionFunc;
     }
 }
 
-// B alone spins, or draws the sword if none is out; R + B gets off.
 static void HandleB(Player* player, PlayState* play, Input* input, bool isGrounded) {
     if (CHECK_BTN_ALL(input->cur.button, BTN_R)) {
         Dismount();
@@ -517,11 +481,9 @@ static void HandleB(Player* player, PlayState* play, Input* input, bool isGround
     func_80833864(play, player,
                   Player_IsHoldingTwoHandedWeapon(player) ? PLAYER_MWA_SPIN_ATTACK_2H : PLAYER_MWA_SPIN_ATTACK_1H);
     sSurf.spinFrames = SPIN_FRAMES;
-    // The swing changes the action; owned again so the takeover check does not read it as a steal.
     sSurf.ownedAction = player->actionFunc;
 }
 
-// A hops; on a rail it also lets go, and the detach window stops the next frame grabbing it straight back.
 static bool HandleHop(Player* player, Input* input, bool isGrounded) {
     if (!CHECK_BTN_ALL(input->press.button, BTN_A) || (!isGrounded && sSurf.state != SURF_RAIL)) {
         return isGrounded;
@@ -539,7 +501,6 @@ static bool HandleHop(Player* player, Input* input, bool isGrounded) {
     return false;
 }
 
-// The shuvit is cosmetic, so the board always lands square under him.
 static void SpinBoard(bool isGrounded) {
     if (isGrounded) {
         sSurf.boardSpinRate = 0;
@@ -559,13 +520,11 @@ static void UpdateRailState(Player* player, PlayState* play, bool isGrounded) {
         sSurf.state = SURF_RAIL;
         sSurf.railMiss = 0;
     } else if (isGrounded && sSurf.railDetach == 0 && sSurf.state != SURF_RAIL && AttractToRail(player, play)) {
-        // Dragged across; once over the strip the branch above pins him.
     } else if (sSurf.state == SURF_RAIL && ++sSurf.railMiss >= RAIL_GRACE) {
         sSurf.state = SURF_RIDE;
     }
 }
 
-// The turn rate grows with the error, so a gentle bend stays gentle and a corner is taken in about a frame.
 static void FollowRail(Player* player) {
     s16 delta = sSurf.railAxisYaw - player->actor.shape.rot.y;
 
@@ -582,7 +541,6 @@ static void SteerFreely(Player* player, s16 yawTarget) {
     Math_SmoothStepToS(&player->actor.shape.rot.y, yawTarget, 6, (s16)MAX(turnMax, TURN_MIN), 100);
 }
 
-// Every incline feeds speed, not only the floors vanilla slides on.
 static void ApplySlope(Player* player, bool isGrounded, bool hasStick, f32 speedTarget) {
     Vec3f slopeNormal;
     s16 downhillYaw;
@@ -604,7 +562,6 @@ static void ApplySlope(Player* player, bool isGrounded, bool hasStick, f32 speed
     player->actor.shape.rot.x = sSurf.leanPitch;
 }
 
-// yaw still holds last frame's heading here, so the difference is exactly how hard he is turning now.
 static void LeanIntoTurn(Player* player) {
     s16 want = (s16)(-(s16)(player->actor.shape.rot.y - player->yaw) * 2);
     s16 upperMax = Degrees(UPPER_LEAN_DEG);
@@ -644,7 +601,6 @@ static void Ride(Player* player, PlayState* play) {
     }
     isGrounded = HandleHop(player, input, isGrounded);
     SpinBoard(isGrounded);
-    // The pause would swallow the C buttons; during a spin the vanilla action already reads them.
     if (!isBPressed && sSurf.spinFrames == 0) {
         RunItemButtons(player, play);
     }
@@ -668,8 +624,6 @@ static void Ride(Player* player, PlayState* play) {
     CheckStop(player, isGrounded);
 }
 
-// The spin owns the action and the animation: the pause stays off and he keeps his speed through it. The window
-// is a ceiling; the swing ending early hands control back at once.
 static void RideThroughSpin(Player* player, PlayState* play) {
     sSurf.spinFrames--;
     if (sSurf.spinFrames == 0 ||
@@ -681,7 +635,6 @@ static void RideThroughSpin(Player* player, PlayState* play) {
 }
 
 static void TryMount(Player* player, PlayState* play) {
-    // A dismount over a pit must not re-arm halfway down the fall.
     if (sSurf.remountLockout > 0) {
         if (IsGrounded(player)) {
             sSurf.remountLockout--;
@@ -705,7 +658,6 @@ static bool LostControl(Player* player, PlayState* play) {
            Player_ActionHandler_2(player, play) || Player_ActionHandler_12(player, play);
 }
 
-// Runs after the player's own update, where the speed and animation written here are the last word.
 static void TickSurf(Player* player) {
     PlayState* play = gPlayState;
 
@@ -842,7 +794,6 @@ static void DrawShieldModel(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// The shuvit turns after the translate and before the placement, so the board spins about its own centre.
 static void DrawBoard(PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     Matrix_Push();
@@ -858,8 +809,6 @@ static void DrawBoard(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// While riding the board is under his feet, so neither the hand nor the back copy draws. The vanilla base is the
-// Hero's Shield, which collides as metal; this one is wood.
 static void DrawOnLimb(Player* player, int32_t limbIndex) {
     PlayState* play = gPlayState;
 
@@ -901,8 +850,8 @@ static void HandBackPlayer(const char* key) {
     sSurf.remountLockout = 0;
 }
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate",       "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw",
-                                              "OnActorDraw",          "OnActorDrawEnd",          "OnSceneInit" };
+static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw",
+                                              "OnActorDraw",    "OnActorDrawEnd",          "OnSceneInit" };
 
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -915,7 +864,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
 #define GET_ITEM_SCALE 0.9f
 static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(play->state.gfxCtx);
@@ -959,6 +907,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.onUnequip = HandBackPlayer;
     definition.getItemModelPath = sShieldDL;
     definition.getItemEntry.drawFunc = DrawGetItem;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = KITE_SHIELD_KEY,
+        .hintKey = KITE_SHIELD_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!sApi->RegisterCustomEquipment(&definition)) {
         return;
     }

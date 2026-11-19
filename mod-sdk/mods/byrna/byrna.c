@@ -1,9 +1,3 @@
-/**
- * Cane of Byrna: Monster Hunter's Insect Glaive. B chains three advancing staff sweeps, the last ending in a burst
- * of magic; R+B vaults. In the air B strikes and every strike that lands bounces Link back up, A evades toward the
- * stick and R+B drives the cane down.
- */
-
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,7 +43,6 @@
 #define JUMP_XZ_SCALE 0.6f
 #define JUMP_Y_SCALE 1.25f
 
-// The cane in the sword hand, dialled in-game in NEI; its long axis is model Y, measured at -416..+223.
 #define CANE_POS_X (-887.74f)
 #define CANE_POS_Y 988.20f
 #define CANE_POS_Z 54.18f
@@ -69,10 +62,8 @@ static const ALIGN_ASSET(2) char sName[] = "__OTR__textures/item_name_custom/gCa
 static const ALIGN_ASSET(2) char sCaneDL[] = "__OTR__objects/object_byrna/g_byrna_cane_dl";
 static const ALIGN_ASSET(2) char sCaneGiveDL[] = "__OTR__objects/object_byrna/g_byrna_cane_give_dl";
 
-// Imported by address: compared against the player's actionFunc, which holds the real function.
 extern HOST_DATA void Player_Action_84(Player* player, PlayState* play);
 extern HOST_DATA void Player_Action_29(Player* player, PlayState* play);
-// The sword blade length the engine measures its quads and trail with, indexed by edge.
 extern HOST_DATA Vec3f D_801C0994[];
 PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeader(const char* animPath);
 s32 Player_SetAction(PlayState* play, Player* player, PlayerActionFunc actionFunc, s32 flags);
@@ -108,9 +99,6 @@ typedef enum {
     CLIP_MAX,
 } ClipId;
 
-// frames is the speed knob: the same motion resampled into fewer frames plays faster. The clips carry a
-// constant root offset in X/Z (up to 118 units), so the root is always centred; ground clips keep their own
-// root height so the feet stay planted, airborne ones hold the first frame's because physics owns the height.
 typedef struct {
     const char* path;
     s16 firstFrame;
@@ -128,7 +116,6 @@ static const ClipSource sClipSources[CLIP_MAX] = {
     { GLAIVE("StationaryRisingMultiHitChargedStaffCombo"), -1, -1, 26, true },
     { GLAIVE("BackwardRisingMultiHitRetreatingStaffStrike"), -1, -1, 22, false },
     { GLAIVE("StationaryStaffReadyIdle_Variant05"), -1, -1, 12, true },
-    // Walk and run share a phase but sample it at 29 and 20 frames; one length for both cuts the cycle short.
     { GLAIVE("ForwardStaffRun"), -1, -1, 29, true },
     { GLAIVE("ForwardStaffRun"), -1, -1, 20, true },
     { GLAIVE("BackwardHighAerialMultiHitSilkbindStaffStrike_Variant15"), -1, -1, VAULT_FRAMES, false },
@@ -140,7 +127,6 @@ static const ClipSource sClipSources[CLIP_MAX] = {
     { GLAIVE("LeftRisingTripleChargedStaffCombo"), -1, -1, 18, false },
     { GLAIVE("ForwardRisingTripleAerialStaffStrike"), -1, -1, 16, false },
     { GLAIVE("StationaryStaffReadyIdle_Variant05"), -1, -1, 12, false },
-    // Frame 0 is still airborne, a metre above the landing pose.
     { GLAIVE("BackwardDoubleChargedStaffCombo"), 1, -1, 22, true },
 };
 
@@ -157,8 +143,6 @@ typedef struct {
     s16 end;
 } HitWindow;
 
-// Measured in the Blender lab off the cane's tip and butt speed. A window opens a frame before the first
-// strike: that frame only primes the swept quad, as vanilla's own leading frame does.
 typedef struct {
     ClipId clip;
     s8 row;
@@ -190,7 +174,6 @@ typedef enum {
     GLAIVE_DESCEND_LAND,
 } GlaiveState;
 
-// Link's own frame: right +X, up +Y, forward +Z; pitch lays the box toward the floor.
 typedef struct {
     f32 up;
     f32 forward;
@@ -208,7 +191,6 @@ typedef struct {
     s16 fxScale;
 } MagicSphere;
 
-// Tapered and nearly touching, so it reads as one forward thrust rather than three hits on the same enemy.
 static const MagicSphere sFinisherShape[FINISHER_SPHERES] = {
     { 34.0f, 68.0f, 18, 500 },
     { 40.0f, 108.0f, 20, 560 },
@@ -217,16 +199,24 @@ static const MagicSphere sFinisherShape[FINISHER_SPHERES] = {
 
 static ColliderQuadInit sAttackQuadInit = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_QUAD },
-    { ELEM_MATERIAL_UNK2, { DMG_SWORD, 0x00, 0x01 }, { 0xFFCFFFFF, 0x00, 0x00 },
-      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL, ACELEM_NONE, OCELEM_NONE },
+    { ELEM_MATERIAL_UNK2,
+      { DMG_SWORD, 0x00, 0x01 },
+      { 0xFFCFFFFF, 0x00, 0x00 },
+      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL,
+      ACELEM_NONE,
+      OCELEM_NONE },
     { { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } } },
 };
 
-#define MAGIC_ELEMENT(radius)                                                                                  \
-    {                                                                                                          \
-        { ELEM_MATERIAL_UNK2, { DMG_SWORD, 0x00, 0x01 }, { 0xFFCFFFFF, 0x00, 0x00 },                         \
-          ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL, ACELEM_NONE, OCELEM_NONE },                               \
-        { 0, { { 0, 0, 0 }, radius }, 100 },                                                                   \
+#define MAGIC_ELEMENT(radius)                             \
+    {                                                     \
+        { ELEM_MATERIAL_UNK2,                             \
+          { DMG_SWORD, 0x00, 0x01 },                      \
+          { 0xFFCFFFFF, 0x00, 0x00 },                     \
+          ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL, \
+          ACELEM_NONE,                                    \
+          OCELEM_NONE },                                  \
+            { 0, { { 0, 0, 0 }, radius }, 100 },          \
     }
 static ColliderJntSphElementInit sFinisherElementsInit[FINISHER_SPHERES] = {
     MAGIC_ELEMENT(18),
@@ -273,7 +263,6 @@ static bool IsWorn(void) {
     return CustomEquipRegistry_IsWorn(BYRNA_KEY);
 }
 
-// Player_GetMeleeWeaponHeld also counts the Deku Stick and the hammer, which must keep their own models.
 static bool IsSwordAction(s32 itemAction) {
     return itemAction >= PLAYER_IA_SWORD_KOKIRI && itemAction <= PLAYER_IA_SWORD_GILDED;
 }
@@ -291,7 +280,6 @@ static bool IsPlayerBusy(Player* player) {
            Player_InBlockingCsMode(gPlayState, player) || player->invincibilityTimer < 0 || player->rideActor != NULL;
 }
 
-// Nearest-frame resampling on purpose, since interpolating packed angles smears anything crossing the wrap.
 static PlayerAnimationHeader* LoadClip(ClipId id) {
     Clip* clip = &sClips[id];
     const ClipSource* source = &sClipSources[id];
@@ -344,7 +332,7 @@ static void PlayClip(PlayState* play, Player* player, ClipId id, bool isLooping,
         return;
     }
     PlayerAnimation_Change(play, &player->skelAnime, anim, 1.0f, 0.0f, Animation_GetLastFrame(anim),
-                         isLooping ? ANIMMODE_LOOP : ANIMMODE_ONCE, morph);
+                           isLooping ? ANIMMODE_LOOP : ANIMMODE_ONCE, morph);
 }
 
 static void Sparkle(PlayState* play, Vec3f* pos, s16 scale, s32 life) {
@@ -355,7 +343,6 @@ static void Sparkle(PlayState* play, Vec3f* pos, s16 scale, s32 life) {
     EffectSsKirakira_SpawnDispersed(play, pos, &zero, &zero, &prim, &env, scale, life);
 }
 
-// A one-frame glint from the update: nothing has to be object-resident.
 static void DrawBlob(PlayState* play, Vec3f* pos, s16 scale) {
     Vec3f zero = { 0.0f, 0.0f, 0.0f };
     Color_RGBA8 prim = { 200, 225, 255, 255 };
@@ -418,7 +405,6 @@ static void FireFinisher(PlayState* play, Player* player) {
     Rumble_Request(80.0f, 110, 6, 16);
 }
 
-// One enemy may overlap more than one sphere: once the collider lands, the glow stays but no second pass hits.
 static void TickFinisher(PlayState* play, Player* player) {
     if (sFinisherTimer <= 0) {
         return;
@@ -478,7 +464,6 @@ static bool IsCloseToTarget(Player* player) {
 
 static void GlaiveAction(Player* player, PlayState* play);
 
-// AT_HIT outlives the swing that set it until the next window primes the quads.
 static void ArmSwing(Player* player, const Swing* swing) {
     sGlaive.swing = swing;
     sGlaive.hasSwingLanded = false;
@@ -490,7 +475,6 @@ static void ArmSwing(Player* player, const Swing* swing) {
     func_8083375C(player, swing->row);
 }
 
-// Chain rows morph into each other; a swing out of idle keeps the hard start vanilla gives every attack.
 static void StartSwing(PlayState* play, Player* player, const Swing* swing, bool isChained) {
     if (LoadClip(swing->clip) == NULL) {
         return;
@@ -545,7 +529,6 @@ static void UpdateSwing(PlayState* play, Player* player, Input* input) {
         StartComboStep(play, player, true);
         return;
     }
-    // Vanilla only opens the spin charge the frame after its own short swing; ours end here, B still down.
     if (sGlaive.bHold >= B_HOLD_TO_CHARGE) {
         sGlaive.swing = NULL;
         func_808335B0(play, player);
@@ -577,7 +560,6 @@ static void ExitAir(PlayState* play, Player* player) {
     EndGlaiveAction(play, player);
 }
 
-// The void check measures the fall from fallStartHeight, so an airborne glaive keeps it level with Link.
 static void SetVerticalSpeed(Player* player, f32 vy) {
     sGlaive.vy = vy;
     player->actor.gravity = 0.0f;
@@ -597,7 +579,6 @@ static void StartFall(PlayState* play, Player* player) {
     EnterAirState(play, player, GLAIVE_FALL, CLIP_AIR_FALL, true);
 }
 
-// Alternating two clips keeps a string of bounces from replaying the same flurry.
 static void StartAirSlash(PlayState* play, Player* player) {
     const Swing* swing = &sAirSlashes[sGlaive.airSlashIndex];
 
@@ -610,7 +591,6 @@ static void StartAirSlash(PlayState* play, Player* player) {
     Player_PlaySfx(player, NA_SE_VO_LI_SWORD_N);
 }
 
-// The dash follows the stick but Link keeps facing ahead; the stick directions are quarter turns from his yaw.
 static void StartEvade(PlayState* play, Player* player) {
     s8 direction = player->controlStickDirections[player->controlStickDataIndex];
     bool isBackward = direction == PLAYER_STICK_DIR_BACKWARD;
@@ -631,7 +611,6 @@ static void StartDescend(PlayState* play, Player* player) {
     EnterAirState(play, player, GLAIVE_DESCEND, CLIP_DESCEND, false);
 }
 
-// R+B is tested before plain B because R alone changes nothing in the air.
 static void ReadAirButtons(PlayState* play, Player* player, Input* input) {
     bool isBPressed = CHECK_BTN_ALL(input->press.button, BTN_B);
 
@@ -644,7 +623,6 @@ static void ReadAirButtons(PlayState* play, Player* player, Input* input) {
     }
 }
 
-// The bounce is what keeps a glaive aloft: each strike that connects buys one more slash and one more evade.
 static void BounceOnHit(Player* player) {
     if (!sGlaive.hasSwingLanded || sGlaive.hasBounced) {
         return;
@@ -740,7 +718,6 @@ static bool IsAirState(u8 state) {
     return state >= GLAIVE_VAULT;
 }
 
-// Its own action, so damage, water or a cutscene replace it the way they replace any vanilla one.
 static void GlaiveAction(Player* player, PlayState* play) {
     Input* input = &play->state.input[0];
 
@@ -785,8 +762,6 @@ static void Vault(PlayState* play, Player* player) {
     Player_PlaySfx(player, NA_SE_VO_LI_AUTO_JUMP);
 }
 
-// The thrust only starts the chain: mid-combo, the forward stick that re-aims would otherwise eat a slash.
-// With R held, B is the vault and never a swing.
 static void TakeMeleeButton(PlayState* play, Player* player, int32_t action, bool* consumed, bool* startedAction) {
     Input* input = &play->state.input[0];
     bool isThrust;
@@ -807,7 +782,6 @@ static void TakeMeleeButton(PlayState* play, Player* player, int32_t action, boo
     *startedAction = IsInGlaiveAction(player);
 }
 
-// The glaive has no guard of its own: R belongs to the vault while the cane is equipped.
 static void TakeShieldButton(PlayState* play, Player* player, int32_t action, bool* consumed, bool* startedAction) {
     if (*consumed || !IsWorn()) {
         return;
@@ -825,7 +799,6 @@ static void ReadVaultButtons(PlayState* play, Player* player) {
     }
 }
 
-// A pole weapon vaults higher and travels less; the reskin is renewed whenever vanilla puts its own clip back.
 static void ReskinVanillaSwing(PlayState* play, Player* player) {
     s8 row = player->meleeWeaponAnimation;
     bool isMelee = player->actionFunc == Player_Action_84;
@@ -876,7 +849,8 @@ static void TickByrna(Player* player) {
     }
     TickFinisher(play, player);
     TickComboIdle(player);
-    sGlaive.bHold = CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_B) ? MIN(sGlaive.bHold + 1, B_HOLD_TO_CHARGE) : 0;
+    sGlaive.bHold =
+        CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_B) ? MIN(sGlaive.bHold + 1, B_HOLD_TO_CHARGE) : 0;
     if (IsPlayerBusy(player) || IsAirState(sGlaive.state)) {
         return;
     }
@@ -884,7 +858,6 @@ static void TickByrna(Player* player) {
     ReskinVanillaSwing(play, player);
 }
 
-// R never reaches vanilla, and neither do A or B stacked on it; in the air the glaive owns every button.
 static void KeepButtonsFromVanilla(Player* player, Input* input) {
     u16 taken = BTN_R;
 
@@ -898,7 +871,6 @@ static void KeepButtonsFromVanilla(Player* player, Input* input) {
     input->press.button &= ~taken;
 }
 
-// Ship leaves the animation type out of the choice: the staff clips are the same for every stance.
 static void RunWithStaff(s32 group, s32 animType, PlayerAnimationHeader** anim) {
     PlayState* play = gPlayState;
     PlayerAnimationHeader* staff;
@@ -913,7 +885,6 @@ static void RunWithStaff(s32 group, s32 animType, PlayerAnimationHeader** anim) 
     }
 }
 
-// Two-handed like the Great Fairy's Sword: the shield goes on the back while the cane is out.
 static void WieldWithBothHands(Player* player, s32 itemAction, s32* modelGroup) {
     if (IsWorn() && IsSwordAction(itemAction)) {
         *modelGroup = PLAYER_MODELGROUP_TWO_HAND_SWORD;
@@ -931,8 +902,6 @@ static void ApplyCaneMatrix(void) {
     Matrix_RotateZYX((s16)(CANE_ROT_X * DEG_TO_BINANG), 0, (s16)(CANE_ROT_Z * DEG_TO_BINANG), MTXMODE_APPLY);
 }
 
-// The sword code lays its blade along +X from the hilt; the cane runs along +Y from the butt, so +X is turned
-// onto +Y. Only the axial scale is baked in: the engine adds its tip margin and lateral offsets in sword units.
 static void TraceCaneSwing(PlayState* play, Player* player) {
     Matrix_Push();
     ApplyCaneMatrix();
@@ -967,8 +936,6 @@ static void DrawCane(Player* player, int32_t limbIndex) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// The vanilla hand block would lay the trail along the hidden sword first; it sees no swing until the cane's
-// own post-limb puts the state back.
 static void HideSwingFromSwordHand(Actor* actor, bool* should) {
     PlayState* play = gPlayState;
     Player* player = (Player*)actor;
@@ -991,7 +958,6 @@ static void RestoreHiddenSwing(Actor* actor, PlayState* play) {
     sGlaive.isMeleeStateHidden = false;
 }
 
-// The colliders belong to the previous scene's collision context; they are rebuilt on first use.
 static void ForgetSceneState(s16 sceneId, s8 spawnNum) {
     sGlaive.state = GLAIVE_SWING;
     sGlaive.swing = NULL;
@@ -1006,7 +972,6 @@ static void PutCaneAway(const char* key) {
     sGlaive.comboStep = 0;
 }
 
-// Match the source mod's pickup presentation; the registry's generic model scale is different.
 static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
@@ -1017,9 +982,10 @@ static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
 }
 
 static const char* const sRequiredHooks[] = {
-    "OnPlayerUpdate",       "OnPlayerActionHandler",  "OnPlayerFilterInput", "OnPlayerResolveAnim",
-    "OnPlayerResolveModelGroup", "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw", "ShouldActorDraw",
-    "OnActorDrawEnd",       "OnSceneInit",
+    "OnPlayerUpdate",       "OnPlayerActionHandler",     "OnPlayerFilterInput",
+    "OnPlayerResolveAnim",  "OnPlayerResolveModelGroup", "OnPlayerResolveLimbDraw",
+    "OnPlayerPostLimbDraw", "ShouldActorDraw",           "OnActorDrawEnd",
+    "OnSceneInit",
 };
 
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
@@ -1054,6 +1020,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.onUnequip = PutCaneAway;
     definition.getItemModelPath = sCaneGiveDL;
     definition.getItemEntry.drawFunc = DrawGetItem;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = BYRNA_KEY,
+        .hintKey = BYRNA_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }

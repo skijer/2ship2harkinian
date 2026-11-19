@@ -1,8 +1,3 @@
-/**
- * Ocarina of Time strength for every form: each form keeps its own strength and the upgrades add to it.
- * Without the Power Bracelet under "Shuffle Grab" every form starts one level lower; a form that still
- * reaches the Human level grabs anyway. The same offsets live in Ship's form mods (z64strength.h).
- */
 
 #include <stdarg.h>
 #include <stdbool.h>
@@ -31,13 +26,15 @@
 #define SHUFFLE_GRAB_OPTION "oot.shuffle_grab"
 #define OOT_ICON(name) "__OTR__textures/oot_icon_item_static/" name
 #define OOT_NAME(name) "__OTR__textures/oot_item_name_static/" name
+#define OOT_QUEST_ICON(name) "__OTR__textures/oot_item_icons/" name
 #define OOT_GLOVES(name) "__OTR__objects/oot_object_gi_gloves/" name
-// MM's NES textbox glyph for the A button.
 #define GLYPH_A "\xB0"
 
 static const ALIGN_ASSET(2) char sGrabIcon[] = "__OTR__textures/icon_item_static/gGrabTex";
 static const ALIGN_ASSET(2) char sGrabDL[] = "__OTR__objects/object_gi_grab/gGiGrabDL";
 static const ALIGN_ASSET(2) char sGoronBraceletDL[] = "__OTR__objects/oot_object_gi_bracelet/gGiGoronBraceletDL";
+static const ALIGN_ASSET(2) char sStoneOfAgonyDL[] = "__OTR__objects/oot_object_gi_map/gGiStoneOfAgonyDL";
+static const ALIGN_ASSET(2) char sGerudoCardDL[] = "__OTR__objects/oot_object_gi_gerudo/gGiGerudoCardDL";
 static const ALIGN_ASSET(2) char sGauntletsDL[] = OOT_GLOVES("gGiGauntletsDL");
 static const ALIGN_ASSET(2) char sGauntletsPlateDL[] = OOT_GLOVES("gGiGauntletsPlateDL");
 static const ALIGN_ASSET(2) char sSilverColorDL[] = OOT_GLOVES("gGiSilverGauntletsColorDL");
@@ -45,8 +42,8 @@ static const ALIGN_ASSET(2) char sGoldenColorDL[] = OOT_GLOVES("gGiGoldenGauntle
 static const ALIGN_ASSET(2) char sSilverPlateColorDL[] = OOT_GLOVES("gGiSilverGauntletsPlateColorDL");
 static const ALIGN_ASSET(2) char sGoldenPlateColorDL[] = OOT_GLOVES("gGiGoldenGauntletsPlateColorDL");
 
-static const char* const sRequiredHooks[] = { "OnLoadFile", "OnSceneInit", "OnResolveCustomGetItem",
-    "OnActorDestroy", "OnCustomItemReceive", "OnActorUpdate" };
+static const char* const sRequiredHooks[] = { "OnLoadFile",     "OnSceneInit",         "OnResolveCustomGetItem",
+                                              "OnActorDestroy", "OnCustomItemReceive", "OnActorUpdate" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
@@ -57,15 +54,14 @@ static Actor* sStrengthPickupActor;
 static const char* sStrengthPickupStage;
 
 static void ResetStrengthPresentation(void) {
-    sStrengthPickupActor=NULL;
-    sStrengthPickupStage=NULL;
+    sStrengthPickupActor = NULL;
+    sStrengthPickupStage = NULL;
 }
 
 static const char* const sGauntletKeys[] = { GORON_BRACELET_KEY, SILVER_GAUNTLETS_KEY, GOLDEN_GAUNTLETS_KEY };
 
 static bool IsGrabShuffled(void) {
-    return gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO &&
-           sApi->GetRandoOption(SHUFFLE_GRAB_OPTION) != 0;
+    return gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO && sApi->GetRandoOption(SHUFFLE_GRAB_OPTION) != 0;
 }
 
 static bool HasGrab(void) {
@@ -81,18 +77,22 @@ static u16 GetGauntletLevel(void) {
     return 0;
 }
 
-// The custom forms ride the Human transformation, so only a bare Fierce Deity is the vanilla one.
+static s32 GetGauntletBonus(void) {
+    const u16 level = GetGauntletLevel();
+
+    return level > 0 ? level - 1 : 0;
+}
+
 static bool IsFierceDeity(void) {
     const char* customForm = sApi->GetActiveForm();
     return GET_PLAYER_FORM == PLAYER_FORM_FIERCE_DEITY && (customForm == NULL || customForm[0] == '\0');
 }
 
-// Registered after every ModInit, so the form mods have already written the form's own strength.
 static void AddStrengthUpgrades(bool* should, va_list args) {
     s32* strength = va_arg(args, s32*);
     const s32 formStrength = IsFierceDeity() ? PLAYER_STRENGTH_GORON : *strength;
 
-    sUnclampedStrength = formStrength + GetGauntletLevel() - (HasGrab() ? 0 : 1);
+    sUnclampedStrength = formStrength + GetGauntletBonus() - (HasGrab() ? 0 : 1);
     *strength = CLAMP(sUnclampedStrength, PLAYER_STRENGTH_DEKU, PLAYER_STRENGTH_GORON);
 }
 
@@ -108,7 +108,6 @@ static bool IsGoronOnlyCarry(Actor* actor) {
     return ((actor->id == ACTOR_EN_ISHI) && (actor->params & 1)) || (actor->id == ACTOR_EN_MM);
 }
 
-// Human strength grabs; what vanilla keeps for Gorons needs Goron strength instead.
 static void DecideLift(bool* should, va_list args) {
     (void)va_arg(args, Player*);
     Actor* actor = va_arg(args, Actor*);
@@ -141,7 +140,6 @@ static bool CanCarryKegInLogic(void* userData) {
     return sApi->GetRandoOption(SHUFFLE_GRAB_OPTION) == 0 || Z64Logic_HasKey(BRACELET_KEY);
 }
 
-// Without the Power Bracelet a Goron drops to Human strength and cannot carry a Powder Keg.
 static const int32_t sKegChecks[] = {
     RC_ENEMY_DROP_ALIEN,
     RC_GORON_RACETRACK_GOLD_DUST,
@@ -192,24 +190,28 @@ static void RegisterRulesOnScene(s16 sceneId, s8 spawnNum) {
     RegisterStrengthRules();
 }
 
-// Progressive stage 1 is strength 0 (the ability to grab), not a gauntlet bonus.
 static u16 ReadGauntletLevel(const SaveContext* save) {
-    if(RandoInfCustom_IsLogicSimulation())return 0;
-    u16 gauntlet=GetGauntletLevel();
-    return gauntlet>0?gauntlet+1:(HasGrab()?1:0);
+    if (RandoInfCustom_IsLogicSimulation()) {
+        return 0;
+    }
+    const u16 gauntlet = GetGauntletLevel();
+    if (gauntlet > 0) {
+        return gauntlet + 1;
+    }
+    return HasGrab() ? 1 : 0;
 }
 
 static u16 StrengthFirstLevel(void) {
-    return IsGrabShuffled()?1:2;
+    return IsGrabShuffled() ? 1 : 2;
 }
 
 static void ApplyGauntletLevel(SaveContext* save, u16 level) {
     if (RandoInfCustom_IsLogicSimulation()) {
         return;
     }
-    sApi->SetCustomItemOwned(BRACELET_KEY,level>0);
+    sApi->SetCustomItemOwned(BRACELET_KEY, level > 0);
     for (u16 i = 0; i < ARRAY_COUNT(sGauntletKeys); i++) {
-        sApi->SetCustomItemOwned(sGauntletKeys[i], level > i+1);
+        sApi->SetCustomItemOwned(sGauntletKeys[i], level > i + 1);
     }
 }
 
@@ -232,7 +234,14 @@ static void DrawGoronBracelet(PlayState* play, S2HGetItemEntry* entry) {
     DrawOpa(play, sGoronBraceletDL);
 }
 
-// OoT GetItem_DrawOpa10Xlu32: color then gloves in OPA, plate color then plate in XLU; ID 1 is golden.
+static void DrawStoneOfAgony(PlayState* play, S2HGetItemEntry* entry) {
+    DrawOpa(play, sStoneOfAgonyDL);
+}
+
+static void DrawGerudoCard(PlayState* play, S2HGetItemEntry* entry) {
+    DrawOpa(play, sGerudoCardDL);
+}
+
 static void DrawGauntlets(PlayState* play, S2HGetItemEntry* entry) {
     const bool isGolden = entry->drawItemId != 0;
     GraphicsContext* gfx = play->state.gfxCtx;
@@ -266,55 +275,67 @@ static const StrengthItem sItems[] = {
     { BRACELET_KEY, sGrabIcon, NULL, "Power Bracelet",
       "You found the %rPower Bracelet%w!&Now you can grab and lift things&with " GLYPH_A ".", DrawPowerBracelet, 0 },
     { GORON_BRACELET_KEY, OOT_ICON("gItemIconGoronsBraceletTex"), OOT_NAME("gGoronsBraceletItemNameENGTex"),
-      "Goron's Bracelet",
-      "You got the %rGoron's Bracelet%w!&Its strength adds to every form&you take.", DrawGoronBracelet, 0 },
+      "Goron's Bracelet", "You got the %rGoron's Bracelet%w!&Your arms are already this&strong in Termina.",
+      DrawGoronBracelet, 0 },
     { SILVER_GAUNTLETS_KEY, OOT_ICON("gItemIconSilverGauntletsTex"), OOT_NAME("gSilverGauntletsItemNameENGTex"),
-      "Silver Gauntlets",
-      "You found the %rSilver Gauntlets%w!&You feel the power to lift big&things with " GLYPH_A "!",
+      "Silver Gauntlets", "You found the %rSilver Gauntlets%w!&You feel the power to lift big&things with " GLYPH_A "!",
       DrawGauntlets, 0 },
     { GOLDEN_GAUNTLETS_KEY, OOT_ICON("gItemIconGoldenGauntletsTex"), OOT_NAME("gGoldenGauntletsItemNameENGTex"),
       "Golden Gauntlets",
-      "You found the %yGolden Gauntlets%w!&You can feel even more power&coursing through your arms!",
-      DrawGauntlets, 1 },
+      "You found the %yGolden Gauntlets%w!&You can feel even more power&coursing through your arms!", DrawGauntlets,
+      1 },
 };
 
 static bool IsStrengthPickup(const char* key) {
-    if(key==NULL)return false;
-    if(!strcmp(key,STRENGTH_PICKUP) || !strcmp(key,BRACELET_KEY))return true;
-    for(u32 i=0;i<ARRAY_COUNT(sGauntletKeys);i++)if(!strcmp(key,sGauntletKeys[i]))return true;
+    if (key == NULL)
+        return false;
+    if (!strcmp(key, STRENGTH_PICKUP) || !strcmp(key, BRACELET_KEY))
+        return true;
+    for (u32 i = 0; i < ARRAY_COUNT(sGauntletKeys); i++)
+        if (!strcmp(key, sGauntletKeys[i]))
+            return true;
     return false;
 }
 
-static void DrawProgressiveStrength(PlayState* play,S2HGetItemEntry* entry) {
-    const char* next=sApi->GetNextProgressiveItem(STRENGTH_PICKUP,S2H_RANDO_INF_SAVE);
-    const S2HCustomItemDefinition* stage=next?sApi->FindCustomItem(next):NULL;
-    if(stage && stage->getItemEntry.drawFunc && stage->getItemEntry.drawFunc!=DrawProgressiveStrength){
-        S2HGetItemEntry drawing=stage->getItemEntry;
-        drawing.drawFunc(play,&drawing);
+static void DrawProgressiveStrength(PlayState* play, S2HGetItemEntry* entry) {
+    const char* next = sApi->GetNextProgressiveItem(STRENGTH_PICKUP, S2H_RANDO_INF_SAVE);
+    const S2HCustomItemDefinition* stage = next ? sApi->FindCustomItem(next) : NULL;
+    if (stage && stage->getItemEntry.drawFunc && stage->getItemEntry.drawFunc != DrawProgressiveStrength) {
+        S2HGetItemEntry drawing = stage->getItemEntry;
+        drawing.drawFunc(play, &drawing);
     }
 }
 
-static void ResolveStrengthPickup(Actor* actor,PlayState* play,S2HGetItemEntry* entry,const char** key) {
-    if(!key || !IsStrengthPickup(*key))return;
-    bool held=actor && (actor->parent || (actor->id==ACTOR_EN_ITEM00 && actor->params==ITEM00_NOTHING &&
-                                          ((EnItem00*)actor)->unk152>=0));
-    const char* next=held && actor==sStrengthPickupActor?sStrengthPickupStage:
-                     sApi->GetNextProgressiveItem(*key,S2H_RANDO_INF_SAVE);
-    const S2HCustomItemDefinition* stage=next?sApi->FindCustomItem(next):NULL;
-    if(!stage)return;
-    if(held){sStrengthPickupActor=actor;sStrengthPickupStage=next;}
-    *key=next;
-    if(entry)*entry=stage->getItemEntry;
+static void ResolveStrengthPickup(Actor* actor, PlayState* play, S2HGetItemEntry* entry, const char** key) {
+    if (!key || !IsStrengthPickup(*key))
+        return;
+    bool held = actor && (actor->parent || (actor->id == ACTOR_EN_ITEM00 && actor->params == ITEM00_NOTHING &&
+                                            ((EnItem00*)actor)->unk152 >= 0));
+    const char* next = held && actor == sStrengthPickupActor ? sStrengthPickupStage
+                                                             : sApi->GetNextProgressiveItem(*key, S2H_RANDO_INF_SAVE);
+    const S2HCustomItemDefinition* stage = next ? sApi->FindCustomItem(next) : NULL;
+    if (!stage)
+        return;
+    if (held) {
+        sStrengthPickupActor = actor;
+        sStrengthPickupStage = next;
+    }
+    *key = next;
+    if (entry)
+        *entry = stage->getItemEntry;
 }
 
 static void ForgetStrengthPickup(Actor* actor) {
-    if(actor==sStrengthPickupActor)ResetStrengthPresentation();
+    if (actor == sStrengthPickupActor)
+        ResetStrengthPresentation();
 }
 
 static void PrepareStrengthText(const char* key) {
-    if(RandoInfCustom_IsLogicSimulation() || !IsStrengthPickup(key))return;
-    const char* next=sApi->GetNextProgressiveItem(key,S2H_RANDO_INF_SAVE);
-    if(next)CustomItemRegistry_PrepareAcquisitionMessage(next);
+    if (RandoInfCustom_IsLogicSimulation() || !IsStrengthPickup(key))
+        return;
+    const char* next = sApi->GetNextProgressiveItem(key, S2H_RANDO_INF_SAVE);
+    if (next)
+        CustomItemRegistry_PrepareAcquisitionMessage(next);
 }
 
 static bool RegisterItem(const StrengthItem* item, const S2HCustomItemRandomizer* randomizer) {
@@ -334,9 +355,14 @@ static bool RegisterItem(const StrengthItem* item, const S2HCustomItemRandomizer
 
 static const char* const sShuffleGrabValues[] = { "Off", "On" };
 static const S2HModRandoOption sShuffleGrabOption = {
-    sizeof(S2HModRandoOption), SHUFFLE_GRAB_OPTION, "Shuffle Grab",
+    sizeof(S2HModRandoOption),
+    SHUFFLE_GRAB_OPTION,
+    "Shuffle Grab",
     "Every form starts one strength level lower until the Power Bracelet is found.",
-    sShuffleGrabValues, ARRAY_COUNT(sShuffleGrabValues), 0, S2H_MOD_RANDO_WIDGET_COMBOBOX,
+    sShuffleGrabValues,
+    ARRAY_COUNT(sShuffleGrabValues),
+    0,
+    S2H_MOD_RANDO_WIDGET_COMBOBOX,
 };
 
 static const S2HCustomItemRandomizer sBraceletPool = {
@@ -362,10 +388,9 @@ static const S2HCustomItemRandomizer sStrengthPool = {
 };
 
 static bool RegisterStrengthChain(void) {
-    static const S2HProgressiveLevel levels[] = { { BRACELET_KEY }, { GORON_BRACELET_KEY },
-                                                  { SILVER_GAUNTLETS_KEY }, { GOLDEN_GAUNTLETS_KEY } };
-    // The pool keeps three upgrade copies plus the existing conditional Shuffle
-    // Grab copy. All four identities now advance the same presentation chain.
+    static const S2HProgressiveLevel levels[] = {
+        { BRACELET_KEY }, { GORON_BRACELET_KEY }, { SILVER_GAUNTLETS_KEY }, { GOLDEN_GAUNTLETS_KEY }
+    };
     StrengthItem pickup = sItems[0];
     pickup.key = STRENGTH_PICKUP;
     pickup.label = "Progressive Strength";
@@ -396,13 +421,13 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
 }
 
 static void RumbleNearHiddenGrotto(Actor* actor) {
-    if (actor->id != ACTOR_DOOR_ANA || !sApi->IsCustomItemOwned("oot.stone_of_agony") ||
-        gPlayState == NULL || (gPlayState->gameplayFrames % 32) != 0) {
+    if (actor->id != ACTOR_DOOR_ANA || !sApi->IsCustomItemOwned("oot.stone_of_agony") || gPlayState == NULL ||
+        (gPlayState->gameplayFrames % 32) != 0) {
         return;
     }
     const s32 type = DOORANA_GET_TYPE(actor);
-    if ((type != DOORANA_TYPE_HIDDEN_BOMB && type != DOORANA_TYPE_HIDDEN_STORMS) ||
-        actor->scale.x != 0.0f || actor->xzDistToPlayer > 200.0f) {
+    if ((type != DOORANA_TYPE_HIDDEN_BOMB && type != DOORANA_TYPE_HIDDEN_STORMS) || actor->scale.x != 0.0f ||
+        actor->xzDistToPlayer > 200.0f) {
         return;
     }
     Rumble_Request(actor->xyzDistToPlayerSq, 100, 8, 12);
@@ -416,15 +441,15 @@ static void RegisterStoneOfAgony(void) {
         .logicKey = "oot.stone_of_agony",
         .hintKey = "oot.stone_of_agony",
     };
-    S2HCustomItemDefinition item = Z64Items_Define("oot.stone_of_agony",
-        "__OTR__textures/oot_icon_item_24_static/gQuestIconStoneOfAgonyTex", NULL);
+    S2HCustomItemDefinition item = Z64Items_Define("oot.stone_of_agony", OOT_QUEST_ICON("gItemIconStoneOfAgonyTex"),
+                                                   OOT_NAME("gStoneofAgonyItemNameENGTex"));
     item.displayName = "Stone of Agony";
     item.pauseText = "%rStone of Agony&%wThe controller rumbles near a hidden grotto. No button is needed.";
     item.getItemText = "You got %rStone of Agony%w!&It makes the controller rumble near hidden grottos.";
     item.preferredPage = S2H_ITEM_PAGE_QUEST_VANILLA + 7;
     item.preferredSlot = 1;
     item.randomizer = &randomizer;
-    Z64Items_SetGetItemModel(&item, "__OTR__objects/oot_object_gi_map/gGiStoneOfAgonyDL");
+    item.getItemEntry.drawFunc = DrawStoneOfAgony;
     Z64Items_Register(sApi, &item);
     S2H_REGISTER_HOOK(sApi, OnActorUpdate, RumbleNearHiddenGrotto);
 }
@@ -456,15 +481,15 @@ static void RegisterGerudoCard(void) {
         !sApi->RegisterVBByName("VB_PIRATE_DETECT_PLAYER", RestrictPirateDetection)) {
         return;
     }
-    S2HCustomItemDefinition item = Z64Items_Define("oot.gerudo_card",
-        "__OTR__textures/oot_icon_item_24_static/gQuestIconGerudosCardTex", NULL);
+    S2HCustomItemDefinition item = Z64Items_Define("oot.gerudo_card", OOT_QUEST_ICON("gItemIconGerudosCardTex"),
+                                                   OOT_NAME("gGerudosCardItemNameENGTex"));
     item.displayName = "Gerudo Membership Card";
     item.pauseText = "%rGerudo Membership Card&%wCarry it past patrols in Pirates' Fortress.";
     item.getItemText = "You got %rGerudo Membership Card%w!&Patrols in Pirates' Fortress will let you pass.";
     item.preferredPage = S2H_ITEM_PAGE_QUEST_VANILLA + 7;
     item.preferredSlot = 2;
     item.randomizer = &randomizer;
-    Z64Items_SetGetItemModel(&item, "__OTR__objects/oot_object_gi_gerudo/gGiGerudoCardDL");
+    item.getItemEntry.drawFunc = DrawGerudoCard;
     Z64Items_Register(sApi, &item);
 }
 

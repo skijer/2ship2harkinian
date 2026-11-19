@@ -9,10 +9,12 @@
 
 #define ROCS_FEATHER_KEY "nei.rocs_feather"
 #define ROCS_CAPE_KEY "nei.rocs_cape"
+#define ROCS_PROGRESSIVE_KEY "nei.progressive_rocs"
+#define ROCS_FEATHER_GIVE_SCALE 0.35f
 #define ROCS_JUMP_VELOCITY 11.0f
 #define ROCS_WATER_JUMP_VELOCITY 5.5f
 
-#define ROCS_BLOCKING_STATES                                                                                   \
+#define ROCS_BLOCKING_STATES                                                                                  \
     (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_4 | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 | \
      PLAYER_STATE1_200000 | PLAYER_STATE1_800000 | PLAYER_STATE1_CARRYING_ACTOR)
 
@@ -25,11 +27,10 @@ static const ALIGN_ASSET(2) char sCapeDL[] = "__OTR__objects/object_nei_rocs_cap
 static const ALIGN_ASSET(2) char sJumpAnim[] = "__OTR__objects/object_nei_rocs/gPlayerAnim_nei_rocs_jump";
 static const ALIGN_ASSET(2) char sAirJumpAnim[] = "__OTR__objects/object_nei_rocs/gPlayerAnim_nei_rocs_front_flip";
 
-// Indexed by Player.heldItemButton; the D-pad starts at 5 and slot 4 is unused.
-static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT,  BTN_CDOWN, BTN_CRIGHT, 0,
-                                                         BTN_DRIGHT, BTN_DLEFT,  BTN_DDOWN, BTN_DUP };
+static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
+                                                         BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate" };
+static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnResolveCustomGetItem" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
@@ -89,8 +90,6 @@ static void Jump(Player* player, PlayState* play, const char* animation) {
 }
 
 static bool CanJumpFromGround(Player* player, PlayState* play) {
-    // A transformation which allows Roc owns its form-specific animation and
-    // movement. This item mod supplies vanilla Link's behavior only.
     return sApi->GetActiveForm() == NULL && (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) &&
            !IsPlayerBlocked(play, player);
 }
@@ -163,6 +162,49 @@ static void UpdateRocs(Player* player) {
     JumpFromAirOrWater(player, play);
 }
 
+static bool HasAnyTier(void) {
+    return IsOwned(ROCS_FEATHER_KEY) || IsOwned(ROCS_CAPE_KEY);
+}
+
+static const char* FindNextTier(void) {
+    return HasAnyTier() ? ROCS_CAPE_KEY : ROCS_FEATHER_KEY;
+}
+
+static void ResolveProgressive(Actor* actor, PlayState* play, S2HGetItemEntry* entry, const char** key) {
+    if (key == NULL || *key == NULL || strcmp(*key, ROCS_PROGRESSIVE_KEY) != 0) {
+        return;
+    }
+    *key = FindNextTier();
+}
+
+static void ReceiveProgressive(const char* key) {
+    sApi->SetCustomItemOwned(FindNextTier(), true);
+    sApi->SetCustomItemOwned(ROCS_PROGRESSIVE_KEY, false);
+}
+
+static const S2HCustomItemRandomizer sProgressiveRandomizer = {
+    sizeof(S2HCustomItemRandomizer),
+    S2H_CUSTOM_ITEM_RANDO_PROGRESSIVE,
+    S2H_CUSTOM_ITEM_TYPE_ITEM,
+    0,
+    2,
+    ROCS_PROGRESSIVE_KEY,
+    ROCS_PROGRESSIVE_KEY,
+    "",
+};
+
+static bool RegisterProgressive(void) {
+    S2HCustomItemDefinition progressive = Z64Items_Define(ROCS_PROGRESSIVE_KEY, sFeatherIconTex, sFeatherNameTex);
+
+    progressive.displayName = "Progressive Roc's Feather";
+    progressive.presentationFlags |= S2H_ITEM_HIDE_FROM_SAVE_EDITOR | S2H_ITEM_HIDE_FROM_KALEIDO;
+    progressive.getItemScale = ROCS_FEATHER_GIVE_SCALE;
+    progressive.onReceive = ReceiveProgressive;
+    Z64Items_SetGetItemModel(&progressive, sFeatherDL);
+    Z64Items_SetLogic(&progressive, &sProgressiveRandomizer);
+    return Z64Items_Register(sApi, &progressive);
+}
+
 static bool RegisterTier(S2HCustomItemDefinition* tier, const char* getItemModel, int32_t wheelPriority) {
     Z64Items_SetButtons(tier, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(tier, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
@@ -193,15 +235,18 @@ S2H_MOD_EXPORT void ModInit(void) {
                                   "Press %y\xA1%w to leap higher than&any run-up could carry you,&or to hop up out of "
                                   "the %bwater%w.");
     Z64Items_SetPauseText(&feather, "%rRoc's Feather&%wPress %y\xA1%w to jump, or to hop up&out of the water.");
+    feather.getItemScale = ROCS_FEATHER_GIVE_SCALE;
 
     S2HCustomItemDefinition cape = Z64Items_Define(ROCS_CAPE_KEY, sCapeIconTex, sCapeNameTex);
     Z64Items_SetTextbox(&cape, "You got %rRoc's Cape%w!&Roc's feathers woven whole, so&the wind carries you twice.^"
                                "Press %y\xA1%w to jump, then %y\xA1%w again&in midair to ride the wind a&%gsecond "
                                "time%w, even as you fall.");
     Z64Items_SetPauseText(&cape, "%rRoc's Cape&%wPress %y\xA1%w to jump, again in midair&for a second jump.");
+    cape.getItemScale = 0.77f;
 
-    if (!RegisterTier(&feather, sFeatherDL, 0) || !RegisterTier(&cape, sCapeDL, 1)) {
+    if (!RegisterTier(&feather, sFeatherDL, 0) || !RegisterTier(&cape, sCapeDL, 1) || !RegisterProgressive()) {
         return;
     }
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, UpdateRocs);
+    S2H_REGISTER_HOOK(sApi, OnResolveCustomGetItem, ResolveProgressive);
 }

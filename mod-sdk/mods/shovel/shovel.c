@@ -28,7 +28,6 @@ static const char* const sRequiredHooks[] = { "OnActorDrawEnd", "OnPlayerUpdate"
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
-// Measured in game against the dig pose.
 #define SHOVEL_HELD_SCALE 0.11f
 #define SHOVEL_HELD_OFFSET_X 5.56f
 #define SHOVEL_HELD_OFFSET_Y -1.49f
@@ -92,7 +91,6 @@ static void DropTreasure(PlayState* play, Vec3f* digPos) {
     Audio_PlaySfx_AtPos(&dropPos, NA_SE_SY_GET_ITEM);
 }
 
-// Only the bomb-hidden grottos answer to a shovel; the visible ones are already open.
 static void RevealGrotto(PlayState* play, DoorAna* grotto) {
     if (DOORANA_GET_TYPE(&grotto->actor) != DOORANA_TYPE_HIDDEN_BOMB) {
         return;
@@ -127,7 +125,6 @@ static void Dig(Player* player, PlayState* play) {
     DropTreasure(play, &digPos);
 }
 
-// Vanilla hands first person its own action func; digging out of it would fight over who owns the player.
 static bool CanDig(Player* player, PlayState* play) {
     return !(player->stateFlags1 & PLAYER_STATE1_8000000) && !func_800B7118(player) &&
            (player->meleeWeaponState == PLAYER_MELEE_WEAPON_STATE_0) &&
@@ -136,7 +133,6 @@ static bool CanDig(Player* player, PlayState* play) {
 
 static void DigAction(Player* player, PlayState* play);
 
-// The engine owns the dig: anything that takes the player over (damage, a cutscene) replaces this action func.
 static bool IsDigging(Player* player) {
     return player->actionFunc == (PlayerActionFunc)DigAction;
 }
@@ -147,12 +143,10 @@ static void StopDigging(Player* player, PlayState* play) {
         return;
     }
     sDigFrame = 0;
-    // Same exit as a vanilla item action: back to idle, or to the targeting stance if one is held.
     func_8083B1A0(player, play);
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_PL_CHANGE_ARMS);
 }
 
-// The dig is timed by the animation, so without the resource the shovel never enters the dig.
 static void StartDigging(Player* player, PlayState* play) {
     if (IsDigging(player) || !CanDig(player, play)) {
         return;
@@ -168,8 +162,6 @@ static void StartDigging(Player* player, PlayState* play) {
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_PL_CHANGE_ARMS);
 }
 
-// Taking the shovel out runs the item-change animation, and that plays an idle animation over the body until it
-// ends. Digging from here would be overwritten mid-swing, so the first dig of a scene waits for the change.
 static void TakeOutShovel(PlayState* play, Player* player) {
     sIsDigPending = true;
 }
@@ -219,7 +211,6 @@ static void ApplyHeldTransform(void) {
     Matrix_Scale(SHOVEL_HELD_SCALE, SHOVEL_HELD_SCALE, SHOVEL_HELD_SCALE, MTXMODE_APPLY);
 }
 
-// A two-handed tool: it sits between both hands and points from the right hand to the left.
 static void DrawShovelInHands(Player* player, PlayState* play) {
     if (!IsDigging(player)) {
         return;
@@ -244,7 +235,6 @@ static void DrawShovelInHands(Player* player, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// After the whole skeleton, outside the per-limb matrices frame interpolation records.
 static void DrawAfterPlayer(Actor* actor, PlayState* play) {
     DrawShovelInHands((Player*)actor, play);
 }
@@ -253,7 +243,6 @@ static void UseShovel(Player* player, PlayState* play) {
     StartDigging(player, play);
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, SHOVEL_KEY, SHOVEL_KEY, "",
 };
@@ -276,7 +265,7 @@ S2H_MOD_EXPORT void ModInit(void) {
                                  "smooth by years of work.^"
                                  "Press %y\xB2%w to dig. A %yhidden&grotto%w opens where the&"
                                  "ground rings hollow.^"
-                                 "Loose earth turns up %grupees%w&and %gbombs%w, and once in a while&a %cfairy%w.");
+                                 "Loose earth turns up %grupees%w&and %gbombs%w, and once in a while&a %bfairy%w.");
     Z64Items_SetPauseText(&shovel, "%rDampe's Shovel&%wPress %y\xB2%w to dig. Hidden grottos&"
                                    "and loose soil hide the most.");
     Z64Items_SetCanUse(&shovel, CanDig);

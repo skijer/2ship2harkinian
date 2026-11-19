@@ -1,9 +1,3 @@
-/**
- * Four Sword: holding the shield up with B held splits Link in four. The three clones keep a formation, swing with
- * him and fire what he fires; holding L picks the formation. The grid pushes any block, the cross spins as one
- * wheel, and the totem is a stack he can carry and jump off.
- */
-
 #include <math.h>
 #include <string.h>
 
@@ -27,10 +21,8 @@
 #define ALL_CLONES ((1 << CLONE_COUNT) - 1)
 #define CHARGE_HOLD 15
 #define ITEM_COOLDOWN 10
-// Long enough that a tap of L still reaches the vanilla Z-target.
 #define WHEEL_HOLD_FRAMES 8
 
-// Shoulder to shoulder: two Link radii is 34, so this is barely wider than the pushing huddle.
 #define SLOT_RADIUS 45.0f
 #define STACK_HEIGHT 40.0f
 #define BLADE_RADIUS 25
@@ -50,7 +42,6 @@
 #define STRAFE_RATE 1.0f
 #define TOTEM_BASE 1
 #define TOTEM_TOP (CLONE_COUNT - 1)
-// Actor_OfferCarry reaches 50 units in XZ and only 10 in Y: the base parks well inside both.
 #define GRAB_REACH 30.0f
 #define TOTEM_CAMERA_SCALE 1.6f
 #define TOTEM_THROW_UP 16.0f
@@ -64,7 +55,6 @@ static const ALIGN_ASSET(2) char sName[] = "__OTR__textures/item_name_custom/gFo
 static const ALIGN_ASSET(2) char sBladeDL[] = "__OTR__objects/object_nei_four_sword/gNeiFourSwordBladeDL";
 static const ALIGN_ASSET(2) char sHiltDL[] = "__OTR__objects/object_nei_four_sword/gNeiFourSwordHiltDL";
 
-// Imported by address: compared against the player's actionFunc, which holds the real function.
 extern HOST_DATA void Player_Action_37(Player* player, PlayState* play);
 void func_808379C0(PlayState* play, Player* player);
 void func_80834DB8(Player* player, PlayerAnimationHeader* anim, f32 lift, PlayState* play);
@@ -102,7 +92,6 @@ static const FormationSlot sFormationSlots[FORM_MAX][CLONE_COUNT] = {
     { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } },
 };
 
-// The wheel has one box per formation; the stick's vertical axis walks the variants of a line or a cross.
 typedef enum {
     ENTRY_TRIANGLE,
     ENTRY_LINE,
@@ -130,7 +119,6 @@ static const char* const sEntryIcons[ENTRY_MAX][VARIANT_MAX] = {
     { "__OTR__textures/four_sword/gFourSwordFormDisperseTex" },
 };
 
-// Every entry wears the sword's own icon on its item, so picking a formation never repaints the Four Sword.
 static Z64WheelEntry sWheelEntries[ENTRY_MAX] = {
     { "__OTR__textures/four_sword/gFourSwordFormTriangleTex", "Triangle", sIcon },
     { "__OTR__textures/four_sword/gFourSwordFormLine0Tex", "Line", sIcon },
@@ -167,7 +155,6 @@ typedef struct {
     s16 swingTimer;
 } FourSwordClone;
 
-// OC leaves TYPE_PLAYER out so a formation can never wall Link into a corridor.
 static ColliderCylinderInit sHurtboxInit = {
     { COL_MATERIAL_NONE, AT_NONE, AC_ON | AC_TYPE_ENEMY, OC1_ON | OC1_TYPE_1 | OC1_TYPE_2, OC2_TYPE_1,
       COLSHAPE_CYLINDER },
@@ -175,7 +162,6 @@ static ColliderCylinderInit sHurtboxInit = {
     { 18, 46, 0, { 0, 0, 0 } },
 };
 
-// The player's own shield quad, so a clone's shield blocks like the real one.
 static ColliderQuadInit sShieldInit = {
     { COL_MATERIAL_METAL, AT_ON | AT_TYPE_PLAYER, AC_ON | AC_HARD | AC_TYPE_ENEMY, OC1_NONE, OC2_TYPE_PLAYER,
       COLSHAPE_QUAD },
@@ -202,7 +188,6 @@ static ColliderCylinderInit sBladeInit = {
 static const S2HModApi* sApi;
 static s16 sCloneActorId = -1;
 static FourSwordClone* sLiveClones[CLONE_COUNT];
-// The actors die with every scene; the mask is what carries a summon across a room change.
 static u8 sCloneMask;
 static Player sCloneDrawTemplate;
 static u8 sUpperBodyMap[PLAYER_LIMB_MAX + 1];
@@ -266,7 +251,6 @@ static bool IsTotemCarried(void) {
     return base != NULL && base->actor.parent != NULL && sCloneMask == ALL_CLONES;
 }
 
-// Reads the mask, not the live actors: the grant must not blink off while a room change rebuilds them.
 static bool DoesGridPushAnyBlock(void) {
     return IsWorn() && GetFormation() == FORM_GRID && sCloneMask == ALL_CLONES;
 }
@@ -275,7 +259,6 @@ static bool IsPushing(Player* player) {
     return GetFormation() == FORM_GRID && (player->stateFlags2 & PLAYER_STATE2_10);
 }
 
-// The charge is read off the live En_M_Thunder, so the blades turn inward on exactly the frames the glow is up.
 static EnMThunder* FindSpinCharge(PlayState* play) {
     for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].first; actor != NULL; actor = actor->next) {
         EnMThunder* thunder = (EnMThunder*)actor;
@@ -297,7 +280,6 @@ static bool IsCrossSpinning(Player* player) {
            player->meleeWeaponAnimation <= PLAYER_MWA_BIG_SPIN_2H;
 }
 
-// The cross puts Link on one arm, so its hub is the average of the four bodies, not his feet.
 static void GetCrossHubOffset(f32* left, f32* ahead) {
     Formation formation = GetFormation();
 
@@ -311,7 +293,6 @@ static void GetCrossHubOffset(f32* left, f32* ahead) {
     *ahead /= CLONE_COUNT + 1;
 }
 
-// Link's body carries the inward turn too, so the geometry is measured from the yaw without it.
 static s16 GetFormationYaw(Player* player) {
     return sSword.isCrossHubHeld ? sSword.crossFormationYaw : player->actor.shape.rot.y;
 }
@@ -340,7 +321,6 @@ static void RotateAroundHub(f32 armLeft, f32 armAhead, f32* spunLeft, f32* spunA
     *spunAhead = armLeft * orbitSin + armAhead * orbitCos;
 }
 
-// The totem hangs off the base clone, which parks within grab reach; the other two stack on it.
 static Vec3f GetTotemSlot(Player* player, u8 index) {
     FourSwordClone* base = sLiveClones[TOTEM_BASE];
     Vec3f out = player->actor.world.pos;
@@ -357,7 +337,6 @@ static Vec3f GetTotemSlot(Player* player, u8 index) {
     return out;
 }
 
-// Spinning, the four orbit the hub as one wheel and the ring opens up.
 static Vec3f GetCrossSlot(Player* player, const FormationSlot* slot) {
     f32 hubLeft;
     f32 hubAhead;
@@ -396,8 +375,6 @@ static Vec3f GetSlotPosition(Player* player, u8 index) {
     return out;
 }
 
-// Link is one of the four: while the cross charges or spins he rides the hub like the rest, and his blade turns
-// inward with theirs. Last frame's turn is taken back first, or it would compound every frame.
 static void UpdateCrossSpin(PlayState* play, Player* player) {
     bool isCharging = IsCrossCharging(play);
     bool isSpinning = IsCrossSpinning(player);
@@ -426,7 +403,6 @@ static void UpdateCrossSpin(PlayState* play, Player* player) {
     if (isSpinning) {
         sSword.spinOrbit += SPIN_STEP;
     }
-    // Whatever Link walked this frame carries the anchor; only his rotation turns into an orbit.
     sSword.crossHub.x += player->actor.world.pos.x - sSword.crossLinkPlaced.x;
     sSword.crossHub.z += player->actor.world.pos.z - sSword.crossLinkPlaced.z;
     GetCrossHubOffset(&hubLeft, &hubAhead);
@@ -443,7 +419,6 @@ static void UpdateCrossSpin(PlayState* play, Player* player) {
     }
 }
 
-// Aimed from the slot, not the lagging body: backs to the hub, turned inward while the spin charges.
 static s16 GetCrossFacing(PlayState* play, Player* player, Vec3f* slotPos) {
     Vec3f hub;
     s16 outward;
@@ -467,7 +442,6 @@ static void Sparkle(PlayState* play, Vec3f* at, s32 count) {
     }
 }
 
-// Link's own sword trail with the clone's livery; the alphas are the fade.
 static void AllocTrail(PlayState* play, FourSwordClone* clone) {
     const Color_RGB8* tint = &sCloneTints[clone->index];
     EffectBlureInit2 init = {
@@ -490,7 +464,6 @@ static void AllocTrail(PlayState* play, FourSwordClone* clone) {
     memset(clone->trailInfo, 0, sizeof(clone->trailInfo));
 }
 
-// The trail repaints itself from the cosmetic settings every frame; the livery goes back on after it.
 static void StampTrailColor(FourSwordClone* clone) {
     EffectBlure* trail = Effect_GetByIndex(clone->trailEffectIndex);
     const Color_RGB8* tint = &sCloneTints[clone->index];
@@ -530,7 +503,6 @@ static void CloneInit(Actor* actor, PlayState* play) {
     Actor_PlaySfx(actor, NA_SE_SY_LOCK_ON);
 }
 
-// The trail slot must be freed: the blur effects never retire one, and re-summoning would exhaust them.
 static void CloneDestroy(Actor* actor, PlayState* play) {
     FourSwordClone* clone = (FourSwordClone*)actor;
 
@@ -546,7 +518,6 @@ static void CloneDestroy(Actor* actor, PlayState* play) {
     }
 }
 
-// The four of them are one Link: a clone never dies, it passes the hit to the body that owns the hearts.
 static void PassHitToLink(FourSwordClone* clone, PlayState* play) {
     ColliderElement* hitBy = clone->hurtbox.elem.acHitElem;
     s32 damage = hitBy != NULL ? hitBy->atDmgInfo.damage : 0;
@@ -561,8 +532,6 @@ static void PassHitToLink(FourSwordClone* clone, PlayState* play) {
     Sparkle(play, &clone->actor.world.pos, 4);
 }
 
-// The offer is renewed every frame: the player clears it each update, and restarting the lift action more than
-// once keeps it from ever reaching the frame that attaches the actor.
 static void OfferTotemCarry(FourSwordClone* clone, PlayState* play, Player* player) {
     Actor_OfferCarry(&clone->actor, play);
     if (player->interactRangeActor == &clone->actor && player->actionFunc != Player_Action_37) {
@@ -573,7 +542,6 @@ static void OfferTotemCarry(FourSwordClone* clone, PlayState* play, Player* play
 
 static void FollowSlot(FourSwordClone* clone, PlayState* play, Player* player, bool isStacked) {
     Vec3f slot = GetSlotPosition(player, clone->index);
-    // The stack is rigid: easing the two on top shows as the tower coming apart while he walks.
     f32 settled = isStacked ? 1.0f : SLOT_PULL;
     f32 pull = clone->summonTimer > 0 ? 1.0f - (f32)clone->summonTimer / SUMMON_FRAMES : settled;
 
@@ -588,7 +556,6 @@ static void FollowSlot(FourSwordClone* clone, PlayState* play, Player* player, b
     }
 }
 
-// A clone never turns to follow the group, so in the cross it walks like Link does under Z-target.
 static void StrafePose(FourSwordClone* clone, Player* player, PlayState* play) {
     const char* anim = gPlayerAnim_link_normal_waitR_free;
     s16 heading;
@@ -621,7 +588,6 @@ static void StrafePose(FourSwordClone* clone, Player* player, PlayState* play) {
     clone->ownsPose = true;
 }
 
-// Four blades meeting at the hub are one strike: one clone carries a single wide cylinder there.
 static void SwingBlade(FourSwordClone* clone, PlayState* play, Player* player) {
     Vec3f hub;
 
@@ -666,7 +632,6 @@ static void CloneUpdate(Actor* actor, PlayState* play) {
     if (isTotemBase && !isCarried && player->heldActor == NULL) {
         OfferTotemCarry(clone, play, player);
     }
-    // Lifted, the base rides in Link's hands and he owns its position.
     if (formation != FORM_DISPERSE && !isCarried) {
         FollowSlot(clone, play, player, isStacked);
     }
@@ -681,14 +646,12 @@ static void CloneUpdate(Actor* actor, PlayState* play) {
     StrafePose(clone, player, play);
     Collider_UpdateCylinder(actor, &clone->hurtbox);
     CollisionCheck_SetAC(play, &play->colChkCtx, &clone->hurtbox.base);
-    // Closed up on a block they overlap by design; OC would shove them back out of formation.
     if (!IsPushing(player)) {
         CollisionCheck_SetOC(play, &play->colChkCtx, &clone->hurtbox.base);
     }
     SwingBlade(clone, play, player);
 }
 
-// In a totem the real Link is the base and wears the bottom clone's purple, while the top clone stands in green.
 static bool GetCloneTint(u8 index, Color_RGBA8* out) {
     if (IsTotemCarried() && index == TOTEM_TOP) {
         return false;
@@ -697,8 +660,6 @@ static bool GetCloneTint(u8 index, Color_RGBA8* out) {
     return true;
 }
 
-// The limb override writes back into the pose (leg IK), so a clone poses from its own copy. The damage quads and
-// the held actor in the shared template still name Link's actor; damage comes from the clone's own cylinder.
 static void PrepareTemplate(FourSwordClone* clone, Player* player) {
     Player* template = &sCloneDrawTemplate;
     s32 limbCount = player->skelAnime.limbCount;
@@ -706,7 +667,6 @@ static void PrepareTemplate(FourSwordClone* clone, Player* player) {
     if (!clone->ownsPose) {
         memcpy(clone->pose, player->skelAnime.jointTable, sizeof(Vec3s) * (limbCount + 1));
     }
-    // A carried body pedalling Link's walk cycle in mid air reads wrong: the stack stands to attention.
     if (GetFormation() == FORM_TOTEM) {
         for (s32 limb = PLAYER_LIMB_RIGHT_THIGH; limb <= PLAYER_LIMB_LEFT_FOOT; limb++) {
             clone->pose[limb] = (Vec3s){ 0, 0, 0 };
@@ -727,8 +687,6 @@ static void PrepareTemplate(FourSwordClone* clone, Player* player) {
     }
 }
 
-// Copying the live Player and overriding only transform and pose is what makes the sword, shield, sheath and
-// tunic render at all; a bare skeleton draw is a naked body.
 static void CloneDraw(Actor* actor, PlayState* play) {
     FourSwordClone* clone = (FourSwordClone*)actor;
     Player* player = GET_PLAYER(play);
@@ -741,7 +699,6 @@ static void CloneDraw(Actor* actor, PlayState* play) {
         player->actor.objectSlot < 0 || !Object_IsLoaded(&play->objectCtx, player->actor.objectSlot)) {
         return;
     }
-    // The player places the base in its post-limb draw, after every update; drawing after it, this is final.
     if (GetFormation() == FORM_TOTEM && clone->index != TOTEM_BASE) {
         actor->world.pos = GetSlotPosition(player, clone->index);
     }
@@ -772,7 +729,6 @@ static void CloneDraw(Actor* actor, PlayState* play) {
     memcpy(clone->trailInfo, template->meleeWeaponInfo, sizeof(clone->trailInfo));
     clone->shield = template->shieldQuad;
     StampTrailColor(clone);
-    // The post-limb draw wrote the sword hand into the Player it was handed: this clone's own hand.
     clone->swordHandMtx = template->leftHandMf;
     clone->isSwordHandMtxValid = true;
 }
@@ -817,7 +773,6 @@ static void OpenFormationWheel(PlayState* play) {
     }
 }
 
-// The library only reads the stick sideways; one flick up or down steps the highlighted box's variant.
 static void BrowseVariants(PlayState* play) {
     s8 stickY = play->state.input[0].rel.stick_y;
     u32 entry = sZ64Wheel.highlighted;
@@ -838,7 +793,6 @@ static void BrowseVariants(PlayState* play) {
     Z64Wheel_PlaySfx(NA_SE_SY_CURSOR);
 }
 
-// A closes the wheel on the picked box and keeps its variant; B closes it without touching the formation.
 static void TrackWheel(PlayState* play) {
     bool isOpen = Z64Wheel_IsOpen();
 
@@ -850,7 +804,6 @@ static void TrackWheel(PlayState* play) {
     sWheel.wasOpen = isOpen;
 }
 
-// The charge pose goes in behind whatever the actions loaded this frame, torso only.
 static void HoldChargePose(Player* player, PlayState* play) {
     AnimTaskQueue_AddLoadPlayerFrame(play, (PlayerAnimationHeader*)gPlayerAnim_link_fighter_power_kiru_wait, 0,
                                      player->skelAnime.limbCount, sChargePose);
@@ -895,7 +848,6 @@ static void EndTotem(Player* player, Actor* base) {
     sWheel.variant = 0;
 }
 
-// Carried, A launches Link off the top; this runs after the player's update, so the throw lands on the next move.
 static void RideTotem(Player* player, PlayState* play) {
     FourSwordClone* base = GetTotemBase();
     s16 health = gSaveContext.save.saveInfo.playerData.health;
@@ -925,7 +877,6 @@ static void RideTotem(Player* player, PlayState* play) {
     player->actor.bgCheckFlags &= ~BGCHECKFLAG_GROUND;
 }
 
-// The explicit table: the plain arrow type is not the first enum value.
 static s16 GetShotArrowType(Player* player) {
     switch (player->heldItemAction) {
         case PLAYER_IA_BOW:
@@ -954,7 +905,6 @@ static void SpawnFromClones(PlayState* play, s16 actorId, s16 rotX, s16 rotY, s1
     sSword.itemCooldown = ITEM_COOLDOWN;
 }
 
-// The frame a shot leaves Link's hands is the frame the clones fire theirs: unk_D57 goes to 4 exactly then.
 static void MirrorShots(Player* player, PlayState* play) {
     bool isCarrying = (player->stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR) != 0;
 
@@ -984,7 +934,6 @@ static void TickSword(Player* player) {
     if ((player->stateFlags1 & PLAYER_STATE1_DEAD) || Player_InBlockingCsMode(play, player)) {
         return;
     }
-    // The wheel holds the world still while it is up.
     TrackWheel(play);
     if (Z64Wheel_IsOpen()) {
         return;
@@ -997,7 +946,6 @@ static void TickSword(Player* player) {
     MirrorShots(player, play);
 }
 
-// Blade, hilt, then the vanilla open hand last: its material restores the player state for the torso after it.
 static void HoldFourSword(Player* player, int32_t limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
     Gfx* dl = sHeldSwordDL;
 
@@ -1015,7 +963,6 @@ static void HoldFourSword(Player* player, int32_t limbIndex, Gfx** dList, Gfx* l
     *dList = sHeldSwordDL;
 }
 
-// Four Links on one block clear its size gate; only while grabbing one, so no boulder gets lifted by it.
 static void PushAnyBlock(bool* should, va_list args) {
     int32_t* strength = va_arg(args, int32_t*);
     PlayState* play = gPlayState;
@@ -1027,7 +974,6 @@ static void PushAnyBlock(bool* should, va_list args) {
     *should = false;
 }
 
-// A stack of four Links needs more room than one.
 static void WidenTotemCamera(Camera* camera, Vec3f* eye, Vec3f* at, Vec3f* up) {
     PlayState* play = gPlayState;
 
@@ -1039,7 +985,6 @@ static void WidenTotemCamera(Camera* camera, Vec3f* eye, Vec3f* at, Vec3f* up) {
     eye->z = at->z + (eye->z - at->z) * TOTEM_CAMERA_SCALE;
 }
 
-// Link wears the livery of the clone he stands in for at the bottom of the stack.
 static void TintLinkInTotem(Actor* actor, PlayState* play, Color_RGBA8* grayscale) {
     if (IsWorn() && IsTotemCarried()) {
         *grayscale = (Color_RGBA8){ sCloneTints[TOTEM_TOP].r, sCloneTints[TOTEM_TOP].g, sCloneTints[TOTEM_TOP].b,
@@ -1047,7 +992,6 @@ static void TintLinkInTotem(Actor* actor, PlayState* play, Color_RGBA8* grayscal
     }
 }
 
-// In the cross the release bursts from where the four blades met, twice as wide.
 static void CenterSpinRing(Actor* actor, bool* should) {
     PlayState* play = gPlayState;
     Player* player;
@@ -1062,8 +1006,6 @@ static void CenterSpinRing(Actor* actor, bool* should) {
     Matrix_Scale(RING_SCALE, RING_SCALE, RING_SCALE, MTXMODE_APPLY);
 }
 
-// One En_M_Thunder serves the whole charge; its glow is drawn again off each clone's sword hand. Only while the
-// charge is up, since the release draws the ring too and a second draw would repeat it.
 static void GlowOnClones(Actor* actor, PlayState* play) {
     EnMThunder* thunder = (EnMThunder*)actor;
     Player* player = GET_PLAYER(play);
@@ -1124,8 +1066,16 @@ static bool RegisterCloneActor(void) {
 }
 
 static const char* const sRequiredHooks[] = {
-    "OnActorDraw", "OnPlayerUpdate", "OnPlayerResolveLimbDraw", "OnCameraResolveView", "ShouldActorDraw",         "OnActorDrawEnd",
-    "OnSceneInit",    "OnLoadFile",              "OnInterfaceDrawEnd",  "OnActorResolveGrayscale",
+    "OnActorDraw",
+    "OnPlayerUpdate",
+    "OnPlayerResolveLimbDraw",
+    "OnCameraResolveView",
+    "ShouldActorDraw",
+    "OnActorDrawEnd",
+    "OnSceneInit",
+    "OnLoadFile",
+    "OnInterfaceDrawEnd",
+    "OnActorResolveGrayscale",
 };
 
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
@@ -1139,8 +1089,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// The same callback is used for MM's world drop and overhead cutscene. Track only
-// the custom pickup actor; gameplay sword/clone drawing keeps its own limb matrices.
 static Actor* sDrawingPickupActor;
 
 static void BeginPickupDraw(Actor* actor) {
@@ -1148,17 +1096,16 @@ static void BeginPickupDraw(Actor* actor) {
 }
 
 static void EndPickupDraw(Actor* actor, PlayState* play) {
-    if (sDrawingPickupActor == actor) sDrawingPickupActor = NULL;
+    if (sDrawingPickupActor == actor)
+        sDrawingPickupActor = NULL;
 }
 
 static f32 PickupModelScale(void) {
     const f32 sourceModelScale = 0.04f;
     if (sDrawingPickupActor != NULL) {
-        // CustomItem00 in MM uses actor.scale * 30; OoT's drop uses .015 * 10,
-        // while Player_DrawGetItemImpl in OoT uses .2 for the receipt model.
         const f32 parentScale = fabsf(sDrawingPickupActor->scale.x) * 30.0f;
-        const bool receiving = (sDrawingPickupActor->home.rot.x & (1 << 2)) &&
-                               ((EnItem00*)sDrawingPickupActor)->unk152 >= 20;
+        const bool receiving =
+            (sDrawingPickupActor->home.rot.x & (1 << 2)) && ((EnItem00*)sDrawingPickupActor)->unk152 >= 20;
         if (parentScale > 0.00001f) {
             return sourceModelScale * (receiving ? 0.2f : 0.15f) / parentScale;
         }
@@ -1166,7 +1113,6 @@ static f32 PickupModelScale(void) {
     return sourceModelScale;
 }
 
-// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
 static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
@@ -1209,6 +1155,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.toggles = 1;
     definition.onUnequip = DismissClones;
     definition.getItemModelPath = sBladeDL;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = FOUR_SWORD_KEY,
+        .hintKey = FOUR_SWORD_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!CustomEquipRegistry_Register(&definition) ||
         !Z64Wheel_Register(sApi, FOUR_SWORD_KEY, MOD_NAME, sWheelEntries, ENTRY_MAX, true)) {
         return;

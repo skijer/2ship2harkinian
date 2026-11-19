@@ -1,6 +1,3 @@
-/**
- * Roc's Boots: half gravity, and a floor wherever Link lands on water or on lava, quicksand and the void.
- */
 
 #include <string.h>
 
@@ -13,10 +10,9 @@
 #include "variables.h"
 
 #define ROC_BOOTS_KEY "nei.equip.roc_boots"
-// OoT child Link stands about three quarters of adult Link's height, as oot_equipment scales its pieces.
 #define ADULT_BOOT_TO_CHILD_SCALE 0.75f
 #define DEKU_LEAF_KEY "nei.deku_leaf"
-#define STATES_WITHOUT_GRAVITY                                                                              \
+#define STATES_WITHOUT_GRAVITY                                                                                  \
     (PLAYER_STATE1_8000000 | PLAYER_STATE1_4 | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 | PLAYER_STATE1_200000 | \
      PLAYER_STATE1_800000 | PLAYER_STATE1_DEAD)
 
@@ -38,7 +34,6 @@ static bool IsGrounded(Player* player) {
     return (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) != 0;
 }
 
-// Hot floors burn on a timer (func_808340AC); the other three sink Link or void him out (func_808340D4).
 static bool IsDeadlyFloor(FloorType floorType) {
     return func_808340AC(floorType) >= 0 || func_808340D4(floorType);
 }
@@ -48,15 +43,13 @@ static bool IsIntegratingGravity(PlayState* play, Player* player) {
            !(player->stateFlags3 & PLAYER_STATE3_FLYING_WITH_HOOKSHOT);
 }
 
-// The leaf pins the fall speed itself and halves it for these boots.
 static bool IsGliding(void) {
     const char* held = CustomItemRegistry_GetHeldKey();
 
     return held != NULL && strcmp(held, DEKU_LEAF_KEY) == 0;
 }
 
-// Link's gravity is rewritten every frame before it is integrated, so the half is given back afterwards: half of
-// g to the velocity and half of g's step to the position leave both exactly where g/2 would have put them.
+// Gravity is rewritten every frame before it is integrated, so the half is given back afterwards.
 static void HalveGravity(Player* player) {
     PlayState* play = gPlayState;
     f32 gravity;
@@ -75,7 +68,6 @@ static void HalveGravity(Player* player) {
     player->actor.world.pos.y -= gravity * 0.5f * (play->state.framerateDivisor * 0.5f);
 }
 
-// While Link is out of the water and not rising, its surface is his floor.
 static void WalkOnWater(CollisionContext* colCtx, Vec3f* pos, Actor* actor, CollisionPoly** poly, int32_t* bgId,
                         float* floorY) {
     PlayState* play = gPlayState;
@@ -94,7 +86,6 @@ static void WalkOnWater(CollisionContext* colCtx, Vec3f* pos, Actor* actor, Coll
     *floorY = surface;
 }
 
-// Skipping the assignment keeps the previous floor type, which these boots never let be a deadly one.
 static void StandOnDeadlyFloors(bool* should, va_list args) {
     Player* player = va_arg(args, Player*);
     PlayState* play = gPlayState;
@@ -107,7 +98,6 @@ static void StandOnDeadlyFloors(bool* should, va_list args) {
     }
 }
 
-// The emitted env colour carries custom tunics and cosmetics, so it is put back after the tint.
 static u32 GetCurrentEnvColor(PlayState* play) {
     Gfx* begin = (Gfx*)play->state.gfxCtx->polyOpa.start;
     Gfx* cursor = play->state.gfxCtx->polyOpa.p;
@@ -132,7 +122,6 @@ static void KeepBootsOnLoadedMatrix(void) {
     sIsPatched = true;
 }
 
-// Only the look changes: OoT's hover boots tinted gold, seated on the live foot matrix like oot_equipment's.
 static void DrawGoldBootsOnFeet(Player* player, int32_t limbIndex) {
     PlayState* play = gPlayState;
     if (play == NULL || player != GET_PLAYER(play) || player->transformation != PLAYER_FORM_HUMAN || !IsWorn() ||
@@ -172,9 +161,9 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
 #define GI_DL_CAPACITY 512
-static const ALIGN_ASSET(2) char gGiHoverBootsDL[] = "__OTR__objects/nei_get_item/roc_boots/object_gi_hoverboots/gGiHoverBootsDL";
+static const ALIGN_ASSET(2) char gGiHoverBootsDL[] =
+    "__OTR__objects/nei_get_item/roc_boots/object_gi_hoverboots/gGiHoverBootsDL";
 static u32 GoldRamp(u32 rgba) {
     u8 r = (rgba >> 24) & 0xFF;
     u8 g = (rgba >> 16) & 0xFF;
@@ -186,8 +175,8 @@ static u32 GoldRamp(u32 rgba) {
 }
 
 static bool IsTwoWordCommand(u8 opcode) {
-    return opcode == 0x20 || opcode == 0x24 || opcode == 0x25 || opcode == 0x27 || opcode == 0x31 ||
-           opcode == 0x32 || opcode == 0x33 || opcode == 0x35 || opcode == 0x36 || opcode == 0x42;
+    return opcode == 0x20 || opcode == 0x24 || opcode == 0x25 || opcode == 0x27 || opcode == 0x31 || opcode == 0x32 ||
+           opcode == 0x33 || opcode == 0x35 || opcode == 0x36 || opcode == 0x42;
 }
 
 static Gfx* BuildGoldBootsDL(void) {
@@ -255,6 +244,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.column = 3;
     definition.formMask = S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN);
     definition.toggles = 1;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = ROC_BOOTS_KEY,
+        .hintKey = ROC_BOOTS_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }

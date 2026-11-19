@@ -1,0 +1,8 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_gi_frog" Segment="6" OutName="oot_object_gi_frog" Game="OOT">
+        <DList Name="gGiFrogDL" Offset="0x0D60" />
+        <DList Name="gGiFrogEyesDL" Offset="0x1060" />
+        <Texture Name="object_gi_frogTex_000000" Offset="0x0" Format="i8" Width="32" Height="32" />
+    </File>
+</Root>

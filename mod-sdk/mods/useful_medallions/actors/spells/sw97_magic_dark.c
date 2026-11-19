@@ -31,8 +31,7 @@ void Sw97_MagicDark_DiamondDraw(Actor* thisx, PlayState* play);
 
 void Sw97_MagicDark_DimLighting(PlayState* play, f32 intensity);
 
-static const ALIGN_ASSET(2) char sDiamondTex[] =
-    "__OTR__overlays/oot_ovl_Magic_Dark/sDiamondTex";
+static const ALIGN_ASSET(2) char sDiamondTex[] = "__OTR__overlays/oot_ovl_Magic_Dark/sDiamondTex";
 
 static Vtx sDiamondVerts[] = {
     VTX(0, 0, 64, 1024, 512, 0x00, 0x00, 0x78, 0xFF),    VTX(55, 0, 32, 1707, 512, 0x67, 0x00, 0x3C, 0xFF),
@@ -123,7 +122,6 @@ void Sw97_MagicDark_DiamondUpdate(Actor* thisx, PlayState* play) {
         return;
     }
 
-    // NEI's Shadow is the Stone Mask's stealth only; unlike Nayru's Love it does not stop damage.
     thisx->scale.x = thisx->scale.z = this->scale;
 
     if (this->timer < 20) {

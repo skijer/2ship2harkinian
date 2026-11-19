@@ -20,14 +20,13 @@
 #define ZONAI_RELEASE_PITCH_END 0.55f
 #define ZONAI_RELEASE_PITCH_STEP 0.11f
 
-// A player in any of these is busy with something that owns them; the time stop does not answer meanwhile.
-#define ZONAI_BLOCKING_STATES     (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_20 | PLAYER_STATE1_20000000)
+#define ZONAI_BLOCKING_STATES (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_20 | PLAYER_STATE1_20000000)
 
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/gItemIconZonaiPermafrostTex";
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/gZonaiPermafrostNameTex";
 static const ALIGN_ASSET(2) char sGiveDL[] = "__OTR__objects/object_nei_magic_spell/gZonaiPermafrostGiveDL";
 
-static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,   BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
+static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
 static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnSceneInit" };
@@ -185,7 +184,6 @@ static void KeepTimeStopped(Player* player, PlayState* play) {
     }
 }
 
-// Vanilla stops reading item buttons in midair or while swimming; the time stop keeps answering there.
 static bool WasToggledOutsideItemButtons(Player* player, PlayState* play, s32 button) {
     return button >= 0 && (play->state.input[0].press.button & sItemButtons[button]) &&
            play->state.frames != sToggleFrame && !(player->stateFlags1 & ZONAI_BLOCKING_STATES) &&
@@ -221,7 +219,6 @@ static bool CanToggleTime(Player* player, PlayState* play) {
     return !(player->stateFlags1 & ZONAI_BLOCKING_STATES);
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, ZONAI_KEY, ZONAI_KEY, "",
 };
@@ -246,7 +243,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetPlacement(&zonai, 0, 11, 0);
     Z64Items_SetTextbox(&zonai, "You got the %rZonai Permafrost%w!&A Zonai device that holds the&"
                                 "flow of time perfectly still.^"
-                                "Press %y\xB2%w to %cstop time%w. Only you&keep moving, and enemies stay&"
+                                "Press %y\xB2%w to %bstop time%w. Only you&keep moving, and enemies stay&"
                                 "open to your blows.^"
                                 "It spends %gmagic%w for as long as&the world is frozen.");
     Z64Items_SetPauseText(&zonai, "%rZonai Permafrost&%wPress %y\xB2%w to stop time, again to let&"
@@ -255,6 +252,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetAction(&zonai, ToggleTime, NULL);
     zonai.flags |= S2H_CUSTOM_ITEM_INSTANT;
     Z64Items_SetGetItemModel(&zonai, sGiveDL);
+    zonai.getItemScale = 0.8f;
 
     Z64Items_SetLogic(&zonai, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &zonai)) {

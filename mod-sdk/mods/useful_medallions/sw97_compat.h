@@ -1,4 +1,3 @@
-// Bridges the SW97 decomp's 1997 names onto Majora's Mask's.
 // Original actors: z64proto/sw97 team (Spaceworld '97 Experience).
 
 #ifndef SW97_COMPAT_H
@@ -34,20 +33,19 @@ typedef PlayState GlobalContext;
 #define Gfx_CallSetupDL Gfx_SetupDL
 #define Audio_PlaySoundAtPosition SoundSource_PlaySfxAtFixedWorldPos
 
-// MM renamed these; Actor_TalkOfferAccepted takes the GameState, which PlayState begins with.
 #define Actor_IsTalking(actor, play) Actor_TalkOfferAccepted((actor), &(play)->state)
 #define Actor_RequestToTalkInRange(actor, play, range) Actor_OfferTalk(actor, play, range)
 #define Actor_MoveForwardXZ Actor_MoveWithGravity
 
-// The names the SW97 actors were written against; MM spells them differently.
 #define Audio_PlayActorSound2(actor, sfxId) Actor_PlaySfx(actor, sfxId)
 #define Actor_PlaySfx_Flagged(actor, sfxId) Actor_PlaySfx_Flagged2(actor, sfxId)
 
 // Missing OoT sounds may resolve to NA_SE_NONE. Test the base ID before
 // removing SFX_FLAG: subtracting from zero creates bank 15, outside MM's banks.
 static inline void Sw97_PlayLoopSfx(Actor* actor, u16 baseId) {
-    if (baseId==NA_SE_NONE || !(baseId&SFX_FLAG) || SFX_BANK(baseId)>BANK_VOICE) return;
-    Actor_PlaySfx_Flagged2(actor,baseId-SFX_FLAG);
+    if (baseId == NA_SE_NONE || !(baseId & SFX_FLAG) || SFX_BANK(baseId) > BANK_VOICE)
+        return;
+    Actor_PlaySfx_Flagged2(actor, baseId - SFX_FLAG);
 }
 
 #define Gfx_SetupDL_25Xlu(gfxCtx) Gfx_SetupDL25_Xlu(gfxCtx)
@@ -61,11 +59,9 @@ static inline void Sw97_PlayLoopSfx(Actor* actor, u16 baseId) {
 #define M_PI 3.14159265358979323846
 #endif
 
-// OoT's generic soft-sprite spawn is MM's EffectSsDust_Spawn, which keeps the same arguments.
 #define func_8002836C(play, pos, vel, accel, prim, env, scale, step, life) \
     EffectSsDust_Spawn((play), 0, (pos), (vel), (accel), (prim), (env), (scale), (step), (life), 0)
 
-// OoT enemies the suction blacklist names that MM lacks: ids that never match.
 #ifndef ACTOR_EN_DH
 #define ACTOR_EN_DH 0x7F61
 #endif
@@ -79,13 +75,11 @@ static inline void Sw97_PlayLoopSfx(Actor* actor, u16 baseId) {
 #define ACTOR_EN_GELDB 0x7F64
 #endif
 
-// The decomp's debug prints need a log level the SDK does not expose.
 #undef LOG_STRING
 #define LOG_STRING(string) ((void)0)
 #undef osSyncPrintf
 #define osSyncPrintf(...) ((void)0)
 
-// MM has no f32 Matrix_RotateY/X/Z; the float variants end in F.
 #define SW97_Matrix_RotateY_s(binang, mode) Matrix_RotateYF(BINANG_TO_RAD(binang), mode)
 #define SW97_Matrix_RotateX_s(binang, mode) Matrix_RotateXF(BINANG_TO_RAD(binang), mode)
 #define SW97_Matrix_RotateZ_s(binang, mode) Matrix_RotateZF(BINANG_TO_RAD(binang), mode)
@@ -99,7 +93,6 @@ static inline void Sw97_PlayLoopSfx(Actor* actor, u16 baseId) {
 
 MtxF* Matrix_GetCurrent(void);
 
-// SW97 helper with no MM equivalent: projects along the current matrix's Z axis.
 static inline void Matrix_MultZ(f32 scale, Vec3f* dst) {
     MtxF* current = Matrix_GetCurrent();
 
@@ -108,12 +101,10 @@ static inline void Matrix_MultZ(f32 scale, Vec3f* dst) {
     dst->z = current->wz + current->zz * scale;
 }
 
-// OoT Bg_Ice_Shelter has no MM actor and SW97 never spawns one: a sentinel id that never matches and a no-op melt.
 #ifndef ACTOR_BG_ICE_SHELTER
 #define ACTOR_BG_ICE_SHELTER 0x7F60
 #endif
 
-// OoT boss and event sounds with no MM sibling stay silent.
 #ifndef NA_SE_EN_GANON_DARKWAVE_M
 #define NA_SE_EN_GANON_DARKWAVE_M NA_SE_NONE
 #endif
@@ -139,7 +130,6 @@ static inline void Matrix_MultZ(f32 scale, Vec3f* dst) {
 #define NA_SE_EV_TRIFORCE_FLASH NA_SE_NONE
 #endif
 
-// OoT's cull-zone fields are MM's culling-volume fields.
 #ifndef uncullZoneForward
 #define uncullZoneForward cullingVolumeDistance
 #endif
@@ -150,9 +140,8 @@ static inline void Matrix_MultZ(f32 scale, Vec3f* dst) {
 #define uncullZoneDownward cullingVolumeDownward
 #endif
 
-// Nothing in MM sets the OoT "grabbed by enemy" state.
 #ifndef PLAYER_STATE2_GRABBED_BY_ENEMY
 #define PLAYER_STATE2_GRABBED_BY_ENEMY 0
 #endif
 
-#endif // SW97_COMPAT_H
+#endif

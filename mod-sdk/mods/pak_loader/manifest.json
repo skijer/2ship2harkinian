@@ -1,0 +1,11 @@
+{
+    "name": "pak_loader",
+    "author": "Skijer",
+    "version": "0.3.0",
+    "description": "Independent Human, Adult and Fierce Deity appearances from mounted O2Rs and imported ModLoader64 Link models for Ocarina of Time and Majora's Mask.",
+    "display_name": "Appearance Pack Loader",
+    "game": "mm",
+    "permissions": [
+        "files"
+    ]
+}

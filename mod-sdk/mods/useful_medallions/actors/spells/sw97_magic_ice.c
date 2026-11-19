@@ -10,25 +10,27 @@ void BgIcefloe_Init(Actor*, PlayState*);
 void BgIcefloe_Destroy(Actor*, PlayState*);
 void BgIcefloe_Update(Actor*, PlayState*);
 void BgIcefloe_Draw(Actor*, PlayState*);
-static s16 sIcePlatformId=-1;
+static s16 sIcePlatformId = -1;
 Actor* Sw97_SpawnIcePlatform(PlayState* play, f32 x, f32 y, f32 z) {
     // Native spawning fails outside scenes that preload OBJECT_ICEFLOE.
     // A mod-owned profile can run the same native callbacks with OTR resources.
-    if(sIcePlatformId<0){
-        S2HActorDefinition d={0}; d.structSize=sizeof(d);
-        d.key="nei.medallion.ice_platform"; d.description="Water Medallion ice platform";
-        d.category=ACTORCAT_BG; d.actorFlags=ACTOR_FLAG_UPDATE_CULLING_DISABLED;
-        d.objectId=GAMEPLAY_KEEP; d.instanceSize=sizeof(BgIcefloe);
-        d.init=BgIcefloe_Init;d.destroy=BgIcefloe_Destroy;d.update=BgIcefloe_Update;d.draw=BgIcefloe_Draw;
-        sIcePlatformId=gSw97Api->RegisterActor(&d);
+    if (sIcePlatformId < 0) {
+        S2HActorDefinition d = { 0 };
+        d.structSize = sizeof(d);
+        d.key = "nei.medallion.ice_platform";
+        d.description = "Water Medallion ice platform";
+        d.category = ACTORCAT_BG;
+        d.actorFlags = ACTOR_FLAG_UPDATE_CULLING_DISABLED;
+        d.objectId = GAMEPLAY_KEEP;
+        d.instanceSize = sizeof(BgIcefloe);
+        d.init = BgIcefloe_Init;
+        d.destroy = BgIcefloe_Destroy;
+        d.update = BgIcefloe_Update;
+        d.draw = BgIcefloe_Draw;
+        sIcePlatformId = gSw97Api->RegisterActor(&d);
     }
-    return sIcePlatformId<0?NULL:Actor_Spawn(&play->actorCtx,play,sIcePlatformId,x,y,z,0,0,0,300);
+    return sIcePlatformId < 0 ? NULL : Actor_Spawn(&play->actorCtx, play, sIcePlatformId, x, y, z, 0, 0, 0, 300);
 }
-
-
-// ============================================================
-// Struct (merged from z_magic_ice.h)
-// ============================================================
 
 struct MagicIce;
 
@@ -45,11 +47,6 @@ typedef struct MagicIce {
     u8 frozenSamples;
 } MagicIce;
 
-
-// ============================================================
-// Forward declarations
-// ============================================================
-
 #define FLAGS 0x02000010
 #define THIS ((MagicIce*)thisx)
 
@@ -65,10 +62,6 @@ typedef enum {
     /* 0x02 */ ACTION_STOP_GROWING,
     /* 0x03 */ ACTION_GROW_QUICKLY
 } MagicIceAction;
-
-// ============================================================
-// Collider
-// ============================================================
 
 static ColliderCylinderInit sIceCylinderInit = {
     {
@@ -89,10 +82,6 @@ static ColliderCylinderInit sIceCylinderInit = {
     },
     { 9, 9, 0, { 0, 0, 0 } },
 };
-
-// ============================================================
-// Vertex + Texture data
-// ============================================================
 
 static Vtx sIceCylinderVtx[] = {
     VTX(707, 0, -707, 1536, 2048, 0xFF, 0xFF, 0xFF, 0xFF),  VTX(0, 0, -1000, 2048, 2048, 0xFF, 0xFF, 0xFF, 0xFF),
@@ -460,10 +449,6 @@ static Gfx sDList4[] = {
     gsSPEndDisplayList(),
 };
 
-// ============================================================
-// SkelCurve data
-// ============================================================
-
 static u8 sIceTransformRefIdx[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x02,
     0x00, 0x02, 0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x02, 0x02, 0x02, 0x02, 0x00, 0x00,
@@ -531,10 +516,6 @@ static SkelCurveLimbList sIceLimbList = {
     0x05,
 };
 
-// ============================================================
-// Actor functions
-// ============================================================
-
 void Sw97_MagicIce_Init(Actor* thisx, PlayState* play) {
     MagicIce* this = THIS;
 
@@ -588,8 +569,6 @@ void Sw97_MagicIce_Update(Actor* thisx, PlayState* play) {
         Actor_Kill(&this->actor);
         return;
     }
-    // MM multiplies this base damage by the enemy's Ice Arrow table entry.
-    // OoT's timer-based 25..55 damage is not portable to that system.
     this->collider.elem.atDmgInfo.damage = 2;
     Collider_UpdateCylinder(&this->actor, &this->collider);
     this->collider.dim.radius = (this->colliderScale.x * 325.0f);
@@ -597,21 +576,18 @@ void Sw97_MagicIce_Update(Actor* thisx, PlayState* play) {
     this->collider.dim.yShift = (this->colliderScale.y * -225.0f);
     CollisionCheck_SetAT(play, &play->colChkCtx, &this->collider.base);
 
-    // Freeze water intersecting the expanding cylinder, including water beside
-    // a bank. Retry failed spawns and respect MM's three-platform limit.
     if (this->action >= ACTION_GROW_SLOWLY && this->floeSpawned < 3) {
-        static const Vec3f samples[] = {{0,0,0},{80,0,0},{-80,0,0},{0,0,80},{0,0,-80}};
-        for (u8 i=0; i<ARRAY_COUNT(samples) && this->floeSpawned<3; ++i) {
-            if ((this->frozenSamples & (1<<i)) ||
-                SQ(samples[i].x)+SQ(samples[i].z)>SQ(this->collider.dim.radius)) continue;
-            f32 x=this->actor.world.pos.x+samples[i].x, z=this->actor.world.pos.z+samples[i].z;
-            f32 waterY=this->actor.world.pos.y;
+        static const Vec3f samples[] = { { 0, 0, 0 }, { 80, 0, 0 }, { -80, 0, 0 }, { 0, 0, 80 }, { 0, 0, -80 } };
+        for (u8 i = 0; i < ARRAY_COUNT(samples) && this->floeSpawned < 3; ++i) {
+            if ((this->frozenSamples & (1 << i)) || SQ(samples[i].x) + SQ(samples[i].z) > SQ(this->collider.dim.radius))
+                continue;
+            f32 x = this->actor.world.pos.x + samples[i].x, z = this->actor.world.pos.z + samples[i].z;
+            f32 waterY = this->actor.world.pos.y;
             WaterBox* waterBox;
-            f32 bottom=this->collider.dim.pos.y+this->collider.dim.yShift;
-            if (WaterBox_GetSurface1(play,&play->colCtx,x,z,&waterY,&waterBox) &&
-                waterY>=bottom && waterY<=bottom+this->collider.dim.height &&
-                Sw97_SpawnIcePlatform(play,x,waterY,z)) {
-                this->frozenSamples|=1<<i;
+            f32 bottom = this->collider.dim.pos.y + this->collider.dim.yShift;
+            if (WaterBox_GetSurface1(play, &play->colCtx, x, z, &waterY, &waterBox) && waterY >= bottom &&
+                waterY <= bottom + this->collider.dim.height && Sw97_SpawnIcePlatform(play, x, waterY, z)) {
+                this->frozenSamples |= 1 << i;
                 this->floeSpawned++;
             }
         }
@@ -675,19 +651,19 @@ static s32 Sw97_MagicIce_OverrideLimbDraw(PlayState* play, SkelCurve* skelCurve,
     if (limbIndex == 1) {
         gSPSegment(POLY_XLU_DISP++, 8,
                    (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, play->gameplayFrames % 0x80, 0, 0x20, 0x40, 1, 0,
-                                    (u8)(play->gameplayFrames * -15), 0x20, 0x40));
+                                               (u8)(play->gameplayFrames * -15), 0x20, 0x40));
     } else if (limbIndex == 2) {
         gSPSegment(POLY_XLU_DISP++, 9,
                    (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, play->gameplayFrames % 0x80, 0, 0x20, 0x40, 1, 0,
-                                    (u8)(play->gameplayFrames * -15), 0x20, 0x40));
+                                               (u8)(play->gameplayFrames * -15), 0x20, 0x40));
     } else if (limbIndex == 3) {
         gSPSegment(POLY_XLU_DISP++, 0xA,
                    (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, play->gameplayFrames % 0x80, 0, 0x20, 0x40, 1, 0,
-                                    (u8)(play->gameplayFrames * -15), 0x20, 0x40));
+                                               (u8)(play->gameplayFrames * -15), 0x20, 0x40));
     } else if (limbIndex == 4) {
         gSPSegment(POLY_XLU_DISP++, 0xB,
                    (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, play->gameplayFrames % 0x80, 0, 0x20, 0x40, 1, 0,
-                                    (u8)(play->gameplayFrames * -15), 0x20, 0x40));
+                                               (u8)(play->gameplayFrames * -15), 0x20, 0x40));
     }
 
     CLOSE_DISPS(play->state.gfxCtx);

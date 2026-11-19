@@ -1,8 +1,3 @@
-/**
- * Climb Boots: full traction. Ice keeps no momentum, a steep slope neither slides Link down nor slows him
- * climbing it, and A still jumps from one.
- */
-
 #include "z64items.h"
 #include "soh/ResourceManagerHelpers.h"
 
@@ -13,7 +8,6 @@
 #include "variables.h"
 
 #define CLIMB_BOOTS_KEY "nei.equip.climb_boots"
-// OoT child Link stands about three quarters of adult Link's height, as oot_equipment scales its pieces.
 #define ADULT_BOOT_TO_CHILD_SCALE 0.75f
 
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__textures/icon_item_custom/gItemIconClimbBootsTex";
@@ -45,11 +39,9 @@ static bool IsGrounded(Player* player) {
 static bool IsOnSteepSlope(Player* player, PlayState* play) {
     CollisionPoly* floor = player->actor.floorPoly;
 
-    return floor != NULL &&
-           SurfaceType_GetFloorEffect(&play->colCtx, floor, player->actor.floorBgId) == FLOOR_EFFECT_1;
+    return floor != NULL && SurfaceType_GetFloorEffect(&play->colCtx, floor, player->actor.floorBgId) == FLOOR_EFFECT_1;
 }
 
-// Skipping the assignment keeps the previous, non-ice floor type: that is what stops the skid.
 static void KeepGripOnIce(bool* should, va_list args) {
     Player* player = va_arg(args, Player*);
     PlayState* play = gPlayState;
@@ -62,8 +54,6 @@ static void KeepGripOnIce(bool* should, va_list args) {
     }
 }
 
-// The slide starts inside the scene collision; ending it here, after the whole update, costs no frame. Walking
-// downhill restarts it every frame, so the walk's own speed and heading are handed back each time.
 static void KeepFootingOnSlopes(Player* player) {
     PlayState* play = gPlayState;
 
@@ -83,8 +73,6 @@ static void KeepFootingOnSlopes(Player* player) {
     }
 }
 
-// Player_ActionHandler_10 without its steep-slope gate, which is the only thing standing between a slope
-// and the hop, backflip or jump slash.
 static bool StartSlopeJump(Player* player, PlayState* play) {
     s32 stickDirection = player->controlStickDirections[player->controlStickDataIndex];
 
@@ -95,8 +83,9 @@ static bool StartSlopeJump(Player* player, PlayState* play) {
     if (!Player_IsZTargeting(player)) {
         return false;
     }
-    if (!(player->stateFlags1 & PLAYER_STATE1_8000000) && Player_GetMeleeWeaponHeld(player) != PLAYER_MELEEWEAPON_NONE &&
-        Player_CanUpdateItems(player) && player->transformation != PLAYER_FORM_GORON) {
+    if (!(player->stateFlags1 & PLAYER_STATE1_8000000) &&
+        Player_GetMeleeWeaponHeld(player) != PLAYER_MELEEWEAPON_NONE && Player_CanUpdateItems(player) &&
+        player->transformation != PLAYER_FORM_GORON) {
         func_808395F0(play, player, PLAYER_MWA_JUMPSLASH_START, 5.0f, 5.0f);
     } else if (!func_80839A84(play, player)) {
         func_80836B3C(play, player, 0.0f);
@@ -108,15 +97,13 @@ static void JumpFromSteepSlope(PlayState* play, Player* player, s32 action, bool
     if (*consumed || !IsWorn() || !IsOnSteepSlope(player, play)) {
         return;
     }
-    if (!CHECK_BTN_ALL(play->state.input[0].press.button, BTN_A) ||
-        play->roomCtx.curRoom.type == ROOM_TYPE_INDOORS) {
+    if (!CHECK_BTN_ALL(play->state.input[0].press.button, BTN_A) || play->roomCtx.curRoom.type == ROOM_TYPE_INDOORS) {
         return;
     }
     *consumed = true;
     *startedAction = StartSlopeJump(player, play);
 }
 
-// The emitted env colour carries custom tunics and cosmetics, so it is put back after the tint.
 static u32 GetCurrentEnvColor(PlayState* play) {
     Gfx* begin = (Gfx*)play->state.gfxCtx->polyOpa.start;
     Gfx* cursor = play->state.gfxCtx->polyOpa.p;
@@ -141,7 +128,6 @@ static void KeepBootsOnLoadedMatrix(void) {
     sIsPatched = true;
 }
 
-// Only the look changes: OoT's iron boots tinted silver, seated on the live foot matrix like oot_equipment's.
 static void DrawClimbBootsOnFeet(Player* player, int32_t limbIndex) {
     PlayState* play = gPlayState;
     if (play == NULL || player != GET_PLAYER(play) || player->transformation != PLAYER_FORM_HUMAN || !IsWorn() ||
@@ -181,10 +167,11 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
 #define GI_DL_CAPACITY 512
-static const ALIGN_ASSET(2) char gGiIronBootsDL[] = "__OTR__objects/nei_get_item/climb_boots/object_gi_boots_2/gGiIronBootsDL";
-static const ALIGN_ASSET(2) char gGiIronBootsRivetsDL[] = "__OTR__objects/nei_get_item/climb_boots/object_gi_boots_2/gGiIronBootsRivetsDL";
+static const ALIGN_ASSET(2) char gGiIronBootsDL[] =
+    "__OTR__objects/nei_get_item/climb_boots/object_gi_boots_2/gGiIronBootsDL";
+static const ALIGN_ASSET(2) char gGiIronBootsRivetsDL[] =
+    "__OTR__objects/nei_get_item/climb_boots/object_gi_boots_2/gGiIronBootsRivetsDL";
 static u32 YellowIronRamp(u32 rgba) {
     u8 r = (rgba >> 24) & 0xFF;
     u8 g = (rgba >> 16) & 0xFF;
@@ -200,8 +187,8 @@ static u32 YellowIronRamp(u32 rgba) {
 }
 
 static bool IsTwoWordCommand(u8 opcode) {
-    return opcode == 0x20 || opcode == 0x24 || opcode == 0x25 || opcode == 0x27 || opcode == 0x31 ||
-           opcode == 0x32 || opcode == 0x33 || opcode == 0x35 || opcode == 0x36 || opcode == 0x42;
+    return opcode == 0x20 || opcode == 0x24 || opcode == 0x25 || opcode == 0x27 || opcode == 0x31 || opcode == 0x32 ||
+           opcode == 0x33 || opcode == 0x35 || opcode == 0x36 || opcode == 0x42;
 }
 
 static Gfx* BuildRecoloredDL(const char* path, Gfx* out, bool* built, bool gray) {
@@ -234,7 +221,9 @@ static Gfx* BuildRecoloredDL(const char* path, Gfx* out, bool* built, bool gray)
                 u32 lum = (((rgba >> 24) & 255) * 3 + ((rgba >> 16) & 255) * 6 + ((rgba >> 8) & 255)) / 10;
                 lum = CLAMP_MAX(lum * 1.15f + 30.0f, 255.0f);
                 out[count - 1].words.w1 = (lum << 24) | (lum << 16) | (lum << 8) | (rgba & 255);
-            } else { out[count - 1].words.w1 = YellowIronRamp(rgba); }
+            } else {
+                out[count - 1].words.w1 = YellowIronRamp(rgba);
+            }
         }
     }
     *built = true;
@@ -281,6 +270,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.column = 2;
     definition.formMask = S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN);
     definition.toggles = 1;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = CLIMB_BOOTS_KEY,
+        .hintKey = CLIMB_BOOTS_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }

@@ -1,5 +1,6 @@
 {
     "name": "pendant",
+  "dependencies": ["nei_equipment"],
     "author": "Skijer",
     "version": "1.0",
     "description": "Pendant of Memories: upgrade-column passive with Mortal Draw, ground pound and parry leap on B."

@@ -1,10 +1,7 @@
-/**
- * NotEnoughBottles: four more bottles as items of their own, the Net, and the Bottomless Bottle. The MM grid
- * becomes [1 5][2 6][3 7][4 8][Net][Bottomless]; the four vanilla bottles stay vanilla, the others answer to the
- * engine's bottle code through the item-action and bottle-write hooks it already has.
- */
 
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "z64items.h"
@@ -67,7 +64,6 @@ typedef struct {
     uint8_t bottomlessUses;
 } NebLegacySave;
 
-// A vanilla slot lent to one of the mod's bottles while an actor asks the vanilla inventory a question.
 typedef struct {
     int8_t slot;
     int8_t bottle;
@@ -92,73 +88,57 @@ typedef struct {
 
 static const char* const sBottleKeys[NEB_BOTTLE_COUNT] = { "nei.bottle_5", "nei.bottle_6", "nei.bottle_7",
                                                            "nei.bottle_8", NEB_BOTTOMLESS_KEY };
-// Odd bottles share the first bottle's cell and even ones the second's, each after the vanilla pair.
 static const uint8_t sExtraCells[NEB_EXTRA_COUNT] = { SLOT_BOTTLE_1, SLOT_BOTTLE_2, SLOT_BOTTLE_3, SLOT_BOTTLE_4 };
 static const int32_t sExtraPriorities[NEB_EXTRA_COUNT] = { -1, -1, -1, -1 };
 
-// Where the D-pad buttons take their ammo, the eleven pixels below the icon included; B and the C
-// buttons read theirs from the registers instead, like Interface_DrawAmmoCount does.
-
 static const ALIGN_ASSET(2) char sNetIconTex[] = "__OTR__textures/icon_item_custom/gItemIconNetTex";
 static const ALIGN_ASSET(2) char sNetNameTex[] = "__OTR__textures/item_name_custom/gNetNameTex";
-static const ALIGN_ASSET(2) char sNetXluDL[]="__OTR__objects/object_nei_net/g_net_xlu_dl";
+static const ALIGN_ASSET(2) char sNetXluDL[] = "__OTR__objects/object_nei_net/g_net_xlu_dl";
 static const ALIGN_ASSET(2) char sNetDL[] = "__OTR__objects/object_nei_net/g_net_dl";
-static const ALIGN_ASSET(2) char sBottomlessIconTex[] =
-    "__OTR__textures/icon_item_custom/gItemIconBottomlessBottleTex";
-static const ALIGN_ASSET(2) char sBottomlessNameTex[] =
-    "__OTR__textures/item_name_custom/gBottomlessBottleNameTex";
+static const ALIGN_ASSET(2) char sBottomlessIconTex[] = "__OTR__textures/icon_item_custom/gItemIconBottomlessBottleTex";
+static const ALIGN_ASSET(2) char sBottomlessNameTex[] = "__OTR__textures/item_name_custom/gBottomlessBottleNameTex";
 static const ALIGN_ASSET(2) char sSwingAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_bottle_bug_miss";
-static const ALIGN_ASSET(2) char sSwingWaterAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_bottle_fish_miss";
+static const ALIGN_ASSET(2) char sSwingWaterAnim[] =
+    "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_bottle_fish_miss";
 
-// Indexed by content - ITEM_BOTTLE, one column per language, the order vanilla's name table uses.
 static const char* const sContentNames[NEB_CONTENT_COUNT] = {
-    "__OTR__item_name_static/gItemNameEmptyBottleENGTex",
-    "__OTR__item_name_static/gItemNameRedPotionENGTex",
-    "__OTR__item_name_static/gItemNameGreenPotionENGTex",
-    "__OTR__item_name_static/gItemNameBluePotionENGTex",
-    "__OTR__item_name_static/gItemNameFairyENGTex",
-    "__OTR__item_name_static/gItemNameDekuPrincessENGTex",
-    "__OTR__item_name_static/gItemNameFullMilkENGTex",
-    "__OTR__item_name_static/gItemNameHalfMilkENGTex",
-    "__OTR__item_name_static/gItemNameFishENGTex",
-    "__OTR__item_name_static/gItemNameBugENGTex",
-    "__OTR__item_name_static/gItemNameBlueFireENGTex",
-    "__OTR__item_name_static/gItemNamePoeENGTex",
-    "__OTR__item_name_static/gItemNameBigPoeENGTex",
-    "__OTR__item_name_static/gItemNameSpringWaterENGTex",
-    "__OTR__item_name_static/gItemNameHotSpringWaterENGTex",
-    "__OTR__item_name_static/gItemNameZoraEggENGTex",
-    "__OTR__item_name_static/gItemNameGoldDustENGTex",
-    "__OTR__item_name_static/gItemNameMagicalMushroomENGTex",
-    "__OTR__item_name_static/gItemNameSeaHorseENGTex",
-    "__OTR__item_name_static/gItemNameChateauRomaniENGTex",
-    "__OTR__item_name_static/gItemNameHylianLoachJPNTex",
-    "__OTR__item_name_static/gItemNameObabasDrinkJPNTex",
+    "__OTR__item_name_static/gItemNameEmptyBottleENGTex",    "__OTR__item_name_static/gItemNameRedPotionENGTex",
+    "__OTR__item_name_static/gItemNameGreenPotionENGTex",    "__OTR__item_name_static/gItemNameBluePotionENGTex",
+    "__OTR__item_name_static/gItemNameFairyENGTex",          "__OTR__item_name_static/gItemNameDekuPrincessENGTex",
+    "__OTR__item_name_static/gItemNameFullMilkENGTex",       "__OTR__item_name_static/gItemNameHalfMilkENGTex",
+    "__OTR__item_name_static/gItemNameFishENGTex",           "__OTR__item_name_static/gItemNameBugENGTex",
+    "__OTR__item_name_static/gItemNameBlueFireENGTex",       "__OTR__item_name_static/gItemNamePoeENGTex",
+    "__OTR__item_name_static/gItemNameBigPoeENGTex",         "__OTR__item_name_static/gItemNameSpringWaterENGTex",
+    "__OTR__item_name_static/gItemNameHotSpringWaterENGTex", "__OTR__item_name_static/gItemNameZoraEggENGTex",
+    "__OTR__item_name_static/gItemNameGoldDustENGTex",       "__OTR__item_name_static/gItemNameMagicalMushroomENGTex",
+    "__OTR__item_name_static/gItemNameSeaHorseENGTex",       "__OTR__item_name_static/gItemNameChateauRomaniENGTex",
+    "__OTR__item_name_static/gItemNameHylianLoachJPNTex",    "__OTR__item_name_static/gItemNameObabasDrinkJPNTex",
 };
 
-// How often the Bottomless Bottle gives the same content back before it runs dry.
 static const NebContentUses sBottomlessUses[] = {
     { ITEM_POTION_RED, 5 }, { ITEM_POTION_GREEN, 5 }, { ITEM_POTION_BLUE, 5 }, { ITEM_MILK_BOTTLE, 5 },
     { ITEM_FISH, 6 },       { ITEM_BUG, 9 },          { ITEM_FAIRY, 3 },       { ITEM_BLUE_FIRE, 7 },
-    { ITEM_POE, 3 },        { ITEM_BIG_POE, 3 }, { ITEM_CHATEAU, 5 },
+    { ITEM_POE, 3 },        { ITEM_BIG_POE, 3 },      { ITEM_CHATEAU, 5 },
 };
 
 static const NebCatch sNetCatch[] = {
-    { ACTOR_EN_FISH, ITEM_FISH }, { ACTOR_EN_INSECT, ITEM_BUG },
+    { ACTOR_EN_FISH, ITEM_FISH },
+    { ACTOR_EN_INSECT, ITEM_BUG },
 };
 
-// The actors whose update asks Inventory_HasEmptyBottle before selling or catching into a bottle.
 static const int16_t sEmptyBottleAskers[] = {
-    ACTOR_EN_AKINDONUTS, ACTOR_EN_COW, ACTOR_EN_GK, ACTOR_EN_GIRLA, ACTOR_EN_IN,
-    ACTOR_EN_TAB, ACTOR_EN_TRT, ACTOR_EN_TRT2, ACTOR_EN_TSN,
+    ACTOR_EN_AKINDONUTS, ACTOR_EN_COW, ACTOR_EN_GK,   ACTOR_EN_GIRLA, ACTOR_EN_IN,
+    ACTOR_EN_TAB,        ACTOR_EN_TRT, ACTOR_EN_TRT2, ACTOR_EN_TSN,
 };
-// The beggar buys any of these, and asks Inventory_HasSpecificBottle for each.
 static const uint8_t sBeggarWants[] = { ITEM_BLUE_FIRE, ITEM_BUG, ITEM_FISH };
 
-static const char* const sRequiredHooks[] = { "OnGameFrameUpdate", "OnPlayerUpdate",   "OnPlayerResolveItemAction", "OnResolveItemGive",
-                                              "OnKaleidoResolveName", "OnInterfaceResolveButtonIcon", "OnKaleidoItemDraw", "OnInterfaceDrawEnd",   "OnLoadFile",
-                                              "ShouldActorUpdate", "OnActorUpdate",
-                                              "OnGameFrameUpdate", "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw" };
+static const char* const sRequiredHooks[] = {
+    "OnGameFrameUpdate",       "OnPlayerUpdate",       "OnPlayerResolveItemAction",
+    "OnResolveItemGive",       "OnKaleidoResolveName", "OnInterfaceResolveButtonIcon",
+    "OnKaleidoItemDraw",       "OnInterfaceDrawEnd",   "OnLoadFile",
+    "ShouldActorUpdate",       "OnActorUpdate",        "OnGameFrameUpdate",
+    "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw"
+};
 static const SOHModRequirements sRequirements = { sizeof(SOHModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
@@ -179,7 +159,77 @@ static uint32_t CaptureRemoteLimbEnv(PlayState* play);
 static void RestoreRemoteLimbEnv(PlayState* play, uint32_t color);
 static NebSave sSave;
 
+#define NEB_FOREIGN_RUTOS_LETTER 0xF0
+#define NEB_FOREIGN_BASE ITEM_OBABA_DRINK
+#define NEB_RUTOS_LETTER_KEY "fleet.bottle.ruto_letter"
+#define NEB_RUTOS_LETTER_TOKEN "ruto_letter"
+#define NEB_ZORA_EGG_MAX 7
+#define NEB_MM_VANILLA_COUNT NEB_VANILLA_COUNT
+static const ALIGN_ASSET(2) char sRutosLetterIcon[] =
+    "__OTR__textures/oot_icon_item_static/gItemIconBottleRutosLetterTex";
+static const ALIGN_ASSET(2) char sRutosLetterName[] = "__OTR__textures/oot_item_name_static/gRutosLetterItemNameENGTex";
+static const char sTimeAndPlace[] = "Oak's words echoed...^There's a time and place for&everything! But not now.";
+static bool sIsTimeAndPlaceSaid;
+static uint8_t sForeignVanilla[NEB_MM_VANILLA_COUNT];
+
+typedef struct {
+    const char* token;
+    uint8_t content;
+} NebNative;
+
+static const NebNative sNatives[] = {
+    { "empty", ITEM_BOTTLE },
+    { "red_potion", ITEM_POTION_RED },
+    { "green_potion", ITEM_POTION_GREEN },
+    { "blue_potion", ITEM_POTION_BLUE },
+    { "fairy", ITEM_FAIRY },
+    { "deku_princess", ITEM_DEKU_PRINCESS },
+    { "milk", ITEM_MILK_BOTTLE },
+    { "half_milk", ITEM_MILK_HALF },
+    { "fish", ITEM_FISH },
+    { "bugs", ITEM_BUG },
+    { "blue_fire", ITEM_BLUE_FIRE },
+    { "poe", ITEM_POE },
+    { "big_poe", ITEM_BIG_POE },
+    { "spring_water", ITEM_SPRING_WATER },
+    { "hot_spring_water", ITEM_HOT_SPRING_WATER },
+    { "zora_egg", ITEM_ZORA_EGG },
+    { "gold_dust", ITEM_GOLD_DUST },
+    { "mushroom", ITEM_MUSHROOM },
+    { "seahorse", ITEM_SEAHORSE },
+    { "chateau", ITEM_CHATEAU },
+    { "hylian_loach", ITEM_HYLIAN_LOACH },
+};
+
+static void StoreForeignVanilla(void) {
+    sApi->StorageSet(NEB_MOD_NAME, "foreign_vanilla", sForeignVanilla, sizeof(sForeignVanilla));
+}
+
+typedef struct {
+    const char* key;
+    uint8_t content;
+    const char* text;
+} NebSharedBottle;
+
+static const NebSharedBottle sSharedBottles[] = {
+    { "fleet.bottle.green_potion", ITEM_POTION_GREEN, "You got a %rBottle with Green Potion%w!" },
+    { "fleet.bottle.blue_potion", ITEM_POTION_BLUE, "You got a %rBottle with Blue Potion%w!" },
+    { "fleet.bottle.fairy", ITEM_FAIRY, "You got a %rBottle with a Fairy%w!" },
+    { "fleet.bottle.fish", ITEM_FISH, "You got a %rBottle with a Fish%w!" },
+    { "fleet.bottle.bugs", ITEM_BUG, "You got a %rBottle with Bugs%w!" },
+    { "fleet.bottle.poe", ITEM_POE, "You got a %rBottle with a Poe%w!" },
+    { "fleet.bottle.big_poe", ITEM_BIG_POE, "You got a %rBottle with a Big Poe%w!" },
+    { "fleet.bottle.blue_fire", ITEM_BLUE_FIRE, "You got a %rBottle with Blue Fire%w!" },
+};
+
+static bool IsForeignContent(uint8_t content) {
+    return content == NEB_FOREIGN_RUTOS_LETTER;
+}
+
+static bool HasRoomForZoraEgg(void);
+
 static NebLoan sLoan = { NEB_NONE, NEB_NONE, ITEM_NONE, ITEM_NONE };
+static int8_t sAcquiredBottle = NEB_NONE;
 static uint16_t sButtonsToRestore;
 static bool sIsCatchResolved;
 static int sNetCaptureFrames;
@@ -245,10 +295,10 @@ static int8_t BottleOnButton(int32_t button) {
     return BottleForKey(sApi->GetEquippedCustomItem((uint8_t)button));
 }
 
-// The icon is the content's, so the bottle reads like a vanilla one; only an empty Bottomless keeps its own.
 static void ShowContent(int8_t bottle) {
-    const char* icon = bottle == NEB_BOTTOMLESS && IsEmpty(bottle) ? sBottomlessIconTex
-                                                                   : (const char*)gItemIcons[sSave.content[bottle]];
+    const char* icon = IsForeignContent(sSave.content[bottle])       ? sRutosLetterIcon
+                       : bottle == NEB_BOTTOMLESS && IsEmpty(bottle) ? sBottomlessIconTex
+                                                                     : (const char*)gItemIcons[sSave.content[bottle]];
 
     CustomItemRegistry_SetIconPath(sBottleKeys[bottle], icon);
 }
@@ -262,11 +312,13 @@ static uint8_t BottomlessUsesFor(uint8_t item) {
     return NEB_DEFAULT_USES;
 }
 
-// Emptying the Bottomless Bottle spends one use instead of the bottle; filling it restarts the count.
 static void SetContent(int8_t bottle, uint8_t item) {
-    if (bottle == NEB_BOTTOMLESS && !IsEmpty(bottle) && (item == ITEM_BOTTLE || item == ITEM_MILK_HALF) &&
+    const bool isBottomless = bottle == NEB_BOTTOMLESS;
+    if (isBottomless && !IsEmpty(bottle) && (item == ITEM_BOTTLE || item == ITEM_MILK_HALF) &&
         sSave.bottomlessUses > 1) {
         sSave.bottomlessUses--;
+    } else if (isBottomless && item == ITEM_ZORA_EGG && sSave.content[bottle] == ITEM_ZORA_EGG) {
+        sSave.bottomlessUses = MIN(sSave.bottomlessUses + 1, NEB_ZORA_EGG_MAX);
     } else {
         sSave.content[bottle] = item;
         if (bottle == NEB_BOTTOMLESS) {
@@ -274,14 +326,17 @@ static void SetContent(int8_t bottle, uint8_t item) {
         }
     }
     if (sSave.content[bottle] == ITEM_HOT_SPRING_WATER) {
-        if (!sSave.hotWaterFrames[bottle]) sSave.hotWaterFrames[bottle] = 60 * 20;
-    } else sSave.hotWaterFrames[bottle] = 0;
+        if (!sSave.hotWaterFrames[bottle])
+            sSave.hotWaterFrames[bottle] = 60 * 20;
+    } else
+        sSave.hotWaterFrames[bottle] = 0;
     StoreBottles();
     ShowContent(bottle);
 }
 
 static void Acquire(int8_t bottle, uint8_t content) {
     sApi->SetCustomItemOwned(sBottleKeys[bottle], true);
+    sAcquiredBottle = NEB_NONE;
     SetContent(bottle, content);
 }
 
@@ -294,7 +349,6 @@ static int8_t FindUnownedExtra(void) {
     return NEB_NONE;
 }
 
-// The Bottomless first: an empty one is the bottle that most wants filling.
 static int8_t FindOwnedHolding(uint8_t content) {
     if (IsOwned(NEB_BOTTOMLESS) && sSave.content[NEB_BOTTOMLESS] == content) {
         return NEB_BOTTOMLESS;
@@ -316,13 +370,73 @@ static int8_t FindVanillaSlot(uint8_t content) {
     return NEB_NONE;
 }
 
+static bool AddBottle(uint8_t content) {
+    int8_t slot = FindVanillaSlot(ITEM_NONE);
+
+    if (slot != NEB_NONE) {
+        gSaveContext.save.saveInfo.inventory.items[slot] = content;
+        return true;
+    }
+    int8_t bottle = FindUnownedExtra();
+
+    if (bottle == NEB_NONE) {
+        return false;
+    }
+    Acquire(bottle, content);
+    return true;
+}
+
+static void NoteAcquiredBottle(const char* key) {
+    sAcquiredBottle = BottleForKey(key);
+}
+
+static void ReceiveExtraBottle(const char* key) {
+    const bool isDuplicate = sAcquiredBottle != BottleForKey(key);
+
+    sAcquiredBottle = NEB_NONE;
+    if (isDuplicate) {
+        AddBottle(ITEM_BOTTLE);
+    }
+}
+
+static void AddForeignBottle(uint8_t content) {
+    int8_t bottle = FindUnownedExtra();
+    if (bottle != NEB_NONE) {
+        Acquire(bottle, content);
+        return;
+    }
+    for (int8_t vanilla = 0; vanilla < NEB_MM_VANILLA_COUNT; vanilla++) {
+        uint8_t* item = &gSaveContext.save.saveInfo.inventory.items[SLOT_BOTTLE_1 + vanilla];
+        if (*item == ITEM_NONE) {
+            *item = NEB_FOREIGN_BASE;
+            sForeignVanilla[vanilla] = 1;
+            StoreForeignVanilla();
+            return;
+        }
+    }
+}
+
+static void ReceiveSharedBottle(const char* key) {
+    if (strcmp(key, NEB_RUTOS_LETTER_KEY) == 0) {
+        AddForeignBottle(NEB_FOREIGN_RUTOS_LETTER);
+        return;
+    }
+    for (uint8_t i = 0; i < ARRAY_COUNT(sSharedBottles); i++) {
+        if (strcmp(key, sSharedBottles[i].key) == 0) {
+            AddBottle(sSharedBottles[i].content);
+            return;
+        }
+    }
+}
+
 static bool FillChateauBottle(PlayState* play) {
     int8_t bottle = FindOwnedHolding(ITEM_BOTTLE);
     if (bottle != NEB_NONE) {
         SetContent(bottle, ITEM_CHATEAU);
         return true;
     }
-    if (FindVanillaSlot(ITEM_BOTTLE) == NEB_NONE) return false;
+    if (FindVanillaSlot(ITEM_BOTTLE) == NEB_NONE)
+        return false;
     Item_Give(play, ITEM_CHATEAU);
     return true;
 }
@@ -331,9 +445,6 @@ static bool HasEmptyBottle(void) {
     return FindVanillaSlot(ITEM_BOTTLE) != NEB_NONE || FindOwnedHolding(ITEM_BOTTLE) != NEB_NONE;
 }
 
-// A write on a button holding one of these bottles lands here instead of the inventory, which has no slot for
-// it. Vanilla then overwrites the button with a plain item id; it gets its custom item back before anyone
-// reads the save or the button list.
 static void CatchBottleWrite(bool* should, va_list args) {
     int32_t button = va_arg(args, int32_t);
     int32_t item = va_arg(args, int32_t);
@@ -365,36 +476,81 @@ static void RestoreButtons(void) {
     sButtonsToRestore = 0;
 }
 
-// The engine resolves a custom item to its own action; one of these bottles answers with its content's.
+static int8_t VanillaBottleOnButton(int32_t button) {
+    if (button < 1 || button >= NEB_BUTTON_COUNT || button == 4) {
+        return NEB_NONE;
+    }
+    const int32_t index = *BottleButtonSlot(button - 1) - SLOT_BOTTLE_1;
+    return index >= 0 && index < NEB_MM_VANILLA_COUNT ? (int8_t)index : NEB_NONE;
+}
+
+static bool IsForeignOnButton(int32_t button) {
+    const int8_t bottle = BottleOnButton(button);
+    if (bottle != NEB_NONE) {
+        return IsForeignContent(sSave.content[bottle]);
+    }
+    const int8_t vanilla = VanillaBottleOnButton(button);
+    return vanilla != NEB_NONE && sForeignVanilla[vanilla] != 0;
+}
+
 static void ResolveBottleAction(int32_t item, int8_t* itemAction) {
-    if (item != ITEM_CUSTOM || gPlayState == NULL) {
+    if (gPlayState == NULL) {
         return;
     }
-    int8_t bottle = BottleOnButton(GET_PLAYER(gPlayState)->heldItemButton);
-
+    Player* player = GET_PLAYER(gPlayState);
+    if (IsForeignOnButton(player->heldItemButton)) {
+        const bool isTalking = player->talkActor != NULL || Message_GetState(&gPlayState->msgCtx) != TEXT_STATE_NONE;
+        *itemAction = isTalking ? PLAYER_IA_NONE : PLAYER_IA_BOTTLE_BIG_POE;
+        return;
+    }
+    int8_t bottle = item == ITEM_CUSTOM ? BottleOnButton(player->heldItemButton) : NEB_NONE;
     if (bottle != NEB_NONE) {
-        *itemAction = Player_ItemToItemAction(GET_PLAYER(gPlayState), sSave.content[bottle]);
+        *itemAction = Player_ItemToItemAction(player, sSave.content[bottle]);
+    }
+}
+
+static void SayTimeAndPlace(void) {
+    if (gPlayState == NULL) {
+        return;
+    }
+    Player* player = GET_PLAYER(gPlayState);
+    const bool isShowingForeign =
+        player->heldItemAction == PLAYER_IA_BOTTLE_BIG_POE && IsForeignOnButton(player->heldItemButton);
+    if (!isShowingForeign) {
+        sIsTimeAndPlaceSaid = false;
+        return;
+    }
+    if (!sIsTimeAndPlaceSaid && Message_GetState(&gPlayState->msgCtx) == TEXT_STATE_NONE &&
+        SOH_MOD_API_HAS(sApi, ShowTextbox)) {
+        sIsTimeAndPlaceSaid = sApi->ShowTextbox(gPlayState, sTimeAndPlace, true);
     }
 }
 
 uint8_t KaleidoItemManager_GetVanillaSlot(uint8_t cell);
 
-// Pause pages name cells; a rearranged page puts any bottle slot in any cell.
-
+static bool IsForeignVanillaSlot(int32_t slot) {
+    const int32_t bottle = slot - SLOT_BOTTLE_1;
+    return bottle >= 0 && bottle < NEB_MM_VANILLA_COUNT && sForeignVanilla[bottle] != 0;
+}
 
 static void ResolveBottleName(PlayState* play, uint16_t item, const char** namePath) {
+    if (item == NEB_FOREIGN_BASE && IsForeignVanillaSlot(play->pauseCtx.cursorSlot[PAUSE_ITEM])) {
+        *namePath = sRutosLetterName;
+        return;
+    }
     const SOHCustomItemDefinition* selected = CustomItemRegistry_GetPauseItem();
     int8_t bottle = item == ITEM_CUSTOM && selected != NULL ? BottleForKey(selected->key) : NEB_NONE;
 
     if (bottle == NEB_NONE || (bottle == NEB_BOTTOMLESS && IsEmpty(bottle))) {
         return;
     }
-    uint8_t language = gSaveContext.options.language <= LANGUAGE_FRA ? gSaveContext.options.language : LANGUAGE_ENG;
-
+    if (IsForeignContent(sSave.content[bottle])) {
+        *namePath = sRutosLetterName;
+        return;
+    }
     *namePath = sContentNames[sSave.content[bottle] - ITEM_BOTTLE];
 }
 
-// Vanilla fills its own four first; only what they cannot hold goes to the mod's bottles.
 static void GiveIntoBottles(PlayState* play, uint8_t* item, bool* handled) {
     uint8_t given = *item;
     bool newBottle = given == ITEM_BOTTLE || given == ITEM_MILK_BOTTLE || given == ITEM_POE ||
@@ -406,12 +562,24 @@ static void GiveIntoBottles(PlayState* play, uint8_t* item, bool* handled) {
         return;
     }
     switch (given) {
-        case ITEM_LONGSHOT: given = ITEM_POTION_RED; break;
-        case ITEM_MILK: given = ITEM_MILK_BOTTLE; break;
-        case ITEM_CHATEAU_2: given = ITEM_CHATEAU; break;
-        case ITEM_GOLD_DUST_2: given = ITEM_GOLD_DUST; break;
-        case ITEM_HYLIAN_LOACH_2: given = ITEM_HYLIAN_LOACH; break;
-        case ITEM_SEAHORSE_CAUGHT: given = ITEM_SEAHORSE; break;
+        case ITEM_LONGSHOT:
+            given = ITEM_POTION_RED;
+            break;
+        case ITEM_MILK:
+            given = ITEM_MILK_BOTTLE;
+            break;
+        case ITEM_CHATEAU_2:
+            given = ITEM_CHATEAU;
+            break;
+        case ITEM_GOLD_DUST_2:
+            given = ITEM_GOLD_DUST;
+            break;
+        case ITEM_HYLIAN_LOACH_2:
+            given = ITEM_HYLIAN_LOACH;
+            break;
+        case ITEM_SEAHORSE_CAUGHT:
+            given = ITEM_SEAHORSE;
+            break;
     }
     if (newBottle) {
         bottle = FindVanillaSlot(ITEM_NONE) == NEB_NONE ? FindUnownedExtra() : NEB_NONE;
@@ -419,6 +587,11 @@ static void GiveIntoBottles(PlayState* play, uint8_t* item, bool* handled) {
             Acquire(bottle, given);
             *handled = true;
         }
+        return;
+    }
+    if (given == ITEM_ZORA_EGG && HasRoomForZoraEgg()) {
+        SetContent(NEB_BOTTOMLESS, given);
+        *handled = true;
         return;
     }
     if (!IsBottleContent(given) || FindVanillaSlot(ITEM_BOTTLE) != NEB_NONE) {
@@ -431,12 +604,11 @@ static void GiveIntoBottles(PlayState* play, uint8_t* item, bool* handled) {
     }
 }
 
-// Buttons that point at a lent slot were rewritten along with it by Item_Give; they go back with the slot.
 static void ResyncSlotButtons(uint8_t slot) {
     for (uint8_t button = 1; button < NEB_BUTTON_COUNT; button++) {
-        if (button == 4) continue;
-        if ((*BottleButtonSlot(button - 1)) != slot ||
-            (*BottleButtonItem(button)) == ITEM_CUSTOM) {
+        if (button == 4)
+            continue;
+        if ((*BottleButtonSlot(button - 1)) != slot || (*BottleButtonItem(button)) == ITEM_CUSTOM) {
             continue;
         }
         (*BottleButtonItem(button)) = gSaveContext.save.saveInfo.inventory.items[slot];
@@ -464,7 +636,6 @@ static void SettleLoan(void) {
     sLoan.slot = NEB_NONE;
 }
 
-// Only a vanilla inventory without the content borrows: a free slot if there is one, the first bottle if not.
 static void LendContent(uint8_t content) {
     int8_t bottle;
     int8_t slot;
@@ -491,6 +662,30 @@ static void LendForEmptyBottleAsker(void* actor, bool* result) {
     }
 }
 
+static bool HasRoomForZoraEgg(void) {
+    return IsOwned(NEB_BOTTOMLESS) && sSave.content[NEB_BOTTOMLESS] == ITEM_ZORA_EGG &&
+           sSave.bottomlessUses < NEB_ZORA_EGG_MAX;
+}
+
+static void LendRoomForZoraEgg(void* actor, bool* result) {
+    if (!*result) {
+        return;
+    }
+    if (!HasRoomForZoraEgg()) {
+        LendContent(ITEM_BOTTLE);
+        return;
+    }
+    SettleLoan();
+    if (FindVanillaSlot(ITEM_BOTTLE) != NEB_NONE) {
+        return;
+    }
+    const int8_t slot = FindVanillaSlot(ITEM_NONE);
+    sLoan.slot = slot != NEB_NONE ? slot : (int8_t)SLOT_BOTTLE_1;
+    sLoan.bottle = NEB_BOTTOMLESS;
+    sLoan.original = gSaveContext.save.saveInfo.inventory.items[sLoan.slot];
+    sLoan.lent = ITEM_BOTTLE;
+    gSaveContext.save.saveInfo.inventory.items[sLoan.slot] = ITEM_BOTTLE;
+}
 
 // Link at zero hearts is about to ask Inventory_ConsumeFairy, which only looks in the vanilla slots.
 static void LendFairyToFallingLink(void* actor, bool* result) {
@@ -505,14 +700,190 @@ static void CloseActorWindow(void* actor) {
 }
 
 static bool NetHeld(void);
-static void ResolveNetCatch(Player* player,PlayState* play);
+static void ResolveNetCatch(Player* player, PlayState* play);
+static void GuardForeignVanilla(void) {
+    for (int8_t bottle = 0; bottle < NEB_MM_VANILLA_COUNT; bottle++) {
+        uint8_t* item = &gSaveContext.save.saveInfo.inventory.items[SLOT_BOTTLE_1 + bottle];
+        if (sForeignVanilla[bottle] == 0 || *item == NEB_FOREIGN_BASE) {
+            continue;
+        }
+        if (*item == ITEM_NONE) {
+            sForeignVanilla[bottle] = 0;
+            StoreForeignVanilla();
+            continue;
+        }
+        *item = NEB_FOREIGN_BASE;
+        ResyncSlotButtons(SLOT_BOTTLE_1 + bottle);
+    }
+}
+
+static const char* NativeToken(uint8_t content) {
+    for (uint8_t i = 0; i < ARRAY_COUNT(sNatives); i++) {
+        if (sNatives[i].content == content) {
+            return sNatives[i].token;
+        }
+    }
+    return "empty";
+}
+
+static const char* ExtraToken(int8_t bottle) {
+    return IsForeignContent(sSave.content[bottle]) ? NEB_RUTOS_LETTER_TOKEN : NativeToken(sSave.content[bottle]);
+}
+
+static const char* VanillaToken(int8_t bottle) {
+    return sForeignVanilla[bottle] != 0
+               ? NEB_RUTOS_LETTER_TOKEN
+               : NativeToken(gSaveContext.save.saveInfo.inventory.items[SLOT_BOTTLE_1 + bottle]);
+}
+
+static int CompareTokens(const void* left, const void* right) {
+    return strcmp(*(const char* const*)left, *(const char* const*)right);
+}
+
+static const char* ReadBottles(void) {
+    static char text[512];
+    const char* tokens[NEB_MM_VANILLA_COUNT + NEB_EXTRA_COUNT];
+    size_t count = 0;
+    for (int8_t bottle = 0; bottle < NEB_MM_VANILLA_COUNT; bottle++) {
+        if (gSaveContext.save.saveInfo.inventory.items[SLOT_BOTTLE_1 + bottle] != ITEM_NONE) {
+            tokens[count++] = VanillaToken(bottle);
+        }
+    }
+    for (int8_t bottle = 0; bottle < NEB_EXTRA_COUNT; bottle++) {
+        if (IsOwned(bottle)) {
+            tokens[count++] = ExtraToken(bottle);
+        }
+    }
+    qsort((void*)tokens, count, sizeof(tokens[0]), CompareTokens);
+    size_t length = 0;
+    text[0] = '\0';
+    for (size_t i = 0; i < count; i++) {
+        length += snprintf(text + length, sizeof(text) - length, "%s%s", i == 0 ? "" : ",", tokens[i]);
+    }
+    if (IsOwned(NEB_BOTTOMLESS)) {
+        snprintf(text + length, sizeof(text) - length, "|%s*%u", ExtraToken(NEB_BOTTOMLESS), sSave.bottomlessUses);
+    }
+    return text;
+}
+
+static bool IsTokenNamed(const char* token, size_t length, const char* name) {
+    return strlen(name) == length && strncmp(token, name, length) == 0;
+}
+
+static uint8_t ContentOfToken(const char* token, size_t length) {
+    if (IsTokenNamed(token, length, NEB_RUTOS_LETTER_TOKEN)) {
+        return NEB_FOREIGN_RUTOS_LETTER;
+    }
+    for (uint8_t i = 0; i < ARRAY_COUNT(sNatives); i++) {
+        if (IsTokenNamed(token, length, sNatives[i].token)) {
+            return sNatives[i].content;
+        }
+    }
+    return ITEM_BOTTLE;
+}
+
+static void SetVanillaToken(int8_t bottle, const char* token, size_t length) {
+    const uint8_t content = ContentOfToken(token, length);
+    const bool isForeign = IsForeignContent(content);
+    sForeignVanilla[bottle] = isForeign ? 1 : 0;
+    gSaveContext.save.saveInfo.inventory.items[SLOT_BOTTLE_1 + bottle] = isForeign ? NEB_FOREIGN_BASE : content;
+    ResyncSlotButtons(SLOT_BOTTLE_1 + bottle);
+}
+
+static void WriteBottles(const char* text) {
+    char wanted[NEB_MM_VANILLA_COUNT + NEB_EXTRA_COUNT][32];
+    size_t wantedCount = 0;
+    const char* cursor = text;
+    while (*cursor != '\0' && *cursor != '|' && wantedCount < ARRAY_COUNT(wanted)) {
+        const size_t length = strcspn(cursor, ",|");
+        snprintf(wanted[wantedCount++], sizeof(wanted[0]), "%.*s", (int)length, cursor);
+        cursor += length + (cursor[length] == ',' ? 1 : 0);
+    }
+    bool isTaken[ARRAY_COUNT(wanted)] = { false };
+    int8_t unmatchedVanilla[NEB_MM_VANILLA_COUNT];
+    int8_t unmatchedExtra[NEB_EXTRA_COUNT];
+    size_t vanillaLeft = 0;
+    size_t extraLeft = 0;
+    for (int8_t bottle = 0; bottle < NEB_MM_VANILLA_COUNT + NEB_EXTRA_COUNT; bottle++) {
+        const bool isVanilla = bottle < NEB_MM_VANILLA_COUNT;
+        const int8_t index = isVanilla ? bottle : (int8_t)(bottle - NEB_MM_VANILLA_COUNT);
+        if (isVanilla ? gSaveContext.save.saveInfo.inventory.items[SLOT_BOTTLE_1 + index] == ITEM_NONE
+                      : !IsOwned(index)) {
+            continue;
+        }
+        const char* token = isVanilla ? VanillaToken(index) : ExtraToken(index);
+        bool isMatched = false;
+        for (size_t i = 0; i < wantedCount && !isMatched; i++) {
+            isMatched = !isTaken[i] && strcmp(wanted[i], token) == 0;
+            isTaken[i] = isTaken[i] || isMatched;
+        }
+        if (!isMatched && isVanilla) {
+            unmatchedVanilla[vanillaLeft++] = index;
+        } else if (!isMatched) {
+            unmatchedExtra[extraLeft++] = index;
+        }
+    }
+    size_t vanillaUsed = 0;
+    size_t extraUsed = 0;
+    for (size_t i = 0; i < wantedCount; i++) {
+        if (isTaken[i]) {
+            continue;
+        }
+        const size_t length = strlen(wanted[i]);
+        const uint8_t content = ContentOfToken(wanted[i], length);
+        if (vanillaUsed < vanillaLeft) {
+            SetVanillaToken(unmatchedVanilla[vanillaUsed++], wanted[i], length);
+        } else if (extraUsed < extraLeft) {
+            SetContent(unmatchedExtra[extraUsed++], content);
+        } else if (IsForeignContent(content)) {
+            AddForeignBottle(content);
+        } else {
+            AddBottle(content);
+        }
+    }
+    StoreForeignVanilla();
+    const char* bottomless = strchr(text, '|');
+    if (bottomless != NULL && IsOwned(NEB_BOTTOMLESS)) {
+        const char* uses = strchr(bottomless, '*');
+        const size_t length = uses != NULL ? (size_t)(uses - bottomless - 1) : strlen(bottomless + 1);
+        sSave.content[NEB_BOTTOMLESS] = ContentOfToken(bottomless + 1, length);
+        sSave.bottomlessUses = uses != NULL ? (uint8_t)atoi(uses + 1) : 0;
+        StoreBottles();
+        ShowContent(NEB_BOTTOMLESS);
+    }
+}
+
+static void ForeignButtonIcon(PlayState* play, u8 button, u16 item, const char** iconPath) {
+    const int8_t bottle = VanillaBottleOnButton(button);
+    if (bottle != NEB_NONE && sForeignVanilla[bottle] != 0) {
+        *iconPath = sRutosLetterIcon;
+    }
+}
+
+void KaleidoScope_DrawTexQuadRGBA32(GraphicsContext* gfxCtx, TexturePtr texture, u16 width, u16 height, u16 point);
+static void ForeignPauseIcon(PlayState* play, s32 slot, s32 item, Vtx* vertices) {
+    if (!IsForeignVanillaSlot(slot)) {
+        return;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPVertex(POLY_OPA_DISP++, (uintptr_t)vertices, 4, 0);
+    KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, (TexturePtr)sRutosLetterIcon, 32, 32, 0);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static void CloseFrame(void) {
-    if(gPlayState && NetHeld()) {
-        Player* player=GET_PLAYER(gPlayState);
-        for(int i=0;i<ARRAY_COUNT(player->meleeWeaponQuads);++i)player->meleeWeaponQuads[i].base.atFlags&=~AT_ON;
-        if(gPlayState->state.input[0].press.button&BTN_B)sNetCaptureFrames=12;
-        if(player->meleeWeaponState!=0 || sNetCaptureFrames>0)ResolveNetCatch(player,gPlayState);
-        if(sNetCaptureFrames>0)--sNetCaptureFrames;
+    sAcquiredBottle = NEB_NONE;
+    GuardForeignVanilla();
+    if (gPlayState && NetHeld()) {
+        Player* player = GET_PLAYER(gPlayState);
+        for (int i = 0; i < ARRAY_COUNT(player->meleeWeaponQuads); ++i)
+            player->meleeWeaponQuads[i].base.atFlags &= ~AT_ON;
+        if (gPlayState->state.input[0].press.button & BTN_B)
+            sNetCaptureFrames = 12;
+        if (player->meleeWeaponState != 0 || sNetCaptureFrames > 0)
+            ResolveNetCatch(player, gPlayState);
+        if (sNetCaptureFrames > 0)
+            --sNetCaptureFrames;
     }
     SettleLoan();
     RestoreButtons();
@@ -530,8 +901,6 @@ static void ForgetBottles(void) {
     sSave.bottomlessUses = 0;
 }
 
-// The first version kept eight bottles of its own and projected the shown ones into slots 1, 2 and 4: the
-// hidden ones move to free vanilla slots, then to the new bottles.
 static void AdoptLegacyBottles(void) {
     NebLegacySave legacy;
 
@@ -541,8 +910,8 @@ static void AdoptLegacyBottles(void) {
     }
     if (IsOwned(NEB_BOTTOMLESS)) {
         gSaveContext.save.saveInfo.inventory.items[SLOT_BOTTLE_4] = ITEM_NONE;
-        sSave.content[NEB_BOTTOMLESS] = IsBottleContent(legacy.bottomlessContent) ? legacy.bottomlessContent
-                                                                                  : ITEM_BOTTLE;
+        sSave.content[NEB_BOTTOMLESS] =
+            IsBottleContent(legacy.bottomlessContent) ? legacy.bottomlessContent : ITEM_BOTTLE;
         sSave.bottomlessUses = legacy.bottomlessUses;
     }
     for (uint8_t index = 0; index < NEB_LEGACY_BOTTLE_COUNT; index++) {
@@ -552,14 +921,7 @@ static void AdoptLegacyBottles(void) {
         if (content == NEB_LEGACY_EMPTY || isShown) {
             continue;
         }
-        int8_t slot = FindVanillaSlot(ITEM_NONE);
-        int8_t bottle = slot == NEB_NONE ? FindUnownedExtra() : NEB_NONE;
-
-        if (slot != NEB_NONE) {
-            gSaveContext.save.saveInfo.inventory.items[slot] = content;
-        } else if (bottle != NEB_NONE) {
-            Acquire(bottle, content);
-        }
+        AddBottle(content);
     }
     sApi->StorageRemove(NEB_MOD_NAME, NEB_LEGACY_SAVE_FIELD);
     StoreBottles();
@@ -569,9 +931,11 @@ static void LoadBottles(int32_t fileNum) {
     ForgetBottles();
     sLoan.slot = NEB_NONE;
     sButtonsToRestore = 0;
+    memset(sForeignVanilla, 0, sizeof(sForeignVanilla));
+    sApi->StorageGet(NEB_MOD_NAME, "foreign_vanilla", sForeignVanilla, sizeof(sForeignVanilla));
     sApi->StorageGet(NEB_MOD_NAME, NEB_SAVE_FIELD, &sSave, sizeof(sSave));
     for (int8_t bottle = 0; bottle < NEB_BOTTLE_COUNT; bottle++) {
-        if (!IsBottleContent(sSave.content[bottle])) {
+        if (!IsBottleContent(sSave.content[bottle]) && !IsForeignContent(sSave.content[bottle])) {
             sSave.content[bottle] = ITEM_BOTTLE;
         }
     }
@@ -583,7 +947,8 @@ static void LoadBottles(int32_t fileNum) {
             Acquire(bottle, content);
             gSaveContext.save.saveInfo.inventory.items[slot] = ITEM_NONE;
             for (uint8_t button = 1; button < NEB_BUTTON_COUNT; ++button) {
-                if (button == 4 || *BottleButtonSlot(button - 1) != slot) continue;
+                if (button == 4 || *BottleButtonSlot(button - 1) != slot)
+                    continue;
                 sApi->EquipCustomItem(button, sBottleKeys[bottle]);
             }
         }
@@ -598,7 +963,8 @@ static uint8_t NetContentOf(Actor* actor) {
         int type = FAIRY_GET_TYPE(actor);
         return type == FAIRY_TYPE_2 || type == FAIRY_TYPE_6 ? ITEM_FAIRY : ITEM_NONE;
     }
-    if(actor->id==ACTOR_EN_BUTTE)return ITEM_FAIRY;
+    if (actor->id == ACTOR_EN_BUTTE)
+        return ITEM_FAIRY;
     for (uint8_t index = 0; index < ARRAY_COUNT(sNetCatch); index++) {
         if (sNetCatch[index].actorId == actor->id) {
             return sNetCatch[index].item;
@@ -610,11 +976,13 @@ static uint8_t NetContentOf(Actor* actor) {
 static Vec3f sNetCatchPoints[9];
 static bool sNetCatchPointsValid;
 static bool IsInFrontOfPlayer(Player* player, Actor* actor) {
-    if(Math_Vec3f_DistXZ(&player->actor.world.pos,&actor->world.pos)<160.0f &&
-       fabsf(player->actor.world.pos.y-actor->world.pos.y)<120.0f)return true;
-    if(sNetCatchPointsValid) {
-        for(int i=0;i<ARRAY_COUNT(sNetCatchPoints);++i)
-            if(Math_Vec3f_DistXYZ(&actor->world.pos,&sNetCatchPoints[i])<100.0f)return true;
+    if (Math_Vec3f_DistXZ(&player->actor.world.pos, &actor->world.pos) < 160.0f &&
+        fabsf(player->actor.world.pos.y - actor->world.pos.y) < 120.0f)
+        return true;
+    if (sNetCatchPointsValid) {
+        for (int i = 0; i < ARRAY_COUNT(sNetCatchPoints); ++i)
+            if (Math_Vec3f_DistXYZ(&actor->world.pos, &sNetCatchPoints[i]) < 100.0f)
+                return true;
         return false;
     }
     f32 deltaX = actor->world.pos.x - player->actor.world.pos.x;
@@ -628,7 +996,9 @@ static bool IsInFrontOfPlayer(Player* player, Actor* actor) {
 }
 
 static Actor* FindCatchableActor(Player* player, PlayState* play, uint8_t* content) {
-    static const uint8_t categories[] = { ACTORCAT_SWITCH,ACTORCAT_BG,ACTORCAT_PLAYER,ACTORCAT_EXPLOSIVE,ACTORCAT_NPC,ACTORCAT_ENEMY,ACTORCAT_PROP,ACTORCAT_ITEMACTION,ACTORCAT_MISC,ACTORCAT_BOSS,ACTORCAT_DOOR,ACTORCAT_CHEST };
+    static const uint8_t categories[] = { ACTORCAT_SWITCH, ACTORCAT_BG,    ACTORCAT_PLAYER, ACTORCAT_EXPLOSIVE,
+                                          ACTORCAT_NPC,    ACTORCAT_ENEMY, ACTORCAT_PROP,   ACTORCAT_ITEMACTION,
+                                          ACTORCAT_MISC,   ACTORCAT_BOSS,  ACTORCAT_DOOR,   ACTORCAT_CHEST };
 
     for (uint8_t index = 0; index < ARRAY_COUNT(categories); index++) {
         for (Actor* actor = play->actorCtx.actorLists[categories[index]].first; actor != NULL; actor = actor->next) {
@@ -643,7 +1013,6 @@ static Actor* FindCatchableActor(Player* player, PlayState* play, uint8_t* conte
     return NULL;
 }
 
-// Item_Give puts it where a vanilla catch would go, and past the vanilla four into the mod's bottles.
 static void ResolveNetCatch(Player* player, PlayState* play) {
     uint8_t content = ITEM_NONE;
     Actor* caught = FindCatchableActor(player, play, &content);
@@ -655,10 +1024,13 @@ static void ResolveNetCatch(Player* player, PlayState* play) {
         sCatchMessage = "The net comes up full, and there&is no empty bottle to hold what&it caught.";
         return;
     }
-    if(caught->id==ACTOR_EN_BUTTE) {
-        Vec3f at=caught->world.pos;
-        Actor_Spawn(&play->actorCtx,play,ACTOR_EN_ELF,at.x,at.y,at.z,0,0,0,FAIRY_PARAMS(FAIRY_TYPE_2, false, 0));
-        Actor_Kill(caught);sCatchMessage="The butterfly becomes a fairy!";return;
+    if (caught->id == ACTOR_EN_BUTTE) {
+        Vec3f at = caught->world.pos;
+        Actor_Spawn(&play->actorCtx, play, ACTOR_EN_ELF, at.x, at.y, at.z, 0, 0, 0,
+                    FAIRY_PARAMS(FAIRY_TYPE_2, false, 0));
+        Actor_Kill(caught);
+        sCatchMessage = "The butterfly becomes a fairy!";
+        return;
     }
     Item_Give(play, content);
     Actor_Kill(caught);
@@ -666,19 +1038,25 @@ static void ResolveNetCatch(Player* player, PlayState* play) {
     sCatchMessage = "The net scoops it up, and it lands&in an empty bottle.";
 }
 
-s32 Player_UpperAction_1(Player* player,PlayState* play);
-static int32_t HoldNet(Player* player,PlayState* play) {
-    int result=Player_UpperAction_1(player,play);
-    for(int i=0;i<ARRAY_COUNT(player->meleeWeaponQuads);++i)player->meleeWeaponQuads[i].base.atFlags&=~AT_ON;
-    if(player->meleeWeaponState) {
-        if(!sIsCatchResolved){sIsCatchResolved=true;ResolveNetCatch(player,play);}
-    } else sIsCatchResolved=false;
+s32 Player_UpperAction_1(Player* player, PlayState* play);
+static int32_t HoldNet(Player* player, PlayState* play) {
+    int result = Player_UpperAction_1(player, play);
+    for (int i = 0; i < ARRAY_COUNT(player->meleeWeaponQuads); ++i)
+        player->meleeWeaponQuads[i].base.atFlags &= ~AT_ON;
+    if (player->meleeWeaponState) {
+        if (!sIsCatchResolved) {
+            sIsCatchResolved = true;
+            ResolveNetCatch(player, play);
+        }
+    } else
+        sIsCatchResolved = false;
     return result;
 }
 static bool NetHeld(void) {
-    const char* key=CustomItemRegistry_GetHeldKey();return key && !strcmp(key,NEB_NET_KEY);
+    const char* key = CustomItemRegistry_GetHeldKey();
+    return key && !strcmp(key, NEB_NET_KEY);
 }
-static void NetSwordHand(Player* player,int32_t limb,Gfx** dl,Gfx* original,Vec3f* pos) {
+static void NetSwordHand(Player* player, int32_t limb, Gfx** dl, Gfx* original, Vec3f* pos) {
     if (player != GET_PLAYER(gPlayState)) {
         RemoteVisualState visual;
         if (limb == PLAYER_LIMB_L_HAND && ReadRemoteVisual(player, &visual)) {
@@ -691,17 +1069,19 @@ static void NetSwordHand(Player* player,int32_t limb,Gfx** dl,Gfx* original,Vec3
         return;
     }
 
-    if(NetHeld() && limb==PLAYER_LIMB_L_HAND)*dl=(Gfx*)(LINK_IS_ADULT?gLinkAdultLeftHandClosedNearDL:gLinkChildLeftFistNearDL);
+    if (NetHeld() && limb == PLAYER_LIMB_L_HAND)
+        *dl = (Gfx*)(LINK_IS_ADULT ? gLinkAdultLeftHandClosedNearDL : gLinkChildLeftFistNearDL);
 }
-static void DrawNetInHand(PlayState* play,Player* player,int32_t limb) {
+static void DrawNetInHand(PlayState* play, Player* player, int32_t limb) {
     RemoteVisualState visual;
     bool local = player == GET_PLAYER(play);
     bool held = local ? NetHeld() : ReadRemoteVisual(player, &visual);
     if (!held || limb != PLAYER_LIMB_L_HAND) {
         return;
     }
-    Matrix_Push();float scale=player->actor.scale.x!=0?1/player->actor.scale.x:1;
-    Matrix_Scale(scale,scale,scale,MTXMODE_APPLY);
+    Matrix_Push();
+    float scale = player->actor.scale.x != 0 ? 1 / player->actor.scale.x : 1;
+    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
     Matrix_RotateX(DEG_TO_RAD(NEB_NET_HELD_ROT_X), MTXMODE_APPLY);
     Matrix_RotateY(DEG_TO_RAD(NEB_NET_HELD_ROT_Y), MTXMODE_APPLY);
     Matrix_RotateZ(DEG_TO_RAD(NEB_NET_HELD_ROT_Z), MTXMODE_APPLY);
@@ -716,13 +1096,15 @@ static void DrawNetInHand(PlayState* play,Player* player,int32_t limb) {
         sNetCatchPointsValid = true;
     }
     uint32_t savedRemoteEnv = CaptureRemoteLimbEnv(play);
-    OPEN_DISPS(play->state.gfxCtx);Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    gSPMatrix(POLY_OPA_DISP++,MATRIX_NEWMTX(play->state.gfxCtx),G_MTX_MODELVIEW|G_MTX_LOAD);
-    gSPDisplayList(POLY_OPA_DISP++,(Gfx*)sNetDL);
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sNetDL);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-    gSPMatrix(POLY_XLU_DISP++,MATRIX_NEWMTX(play->state.gfxCtx),G_MTX_MODELVIEW|G_MTX_LOAD);
-    gSPDisplayList(POLY_XLU_DISP++,(Gfx*)sNetXluDL);
-    CLOSE_DISPS(play->state.gfxCtx);Matrix_Pop();
+    gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sNetXluDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
 
     if (player != GET_PLAYER(play)) {
         RestoreRemoteLimbEnv(play, savedRemoteEnv);
@@ -733,14 +1115,13 @@ static void DrawNetInHand_Mm(Player* player, s32 limbIndex) {
     DrawNetInHand(gPlayState, player, limbIndex);
 }
 
-
-void func_80833864(PlayState* play,Player* player,s32 meleeWeaponAnim);
-static void SwingNetRequest(Player* player,PlayState* play) {
-    sNetCaptureFrames=12;
-    func_80833864(play,player,PLAYER_MWA_FORWARD_SLASH_1H);
+void func_80833864(PlayState* play, Player* player, s32 meleeWeaponAnim);
+static void SwingNetRequest(Player* player, PlayState* play) {
+    sNetCaptureFrames = 12;
+    func_80833864(play, player, PLAYER_MWA_FORWARD_SLASH_1H);
 }
 static void TakeOutNet(PlayState* play, Player* player) {
-    sNetCatchPointsValid=false;
+    sNetCatchPointsValid = false;
     sIsCatchResolved = false;
     sCatchMessage = NULL;
 }
@@ -753,20 +1134,11 @@ static void DrawNetGetItem(PlayState* play, GetItemEntry* getItemEntry) {
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sNetDL);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-    gSPMatrix(POLY_XLU_DISP++,MATRIX_NEWMTX(play->state.gfxCtx),G_MTX_MODELVIEW|G_MTX_LOAD);
-    gSPDisplayList(POLY_XLU_DISP++,(Gfx*)sNetXluDL);
+    gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sNetXluDL);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-
-
-// The spot Interface_DrawAmmoCount would use for this button, without its reposition cosmetics.
-
-// The uses left are what tells the Bottomless Bottle apart from an ordinary one, drawn where vanilla
-// would put its ammo.
-
-
-// Each bottle tool is shuffled once by the randomizer; no vanilla logic needs them.
 static const SOHCustomItemRandomizer sNetRandomizer = {
     sizeof(SOHCustomItemRandomizer), 0, SOH_CUSTOM_ITEM_TYPE_ITEM, 0, 1, NEB_NET_KEY, NEB_NET_KEY, "",
 };
@@ -788,11 +1160,12 @@ static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
         return false;
     }
     uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
-    if (peerId == 0 || sApi->GetNetPeerState(peerId, "nei.not_enough_bottles.visual", visual, sizeof(*visual)) != sizeof(*visual)) {
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, "nei.not_enough_bottles.visual", visual, sizeof(*visual)) != sizeof(*visual)) {
         return false;
     }
-    if (visual->active != 1 || visual->adult > 1 || visual->scene != gPlayState->sceneId ||
-        visual->flags[0] > 255 || (player->stateFlags2 & PLAYER_STATE2_DISABLE_DRAW)) {
+    if (visual->active != 1 || visual->adult > 1 || visual->scene != gPlayState->sceneId || visual->flags[0] > 255 ||
+        (player->stateFlags2 & PLAYER_STATE2_DISABLE_DRAW)) {
         return false;
     }
     for (uint32_t i = 0; i < ARRAY_COUNT(visual->values); i++) {
@@ -815,9 +1188,7 @@ static void PublishRemoteVisual(void) {
         visual.scene = play->sceneId;
         visual.adult = LINK_IS_ADULT;
         visual.active = (NetHeld());
-        if (visual.active) {
-
-        }
+        if (visual.active) {}
         if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
             return;
         }
@@ -831,8 +1202,6 @@ static void PublishRemoteVisual(void) {
     }
 }
 
-
-
 static void InitRemoteVisuals(void) {
     if (!SOH_MOD_API_HAS(sApi, RegisterNetChannel) || !SOH_MOD_API_HAS(sApi, SetNetPeerState) ||
         !SOH_MOD_API_HAS(sApi, GetNetPeerState) || !SOH_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
@@ -843,9 +1212,6 @@ static void InitRemoteVisuals(void) {
         SOH_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
     }
 }
-
-
-
 
 static uint32_t CaptureRemoteLimbEnv(PlayState* play) {
     Gfx* begin = play->state.gfxCtx->polyOpa.start;
@@ -877,7 +1243,6 @@ SOH_MOD_EXPORT const SOHModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Same opaque stopper and translucent glass passes, matrices and scale as vanilla.
 static void DrawBottleModel(PlayState* play, bool black) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
@@ -890,11 +1255,17 @@ static void DrawBottleModel(PlayState* play, bool black) {
     }
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gGiEmptyBottleGlassDL);
-    if (black) { gSPGrayscale(POLY_XLU_DISP++, false); }
+    if (black) {
+        gSPGrayscale(POLY_XLU_DISP++, false);
+    }
     CLOSE_DISPS(play->state.gfxCtx);
 }
-static void DrawExtraBottle(PlayState* play, GetItemEntry* entry) { DrawBottleModel(play, false); }
-static void DrawBottomlessBottle(PlayState* play, GetItemEntry* entry) { DrawBottleModel(play, true); }
+static void DrawExtraBottle(PlayState* play, GetItemEntry* entry) {
+    DrawBottleModel(play, false);
+}
+static void DrawBottomlessBottle(PlayState* play, GetItemEntry* entry) {
+    DrawBottleModel(play, true);
+}
 
 static bool RegisterNet(void) {
     SOHCustomItemDefinition net = Z64Items_Define(NEB_NET_KEY, sNetIconTex, sNetNameTex);
@@ -906,9 +1277,9 @@ static bool RegisterNet(void) {
                               "lands in an empty bottle.");
     Z64Items_SetPauseText(&net, "%rNet&%wSwing it with %y\xA1%w to catch something&into an empty bottle.");
     Z64Items_SetAction(&net, TakeOutNet, HoldNet);
-    Z64Items_SetMeleeWeapon(&net,2);
-    Z64Items_SetHeldCallbacks(&net,SwingNetRequest,NULL,NULL);
-    net.modelGroup=PLAYER_MODELGROUP_SWORD_AND_SHIELD;
+    Z64Items_SetMeleeWeapon(&net, 2);
+    Z64Items_SetHeldCallbacks(&net, SwingNetRequest, NULL, NULL);
+    net.modelGroup = PLAYER_MODELGROUP_SWORD_AND_SHIELD;
     net.getItemEntry.drawFunc = DrawNetGetItem;
     Z64Items_SetLogic(&net, &sNetRandomizer);
     return Z64Items_Register(sApi, &net);
@@ -932,7 +1303,6 @@ static bool RegisterBottomless(void) {
     return Z64Items_Register(sApi, &bottomless);
 }
 
-// MM supplies six bottles; two custom pool entries bring the total to eight.
 static bool RegisterExtraBottle(int8_t bottle) {
     SOHCustomItemDefinition extra =
         Z64Items_Define(sBottleKeys[bottle], (const char*)gItemIcons[ITEM_BOTTLE], gEmptyBottleItemNameENGTex);
@@ -943,16 +1313,50 @@ static bool RegisterExtraBottle(int8_t bottle) {
     extra.getItemEntry = ItemTable_RetrieveEntry(MOD_NONE, GI_BOTTLE);
     extra.getItemEntry.textId = 0;
     extra.getItemEntry.drawFunc = DrawExtraBottle;
+    extra.onAcquire = NoteAcquiredBottle;
+    extra.onReceive = ReceiveExtraBottle;
     Z64Items_SetTextbox(&extra, "You got an %rEmpty Bottle%w! You&can put something in this&bottle.");
     Z64Items_SetPauseText(&extra, "%rBottle&%wWhatever it holds, %y\xA1%w uses it like&any other bottle.");
     const SOHCustomItemRandomizer randomizer = {
-        sizeof(SOHCustomItemRandomizer), 0, SOH_CUSTOM_ITEM_TYPE_ITEM, 0, bottle >= 2 ? 1 : 0, sBottleKeys[bottle], sBottleKeys[bottle], "",
+        sizeof(SOHCustomItemRandomizer),
+        0,
+        SOH_CUSTOM_ITEM_TYPE_ITEM,
+        0,
+        bottle >= 2 ? 1 : 0,
+        sBottleKeys[bottle],
+        sBottleKeys[bottle],
+        "",
     };
     Z64Items_SetLogic(&extra, &randomizer);
     return Z64Items_Register(sApi, &extra);
 }
 
-// Bottles 3 and 4 join the first two cells, so the row reads 1-3-5-7, 2-4-6-8, Net, Bottomless.
+static bool RegisterSharedBottle(const char* key, const char* icon, const char* name, const char* text) {
+    SOHCustomItemDefinition shared = Z64Items_Define(key, icon, name);
+
+    shared.presentationFlags = SOH_ITEM_HIDE_FROM_KALEIDO | SOH_ITEM_HIDE_FROM_SAVE_EDITOR;
+    shared.getItemEntry = ItemTable_RetrieveEntry(MOD_NONE, GI_BOTTLE);
+    shared.getItemEntry.textId = 0;
+    shared.getItemEntry.drawFunc = DrawExtraBottle;
+    shared.onReceive = ReceiveSharedBottle;
+    Z64Items_SetTextbox(&shared, text);
+    const SOHCustomItemRandomizer randomizer = {
+        sizeof(SOHCustomItemRandomizer), 0, SOH_CUSTOM_ITEM_TYPE_ITEM, 0, 0, key, key, "",
+    };
+    Z64Items_SetLogic(&shared, &randomizer);
+    return Z64Items_Register(sApi, &shared);
+}
+
+static void RegisterSharedBottles(void) {
+    for (uint8_t i = 0; i < ARRAY_COUNT(sSharedBottles); i++) {
+        const NebSharedBottle* bottle = &sSharedBottles[i];
+        RegisterSharedBottle(bottle->key, (const char*)gItemIcons[bottle->content],
+                             sContentNames[bottle->content - ITEM_BOTTLE], bottle->text);
+    }
+    RegisterSharedBottle(NEB_RUTOS_LETTER_KEY, sRutosLetterIcon, sRutosLetterName,
+                         "You got a %rBottle with Ruto's Letter%w!&It smells of Zora's Domain.");
+}
+
 static void GroupVanillaBottles(void) {
     if (!SOH_MOD_API_HAS(sApi, PlaceLayoutItem)) {
         return;
@@ -961,15 +1365,22 @@ static void GroupVanillaBottles(void) {
 
 static void TickBottles(void) {
     CloseFrame();
-    if (!gPlayState || gPlayState->pauseCtx.state != 0) return;
+    if (!gPlayState || gPlayState->pauseCtx.state != 0)
+        return;
     for (int8_t bottle = 0; bottle < NEB_BOTTLE_COUNT; ++bottle) {
-        if (!IsOwned(bottle) || sSave.content[bottle] != ITEM_HOT_SPRING_WATER) continue;
-        if (!sSave.hotWaterFrames[bottle]) sSave.hotWaterFrames[bottle] = 60 * 20;
-        if (--sSave.hotWaterFrames[bottle] == 0) SetContent(bottle, ITEM_SPRING_WATER);
-        else if (sSave.hotWaterFrames[bottle] % 20 == 0) StoreBottles();
+        if (!IsOwned(bottle) || sSave.content[bottle] != ITEM_HOT_SPRING_WATER)
+            continue;
+        if (!sSave.hotWaterFrames[bottle])
+            sSave.hotWaterFrames[bottle] = 60 * 20;
+        if (--sSave.hotWaterFrames[bottle] == 0)
+            SetContent(bottle, ITEM_SPRING_WATER);
+        else if (sSave.hotWaterFrames[bottle] % 20 == 0)
+            StoreBottles();
     }
 }
-static void ClosePlayerFrame(Player* player) { CloseFrame(); }
+static void ClosePlayerFrame(Player* player) {
+    CloseFrame();
+}
 
 SOH_MOD_EXPORT void ModInit(void) {
     InitRemoteVisuals();
@@ -984,10 +1395,21 @@ SOH_MOD_EXPORT void ModInit(void) {
             return;
         }
     }
-    if(SOH_MOD_API_HAS(sApi,PublishService))sApi->PublishService("nei.bottles.fill_chateau",(void*)FillChateauBottle);
+    if (SOH_MOD_API_HAS(sApi, PublishService))
+        sApi->PublishService("nei.bottles.fill_chateau", (void*)FillChateauBottle);
+    if (SOH_MOD_API_HAS(sApi, PublishService)) {
+        sApi->PublishService("nei.bottles.read", (void*)ReadBottles);
+        sApi->PublishService("nei.bottles.write", (void*)WriteBottles);
+    }
+    RegisterSharedBottles();
+    SOH_REGISTER_HOOK(sApi, OnPlayerUpdate, SayTimeAndPlace);
+    SOH_REGISTER_HOOK(sApi, OnInterfaceResolveButtonIcon, ForeignButtonIcon);
+    SOH_REGISTER_HOOK(sApi, OnKaleidoItemDraw, ForeignPauseIcon);
+    SOH_REGISTER_HOOK_FOR_ID(sApi, ShouldActorUpdate, ACTOR_EN_ZORAEGG, LendRoomForZoraEgg);
+    SOH_REGISTER_HOOK_FOR_ID(sApi, OnActorUpdate, ACTOR_EN_ZORAEGG, CloseActorWindow);
     GroupVanillaBottles();
-    SOH_REGISTER_HOOK(sApi,OnPlayerResolveLimbDraw,NetSwordHand);
-    SOH_REGISTER_HOOK(sApi,OnPlayerPostLimbDraw,DrawNetInHand_Mm);
+    SOH_REGISTER_HOOK(sApi, OnPlayerResolveLimbDraw, NetSwordHand);
+    SOH_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, DrawNetInHand_Mm);
     sApi->RegisterVB(VB_UPDATE_BOTTLE_ITEM, CatchBottleWrite);
     SOH_REGISTER_HOOK(sApi, OnPlayerResolveItemAction, ResolveBottleAction);
     SOH_REGISTER_HOOK(sApi, OnResolveItemGive, GiveIntoBottles);

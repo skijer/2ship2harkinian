@@ -54,7 +54,6 @@ static const ALIGN_ASSET(2) char sBodyDL[] = "__OTR__objects/object_nei_beetle/g
 static const ALIGN_ASSET(2) char sWingsDL[] = "__OTR__objects/object_nei_beetle/g_beetle_wings_dl";
 static const ALIGN_ASSET(2) char sWholeDL[] = "__OTR__objects/object_nei_beetle/g_beetle_dl";
 static const ALIGN_ASSET(2) char sWaitAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_boom_throw_waitR";
-// Majora's Mask has no one-handed throw or catch clip, only the two waiting poses of the Zora boomerang.
 static const ALIGN_ASSET(2) char sThrowAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_boom_throw_waitL";
 static const ALIGN_ASSET(2) char sCatchAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_boom_throw_waitL";
 
@@ -81,7 +80,9 @@ static ColliderCylinderInit sColliderInit = {
     { BEETLE_COLLIDER_RADIUS, BEETLE_COLLIDER_HEIGHT, 0, { 0, 0, 0 } },
 };
 
-static const char* const sRequiredHooks[] = { "OnActorDestroy", "OnActorUpdate", "OnPlayDrawEnd", "OnPlayerUpdate", "OnActorDrawEnd", "OnSceneInit",
+static const char* const sRequiredHooks[] = { "OnActorDestroy",      "OnActorUpdate",
+                                              "OnPlayDrawEnd",       "OnPlayerUpdate",
+                                              "OnActorDrawEnd",      "OnSceneInit",
                                               "OnPlayerFilterInput", "OnPlayerResolveItemActionInit" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -147,7 +148,6 @@ static void CreateFlightCamera(PlayState* play) {
     Play_ChangeCameraStatus(play, sCameraId, CAM_STATUS_ACTIVE);
 }
 
-// The eye rides behind and above the beetle along its own heading, so steering turns the view with it.
 static void FollowBeetleWithCamera(PlayState* play) {
     f32 pitchScale = Math_CosS(sBeetleRot.x);
     Vec3f eye;
@@ -183,7 +183,6 @@ static void CarryCargo(void) {
     Math_Vec3f_Copy(&sCargo->world.pos, &sBeetlePos);
 }
 
-// Whatever it was carrying lands on Link: a collectible that kept riding would never be picked up.
 static void DropCargo(Player* player) {
     if (sCargo == NULL) {
         return;
@@ -263,9 +262,6 @@ static void Fly(f32 speed) {
     sBeetlePos.z += Math_CosS(sBeetleRot.y) * pitchScale * speed;
 }
 
-// Steers exactly like the first-person aim the launch came out of: the yaw follows the NEGATED stick X and
-// the pitch the stick Y, where a positive pitch points down, the same way Math_Vec3f_Pitch reports it and
-// the flight reads it. The processed stick is what carries the dead zone, and it tops out at 60.
 static void SteerWithStick(PlayState* play) {
     f32 stickX = play->state.input[0].rel.stick_x * GameInteractor_InvertControl(GI_INVERT_FIRST_PERSON_AIM_X);
     f32 stickY = -play->state.input[0].rel.stick_y * GameInteractor_InvertControl(GI_INVERT_FIRST_PERSON_AIM_Y);
@@ -274,23 +270,21 @@ static void SteerWithStick(PlayState* play) {
         return;
     }
     sBeetleRot.y -= (s16)((stickX / 60.0f) * BEETLE_TURN_RATE);
-    sBeetleRot.x = CLAMP((s32)(sBeetleRot.x + (s16)((stickY / 60.0f) * BEETLE_TURN_RATE)), -BEETLE_MAX_PITCH,
-                         BEETLE_MAX_PITCH);
+    sBeetleRot.x =
+        CLAMP((s32)(sBeetleRot.x + (s16)((stickY / 60.0f) * BEETLE_TURN_RATE)), -BEETLE_MAX_PITCH, BEETLE_MAX_PITCH);
 }
 
 static bool IsCollectible(Actor* actor) {
     return actor->id == ACTOR_EN_ITEM00 || actor->id == ACTOR_EN_SI ||
-           (actor->id == ACTOR_EN_ELFORG && actor->draw != NULL &&
-            (actor->params & 0xF) != 1 && (actor->params & 0xF) != 8);
+           (actor->id == ACTOR_EN_ELFORG && actor->draw != NULL && (actor->params & 0xF) != 1 &&
+            (actor->params & 0xF) != 8);
 }
 
 static void Grab(Actor* actor) {
     sCargo = actor;
-    // Stray fairies only let go of their spot for something that has hooked them.
     actor->flags |= ACTOR_FLAG_HOOKSHOT_ATTACHED;
 }
 
-// Its own AT pass never fires on some collectibles, so anything it can pick up is taken by distance instead.
 static void GrabWhatItPasses(PlayState* play) {
     static const u8 sCollectibleCategories[] = { ACTORCAT_ITEMACTION, ACTORCAT_PROP, ACTORCAT_MISC };
 
@@ -309,7 +303,6 @@ static void GrabWhatItPasses(PlayState* play) {
     }
 }
 
-// A hit on anything else ends the flight: the beetle bounces off and heads home, as a thrown item should.
 static bool HasStruckSomething(void) {
     Actor* hit = (sCollider.base.atFlags & AT_HIT) ? sCollider.base.at : NULL;
 
@@ -339,8 +332,6 @@ static bool HasHitGeometry(PlayState* play, Vec3f* previousPos) {
     return true;
 }
 
-// Only what the beetle can do something about: an enemy the game already lets Link lock onto, a
-// collectible it can carry, or a switch a boomerang-strength hit trips.
 static bool IsTargetable(Actor* actor) {
     if (actor->category == ACTORCAT_ENEMY || actor->category == ACTORCAT_BOSS) {
         return (actor->flags & ACTOR_FLAG_ATTENTION_ENABLED) != 0;
@@ -364,8 +355,7 @@ static Actor* FindTarget(PlayState* play) {
     f32 nearestDistance = BEETLE_TARGET_RANGE;
 
     for (u32 i = 0; i < ARRAY_COUNT(sTargetCategories); i++) {
-        for (Actor* actor = play->actorCtx.actorLists[sTargetCategories[i]].first; actor != NULL;
-             actor = actor->next) {
+        for (Actor* actor = play->actorCtx.actorLists[sTargetCategories[i]].first; actor != NULL; actor = actor->next) {
             if (actor->update == NULL || !IsTargetable(actor)) {
                 continue;
             }
@@ -392,8 +382,6 @@ static void DropLostTarget(void) {
     }
 }
 
-// Z locks and unlocks the nearest thing worth hitting; the lock drives vanilla's own reticle through
-// focusActor, which survives because this runs after the player's update.
 static void HoldTarget(Player* player, PlayState* play) {
     if (play->state.input[0].press.button & BTN_Z) {
         sTarget = sTarget != NULL ? NULL : FindTarget(play);
@@ -429,8 +417,6 @@ static void AdvanceFlight(Player* player, PlayState* play, f32 speed) {
     }
 }
 
-// Piloted: Link stands still, the stick and the camera belong to the beetle. A flies faster, Z locks on,
-// and B hands the camera back and leaves it to finish the job on its own.
 static void UpdatePiloted(Player* player, PlayState* play) {
     bool isBoosting = (play->state.input[0].cur.button & BTN_A) != 0;
 
@@ -453,7 +439,6 @@ static void UpdatePiloted(Player* player, PlayState* play) {
         return;
     }
     HoldTarget(player, play);
-    // Nothing locked: remember what Z would take, so the draw can offer it like the game offers its own.
     sCandidate = sTarget == NULL ? FindTarget(play) : NULL;
     SteerWithStick(play);
     if (sTarget != NULL) {
@@ -463,7 +448,6 @@ static void UpdatePiloted(Player* player, PlayState* play) {
     FollowBeetleWithCamera(play);
 }
 
-// Loose: the camera is Link's again and the beetle finishes alone, charging whatever it had locked.
 static void UpdateLoose(Player* player, PlayState* play) {
     DropLostTarget();
     if (!sIsCharging || sTarget == NULL) {
@@ -482,7 +466,6 @@ static void UpdateReturning(Player* player, PlayState* play) {
     BeatWings();
     CarryCargo();
     if (distance <= BEETLE_CATCH_DISTANCE) {
-        // Only a Link who was waiting for it reaches out: one who let it go is busy with his own hands.
         if (!sIsAutonomous) {
             PlayerAnimation_PlayOnce(play, &player->skelAnimeUpper, (PlayerAnimationHeader*)sCatchAnim);
             sAnimatedPhase = BEETLE_RETURNING;
@@ -514,8 +497,6 @@ static void AnimateArm(Player* player, PlayState* play) {
     }
 }
 
-// Aiming is the one phase that has to run inside the player's update: it holds the first-person state
-// and the rotations the engine walks back to zero every frame they go unclaimed.
 static void UpdateAiming(Player* player, PlayState* play) {
     Z64Aiming_Update(player, play);
     Player_StopHorizontalMovement(player);
@@ -527,16 +508,11 @@ static void UpdateAiming(Player* player, PlayState* play) {
         sWasButtonHeld = true;
         return;
     }
-    // Held to aim, released to fly. The button is only read as a release once it has been seen held, or
-    // the press that took the beetle out would launch it during the item-change animation.
     if (sWasButtonHeld || WasButtonPressed(play)) {
         Launch(player, play);
     }
 }
 
-// The return value is Link's "upper body is busy" flag: a beetle merely resting in his hand must not block
-// his rolls or his other items, and neither must one he has handed over - from the moment it flies on its
-// own he is free to fight while it finishes, which is the whole point of letting go of it.
 static int32_t UpdateBeetleInHand(Player* player, PlayState* play) {
     if (sPhase == BEETLE_IN_HAND || sPhase == BEETLE_STOWED || sIsAutonomous) {
         return 0;
@@ -560,8 +536,6 @@ static void TakeOutBeetle(PlayState* play, Player* player) {
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_PL_CHANGE_ARMS);
 }
 
-// Pressing the button acts from the end of the player's update, never from the item-button pass: the aim
-// claims the camera and the first-person state, and what is set from there is undone the same frame.
 static void RequestAim(Player* player, PlayState* play) {
     sIsAimPending = true;
 }
@@ -598,9 +572,6 @@ static bool IsFlightInterrupted(Player* player) {
     return player->invincibilityTimer < 0 || (player->stateFlags1 & PLAYER_STATE1_8000000);
 }
 
-// The flight runs here, after the action func: its position, its camera and the lock-on reticle are the
-// last word of the frame. The item's upper action does not necessarily run while it is away, so the
-// host's held-item watchdog has to be told the beetle is still out.
 static void UpdateBeetleWorld(Player* player) {
     PlayState* play = gPlayState;
 
@@ -636,8 +607,6 @@ static void UpdateBeetleWorld(Player* player) {
     }
 }
 
-// While piloting, the stick and the action buttons belong to the beetle. The mod reads the raw input, so
-// taking them off Link's copy costs it nothing and keeps him from walking away under the flight camera.
 static void HoldPilotInput(Player* player, Input* input) {
     if (sPhase != BEETLE_PILOTED) {
         return;
@@ -650,7 +619,6 @@ static void HoldPilotInput(Player* player, Input* input) {
     input->rel.stick_y = 0;
 }
 
-// The camera and the actors it was holding belong to the scene that is ending.
 static void ForgetScene(s16 sceneId, s8 spawnNum) {
     sCameraId = CAM_ID_NONE;
     sCargo = NULL;
@@ -662,7 +630,6 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
     sPhase = BEETLE_STOWED;
 }
 
-// The wings are drawn off the body's own matrix, so they beat around the beetle wherever it is.
 static void DrawBeetleAt(PlayState* play, Vec3f* pos, Vec3s* rot, f32 scale) {
     OPEN_DISPS(play->state.gfxCtx);
     Matrix_Translate(pos->x, pos->y, pos->z, MTXMODE_NEW);
@@ -678,9 +645,7 @@ static void DrawBeetleAt(PlayState* play, Vec3f* pos, Vec3s* rot, f32 scale) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// The spinning arrow the game offers over a lockable actor is drawn over attention.arrowHoverActor, and the
-// end of Actor_UpdateAll fills that field from a search around LINK, which finds nothing while the beetle is
-// off flying. Writing it here, in the draw phase, is what puts the arrow over what the beetle can grab.
+// Actor_UpdateAll fills arrowHoverActor from a search around Link; written here so the arrow follows the beetle.
 static void OfferCandidate(PlayState* play) {
     if (sCandidate != NULL && sCandidate->update != NULL) {
         play->actorCtx.attention.arrowHoverActor = sCandidate;
@@ -717,19 +682,22 @@ static void DrawAimReticle(void) {
 }
 
 static void KeepFairyCargo(Actor* actor) {
-    if (actor != sCargo || actor->id != ACTOR_EN_ELFORG) return;
+    if (actor != sCargo || actor->id != ACTOR_EN_ELFORG)
+        return;
     actor->world.pos = sBeetlePos;
     actor->velocity.y = 0.0f;
     actor->speed = 0.0f;
 }
 
 static void ForgetDestroyedActor(Actor* actor) {
-    if (sCargo == actor) sCargo = NULL;
-    if (sTarget == actor) sTarget = NULL;
-    if (sCandidate == actor) sCandidate = NULL;
+    if (sCargo == actor)
+        sCargo = NULL;
+    if (sTarget == actor)
+        sTarget = NULL;
+    if (sCandidate == actor)
+        sCandidate = NULL;
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, BEETLE_KEY, BEETLE_KEY, "",
 };
@@ -742,11 +710,10 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// The aimed flier hits with the Zora boomerang's damage, so it reaches what MM's projectiles do.
 static void GrantBeetleLogic(void) {
     static const Z64LogicSource sBeetle = { BEETLE_KEY };
-    static const char* const sFlying[] = { "CanUseProjectile", "HookshotOrBoomerang", "CanHitSwitch", "CanAttack",
-                                           "CanDamage", NULL };
+    static const char* const sFlying[] = { "CanUseProjectile", "HookshotOrBoomerang", "CanHitSwitch",
+                                           "CanAttack",        "CanDamage",           NULL };
 
     if (Z64Logic_Init(sApi)) {
         Z64Logic_GrantCapabilities(&sBeetle, sFlying);
@@ -774,7 +741,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetAction(&beetle, TakeOutBeetle, UpdateBeetleInHand);
     Z64Items_SetHeldCallbacks(&beetle, RequestAim, PutBeetleAway, NULL);
     Z64Items_SetGetItemModel(&beetle, sWholeDL);
-    beetle.getItemScale = 0.15333333f;
+    beetle.getItemScale = 0.28f;
     beetle.modelGroup = PLAYER_MODELGROUP_DEFAULT;
 
     Z64Items_SetLogic(&beetle, &sRandomizerItem);

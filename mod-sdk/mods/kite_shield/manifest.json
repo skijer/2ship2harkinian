@@ -1,5 +1,6 @@
 {
     "name": "kite_shield",
+  "dependencies": ["nei_equipment"],
     "author": "Skijer",
     "version": "1.0",
     "description": "Kite Shield: shield-slot equipment Link can surf on, with grind rails, hops and spins."

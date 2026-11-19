@@ -1,24 +1,7 @@
 /*
  * File: z_en_hammergeist.c
  * Description: Molmauk (formerly Hammergeist), an enemy with an ice hammer and a fire hammer.
- * Authors: @syeo501 (Model) | @trueffel (Code) — 2ship/MM port by Skijer's NEI.
- *
- * ---- MM port notes ----------------
- *  - OoT func_80034BA0 / func_80034CC4 (draw flex skeleton with env alpha, OPA/XLU) do not exist
- *    in MM — re-implemented locally as EnHammergeist_DrawFlexAlphaOpa/Xlu on top of MM's
- *    SkelAnime_DrawFlex (which is why the limb callbacks keep the Gfx**-tailed OverrideLimbDraw /
- *    PostLimbDraw signatures).
- *  - The hammer/face material DLs branch into segment 0x0C (gsSPDisplayList(0xC000000)); the
- *    original relied on the scene binding it. Bound defensively to a no-op DL here (same trick as
- *    boss_remains' allies) so a stray branch just returns.
- *  - OoT->MM API mapping: Actor_SetPlayerKnockbackDamage->func_800B8D50 (last arg = damage),
- *    Actor_SetPlayerKnockbackNoDamage->func_800B8D98, Camera_RequestQuake->Actor_RequestQuake,
- *    player->isBurning/flameTimers->bodyIsBurning/bodyFlameTimers, func_8002843C (sparkle aura)
- *    ->EffectSsKirakira_SpawnDispersed, EffectSsEnIce_SpawnFlyingVec3s->local ice-chunk helper on
- *    MM's EffectSsEnIce_Spawn (Bg_Icicle idiom), Audio_StopSfxById->AudioSfx_StopById.
- *  - Sfx substitutions: NA_SE_EN_GOMA_JR_FREEZE->NA_SE_EN_COMMON_FREEZE,
- *    NA_SE_EN_ANUBIS_FIRE->NA_SE_EV_FLAME_OF_FIRE. Pitched Audio_PlaySfxGeneral calls ->
- *    Audio_PlaySfx_AtPosWithFreq.
+ * Authors: @syeo501 (Model) | @trueffel (Code)
  */
 
 #include "2s2h/ModApi/ModApi.h"
@@ -41,7 +24,7 @@ typedef void (*EnHammergeistActionFunc)(struct EnHammergeist*, PlayState*);
 
 typedef struct EnHammergeist {
     Actor actor;
-    Vec3s firePos[10]; // death-burn flame anchors, one per burning limb
+    Vec3s firePos[10];
     Vec3s jointTable[GHAMMERGEISTSKEL_NUM_LIMBS];
     Vec3s morphTable[GHAMMERGEISTSKEL_NUM_LIMBS];
     Vec3s headRot;
@@ -65,14 +48,13 @@ typedef struct EnHammergeist {
     s16 fireTimer;
     s16 alpha;
     u8 explosionRadiusIncrease;
-    u8 leftHammerInfused;  // Ice
-    u8 rightHammerInfused; // Fire
+    u8 leftHammerInfused;
+    u8 rightHammerInfused;
     u8 playerHit;
     u8 noHitAgain;
     EnHammergeistActionFunc actionFunc;
 } EnHammergeist;
 
-// z-targetable, hostile, update + draw outside cull zone (OoT FLAG_0|2|4|5)
 #define HAMMERGEIST_FLAGS                                                                     \
     (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE | ACTOR_FLAG_UPDATE_CULLING_DISABLED | \
      ACTOR_FLAG_DRAW_CULLING_DISABLED)
@@ -85,7 +67,6 @@ void EnHammergeist_Draw(Actor* thisx, PlayState* play);
 s32 EnHammergeist_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, Actor* thisx,
                                    Gfx** gfx);
 void EnHammergeist_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, Actor* thisx, Gfx** gfx);
-// Sets body parts in fire and body transparency
 void EnHammergeist_DeadPostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, Actor* thisx, Gfx** gfx);
 
 void EnHammergeist_UpdateBgCheck(EnHammergeist* self, PlayState* play);
@@ -103,15 +84,15 @@ void EnHammergeist_Stunned(EnHammergeist* self, PlayState* play);
 void EnHammergeist_SetupDie(EnHammergeist* self, PlayState* play);
 void EnHammergeist_Die(EnHammergeist* self, PlayState* play);
 void EnHammergeist_SetupExplosion(EnHammergeist* self, PlayState* play);
-void EnHammergeist_Explosion(EnHammergeist* self, PlayState* play); // 2 Heart Damage
+void EnHammergeist_Explosion(EnHammergeist* self, PlayState* play);
 void EnHammergeist_SetupInfuse(EnHammergeist* self, PlayState* play);
 void EnHammergeist_Infuse(EnHammergeist* self, PlayState* play);
 void EnHammergeist_SetupHeavySlam(EnHammergeist* self, PlayState* play);
-void EnHammergeist_HeavySlam(EnHammergeist* self, PlayState* play); // 3 Heart Damage
+void EnHammergeist_HeavySlam(EnHammergeist* self, PlayState* play);
 void EnHammergeist_SetupSlamL(EnHammergeist* self, PlayState* play);
 void EnHammergeist_SlamL(EnHammergeist* self, PlayState* play);
 void EnHammergeist_SetupSlamR(EnHammergeist* self, PlayState* play);
-void EnHammergeist_SlamR(EnHammergeist* self, PlayState* play); // 1 Heart Damage (1 1/2 if infused)
+void EnHammergeist_SlamR(EnHammergeist* self, PlayState* play);
 void EnHammergeist_SetupFlex(EnHammergeist* self, PlayState* play);
 void EnHammergeist_Flex(EnHammergeist* self, PlayState* play);
 
@@ -127,7 +108,7 @@ static ColliderCylinderInit sHammergeistCylinderInit = {
     {
         ELEM_MATERIAL_UNK1,
         { 0x00000000, 0x00, 0x00 },
-        { 0xF7CFFFFF, 0x00, 0x00 }, // MM accept-all bumper mask (z_en_skb.c), not OoT's 0xFFCFFFFF
+        { 0xF7CFFFFF, 0x00, 0x00 },
         ATELEM_NONE,
         ACELEM_ON | ACELEM_HOOKABLE,
         OCELEM_ON,
@@ -135,8 +116,6 @@ static ColliderCylinderInit sHammergeistCylinderInit = {
     { 40, 90, 0, { 0, 0, 0 } },
 };
 
-// Hammer touchers: OoT used DMG_HAMMER (an OoT dmg bit) — meaningless vs the MM player, so the
-// generic enemy-attack mask is used; damage stays 0x10 (0x18 when infused, set at runtime).
 static ColliderCylinderInit sHammerLeftCylinderInit = {
     {
         COL_MATERIAL_HIT5,
@@ -191,7 +170,6 @@ static ColliderJntSphElementInit sHammergeistJntSphElementsInit[1] = {
     },
 };
 
-// For the hammer explosion
 static ColliderJntSphInit sHammergeistJntSphInit = {
     {
         COL_MATERIAL_NONE,
@@ -249,14 +227,12 @@ typedef enum {
     /* 2 */ HAMMERGEIST_ICE_HAMMER_ICE_2
 } EnHammerGeistIceHammer;
 
-// OTR path strings — resolved by the gSPSegment shim at draw time.
 static const char* const sHammergeistFaceTextures[] = {
     gHammergeistSkel_normal_ci8,
     gHammergeistSkel_laugh_ci8,
     gHammergeistSkel_mouth_open_ci8,
 };
 
-// Very small texture differences so that the hammer doesn't just look the same the whole time
 static const char* const sFireHammerTextures[] = {
     gHammergeistSkel_metal2_rgba16,
     gHammergeistSkel_hammerfire_1_rgba16,
@@ -277,12 +253,6 @@ typedef enum {
     /* 14 */ ENHAMMERGEIST_DMGEFF_FIRE
 } EnHammergeistDamageEffect;
 
-/**
- * MM damage table (MM weapon order — rebuilt from the OoT original preserving intent):
- * stun columns (nut/boomerang/hookshot) -> 0 + STUN, explosives 0 (he shrugs them off, as in the
- * original), sword 1, spins 3, arrows 2, fire arrow 2 + FIRE, ice arrow 3 + ICE (OoT's ice-magic
- * damage), light arrow 4 + LIGHT, Goron punch/pound = OoT hammer 2.
- */
 static DamageTable sHammergeistDamageTable = {
     /* Deku Nut       */ DMG_ENTRY(0, ENHAMMERGEIST_DMGEFF_STUN),
     /* Deku Stick     */ DMG_ENTRY(2, ENHAMMERGEIST_DMGEFF_NONE),
@@ -318,7 +288,6 @@ static DamageTable sHammergeistDamageTable = {
     /* Powder Keg     */ DMG_ENTRY(0, ENHAMMERGEIST_DMGEFF_NONE),
 };
 
-// MM field order: health, cylRadius, cylHeight, cylYShift, mass (differs from OoT).
 static CollisionCheckInfoInit2 sHammergeistColChkInit = {
     /* health    */ 16,
     /* cylRadius */ 35,
@@ -327,8 +296,7 @@ static CollisionCheckInfoInit2 sHammergeistColChkInit = {
     /* mass      */ MASS_HEAVY,
 };
 
-// The material DLs contain gsSPDisplayList(0xC000000) branches; bind segment 0x0C to a no-op so
-// they return immediately (spiritual_stone_statue.c / remains_ally idiom).
+// The material DLs branch into segment 0x0C; it is bound to a no-op so they return immediately.
 static Gfx sHammergeistSeg0xC_Noop[] = {
     gsSPEndDisplayList(),
     gsSPEndDisplayList(),
@@ -348,10 +316,6 @@ void EnHammergeist_ChangeFace(EnHammergeist* self, s16 faceIndex) {
     self->faceIndex = faceIndex;
 }
 
-/**
- * OoT func_80034BA0 replacement: draw the flex skeleton on the OPA list with an env-alpha
- * setup. Uses SkelAnime_DrawFlex so the Gfx**-tailed limb callbacks work like the original's.
- */
 static void EnHammergeist_DrawFlexAlphaOpa(PlayState* play, SkelAnime* skelAnime, OverrideLimbDraw overrideLimbDraw,
                                            PostLimbDraw postLimbDraw, Actor* actor, s16 alpha) {
     OPEN_DISPS(play->state.gfxCtx);
@@ -364,9 +328,6 @@ static void EnHammergeist_DrawFlexAlphaOpa(PlayState* play, SkelAnime* skelAnime
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-/**
- * OoT func_80034CC4 replacement: same, on the XLU list (used for the transparent death fade).
- */
 static void EnHammergeist_DrawFlexAlphaXlu(PlayState* play, SkelAnime* skelAnime, OverrideLimbDraw overrideLimbDraw,
                                            PostLimbDraw postLimbDraw, Actor* actor, s16 alpha) {
     OPEN_DISPS(play->state.gfxCtx);
@@ -379,10 +340,6 @@ static void EnHammergeist_DrawFlexAlphaXlu(PlayState* play, SkelAnime* skelAnime
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-/**
- * OoT EffectSsEnIce_SpawnFlyingVec3s replacement: MM only has EffectSsEnIce_Spawn (no built-in
- * fling), so each chunk gets a random outward velocity (Bg_Icicle's shatter idiom).
- */
 static void EnHammergeist_SpawnIceChunk(PlayState* play, Vec3f* posS) {
     static Color_RGBA8 sIcePrimColor = { 150, 150, 150, 250 };
     static Color_RGBA8 sIceEnvColor = { 235, 245, 255, 255 };
@@ -402,7 +359,6 @@ static void EnHammergeist_SpawnIceChunk(PlayState* play, Vec3f* posS) {
                         &sIceEnvColor, 30);
 }
 
-// Very small texture differences so that the hammers don't just look the same the whole time
 void EnHammergeist_HammerAppearance(EnHammergeist* self, PlayState* play) {
     if (self->rightHammerInfused) {
         if (self->fireHammerIndex == HAMMERGEIST_FIRE_HAMMER_NORMAL) {
@@ -459,29 +415,26 @@ void EnHammergeist_UpdateCollision(EnHammergeist* self, PlayState* play) {
 }
 
 void EnHammergeist_UpdateHammerCollider(EnHammergeist* self, PlayState* play) {
-    // MM player hit effects: 1 = fire, 2 = freeze (verified against z_en_firefly.c) — same
-    // values the OoT original used. The infused hammers just hit harder + carry the effect.
-    if (self->leftHammerInfused) {                          // More damage and ice effect
-        self->hammerLeftCollider.elem.atDmgInfo.effect = 2; // Ice
+    if (self->leftHammerInfused) {
+        self->hammerLeftCollider.elem.atDmgInfo.effect = 2;
         self->hammerLeftCollider.elem.atDmgInfo.damage = 0x18;
     } else {
         self->hammerLeftCollider.elem.atDmgInfo.effect = 0;
         self->hammerLeftCollider.elem.atDmgInfo.damage = 0x10;
     }
 
-    if (self->rightHammerInfused) {                          // More damage and fire effect
-        self->hammerRightCollider.elem.atDmgInfo.effect = 1; // Fire
+    if (self->rightHammerInfused) {
+        self->hammerRightCollider.elem.atDmgInfo.effect = 1;
         self->hammerRightCollider.elem.atDmgInfo.damage = 0x18;
     } else {
         self->hammerRightCollider.elem.atDmgInfo.effect = 0;
         self->hammerRightCollider.elem.atDmgInfo.damage = 0x10;
     }
 
-    // If the hammers explode with ice and fire together, the explosion causes more damage
     if (self->leftHammerInfused && self->rightHammerInfused) {
-        self->explosionColliderItems[0].base.atDmgInfo.damage = 0x40; // 4 Heart Damage
+        self->explosionColliderItems[0].base.atDmgInfo.damage = 0x40;
     } else {
-        self->explosionColliderItems[0].base.atDmgInfo.damage = 0x20; // 2 Heart Damage
+        self->explosionColliderItems[0].base.atDmgInfo.damage = 0x20;
     }
 }
 
@@ -490,7 +443,7 @@ void EnHammergeist_DefuseLeftHammer(EnHammergeist* self, PlayState* play) {
 
     self->leftHammerInfused = false;
 
-    for (i = 0; i <= 7; i++) { // The pushing ice energy gets visualized by ice fragments
+    for (i = 0; i <= 7; i++) {
         EnHammergeist_SpawnIceChunk(play, &self->hammerLeftCollider.dim.pos);
     }
 }
@@ -500,7 +453,7 @@ void EnHammergeist_DefuseRightHammer(EnHammergeist* self, PlayState* play) {
 
     self->rightHammerInfused = false;
 
-    for (i = 0; i <= 7; i++) { // The pushing fire energy gets visualized as a big flame
+    for (i = 0; i <= 7; i++) {
         EffectSsEnFire_SpawnVec3f(play, &self->actor, &self->hammerRightCollider.dim.pos, 400, 0, 0, -1);
     }
 }
@@ -566,7 +519,7 @@ void EnHammergeist_Draw(Actor* thisx, PlayState* play) {
 
     OPEN_DISPS(play->state.gfxCtx);
 
-    if (self->alpha == 255) { // Alive
+    if (self->alpha == 255) {
         gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sFireHammerTextures[self->fireHammerIndex]);
         gSPSegment(POLY_OPA_DISP++, 0x09, (uintptr_t)sIceHammerTextures[self->iceHammerIndex]);
         gSPSegment(POLY_OPA_DISP++, 0x0A, (uintptr_t)sHammergeistFaceTextures[self->faceIndex]);
@@ -574,8 +527,8 @@ void EnHammergeist_Draw(Actor* thisx, PlayState* play) {
 
         EnHammergeist_DrawFlexAlphaOpa(play, &self->skelAnime, EnHammergeist_OverrideLimbDraw,
                                        EnHammergeist_PostLimbDraw, thisx, 255);
-    } else {                    // Dead
-        if (self->alpha != 0) { // Molmauk loses his transparency over time
+    } else {
+        if (self->alpha != 0) {
             gSPSegment(POLY_XLU_DISP++, 0x08, (uintptr_t)sFireHammerTextures[self->fireHammerIndex]);
             gSPSegment(POLY_XLU_DISP++, 0x09, (uintptr_t)sIceHammerTextures[self->iceHammerIndex]);
             gSPSegment(POLY_XLU_DISP++, 0x0A, (uintptr_t)sHammergeistFaceTextures[self->faceIndex]);
@@ -584,7 +537,7 @@ void EnHammergeist_Draw(Actor* thisx, PlayState* play) {
                                            self->alpha);
         }
 
-        if (self->fireTimer != 0) { // Molmauk is burning down when dying
+        if (self->fireTimer != 0) {
             thisx->colorFilterTimer++;
             self->fireTimer--;
             if (self->fireTimer % 4 == 0) {
@@ -601,7 +554,6 @@ s32 EnHammergeist_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, 
     EnHammergeist* self = (EnHammergeist*)thisx;
 
     switch (limbIndex) {
-        // Rotate head towards player
         case GHAMMERGEISTSKEL_HEAD_LIMB:
             if (self->actionFunc == EnHammergeist_ApproachPlayer) {
                 rot->z += self->headRot.y;
@@ -627,14 +579,12 @@ void EnHammergeist_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec
     EnHammergeist* self = (EnHammergeist*)thisx;
     MtxF mtx;
 
-    Matrix_Get(&mtx); // This is for positioning the hammer effects and AT colliders
-
+    Matrix_Get(&mtx);
     switch (limbIndex) {
         case GHAMMERGEISTSKEL_HEAD_LIMB:
             Matrix_MultVec3f(&sHammergeistZeroVec, &self->actor.focus.pos);
             break;
 
-        // Positioning code for the ice effect on the left hammer
         case GHAMMERGEISTSKEL_HAMMERL_LIMB:
             self->hammerLeftCollider.dim.pos.x = mtx.xw;
             self->hammerLeftCollider.dim.pos.y = (mtx.yw - 40.0f);
@@ -645,7 +595,6 @@ void EnHammergeist_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec
             iceEffPos.z = mtx.zw;
             break;
 
-        // Positioning code for the fire effect on the right hammer
         case GHAMMERGEISTSKEL_HAMMERR_LIMB:
             self->hammerRightCollider.dim.pos.x = mtx.xw;
             self->hammerRightCollider.dim.pos.y = (mtx.yw - 40.0f);
@@ -657,20 +606,17 @@ void EnHammergeist_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec
             break;
     }
 
-    // Fire effect (OoT func_8002843C == kirakira sparkle burst)
     if (self->rightHammerInfused) {
         EffectSsKirakira_SpawnDispersed(play, &fireEffPos, &effVelocity, &effAccel, &fireAuraPrimColor,
                                         &fireAuraEnvColor, 500, 10);
     }
 
-    // Ice effect
     if (self->leftHammerInfused) {
         EffectSsKirakira_SpawnDispersed(play, &iceEffPos, &effVelocity, &effAccel, &iceAuraPrimColor, &iceAuraEnvColor,
                                         500, 10);
     }
 }
 
-// Flames on all his body parts when dying
 void EnHammergeist_DeadPostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, Actor* thisx, Gfx** gfx) {
     EnHammergeist* self = (EnHammergeist*)thisx;
     s32 idx = -1;
@@ -721,7 +667,7 @@ void EnHammergeist_DeadPostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList,
         }
     }
 
-    if (idx >= 0) { // this is straight off copied ReDead code
+    if (idx >= 0) {
         Matrix_MultVec3f(&modifiedVec, &destPos);
         self->firePos[idx].x = destPos.x;
         self->firePos[idx].y = destPos.y;
@@ -736,7 +682,6 @@ void EnHammergeist_UpdateBgCheck(EnHammergeist* self, PlayState* play) {
         (UPDBGCHECKINFO_FLAG_1 | UPDBGCHECKINFO_FLAG_4 | UPDBGCHECKINFO_FLAG_8 | UPDBGCHECKINFO_FLAG_10));
 }
 
-// Move towards Link, stand still if right infront of him
 void EnHammergeist_Movement(EnHammergeist* self, PlayState* play) {
     SkelAnime_Update(&self->skelAnime);
 
@@ -774,7 +719,6 @@ void EnHammergeist_CheckDamage(EnHammergeist* self, PlayState* play) {
         if (self->actor.colChkInfo.damageEffect != ENHAMMERGEIST_DMGEFF_STUN) {
             EnHammergeist_SetupDamage(self, play);
         } else {
-            // Stunning effect because of e.g. a deku nut
             Actor_SetColorFilter(&self->actor, COLORFILTER_COLORFLAG_BLUE, 120, COLORFILTER_BUFFLAG_OPA, 60);
             Actor_ApplyDamage(&self->actor);
             EnHammergeist_SetupStunned(self, play);
@@ -785,7 +729,6 @@ void EnHammergeist_CheckDamage(EnHammergeist* self, PlayState* play) {
         }
     }
     if ((self->actor.bgCheckFlags & BGCHECKFLAG_WATER) && self->actionFunc != EnHammergeist_Die) {
-        // Currently, the Hammergeist dies if he falls into a water box
         EnHammergeist_SetupDie(self, play);
     }
 }
@@ -799,7 +742,6 @@ void EnHammergeist_SetupDoNothing(EnHammergeist* self, PlayState* play) {
 void EnHammergeist_DoNothing(EnHammergeist* self, PlayState* play) {
     SkelAnime_Update(&self->skelAnime);
 
-    // Player noticed, get active
     if (self->actor.xzDistToPlayer < 800.0f) {
         EnHammergeist_SetupApproachPlayer(self, play);
     }
@@ -822,10 +764,8 @@ void EnHammergeist_ApproachPlayer(EnHammergeist* self, PlayState* play) {
             self->slamTimer = 30;
             if (Rand_ZeroOne() < 0.6f) {
                 if (play->gameplayFrames % 2 == 0) {
-                    // Either hit with the left hammer
                     EnHammergeist_SetupSlamL(self, play);
                 } else {
-                    // Or the right hammer
                     EnHammergeist_SetupSlamR(self, play);
                 }
             }
@@ -836,7 +776,6 @@ void EnHammergeist_ApproachPlayer(EnHammergeist* self, PlayState* play) {
         if (DECR(self->infuseTimer) == 0) {
             self->infuseTimer = 40;
             if (Rand_ZeroOne() < 0.2f) {
-                // 20% chance
                 EnHammergeist_SetupInfuse(self, play);
             }
         }
@@ -846,7 +785,6 @@ void EnHammergeist_ApproachPlayer(EnHammergeist* self, PlayState* play) {
         if (DECR(self->explosionTimer) == 0) {
             self->explosionTimer = 20;
             if (Rand_ZeroOne() < 0.3f) {
-                // 30% chance
                 EnHammergeist_SetupExplosion(self, play);
             }
         }
@@ -855,7 +793,6 @@ void EnHammergeist_ApproachPlayer(EnHammergeist* self, PlayState* play) {
         if (DECR(self->heavySlamTimer) == 0) {
             self->heavySlamTimer = 60;
             if (Rand_ZeroOne() < 0.2f) {
-                // 20% chance
                 EnHammergeist_SetupHeavySlam(self, play);
             }
         }
@@ -867,8 +804,7 @@ void EnHammergeist_SetupDamage(EnHammergeist* self, PlayState* play) {
     EnHammergeist_ChangeFace(self, HAMMERGEIST_FACE_NORMAL);
     Actor_SetColorFilter(&self->actor, COLORFILTER_COLORFLAG_RED, 255, COLORFILTER_BUFFLAG_OPA, 8);
     Actor_ApplyDamage(&self->actor);
-    // OoT played this with pitch 0.25 (deep grunt) — MM positional pitched wrapper (MM's AtPos
-    // wrappers want the actor's PROJECTED position, not world pos — see z_shot_sun.c).
+    // MM's AtPos wrappers want the actor's projected position, not world pos.
     Audio_PlaySfx_AtPosWithFreq(&self->actor.projectedPos, NA_SE_EN_STALKID_DAMAGE, 0.25f);
     EnHammergeist_ChangeAnimation(self, HAMMERGEIST_ANIMATION_DAMAGE);
     EnHammergeist_SetupAction(self, EnHammergeist_Damage);
@@ -877,15 +813,11 @@ void EnHammergeist_SetupDamage(EnHammergeist* self, PlayState* play) {
 void EnHammergeist_Damage(EnHammergeist* self, PlayState* play) {
     if (SkelAnime_Update(&self->skelAnime)) {
         if (DECR(self->genericAnimationTimer) == 0) {
-            // Molmauk might take revenge for getting hit
             if (Rand_ZeroOne() < 0.4f && self->noHitAgain == false) {
-                // 40% chance
                 self->noHitAgain = true;
                 if (play->gameplayFrames % 2 == 0) {
-                    // either left slam
                     EnHammergeist_SetupSlamL(self, play);
                 } else {
-                    // or right slam
                     EnHammergeist_SetupSlamR(self, play);
                 }
             } else {
@@ -898,7 +830,7 @@ void EnHammergeist_Damage(EnHammergeist* self, PlayState* play) {
 
 void EnHammergeist_SetupStunned(EnHammergeist* self, PlayState* play) {
     self->actor.speed = 0.0f;
-    Actor_PlaySfx(&self->actor, NA_SE_EN_COMMON_FREEZE); // MM's common enemy stun/freeze sfx
+    Actor_PlaySfx(&self->actor, NA_SE_EN_COMMON_FREEZE);
     Animation_PlayOnceSetSpeed(&self->skelAnime, &gHammergeistSkelIdleAnim, 0.0f);
     Actor_SetColorFilter(&self->actor, COLORFILTER_COLORFLAG_BLUE, 120, COLORFILTER_BUFFLAG_OPA, 60);
     EnHammergeist_SetupAction(self, EnHammergeist_Stunned);
@@ -921,18 +853,16 @@ void EnHammergeist_SetupDie(EnHammergeist* self, PlayState* play) {
         EnHammergeist_DefuseRightHammer(self, play);
     }
     self->actor.speed = 0.0f;
-    self->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED; // Molmauk not targetable anymore
+    self->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED;
     Actor_SetColorFilter(&self->actor, COLORFILTER_COLORFLAG_RED, 255, COLORFILTER_BUFFLAG_OPA, 80);
     self->fireTimer = 40;
     Enemy_StartFinishingBlow(play, &self->actor);
-    // NA_SE_EN_ANUBIS_FIRE doesn't exist in MM — burst of flame sfx instead.
     Actor_PlaySfx(&self->actor, NA_SE_EV_FLAME_OF_FIRE);
     EnHammergeist_ChangeAnimation(self, HAMMERGEIST_ANIMATION_DIE);
     EnHammergeist_SetupAction(self, EnHammergeist_Die);
 }
 
 void EnHammergeist_Die(EnHammergeist* self, PlayState* play) {
-    // Molmauk loses his transparency when dying
     if (self->alpha != 0) {
         if (play->gameplayFrames % 2 == 0) {
             self->alpha -= 5;
@@ -964,7 +894,6 @@ void EnHammergeist_Explosion(EnHammergeist* self, PlayState* play) {
     if (SkelAnime_Update(&self->skelAnime)) {
         if (DECR(self->genericAnimationTimer) == 0) {
             if (self->playerHit == true) {
-                // Player got hit, emote on him
                 self->playerHit = false;
                 EnHammergeist_SetupFlex(self, play);
             } else {
@@ -977,7 +906,6 @@ void EnHammergeist_Explosion(EnHammergeist* self, PlayState* play) {
     if (self->explosionCollider.base.atFlags & AT_HIT) {
         self->explosionCollider.base.atFlags &= ~AT_HIT;
         self->playerHit = true;
-        // knockback without damage (the collider already delivered the damage)
         func_800B8D98(play, &self->actor, 10.0f, self->actor.shape.rot.y, 5.0f);
         Player_PlaySfx(GET_PLAYER(play), NA_SE_PL_BODY_HIT);
     }
@@ -1008,10 +936,9 @@ void EnHammergeist_Explosion(EnHammergeist* self, PlayState* play) {
         }
         EffectSsBomb2_SpawnLayered(play, &effPos, &effVel, &effAcc, 100, 30);
         Actor_PlaySfx(&self->actor, NA_SE_IT_BOMB_EXPLOSION);
-        Actor_RequestQuake(play, 11, 8); // OoT Camera_RequestQuake(mainCam, 2, 11, 8)
+        Actor_RequestQuake(play, 11, 8);
     }
 
-    // Molmauk is attackable
     if (self->skelAnime.curFrame >= 41.0f) {
         EnHammergeist_CheckDamage(self, play);
     }
@@ -1027,15 +954,14 @@ void EnHammergeist_SetupInfuse(EnHammergeist* self, PlayState* play) {
 void EnHammergeist_Infuse(EnHammergeist* self, PlayState* play) {
     s32 i;
     Vec3f newIcePos = self->hammerLeftCollider.dim.pos;
-    newIcePos.y += 70; // ice fragments needed a better offset
-
+    newIcePos.y += 70;
     if (self->skelAnime.curFrame == 9.0f) {
         EnHammergeist_ChangeFace(self, HAMMERGEIST_FACE_MOUTH_OPEN);
     }
 
     if (self->skelAnime.curFrame == 15.0f) {
         self->rightHammerInfused = true;
-        for (i = 0; i <= 7; i++) { // Big flame appears
+        for (i = 0; i <= 7; i++) {
             EffectSsEnFire_SpawnVec3f(play, &self->actor, &self->hammerRightCollider.dim.pos, 400, 0, 0, -1);
         }
         EnHammergeist_ChangeFace(self, HAMMERGEIST_FACE_NORMAL);
@@ -1047,7 +973,7 @@ void EnHammergeist_Infuse(EnHammergeist* self, PlayState* play) {
 
     if (self->skelAnime.curFrame == 37.0f) {
         self->leftHammerInfused = true;
-        for (i = 0; i <= 7; i++) { // Ice fragments appear
+        for (i = 0; i <= 7; i++) {
             EnHammergeist_SpawnIceChunk(play, &newIcePos);
         }
         EnHammergeist_ChangeFace(self, HAMMERGEIST_FACE_LAUGH);
@@ -1067,13 +993,12 @@ void EnHammergeist_SetupHeavySlam(EnHammergeist* self, PlayState* play) {
 
 void EnHammergeist_HeavySlam(EnHammergeist* self, PlayState* play) {
     if (SkelAnime_Update(&self->skelAnime)) {
-        self->heavySlamCooldown = 600; // Heavy slam cooldown
+        self->heavySlamCooldown = 600;
         if (DECR(self->genericAnimationTimer) == 0) {
             EnHammergeist_SetupFlex(self, play);
         }
     }
 
-    // Frame window right before the hit where the heavy slam can be prevented
     if (self->skelAnime.curFrame >= 38.0f && self->skelAnime.curFrame <= 45.0f) {
         EnHammergeist_CheckDamage(self, play);
     }
@@ -1089,12 +1014,11 @@ void EnHammergeist_HeavySlam(EnHammergeist* self, PlayState* play) {
         }
 
         Audio_PlaySfx_AtPos(&GET_PLAYER(play)->actor.projectedPos, NA_SE_EV_WALL_BROKEN);
-        for (i = 0; i < 10; i++) { // it just needed to be more powerful!
+        for (i = 0; i < 10; i++) {
             Actor_SpawnFloorDustRing(play, &self->actor, &self->actor.world.pos, i * 100.0f, 4, 4.0f, i * 500, i * 110,
                                      true);
         }
-        if (self->actor.xzDistToPlayer < 800.0f) { // The energy caused by the ground hit makes Link fly away
-            // knockback WITH damage (0x30) — MM's func_800B8D50 takes the damage as the last arg
+        if (self->actor.xzDistToPlayer < 800.0f) {
             func_800B8D50(play, &self->actor, 20.0f, GET_PLAYER(play)->actor.world.rot.y + 0x8000, 10.0f, 0x30);
         }
     }
@@ -1118,7 +1042,6 @@ void EnHammergeist_SlamL(EnHammergeist* self, PlayState* play) {
         EnHammergeist_CheckDamage(self, play);
     }
 
-    // Sound of the hammer when hitting the floor
     if (self->skelAnime.curFrame == 15.0f) {
         Actor_PlaySfx(&self->actor, NA_SE_IT_HAMMER_HIT);
     }
@@ -1137,7 +1060,6 @@ void EnHammergeist_SlamL(EnHammergeist* self, PlayState* play) {
         Player_PlaySfx(GET_PLAYER(play), NA_SE_PL_BODY_HIT);
     }
 
-    // The frame window where the left hammer causes damage
     if (self->skelAnime.curFrame >= 10.0f && self->skelAnime.curFrame <= 18.0f) {
         CollisionCheck_SetAT(play, &play->colChkCtx, &self->hammerLeftCollider.base);
     }
@@ -1164,7 +1086,6 @@ void EnHammergeist_SlamR(EnHammergeist* self, PlayState* play) {
         EnHammergeist_CheckDamage(self, play);
     }
 
-    // Sound of the hammer when hitting the floor
     if (self->skelAnime.curFrame == 15.0f) {
         Actor_PlaySfx(&self->actor, NA_SE_IT_HAMMER_HIT);
     }
@@ -1178,7 +1099,6 @@ void EnHammergeist_SlamR(EnHammergeist* self, PlayState* play) {
         if (self->rightHammerInfused) {
             EnHammergeist_DefuseRightHammer(self, play);
             func_800B8D98(play, &self->actor, 0.0f, self->actor.shape.rot.y, 0.0f);
-            // MM player burn fields (OoT isBurning/flameTimers)
             if (player->bodyIsBurning == false) {
                 for (i = 0; i < PLAYER_BODYPART_MAX; i++) {
                     player->bodyFlameTimers[i] = Rand_S16Offset(0, 200);
@@ -1191,7 +1111,6 @@ void EnHammergeist_SlamR(EnHammergeist* self, PlayState* play) {
         Player_PlaySfx(GET_PLAYER(play), NA_SE_PL_BODY_HIT);
     }
 
-    // The frame window where the right hammer causes damage
     if (self->skelAnime.curFrame >= 10.0f && self->skelAnime.curFrame <= 18.0f) {
         CollisionCheck_SetAT(play, &play->colChkCtx, &self->hammerRightCollider.base);
     }
@@ -1201,13 +1120,11 @@ void EnHammergeist_SetupFlex(EnHammergeist* self, PlayState* play) {
     self->actor.speed = 0.0f;
     self->genericAnimationTimer = 10;
     EnHammergeist_ChangeFace(self, HAMMERGEIST_FACE_LAUGH);
-    // Flexing voice — pitch 0.7 like the OoT original.
     Audio_PlaySfx_AtPosWithFreq(&self->actor.projectedPos, NA_SE_EN_FANTOM_VOICE, 0.7f);
     EnHammergeist_ChangeAnimation(self, HAMMERGEIST_ANIMATION_FLEX);
     EnHammergeist_SetupAction(self, EnHammergeist_Flex);
 }
 
-// Molmauk is distracted when flexing and can be attacked
 void EnHammergeist_Flex(EnHammergeist* self, PlayState* play) {
     EnHammergeist_CheckDamage(self, play);
     if (SkelAnime_Update(&self->skelAnime)) {
@@ -1222,7 +1139,6 @@ S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
 }
 
-// Limb DLs resolve by OTR path, so GAMEPLAY_KEEP is the only bank needed.
 S2H_MOD_EXPORT void ModInit(void) {
     if (!S2H_MOD_API_HAS(sApi, RegisterActor)) {
         return;

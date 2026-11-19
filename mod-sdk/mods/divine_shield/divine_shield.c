@@ -1,8 +1,3 @@
-/**
- * Divine Shield: a wooden shield fire cannot burn. A block inside the first frames of raising it freezes every
- * enemy in the room, the way a Deku Nut would.
- */
-
 #include "z64items.h"
 #include "z64logic.h"
 
@@ -16,7 +11,6 @@
 #define PARRY_WINDOW 10
 #define FREEZE_FRAMES 40
 #define SPARKLES_PER_ENEMY 6
-// The model is authored in the shield limb's own space, about 6000 units across.
 #define SHIELD_SCALE 44.2f
 #define SHIELD_ROT_X (-95.0f * (M_PIf / 180.0f))
 #define SHIELD_ROT_Y (-27.0f * (M_PIf / 180.0f))
@@ -92,8 +86,6 @@ static void ParryOnBlock(PlayState* play, Player* player, Actor* attacker) {
     }
 }
 
-// The hand model carries the shield, so it is swapped for the bare fist. The back shield is drawn by the sheath
-// limb's post draw from currentShield, so that is cleared until DrawOnLimb restores it.
 static void HideVanillaShield(Player* player, int32_t limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
     if (!IsWorn() || player->transformation != PLAYER_FORM_HUMAN || player->currentShield == PLAYER_SHIELD_NONE) {
         return;
@@ -128,7 +120,6 @@ static void RestoreVanillaShield(Player* player) {
     }
 }
 
-// The vanilla base is the Hero's Shield, which collides as metal; this one is wood.
 static void DrawOnLimb(Player* player, int32_t limbIndex) {
     PlayState* play = gPlayState;
 
@@ -167,7 +158,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Get-item drawing ported from the authoritative OoT mod; preserve its materials, layers and scale.
 #define GET_ITEM_SCALE 0.9f
 static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(play->state.gfxCtx);
@@ -196,8 +186,9 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.key = DIVINE_SHIELD_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rDivine Shield&%wBlock with %y\xB4%w right as you raise it and every enemy nearby freezes. "
-                           "Fire cannot burn it.";
+    definition.pauseText =
+        "%rDivine Shield&%wBlock with %y\xB4%w right as you raise it and every enemy nearby freezes. "
+        "Fire cannot burn it.";
     definition.getItemText = "You got the %rDivine Shield%w!&Wood blessed by the goddess: flames will not take it, and "
                              "a guard raised just in time freezes whatever dares to strike it.";
     definition.slot = S2H_EQUIP_SLOT_SHIELD;
@@ -210,6 +201,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.onUnequip = ForgetRaise;
     definition.getItemModelPath = sShieldDL;
     definition.getItemEntry.drawFunc = DrawGetItem;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = DIVINE_SHIELD_KEY,
+        .hintKey = DIVINE_SHIELD_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }

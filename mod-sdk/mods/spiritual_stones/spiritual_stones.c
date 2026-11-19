@@ -1,5 +1,3 @@
-// The three spiritual stones as C-button items: each gives a passive speed buff while owned, and holding its
-// button plants an owl statue that a tap later warps back to.
 
 #include <string.h>
 
@@ -61,6 +59,42 @@ static const ALIGN_ASSET(2) char sStoneNames[STONE_MAX][72] = {
     "__OTR__textures/item_name_static/gZorasSapphireItemNameENGTex",
 };
 
+static const ALIGN_ASSET(2) char sOotStoneIcons[STONE_MAX][64] = {
+    "__OTR__textures/oot_item_icons/gItemIconKokiriEmeraldTex",
+    "__OTR__textures/oot_item_icons/gItemIconGoronRubyTex",
+    "__OTR__textures/oot_item_icons/gItemIconZoraSapphireTex",
+};
+
+static const ALIGN_ASSET(2) char sOotStoneNames[STONE_MAX][72] = {
+    "__OTR__textures/oot_item_name_static/gKokiriEmeraldItemNameENGTex",
+    "__OTR__textures/oot_item_name_static/gGoronsRubyItemNameENGTex",
+    "__OTR__textures/oot_item_name_static/gZorasSapphireItemNameENGTex",
+};
+
+static const ALIGN_ASSET(2) char sGemDLs[STONE_MAX][64] = {
+    "__OTR__objects/oot_object_gi_jewel/gGiKokiriEmeraldGemDL",
+    "__OTR__objects/oot_object_gi_jewel/gGiGoronRubyGemDL",
+    "__OTR__objects/oot_object_gi_jewel/gGiZoraSapphireGemDL",
+};
+
+static const ALIGN_ASSET(2) char sSettingDLs[STONE_MAX][64] = {
+    "__OTR__objects/oot_object_gi_jewel/gGiKokiriEmeraldSettingDL",
+    "__OTR__objects/oot_object_gi_jewel/gGiGoronRubySettingDL",
+    "__OTR__objects/oot_object_gi_jewel/gGiZoraSapphireSettingDL",
+};
+
+static const Color_RGB8 sGemPrim[STONE_MAX] = {
+    { 255, 255, 160 },
+    { 255, 170, 255 },
+    { 50, 255, 255 },
+};
+
+static const Color_RGB8 sGemEnv[STONE_MAX] = {
+    { 0, 255, 0 },
+    { 255, 0, 100 },
+    { 50, 0, 150 },
+};
+
 static const ALIGN_ASSET(2) char sFlashDL[] = "__OTR__objects/gameplay_keep/gEffFlash1DL";
 static const ALIGN_ASSET(2) char sOwlStatueDL[] = "__OTR__objects/object_sek/gOwlStatueOpenedDL";
 
@@ -88,21 +122,19 @@ static const StoneInfo sStones[STONE_MAX] = {
       "%bZora's Sapphire&%w%y\xB0%w toggles swimming speed. Hold&%y\xB2%w to plant a warp, tap it to&return." },
 };
 
+static const char* const sStoneLabels[STONE_MAX] = { "Kokiri's Emerald", "Goron's Ruby", "Zora's Sapphire" };
+
 static const Color_RGB8 sStoneGlow[STONE_MAX] = {
     { 0, 255, 100 },
     { 255, 60, 60 },
     { 60, 160, 255 },
 };
 
-static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,   BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
+static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
 static const char* const sRequiredHooks[] = {
-    "OnPlayerUpdate",
-    "OnPlayerResolveMotionScale",
-    "OnSceneInit",
-    "OnLoadFile",
-    "OnSceneSpawnActors",
+    "OnPlayerUpdate", "OnPlayerResolveMotionScale", "OnSceneInit", "OnLoadFile", "OnSceneSpawnActors",
 };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -134,8 +166,8 @@ static void LoadState(void) {
         sSaved.warp[stone].sceneId = -1;
     }
     sApi->StorageGet(MOD_NAME, STORAGE_FIELD, &sSaved, sizeof(sSaved));
-    sDisabledSpeedMask=0;
-    sApi->StorageGet(MOD_NAME,"speed-effects-disabled",&sDisabledSpeedMask,sizeof(sDisabledSpeedMask));
+    sDisabledSpeedMask = 0;
+    sApi->StorageGet(MOD_NAME, "speed-effects-disabled", &sDisabledSpeedMask, sizeof(sDisabledSpeedMask));
 }
 
 static uint16_t FindEquippedButtonMask(const char* key) {
@@ -149,29 +181,32 @@ static uint16_t FindEquippedButtonMask(const char* key) {
     return 0;
 }
 
-// MM has no quest flag for the stones, so the registry's owned state is the only record of them.
 static bool IsStoneOwned(uint8_t stone) {
     return sApi->IsCustomItemOwned(sStones[stone].key);
 }
 
 static bool StoneSpeedActive(const char* key) {
-    for(uint8_t i=0;i<STONE_MAX;++i)if(strcmp(key,sStones[i].key)==0)return !(sDisabledSpeedMask & (1<<i));
+    for (uint8_t i = 0; i < STONE_MAX; ++i)
+        if (strcmp(key, sStones[i].key) == 0)
+            return !(sDisabledSpeedMask & (1 << i));
     return true;
 }
 static void ToggleStoneSpeed(const char* key) {
-    for(uint8_t i=0;i<STONE_MAX;++i)if(strcmp(key,sStones[i].key)==0) {
-        sDisabledSpeedMask ^= (1<<i);
-        sApi->StorageSet(MOD_NAME,"speed-effects-disabled",&sDisabledSpeedMask,sizeof(sDisabledSpeedMask));
-        break;
-    }
+    for (uint8_t i = 0; i < STONE_MAX; ++i)
+        if (strcmp(key, sStones[i].key) == 0) {
+            sDisabledSpeedMask ^= (1 << i);
+            sApi->StorageSet(MOD_NAME, "speed-effects-disabled", &sDisabledSpeedMask, sizeof(sDisabledSpeedMask));
+            break;
+        }
 }
-static bool IsStoneSpeedOn(uint8_t stone) {return IsStoneOwned(stone) && StoneSpeedActive(sStones[stone].key);}
+static bool IsStoneSpeedOn(uint8_t stone) {
+    return IsStoneOwned(stone) && StoneSpeedActive(sStones[stone].key);
+}
 
 static bool IsStoneWarpReady(uint8_t stone) {
     return sHasOwlStatue && sSaved.warp[stone].entranceIndex >= 0;
 }
 
-// Replanting moves the one waypoint that stone has, so the statue standing on the old spot goes with it.
 static void SpawnStatue(PlayState* play, uint8_t stone) {
     const StoneWarp* warp = &sSaved.warp[stone];
 
@@ -234,8 +269,7 @@ static void WarpToStatue(PlayState* play, uint8_t stone) {
 }
 
 static void ResolveWarpPrompt(PlayState* play) {
-    if (sPendingWarpStone < 0 || Message_GetState(&play->msgCtx) != TEXT_STATE_CHOICE ||
-        !Message_ShouldAdvance(play)) {
+    if (sPendingWarpStone < 0 || Message_GetState(&play->msgCtx) != TEXT_STATE_CHOICE || !Message_ShouldAdvance(play)) {
         return;
     }
     uint8_t stone = (uint8_t)sPendingWarpStone;
@@ -277,9 +311,9 @@ static void TickStoneButtons(Player* player, PlayState* play) {
     }
 }
 
-// Scale the fresh movement target, never the velocity retained from the previous frame.
 static void ScaleStoneMovement(Player* player, s32 kind, f32* scale) {
-    if (kind != SOH_PLAYER_MOTION_STICK_SPEED || gPlayState == NULL || IsPlayerBusy(player, gPlayState)) return;
+    if (kind != SOH_PLAYER_MOTION_STICK_SPEED || gPlayState == NULL || IsPlayerBusy(player, gPlayState))
+        return;
     if (IsStoneSpeedOn(STONE_ZORA) && (player->stateFlags1 & PLAYER_STATE1_8000000)) {
         *scale *= STONE_SWIM_BOOST;
     } else if (IsStoneSpeedOn(STONE_KOKIRI) && (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
@@ -374,36 +408,62 @@ static bool RegisterStatueActor(void) {
     return sStatueActorId >= 0;
 }
 
+// OoT GetItem_DrawJewel. The gem calls segment 0x09 and the setting 0x08: left unbound, both still hold the
+// texture paths of Link's face and the renderer runs them as display lists.
+static void DrawStoneGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    GraphicsContext* gfxCtx = play->state.gfxCtx;
+    Stone stone = (Stone)(entry->drawItemId % STONE_MAX);
+    Color_RGB8 prim = sGemPrim[stone];
+    Color_RGB8 env = sGemEnv[stone];
+
+    OPEN_DISPS(gfxCtx);
+    Matrix_Push();
+    Matrix_RotateZYX(0, -0x4000, 0x4000, MTXMODE_APPLY);
+    Gfx_SetupDL25_Xlu(gfxCtx);
+    gSPSegment(POLY_XLU_DISP++, 0x09, (uintptr_t)Gfx_TwoTexScroll(gfxCtx, 0, 0, 255, 64, 64, 1, 0, 255, 16, 16));
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 128, prim.r, prim.g, prim.b, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, env.r, env.g, env.b, 255);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sGemDLs[stone]);
+    Gfx_SetupDL25_Opa(gfxCtx);
+    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)Gfx_TexScroll(gfxCtx, 0, 0, 16, 16));
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 128, 255, 255, 170, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, 150, 120, 0, 255);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sSettingDLs[stone]);
+    Matrix_Pop();
+    CLOSE_DISPS(gfxCtx);
+}
+
+static bool HasOotStoneModel(Stone stone) {
+    return sApi->HasResource(sGemDLs[stone]) != 0 && sApi->HasResource(sSettingDLs[stone]) != 0;
+}
+
 static bool RegisterStone(Stone stone) {
     S2HCustomItemDefinition jewel = Z64Items_Define(sStones[stone].key, sStones[stone].icon, sStones[stone].name);
+    const S2HCustomItemRandomizer randomizer = {
+        sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, sStones[stone].key, sStones[stone].key, "",
+    };
 
-    static const char* const loaderIcons[] = {
-        "__OTR__textures/oot_item_icons/gItemIconKokiriEmeraldTex",
-        "__OTR__textures/oot_item_icons/gItemIconGoronRubyTex",
-        "__OTR__textures/oot_item_icons/gItemIconZoraSapphireTex",
-    };
-    if (sApi->HasResource(loaderIcons[stone])) jewel.iconPath = loaderIcons[stone];
-    static const char* const loaderNames[] = {
-        "__OTR__textures/oot_item_name_static/gKokiriEmeraldItemNameENGTex",
-        "__OTR__textures/oot_item_name_static/gGoronsRubyItemNameENGTex",
-        "__OTR__textures/oot_item_name_static/gZorasSapphireItemNameENGTex",
-    };
-    static const char* const loaderModels[] = {
-        "__OTR__objects/oot_loader_models/gKokiriEmeraldDL",
-        "__OTR__objects/oot_loader_models/gGoronRubyDL",
-        "__OTR__objects/oot_loader_models/gZoraSapphireDL",
-    };
-    if (sApi->HasResource(loaderNames[stone])) {
-        jewel.namePath = loaderNames[stone];
-        Z64Items_SetGetItemModel(&jewel, loaderModels[stone]);
+    if (sApi->HasResource(sOotStoneIcons[stone])) {
+        jewel.iconPath = sOotStoneIcons[stone];
+    }
+    if (sApi->HasResource(sOotStoneNames[stone])) {
+        jewel.namePath = sOotStoneNames[stone];
+    }
+    if (HasOotStoneModel(stone)) {
+        jewel.getItemEntry.drawFunc = DrawStoneGetItem;
+        jewel.getItemEntry.drawItemId = (uint16_t)stone;
     }
     Z64Items_SetButtons(&jewel, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetPlacement(&jewel, S2H_ITEM_PAGE_QUEST_VANILLA + 1, (uint8_t)(18 + stone), 0);
     Z64Items_SetTextbox(&jewel, sStones[stone].getItemText);
     Z64Items_SetPauseText(&jewel, sStones[stone].pauseText);
     jewel.flags |= S2H_CUSTOM_ITEM_INSTANT;
-    jewel.onPauseToggle=ToggleStoneSpeed;
-    jewel.isPauseActive=StoneSpeedActive;
+    jewel.onPauseToggle = ToggleStoneSpeed;
+    jewel.isPauseActive = StoneSpeedActive;
+    jewel.displayName = sStoneLabels[stone];
+    Z64Items_SetLogic(&jewel, &randomizer);
     return Z64Items_Register(sApi, &jewel);
 }
 

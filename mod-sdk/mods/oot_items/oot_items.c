@@ -27,12 +27,10 @@
 #define SLING_SHOW_KEG "gMods.OotItems.ShowPowderKeg"
 #define SLING_FIRST_PERSON_LIFT 4.0f
 #define OOT_BAG_MODEL(name) "__OTR__objects/oot_object_gi_dekupouch/" name
-// The bow reticle's reach: 341000 hand units at the player's 0.01 scale.
 #define SLINGSHOT_RETICLE_RANGE 3410.0f
 #define OOT_ICON(name) "__OTR__textures/oot_icon_item_static/" name
 #define OOT_NAME(name) "__OTR__textures/oot_item_name_static/" name
 #define OOT_SPELL_MODEL(name) "__OTR__objects/oot_object_gi_goddess/" name
-// MM's NES textbox control bytes.
 #define GLYPH_A "\xB0"
 #define GLYPH_B "\xB1"
 #define GLYPH_C "\xB2"
@@ -159,13 +157,11 @@ static bool sSlingPull;
 static enum { BOOM_STOWED, BOOM_PENDING, BOOM_AIM, BOOM_THROW, BOOM_FLIGHT, BOOM_CATCH } sBoomPhase;
 static s16 sBoomYaw, sBoomPitch;
 static bool sBoomLocked;
-// Z-targeted aiming keeps Link's own locomotion (OoT's side walk); only the upper body aims.
 static bool sBoomTargeted;
 static bool sBoomArmed;
 static bool sSlingTargeted;
 static bool sHammerSwingPending;
 static bool sHammerSideSwing;
-// OoT av1 order: Farore's Wind, Nayru's Love, Din's Fire.
 typedef enum { CAST_NONE, CAST_FARORE, CAST_NAYRU, CAST_DIN } OotCast;
 static const u8 sCastCosts[] = { 0, 12, 24, 12 };
 typedef enum { CAST_PHASE_CHARGE, CAST_PHASE_RAISE, CAST_PHASE_HOLD, CAST_PHASE_LOWER } OotCastPhase;
@@ -191,7 +187,6 @@ static s16 sSlingCooldown;
 // OoT gSaveContext.nayrusLoveTimer; kept apart because useful_medallions reads that field as Shadow stealth.
 static s16 sNayruTimer;
 static Actor* sNayrusLove;
-// OoT respawn[RESPAWN_MODE_TOP].data for the warp-point pointer: <40 grows, 40 rests, >40 fades into the camera.
 static s32 sFaroreMarkerData;
 static Vec3f sFaroreMarkerPos;
 static s32 sFaroreFlyTimer;
@@ -205,32 +200,42 @@ static struct {
     s16 x, y;
     u8 button;
 } sEquipFlight;
-static const u32 sButtons[S2H_ITEM_BUTTON_COUNT] = {
-    BTN_B, BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0, BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP
-};
-static const char* const sHooks[] = { "OnPlayerUpdate", "OnSceneInit", "OnLoadFile", "OnActorDestroy",
-                                      "OnPlayDrawEnd", "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw", "OnKaleidoItemDraw",
-                                      "OnInterfaceDrawEnd", "OnKaleidoItemEquip", "OnKaleidoInput",
-                                      "OnResolveCustomGetItem", "OnPlayerResolveAnim", "OnPlayerActionHandler" };
+static const u32 sButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
+                                                     BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
+static const char* const sHooks[] = { "OnPlayerUpdate",       "OnSceneInit",          "OnLoadFile",
+                                      "OnActorDestroy",       "OnPlayDrawEnd",        "OnPlayerResolveLimbDraw",
+                                      "OnPlayerPostLimbDraw", "OnKaleidoItemDraw",    "OnInterfaceDrawEnd",
+                                      "OnKaleidoItemEquip",   "OnKaleidoInput",       "OnResolveCustomGetItem",
+                                      "OnPlayerResolveAnim",  "OnPlayerActionHandler" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sHooks, ARRAY_COUNT(sHooks) };
 static const ALIGN_ASSET(2) char sBoomDL[] = "__OTR__objects/oot_object_gi_boomerang/gGiBoomerangDL";
 static const ALIGN_ASSET(2) char sBoomFlightDL[] = "__OTR__objects/oot_gameplay_keep/gBoomerangDL";
-static const ALIGN_ASSET(2) char sBoomHandDL[] = "__OTR__objects/oot_object_link_child/gLinkChildLeftFistAndBoomerangNearDL";
+static const ALIGN_ASSET(2) char sBoomHandDL[] =
+    "__OTR__objects/oot_object_link_child/gLinkChildLeftFistAndBoomerangNearDL";
 static const ALIGN_ASSET(2) char sBoomThrowAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_boom_throwR";
 static const ALIGN_ASSET(2) char sBoomCatchAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_boom_catch";
 static const ALIGN_ASSET(2) char sHammerDL[] = "__OTR__objects/oot_object_gi_hammer/gGiHammerDL";
-static const ALIGN_ASSET(2) char sHammerHandDL[] = "__OTR__objects/oot_object_link_boy/gLinkAdultLeftHandHoldingHammerNearDL";
+static const ALIGN_ASSET(2) char sHammerHandDL[] =
+    "__OTR__objects/oot_object_link_boy/gLinkAdultLeftHandHoldingHammerNearDL";
 static const ALIGN_ASSET(2) char sHumanLeftFistDL[] = "__OTR__objects/object_link_child/gLinkHumanLeftHandClosedDL";
 static const ALIGN_ASSET(2) char sHammerHitAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_hammer_hit";
-static const ALIGN_ASSET(2) char sHammerHitEndAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_hammer_hit_end";
-static const ALIGN_ASSET(2) char sHammerHitEndLockedAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_hammer_hit_endR";
-static const ALIGN_ASSET(2) char sHammerSideAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_hammer_side_hit";
-static const ALIGN_ASSET(2) char sHammerSideEndAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_hammer_side_hit_end";
-static const ALIGN_ASSET(2) char sHammerSideEndLockedAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_hammer_side_hit_endR";
-static const ALIGN_ASSET(2) char sSlingDL[] = "__OTR__objects/oot_object_link_child/gLinkChildRightHandHoldingSlingshotNearDL";
+static const ALIGN_ASSET(2) char sHammerHitEndAnim[] =
+    "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_hammer_hit_end";
+static const ALIGN_ASSET(2) char sHammerHitEndLockedAnim[] =
+    "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_hammer_hit_endR";
+static const ALIGN_ASSET(2) char sHammerSideAnim[] =
+    "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_hammer_side_hit";
+static const ALIGN_ASSET(2) char sHammerSideEndAnim[] =
+    "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_hammer_side_hit_end";
+static const ALIGN_ASSET(2) char sHammerSideEndLockedAnim[] =
+    "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_hammer_side_hit_endR";
+static const ALIGN_ASSET(2) char sSlingDL[] =
+    "__OTR__objects/oot_object_link_child/gLinkChildRightHandHoldingSlingshotNearDL";
 static const ALIGN_ASSET(2) char sSlingStringDL[] = "__OTR__objects/oot_object_link_child/gLinkChildSlinghotStringDL";
-static const ALIGN_ASSET(2) char sSlingFirstPersonDL[] = "__OTR__objects/oot_object_link_child/gLinkChildRightArmStretchedSlingshotDL";
-static const ALIGN_ASSET(2) char sSlingShoulderDL[] = "__OTR__objects/oot_object_link_child/gLinkChildRightShoulderNearDL";
+static const ALIGN_ASSET(2) char sSlingFirstPersonDL[] =
+    "__OTR__objects/oot_object_link_child/gLinkChildRightArmStretchedSlingshotDL";
+static const ALIGN_ASSET(2) char sSlingShoulderDL[] =
+    "__OTR__objects/oot_object_link_child/gLinkChildRightShoulderNearDL";
 static const ALIGN_ASSET(2) char sSlingGetDL[] = "__OTR__objects/oot_object_gi_pachinko/gGiSlingshotDL";
 static const ALIGN_ASSET(2) char sSpellDiamondDL[] = OOT_SPELL_MODEL("gGiMagicSpellDiamondDL");
 static const ALIGN_ASSET(2) char sSpellOrbDL[] = OOT_SPELL_MODEL("gGiMagicSpellOrbDL");
@@ -249,9 +254,15 @@ static const ALIGN_ASSET(2) char sSeedDL[] = "__OTR__objects/oot_object_gi_seed/
 static const u8 sSeedCapacities[] = { 30, 40, 50, 50 };
 static const char* const sInfinityModes[] = { "Off", "Progressive", "Condensed Progressive" };
 static const S2HModRandoOption sInfinityOption = {
-    sizeof(S2HModRandoOption), SLING_INFINITY_OPTION, "Slingshot Infinite Upgrades",
-    "Progressive adds an infinite Bullet Bag after the finite upgrades. Condensed upgrades directly from 30 to infinite.",
-    sInfinityModes, ARRAY_COUNT(sInfinityModes), 0, S2H_MOD_RANDO_WIDGET_COMBOBOX,
+    sizeof(S2HModRandoOption),
+    SLING_INFINITY_OPTION,
+    "Slingshot Infinite Upgrades",
+    "Progressive adds an infinite Bullet Bag after the finite upgrades. Condensed upgrades directly from 30 to "
+    "infinite.",
+    sInfinityModes,
+    ARRAY_COUNT(sInfinityModes),
+    0,
+    S2H_MOD_RANDO_WIDGET_COMBOBOX,
 };
 static const char* const sAmmoDigits[] = {
     gAmmoDigit0Tex, gAmmoDigit1Tex, gAmmoDigit2Tex, gAmmoDigit3Tex, gAmmoDigit4Tex,
@@ -280,22 +291,32 @@ static u8 SeedCapacity(void) {
 
 static ColliderQuadInit sBoomCollider = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_TYPE_PLAYER, COLSHAPE_QUAD },
-    { ELEM_MATERIAL_UNK2, { DMG_ZORA_BOOMERANG, 0, 1 }, { 0xF7CFFFFF, 0, 0 },
-      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL, ACELEM_NONE, OCELEM_NONE },
+    { ELEM_MATERIAL_UNK2,
+      { DMG_ZORA_BOOMERANG, 0, 1 },
+      { 0xF7CFFFFF, 0, 0 },
+      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL,
+      ACELEM_NONE,
+      OCELEM_NONE },
     { { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } } },
 };
 
 static ColliderCylinderInit sDinsFireCollider = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_TYPE_1, COLSHAPE_CYLINDER },
-    { ELEM_MATERIAL_UNK0, { DMG_FIRE_ARROW, 0, 1 }, { 0, 0, 0 }, ATELEM_ON | ATELEM_SFX_NONE, ACELEM_NONE,
+    { ELEM_MATERIAL_UNK0,
+      { DMG_FIRE_ARROW, 0, 1 },
+      { 0, 0, 0 },
+      ATELEM_ON | ATELEM_SFX_NONE,
+      ACELEM_NONE,
       OCELEM_NONE },
     { 9, 9, 0, { 0, 0, 0 } },
 };
 
-static void Store(void) { sApi->StorageSet(MOD, "state", &sSave, sizeof(sSave)); }
+static void Store(void) {
+    sApi->StorageSet(MOD, "state", &sSave, sizeof(sSave));
+}
 static void Load(s32 fileNum) {
-    sSlingPickup=NULL;
-    sSlingPickupStage=NULL;
+    sSlingPickup = NULL;
+    sSlingPickupStage = NULL;
     sNayruTimer = 0;
     memset(&sFaroreRoomFlags, 0, sizeof(sFaroreRoomFlags));
     sApi->StorageGet(MOD, "farore_room_flags", &sFaroreRoomFlags, sizeof(sFaroreRoomFlags));
@@ -307,8 +328,10 @@ static void Load(s32 fileNum) {
     }
     sBulletBagLevel = 0;
     sApi->StorageGet(MOD, "bullet_bag_level", &sBulletBagLevel, sizeof(sBulletBagLevel));
-    if (sBulletBagLevel > 4) sBulletBagLevel = 0;
-    if (sBulletBagLevel == 0 && sApi->IsCustomItemOwned(SLING)) sBulletBagLevel = 3;
+    if (sBulletBagLevel > 4)
+        sBulletBagLevel = 0;
+    if (sBulletBagLevel == 0 && sApi->IsCustomItemOwned(SLING))
+        sBulletBagLevel = 3;
     sSave.seeds = CLAMP(sSave.seeds, 0, SeedCapacity());
 }
 static bool CanUse(Player* player, PlayState* play) {
@@ -320,7 +343,6 @@ static bool HasUnlimitedMagic(void) {
     return CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI);
 }
 
-
 static bool UseTargetCamera(Player* player, PlayState* play) {
     return player->focusActor != NULL || (play->state.input[0].cur.button & BTN_Z);
 }
@@ -329,7 +351,8 @@ static void UpdateWeaponAim(Player* player, PlayState* play) {
     if (UseTargetCamera(player, play)) {
         Z64Aiming_Release(player, play);
     } else {
-        if (!Z64Aiming_IsAiming()) Z64Aiming_Request(player, play);
+        if (!Z64Aiming_IsAiming())
+            Z64Aiming_Request(player, play);
         Z64Aiming_Update(player, play);
     }
 }
@@ -347,8 +370,6 @@ static void GetWeaponAim(Player* player, s16* yaw, s16* pitch) {
     }
 }
 
-// First-person aim turns Link's whole body like the native bow, whose aim yaw is clamped around his facing;
-// lock-on keeps the body on its side walk and twists only the upper body.
 static void FaceWeaponAim(Player* player, s16 yaw, s16 pitch) {
     if (Z64Aiming_IsAiming()) {
         player->actor.shape.rot.y = yaw;
@@ -360,8 +381,10 @@ static void FaceWeaponAim(Player* player, s16 yaw, s16 pitch) {
     player->unk_AA6_rotFlags |= UNKAA6_ROT_UPPER_X | UNKAA6_ROT_UPPER_Y;
 }
 static bool HasModels(Player* player, PlayState* play) {
-    if (!CanUse(player, play)) return false;
-    if (sApi->HasResource(sBoomDL)) return true;
+    if (!CanUse(player, play))
+        return false;
+    if (sApi->HasResource(sBoomDL))
+        return true;
     sApi->ShowTextbox(play, "Extract your OoT assets with %rOoT Asset Loader%w, then restart.", true);
     return false;
 }
@@ -396,8 +419,6 @@ static bool IsCustomPickup(Actor* actor) {
     return actor->id == ACTOR_EN_ITEM00 && sApi->GetActorCustomItem(actor) != NULL;
 }
 
-// Console drops only register their AC cylinder with ABLE_TO_ZORA_RANG, so test their
-// radius 10, height 30 cylinder against the segment the quad swept this frame.
 static bool IsPickupInSweep(Actor* pickup, Vec3f* from, Vec3f* to) {
     const f32 reach = 10.0f + 9.6f;
     Vec3f segment = { to->x - from->x, to->y - from->y, to->z - from->z };
@@ -565,11 +586,7 @@ static void BoomDraw(Actor* actor, PlayState* play) {
 static void LaunchBoom(PlayState* play, Player* player) {
     f32 x = Math_SinS(player->actor.shape.rot.y) * 10.0f + player->actor.world.pos.x;
     f32 z = Math_CosS(player->actor.shape.rot.y) * 10.0f + player->actor.world.pos.z;
-    // OoT releases at frame 6, at +30 on its child pose. MM's human pose places
-    // the throwing hand higher: release at that hand's actual height instead of
-    // starting the projectile below the visible weapon. Keep OoT's forward offset.
     f32 y = player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND].y;
-    // Use the direction captured while aiming; the camera is released before frame 6.
     s16 pitch = sBoomPitch;
     s16 yaw = sBoomLocked ? player->actor.shape.rot.y + 0x36B0 : sBoomYaw;
     sBoom = Actor_Spawn(&play->actorCtx, play, sBoomId, x, y, z, pitch, yaw, 0, 0);
@@ -585,27 +602,28 @@ static void LaunchBoom(PlayState* play, Player* player) {
 }
 
 static void TakeBoom(PlayState* play, Player* player) {
-    if (sBoom == NULL && sBoomPhase == BOOM_STOWED) sBoomPhase = BOOM_PENDING;
+    if (sBoom == NULL && sBoomPhase == BOOM_STOWED)
+        sBoomPhase = BOOM_PENDING;
 }
 
 static void PutBoom(Player* player, PlayState* play) {
-    if (sBoomPhase == BOOM_AIM && !sBoomLocked) Z64Aiming_Release(player, play);
+    if (sBoomPhase == BOOM_AIM && !sBoomLocked)
+        Z64Aiming_Release(player, play);
     sBoomPhase = BOOM_STOWED;
     sBoomTargeted = false;
 }
 
-// A lock-on aim keeps A for the side hop, as OoT does; first person cancels with it too.
 static u32 AimCancelButtons(bool isTargeted) {
     return isTargeted ? (BTN_B | BTN_CUP) : (BTN_A | BTN_B | BTN_CUP);
 }
 
 static void UseBoom(Player* player, PlayState* play) {
-    if (sBoom == NULL) TakeBoom(play, player);
+    if (sBoom == NULL)
+        TakeBoom(play, player);
 }
 
 static void BoomAimAction(Player* player, PlayState* play);
 
-// A boomerang raised by Z-targeting alone waits for a press, so the release that throws it is the player's.
 static void RaiseBoom(Player* player, PlayState* play, bool isArmed) {
     sBoomLocked = player->focusActor != NULL;
     sBoomTargeted = UseTargetCamera(player, play);
@@ -664,7 +682,8 @@ static s32 UpdateBoomHeld(Player* player, PlayState* play) {
         }
         case BOOM_THROW: {
             bool finished = PlayerAnimation_Update(play, upper);
-            if (PlayerAnimation_OnFrame(upper, 6.0f)) LaunchBoom(play, player);
+            if (PlayerAnimation_OnFrame(upper, 6.0f))
+                LaunchBoom(play, player);
             if (finished) {
                 sBoomPhase = sBoom != NULL ? BOOM_FLIGHT : BOOM_STOWED;
                 if (sBoomPhase == BOOM_FLIGHT && sBoomLocked) {
@@ -687,7 +706,8 @@ static s32 UpdateBoomHeld(Player* player, PlayState* play) {
             }
             return 0;
         case BOOM_CATCH:
-            if (PlayerAnimation_Update(play, upper)) sBoomPhase = BOOM_STOWED;
+            if (PlayerAnimation_Update(play, upper))
+                sBoomPhase = BOOM_STOWED;
             return 1;
         default:
             return 0;
@@ -702,12 +722,11 @@ static void BoomAimAction(Player* player, PlayState* play) {
     }
 }
 
-// OoT Item Upgrades owns the axe model and keeps the Hammer item as its slot.
 static bool IsHammerUpgraded(void) {
     return sApi->IsCustomItemOwned("nei.weapon.gerudo_axe");
 }
 
-// SoH's child-hammer patch: instruction 92 starts the baked adult hand; draw MM's fist there instead.
+// Instruction 92 starts the baked adult hand; MM's fist is drawn there instead.
 static bool PatchHammerHand(void) {
     static bool sIsPatched;
     if (sIsPatched) {
@@ -726,9 +745,11 @@ static bool PatchHammerHand(void) {
 
 static void DrawOotLeftHand(Player* player, s32 limb, Gfx** displayList, Gfx* original, Vec3f* position) {
     if (gPlayState == NULL || player != GET_PLAYER(gPlayState) || limb != PLAYER_LIMB_LEFT_HAND ||
-        player->heldItemAction != PLAYER_IA_CUSTOM) return;
+        player->heldItemAction != PLAYER_IA_CUSTOM)
+        return;
     const char* held = sApi->GetEquippedCustomItem(player->heldItemButton);
-    if (held == NULL) return;
+    if (held == NULL)
+        return;
     if (strcmp(held, BOOM) == 0 && sBoom == NULL && sApi->HasResource(sBoomHandDL)) {
         *displayList = (Gfx*)sBoomHandDL;
     } else if (strcmp(held, HAMMER) == 0 && !IsHammerUpgraded() && PatchHammerHand()) {
@@ -744,7 +765,6 @@ typedef struct {
     f32 endFrame;
 } HammerSwing;
 
-// OoT D_80854190 rows PLAYER_MWA_HAMMER_FORWARD and PLAYER_MWA_HAMMER_SIDE.
 static const HammerSwing sHammerSwings[] = {
     { sHammerHitAnim, sHammerHitEndAnim, sHammerHitEndLockedAnim, 3.0f, 10.0f },
     { sHammerSideAnim, sHammerSideEndAnim, sHammerSideEndLockedAnim, 2.0f, 11.0f },
@@ -769,7 +789,6 @@ static void PutHammer(Player* player, PlayState* play) {
     sHammerSwingPending = false;
 }
 
-// MM has no hammer damage flags; NEI hits like the Goron moveset.
 static void SetHammerDamage(Player* player, bool isSideSwing) {
     u32 dmgFlags = isSideSwing ? DMG_GORON_PUNCH : DMG_GORON_POUND;
     s32 damage = isSideSwing ? 2 : 4;
@@ -812,8 +831,7 @@ static void RecoilHammer(PlayState* play, Player* player) {
     };
     func_8082DC38(player);
     Player_SetAction(play, player, HammerRecoilAction, 0);
-    Player_Anim_PlayOnceAdjusted(play, player,
-                                 (PlayerAnimationHeader*)sRecoilAnims[Player_CheckHostileLockOn(player)]);
+    Player_Anim_PlayOnceAdjusted(play, player, (PlayerAnimationHeader*)sRecoilAnims[Player_CheckHostileLockOn(player)]);
     player->speedXZ = -18.0f;
 }
 
@@ -822,7 +840,6 @@ static void SmashHammer(PlayState* play, Player* player) {
     play->actorCtx.unk2 = 4;
 }
 
-// OoT func_80842DF4 hammer branch: a bounce or a wall in front of the head stops the swing.
 static bool HasHammerHitWall(PlayState* play, Player* player) {
     if (player->meleeWeaponState <= 0) {
         return false;
@@ -908,7 +925,6 @@ static void HammerAttackAction(Player* player, PlayState* play) {
     }
 }
 
-// OoT animation headers sit under oot_gameplay_keep with the same names as MM's.
 static const char* GetOotPlayerAnim(const char* mmAnim) {
     static const char sMmPrefix[] = "__OTR__objects/gameplay_keep/";
     static const char* sSources[32];
@@ -934,7 +950,6 @@ static const char* GetOotPlayerAnim(const char* mmAnim) {
     return path[0] != '\0' ? path : NULL;
 }
 
-// OoT holds the hammer with PLAYER_ANIMTYPE_3; MM's "_long" poses are redrawn for the Great Fairy's Sword.
 static void ResolveHammerStance(s32 group, s32 animType, PlayerAnimationHeader** anim) {
     PlayState* play = gPlayState;
     if (play == NULL || animType != PLAYER_ANIMTYPE_3 || *anim == NULL || !IsHoldingHammer(GET_PLAYER(play))) {
@@ -952,7 +967,6 @@ static bool IsHammerJumpslash(Player* player) {
            player->meleeWeaponAnimation == PLAYER_MWA_JUMPSLASH_FINISH;
 }
 
-// MM's jumpslash runs its own action; swap in OoT's two-handed poses and the hammer landing.
 static void UpdateHammerJumpslash(PlayState* play, Player* player) {
     if (!IsHammerJumpslash(player)) {
         return;
@@ -965,7 +979,6 @@ static void UpdateHammerJumpslash(PlayState* play, Player* player) {
                                skelAnime->curFrame, Animation_GetLastFrame((void*)ootAnim), skelAnime->mode, 0.0f);
     }
     SetHammerDamage(player, false);
-    // NEI smashes from the landing action itself; the hitbox can already be off on frame 2.
     if (player->meleeWeaponAnimation == PLAYER_MWA_JUMPSLASH_FINISH && player->actionFunc == Player_Action_84) {
         UpdateHammerSmash(play, player, 2.0f);
     }
@@ -1105,7 +1118,6 @@ static void DinsFireUpdate(Actor* actor, PlayState* play) {
     }
 }
 
-// OoT's bright core and translucent shell come from per-vertex alpha on the shared sphere.
 static void FadeDinsFireSphere(f32 alphaMultiplier) {
     static const u8 sVertexIndices[] = {
         3,  4,  5,  6,  7,  8,  9,  10, 16, 17, 18, 19, 25, 26, 27, 32, 35, 36, 37, 38,
@@ -1146,15 +1158,15 @@ static void DinsFireDraw(Actor* actor, PlayState* play) {
     gDPPipeSync(POLY_XLU_DISP++);
     gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
     gDPSetTextureLUT(POLY_XLU_DISP++, G_TT_NONE);
-    gDPLoadTextureBlock(POLY_XLU_DISP++, sDinFireTexture, G_IM_FMT_I, G_IM_SIZ_8b, 64, 64, 0,
-                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 6, 6, 15, G_TX_NOLOD);
+    gDPLoadTextureBlock(POLY_XLU_DISP++, sDinFireTexture, G_IM_FMT_I, G_IM_SIZ_8b, 64, 64, 0, G_TX_NOMIRROR | G_TX_WRAP,
+                        G_TX_NOMIRROR | G_TX_WRAP, 6, 6, 15, G_TX_NOLOD);
     gDPSetTile(POLY_XLU_DISP++, G_IM_FMT_I, G_IM_SIZ_8b, 8, 0, 1, 0, G_TX_NOMIRROR | G_TX_WRAP, 6, 14,
                G_TX_NOMIRROR | G_TX_WRAP, 6, 14);
     gDPSetTileSize(POLY_XLU_DISP++, 1, 0, 0, 252, 252);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sDinFireMaterial);
     gSPDisplayList(POLY_XLU_DISP++,
-                   Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, (frames * 2) % 512, 511 - ((frames * 5) % 512), 64, 64,
-                                      1, (frames * 2) % 256, 255 - ((frames * 20) % 256), 32, 32, 2, -5, 2, -20));
+                   Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, (frames * 2) % 512, 511 - ((frames * 5) % 512), 64, 64, 1,
+                                      (frames * 2) % 256, 255 - ((frames * 20) % 256), 32, 32, 2, -5, 2, -20));
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sDinFireModel);
     CLOSE_DISPS(play->state.gfxCtx);
     FadeDinsFireSphere(fire->alphaMultiplier);
@@ -1167,7 +1179,8 @@ static void DimNayruLighting(PlayState* play, f32 intensity) {
     env->adjLightSettings.fogNear = (850.0f - env->lightSettings.fogNear) * fogScale;
     f32 colorScale = MIN(intensity * 5.0f, 1.0f);
     for (s32 i = 0; i < ARRAY_COUNT(env->adjLightSettings.fogColor); i++) {
-        env->adjLightSettings.fogColor[i] = (intensity == 0.0f) ? 0 : -(s16)(env->lightSettings.fogColor[i] * colorScale);
+        env->adjLightSettings.fogColor[i] =
+            (intensity == 0.0f) ? 0 : -(s16)(env->lightSettings.fogColor[i] * colorScale);
     }
 }
 
@@ -1352,7 +1365,10 @@ static void NayrusLoveDraw(Actor* actor, PlayState* play) {
     }
 }
 static void WaiveVoid(bool* should, va_list args) {
-    if (sWaiveVoid) { *should = false; sWaiveVoid = false; }
+    if (sWaiveVoid) {
+        *should = false;
+        sWaiveVoid = false;
+    }
 }
 typedef enum { WIND_WAIT, WIND_GROW, WIND_HOLD, WIND_FADE, WIND_SHRINK } OotWindPhase;
 
@@ -1383,7 +1399,8 @@ static void WindInit(Actor* actor, PlayState* play) {
     actor->room = -1;
     if (!sApi->HasResource(sWindSkeleton) || !sApi->HasResource(sWindAnimation) ||
         !SkelCurve_Init(play, &wind->curve, (CurveSkeletonHeader*)sWindSkeleton,
-                        (CurveAnimationHeader*)sWindAnimation) || wind->curve.jointTable == NULL) {
+                        (CurveAnimationHeader*)sWindAnimation) ||
+        wind->curve.jointTable == NULL) {
         Actor_Kill(actor);
         return;
     }
@@ -1465,13 +1482,13 @@ static s32 WindLimb(PlayState* play, SkelCurve* curve, s32 limb, Actor* actor) {
     if (limb == 1) {
         gSPSegment(POLY_XLU_DISP++, 8,
                    (uintptr_t)Gfx_TwoTexScrollEx(gfx, 0, (frames * 9) & 0xFF, 0xFF - ((frames * 0xF) & 0xFF), 0x40,
-                                                  0x40, 1, (frames * 0xF) & 0xFF, 0xFF - ((frames * 0x1E) & 0xFF),
-                                                  0x40, 0x40, 9, -0xF, 0xF, -0x1E));
+                                                 0x40, 1, (frames * 0xF) & 0xFF, 0xFF - ((frames * 0x1E) & 0xFF), 0x40,
+                                                 0x40, 9, -0xF, 0xF, -0x1E));
     } else if (limb == 2) {
         gSPSegment(POLY_XLU_DISP++, 9,
-                   (uintptr_t)Gfx_TwoTexScrollEx(gfx, 0, (frames * 3) & 0xFF, 0xFF - ((frames * 5) & 0xFF), 0x40,
-                                                  0x40, 1, (frames * 6) & 0xFF, 0xFF - ((frames * 0xA) & 0xFF), 0x40,
-                                                  0x40, 3, -5, 6, -0xA));
+                   (uintptr_t)Gfx_TwoTexScrollEx(gfx, 0, (frames * 3) & 0xFF, 0xFF - ((frames * 5) & 0xFF), 0x40, 0x40,
+                                                 1, (frames * 6) & 0xFF, 0xFF - ((frames * 0xA) & 0xFF), 0x40, 0x40, 3,
+                                                 -5, 6, -0xA));
     }
     CLOSE_DISPS(gfx);
     return true;
@@ -1486,7 +1503,6 @@ static void WindDraw(Actor* actor, PlayState* play) {
     SkelCurve_Draw(actor, play, &wind->curve, WindLimb, NULL, 1, actor);
 }
 
-// OoT stores respawn[RESPAWN_MODE_DOWN]; the marker then flies there from the cast spot.
 static void SetFaroresPoint(PlayState* play, Player* player) {
     RespawnData* down = &gSaveContext.respawn[RESPAWN_MODE_DOWN];
     sSave.valid = true;
@@ -1504,7 +1520,6 @@ static void SetFaroresPoint(PlayState* play, Player* player) {
     sFaroreMarkerPos = player->actor.world.pos;
 }
 
-// OoT greys Farore's Wind out on the overworld; these are MM's dungeons and boss lairs.
 static bool CanSceneHoldFaroresWind(PlayState* play) {
     switch (Play_GetOriginalSceneId(play->sceneId)) {
         case SCENE_MITURIN:
@@ -1618,8 +1633,12 @@ static void CastFarore(PlayState* play, Player* player) {
     if (!CanSceneHoldFaroresWind(play)) {
         Audio_PlaySfx(NA_SE_SY_ERROR);
     } else if (sSave.valid) {
-        sFarorePrompt = sApi->ShowTextbox(play, "\xC3\x02" "Return to Warp Point\x11"
-                                               "Dispel Warp Point\x11" "Exit\xBF", false);
+        sFarorePrompt = sApi->ShowTextbox(play,
+                                          "\xC3\x02"
+                                          "Return to Warp Point\x11"
+                                          "Dispel Warp Point\x11"
+                                          "Exit\xBF",
+                                          false);
         sFarorePromptPending = sFarorePrompt;
     } else {
         QueueCast(play, CAST_FARORE);
@@ -1638,7 +1657,6 @@ static void ReleaseOotCastCamera(PlayState* play) {
     }
 }
 
-// A cast cut short before its spell spawned leaves the WAIT_PREVIEW reservation flashing forever.
 static void AbortOotCast(PlayState* play, Player* player) {
     sActiveCast = CAST_NONE;
     if (gSaveContext.magicState == MAGIC_STATE_METER_FLASH_2) {
@@ -1663,8 +1681,6 @@ typedef struct {
     Vec3f eye;
 } DinCameraShot;
 
-// OoT OnePointCutscene 1100 (Din's Fire); at/eye are pitch and yaw in degrees, then radius.
-// The short version replays within 3600 frames, mirrored on odd frames.
 static const DinCameraShot sDinShots[] = {
     { 2, 8, 70, { -27, -96, 25 }, { 37, -5, 100 } },
     { 38, 4, 60, { 64, -109, 55 }, { 37, 150, 155 } },
@@ -1682,8 +1698,7 @@ static s16 CastCameraAngle(f32 degrees) {
 
 static Vec3f CastCameraOffset(Vec3f origin, s16 pitch, s16 yaw, f32 radius) {
     f32 horizontal = Math_CosS(pitch) * radius;
-    return (Vec3f){ origin.x + Math_SinS(yaw) * horizontal,
-                    origin.y + Math_SinS(pitch) * radius,
+    return (Vec3f){ origin.x + Math_SinS(yaw) * horizontal, origin.y + Math_SinS(pitch) * radius,
                     origin.z + Math_CosS(yaw) * horizontal };
 }
 
@@ -1730,14 +1745,14 @@ static void UpdateDinCamera(PlayState* play, Player* player, Camera* camera) {
 }
 
 static void UpdateOotCastCamera(PlayState* play, Player* player) {
-    if (sCastCamera == CAM_ID_NONE) return;
+    if (sCastCamera == CAM_ID_NONE)
+        return;
     Camera* camera = Play_GetCamera(play, sCastCamera);
     if (sActiveCast == CAST_DIN) {
         UpdateDinCamera(play, player, camera);
         return;
     }
 
-    // OoT KeepOn4, item type 10: turn toward the front over 60 frames.
     f32 height = Player_GetHeight(player);
     f32 normalizedHeight = (height + 68.0f) * 0.5f;
     f32 turn = MIN(sCastAge, 60) / 60.0f;
@@ -1761,16 +1776,12 @@ static void UpdateOotCastCamera(PlayState* play, Player* player) {
     Play_SetCameraFov(play, sCastCamera, camera->fov + (70.0f - camera->fov) * 0.25f);
 }
 
-// OoT D_80854A58..A70: av1 1 (Nayru) uses the honoo poses and av1 2 (Din) the tamashii ones.
-static const char* const sCastRaiseAnims[] = {
-    gPlayerAnim_link_magic_kaze1, gPlayerAnim_link_magic_honoo1, gPlayerAnim_link_magic_tamashii1
-};
-static const char* const sCastHoldAnims[] = {
-    gPlayerAnim_link_magic_kaze2, gPlayerAnim_link_magic_honoo2, gPlayerAnim_link_magic_tamashii2
-};
-static const char* const sCastLowerAnims[] = {
-    gPlayerAnim_link_magic_kaze3, gPlayerAnim_link_magic_honoo3, gPlayerAnim_link_magic_tamashii3
-};
+static const char* const sCastRaiseAnims[] = { gPlayerAnim_link_magic_kaze1, gPlayerAnim_link_magic_honoo1,
+                                               gPlayerAnim_link_magic_tamashii1 };
+static const char* const sCastHoldAnims[] = { gPlayerAnim_link_magic_kaze2, gPlayerAnim_link_magic_honoo2,
+                                              gPlayerAnim_link_magic_tamashii2 };
+static const char* const sCastLowerAnims[] = { gPlayerAnim_link_magic_kaze3, gPlayerAnim_link_magic_honoo3,
+                                               gPlayerAnim_link_magic_tamashii3 };
 static const u8 sCastHoldDurations[] = { 70, 10, 10 };
 static OotAnimSfxEntry sCastChargeSfx[] = {
     { NA_SE_PL_SKIP, (OOT_ANIMSFX_GENERAL << 11) | 20 },
@@ -1789,8 +1800,7 @@ static OotAnimSfxEntry sCastVoiceSfx[][2] = {
 static Actor* SpawnSpell(PlayState* play, Player* player, OotCast spell) {
     static s16* const sSpellActorIds[] = { &sWindId, &sNayruId, &sFireId };
     Vec3f* pos = &player->actor.world.pos;
-    return Actor_Spawn(&play->actorCtx, play, *sSpellActorIds[spell - CAST_FARORE], pos->x, pos->y, pos->z, 0, 0, 0,
-                       0);
+    return Actor_Spawn(&play->actorCtx, play, *sSpellActorIds[spell - CAST_FARORE], pos->x, pos->y, pos->z, 0, 0, 0, 0);
 }
 
 static void PlayCastAnim(PlayState* play, Player* player, const char* anim, bool loop) {
@@ -1844,7 +1854,6 @@ static void OnCastAnimPlaying(Player* player, OotCast spell, s32 index) {
         Player_PlayAnimSfx(player, sCastChargeSfx);
     } else if (sCastPhase == CAST_PHASE_RAISE) {
         Player_PlayAnimSfx(player, sCastVoiceSfx[index]);
-        // Enemies stay frozen while IN_CUTSCENE is set, so Din's dome would never reach them.
         if (spell == CAST_DIN && PlayerAnimation_OnFrame(&player->skelAnime, 30.0f)) {
             SetCastCutsceneFlags(player, false);
         }
@@ -1915,27 +1924,24 @@ static u32 SlingButton(Player* player) {
 static void PutSling(Player* player, PlayState* play);
 
 static bool HoldSlingAimForWheel(Player* player, PlayState* play) {
-    bool (*wheelCapturesInput)(void)=(bool(*)(void))sApi->FindService("nei.arrow_wheel.captures_input");
-    if(!wheelCapturesInput || !wheelCapturesInput())return false;
-    // Keep the camera/weapon state alive without using the wheel's stick input
-    // as aiming input. Native Player_UpdateCommon clears the first-person bit.
+    bool (*wheelCapturesInput)(void) = (bool (*)(void))sApi->FindService("nei.arrow_wheel.captures_input");
+    if (!wheelCapturesInput || !wheelCapturesInput())
+        return false;
     Z64Items_KeepHeld(sApi);
-    player->actor.focus.rot.x=sZ64AimingPitch;
-    player->actor.focus.rot.y=sZ64AimingYaw;
+    player->actor.focus.rot.x = sZ64AimingPitch;
+    player->actor.focus.rot.y = sZ64AimingYaw;
     Z64Aiming_HoldState(player);
     Player_StopHorizontalMovement(player);
     Z64AimingImpl_HoldCamera(play);
     return true;
 }
 static void SyncHeldSlingAim(Player* player) {
-    // The elemental cone reads the held seed's basis. Unlike OoT's native
-    // slingshot, this custom action must keep that basis in sync while aiming.
-    if(sSlingSeed!=NULL && sSlingSeed->parent==&player->actor){
-        s16 yaw,pitch;
-        GetWeaponAim(player,&yaw,&pitch);
-        sSlingSeed->world.rot.x=sSlingSeed->shape.rot.x=pitch;
-        sSlingSeed->world.rot.y=sSlingSeed->shape.rot.y=yaw;
-        sSlingSeed->world.rot.z=sSlingSeed->shape.rot.z=0;
+    if (sSlingSeed != NULL && sSlingSeed->parent == &player->actor) {
+        s16 yaw, pitch;
+        GetWeaponAim(player, &yaw, &pitch);
+        sSlingSeed->world.rot.x = sSlingSeed->shape.rot.x = pitch;
+        sSlingSeed->world.rot.y = sSlingSeed->shape.rot.y = yaw;
+        sSlingSeed->world.rot.z = sSlingSeed->shape.rot.z = 0;
     }
 }
 static void StowSling(Player* player, PlayState* play) {
@@ -1956,13 +1962,13 @@ static void FaceSlingAim(Player* player) {
 static void UpdateSlingShot(Player* player, PlayState* play);
 
 static void AimSling(Player* player, PlayState* play) {
-    if(HoldSlingAimForWheel(player,play))return;
+    if (HoldSlingAimForWheel(player, play))
+        return;
     Input* input = &play->state.input[0];
     if (!sSlingOut || (input->press.button & AimCancelButtons(true))) {
         StowSling(player, play);
         return;
     }
-    // OoT leaves first person with A but keeps the slingshot in hand.
     if (input->press.button & BTN_A) {
         PutSling(player, play);
         return;
@@ -1977,7 +1983,6 @@ static void AimSling(Player* player, PlayState* play) {
     UpdateSlingShot(player, play);
 }
 
-// Runs from the held-item upper body, so Link keeps his lock-on side walk; releasing Z enters first person.
 static void UpdateTargetedSling(Player* player, PlayState* play) {
     if (play->state.input[0].press.button & AimCancelButtons(true)) {
         StowSling(player, play);
@@ -2000,16 +2005,20 @@ static void UpdateTargetedSling(Player* player, PlayState* play) {
 
 static void UpdateSlingShot(Player* player, PlayState* play) {
     Input* input = &play->state.input[0];
-    if (sSlingCooldown > 0) --sSlingCooldown;
+    if (sSlingCooldown > 0)
+        --sSlingCooldown;
     const u32 button = SlingButton(player);
-    if (input->press.button & button) sSlingPull = true;
+    if (input->press.button & button)
+        sSlingPull = true;
     if (sSlingCooldown == 0 && sSlingPull && sSlingSeed == NULL) {
         sSlingPull = false;
-        if (sSave.seeds <= 0) { Audio_PlaySfx(NA_SE_IT_SLING_FLICK); return; }
+        if (sSave.seeds <= 0) {
+            Audio_PlaySfx(NA_SE_IT_SLING_FLICK);
+            return;
+        }
         sSlingSeed = Actor_SpawnAsChild(&play->actorCtx, &player->actor, play, ACTOR_EN_ARROW,
-                                      player->actor.focus.pos.x, player->actor.focus.pos.y,
-                                      player->actor.focus.pos.z, 0, player->actor.shape.rot.y, 0,
-                                      ARROW_TYPE_SLINGSHOT);
+                                        player->actor.focus.pos.x, player->actor.focus.pos.y, player->actor.focus.pos.z,
+                                        0, player->actor.shape.rot.y, 0, ARROW_TYPE_SLINGSHOT);
         if (sSlingSeed != NULL) {
             player->heldActor = sSlingSeed;
             Audio_PlaySfx_AtPos(&player->actor.projectedPos, NA_SE_IT_SLING_DRAW);
@@ -2024,8 +2033,10 @@ static void UpdateSlingShot(Player* player, PlayState* play) {
         GetWeaponAim(player, &yaw, &pitch);
         Actor* shot = sSlingSeed;
         sSlingSeed = NULL;
-        if (player->heldActor == shot) player->heldActor = NULL;
-        if (player->actor.child == shot) player->actor.child = NULL;
+        if (player->heldActor == shot)
+            player->heldActor = NULL;
+        if (player->actor.child == shot)
+            player->actor.child = NULL;
         shot->parent = NULL;
         shot->world.rot.x = shot->shape.rot.x = pitch;
         shot->world.rot.y = shot->shape.rot.y = yaw;
@@ -2058,8 +2069,7 @@ static void StartSlingAim(Player* player, PlayState* play, bool isPulling) {
         Player_SetAction_PreserveItemAction(play, player, AimSling, 0);
         UpdateWeaponAim(player, play);
     }
-    PlayerAnimation_PlayOnce(play, &player->skelAnimeUpper,
-                             (PlayerAnimationHeader*)gPlayerAnim_link_bow_bow_ready);
+    PlayerAnimation_PlayOnce(play, &player->skelAnimeUpper, (PlayerAnimationHeader*)gPlayerAnim_link_bow_bow_ready);
 }
 static void PutSling(Player* player, PlayState* play) {
     bool wasOut = sSlingOut;
@@ -2069,15 +2079,19 @@ static void PutSling(Player* player, PlayState* play) {
     sSlingLoading = false;
     sSlingPull = false;
     if (sSlingSeed != NULL) {
-        if (player->heldActor == sSlingSeed) player->heldActor = NULL;
-        if (player->actor.child == sSlingSeed) player->actor.child = NULL;
+        if (player->heldActor == sSlingSeed)
+            player->heldActor = NULL;
+        if (player->actor.child == sSlingSeed)
+            player->actor.child = NULL;
         Actor_Kill(sSlingSeed);
         sSlingSeed = NULL;
     }
     sSlingCooldown = 0;
     Z64Aiming_Release(player, play);
-    if (wasOut && player->unk_AA5 == PLAYER_UNKAA5_3) player->unk_AA5 = PLAYER_UNKAA5_0;
-    if (player->actionFunc == AimSling) func_8083B1A0(player, play);
+    if (wasOut && player->unk_AA5 == PLAYER_UNKAA5_3)
+        player->unk_AA5 = PLAYER_UNKAA5_0;
+    if (player->actionFunc == AimSling)
+        func_8083B1A0(player, play);
 }
 static void DrawOotReticle(void) {
     PlayState* play = gPlayState;
@@ -2087,10 +2101,10 @@ static void DrawOotReticle(void) {
     }
     if (sBoomPhase == BOOM_AIM) {
         Z64Aiming_DrawReticle(play, GET_PLAYER(play), 432.0f,
-                             (Z64AimingReticleStyle){ Z64AIMING_TOGGLE_BOOMERANG, Z64AIMING_TINT_LAUNCH });
+                              (Z64AimingReticleStyle){ Z64AIMING_TOGGLE_BOOMERANG, Z64AIMING_TINT_LAUNCH });
     } else if (sSlingOut) {
         Z64Aiming_DrawReticle(play, GET_PLAYER(play), SLINGSHOT_RETICLE_RANGE,
-                             (Z64AimingReticleStyle){ Z64AIMING_TOGGLE_BOW, Z64AIMING_TINT_LAUNCH });
+                              (Z64AimingReticleStyle){ Z64AIMING_TOGGLE_BOW, Z64AIMING_TINT_LAUNCH });
     }
 }
 
@@ -2104,7 +2118,6 @@ static void InitFaroreMarker(PlayState* play) {
     sFaroreLightNode = LightContext_InsertLight(play, &play->lightCtx, &sFaroreLightInfo);
 }
 
-// OoT Actor_DrawFaroresWindPointer leg that carries the marker from the cast spot to the stored point.
 static void FlyFaroreMarker(PlayState* play, f32* yOffset) {
     static Vec3f sSparkleVelocity = { 0.0f, -0.05f, 0.0f };
     static Vec3f sSparkleAccel = { 0.0f, -0.025f, 0.0f };
@@ -2139,7 +2152,6 @@ static void FlyFaroreMarker(PlayState* play, f32* yOffset) {
     }
 }
 
-// OoT arrival leg: the marker is pulled into the camera and the point is consumed when it fades out.
 static f32 FadeFaroreMarker(PlayState* play, s32 fadeStep, f32 yOffset, s32* alpha) {
     f32 nextRatio = 1.0f - fadeStep * 0.1f;
     f32 currentRatio = 1.0f - (f32)(fadeStep - 1) * 0.1f;
@@ -2179,7 +2191,7 @@ static void DrawFaroreMarkerFlash(PlayState* play, f32 yOffset, f32 ratio, s32 a
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gEffFlash1DL);
     Matrix_Pop();
-    Matrix_RotateZS((s16)~(play->gameplayFrames * 1200), MTXMODE_APPLY);
+    Matrix_RotateZS((s16) ~(play->gameplayFrames * 1200), MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gEffFlash1DL);
     CLOSE_DISPS(play->state.gfxCtx);
@@ -2226,18 +2238,21 @@ static void DrawOotSpellEffects(void) {
 static void DrawSlingshotString(Player* player, s32 limb) {
     PlayState* play = gPlayState;
     if (play == NULL || player != GET_PLAYER(play) || limb != PLAYER_LIMB_RIGHT_HAND ||
-        player->actionFunc != AimSling || sSlingSeed == NULL || !sApi->HasResource(sSlingStringDL)) return;
+        player->actionFunc != AimSling || sSlingSeed == NULL || !sApi->HasResource(sSlingStringDL))
+        return;
     Vec3f projectedFocus;
     SkinMatrix_Vec3fMtxFMultXYZ(&play->viewProjectionMtxF, &player->actor.focus.pos, &projectedFocus);
     if ((player->stateFlags1 & PLAYER_STATE1_100000) && projectedFocus.z < -4.0f &&
-        sApi->HasResource(sSlingFirstPersonDL)) return;
+        sApi->HasResource(sSlingFirstPersonDL))
+        return;
 
     Vec3f anchor = { 606.0f, 236.0f, 0.0f };
     Vec3f worldAnchor;
     Matrix_MultVec3f(&anchor, &worldAnchor);
     f32 distance = Math_Vec3f_DistXYZ(&worldAnchor, &player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND]);
     f32 tension = CLAMP((distance - 3.0f) * 1.6f, 0.0f, 1.0f);
-    if (tension == 0.0f) return;
+    if (tension == 0.0f)
+        return;
     GraphicsContext* gfx = play->state.gfxCtx;
     OPEN_DISPS(gfx);
     Matrix_Push();
@@ -2250,8 +2265,9 @@ static void DrawSlingshotString(Player* player, s32 limb) {
     Matrix_Pop();
     CLOSE_DISPS(gfx);
 }
-static s32 HoldItem(Player* player, PlayState* play) { return 0; }
-// OoT raises the slingshot in hand while Z-targeting, so Link side walks with it; a press aims it.
+static s32 HoldItem(Player* player, PlayState* play) {
+    return 0;
+}
 static void RaiseHeldSling(Player* player, PlayState* play) {
     if (sSlingAimPending || (player->stateFlags3 & PLAYER_STATE3_START_CHANGING_HELD_ITEM)) {
         return;
@@ -2266,12 +2282,13 @@ static s32 HoldSlingshot(Player* player, PlayState* play) {
     if (!sSlingOut) {
         RaiseHeldSling(player, play);
     }
-    if (sSlingOut && sSlingTargeted) UpdateTargetedSling(player, play);
-    if (!sSlingOut) return 0;
+    if (sSlingOut && sSlingTargeted)
+        UpdateTargetedSling(player, play);
+    if (!sSlingOut)
+        return 0;
     if (PlayerAnimation_Update(play, &player->skelAnimeUpper) && sSlingLoading) {
         sSlingLoading = false;
-        PlayerAnimation_PlayLoop(play, &player->skelAnimeUpper,
-                                 (PlayerAnimationHeader*)gPlayerAnim_link_bow_bow_wait);
+        PlayerAnimation_PlayLoop(play, &player->skelAnimeUpper, (PlayerAnimationHeader*)gPlayerAnim_link_bow_bow_wait);
     }
     return 1;
 }
@@ -2279,22 +2296,21 @@ static s32 HoldSlingshot(Player* player, PlayState* play) {
 static void DrawSlingshotHand(Player* player, s32 limb, Gfx** displayList, Gfx* original, Vec3f* position) {
     PlayState* play = gPlayState;
     if (play == NULL || player != GET_PLAYER(play) || player->heldItemAction != PLAYER_IA_CUSTOM ||
-        !HasSlingshotKey(sApi->GetEquippedCustomItem(player->heldItemButton))) return;
+        !HasSlingshotKey(sApi->GetEquippedCustomItem(player->heldItemButton)))
+        return;
 
     // The bow model group would draw the Hero's Bow in the right hand whenever the slingshot is not aimed.
     const bool isAiming = sSlingOut && (player->actionFunc == AimSling || sSlingTargeted);
     Vec3f projectedFocus;
     SkinMatrix_Vec3fMtxFMultXYZ(&play->viewProjectionMtxF, &player->actor.focus.pos, &projectedFocus);
-    // Match MM's first-person limb pass, using the child display lists OoT chooses there.
     const bool firstPerson = isAiming && (player->stateFlags1 & PLAYER_STATE1_100000) && projectedFocus.z < -4.0f &&
                              sApi->HasResource(sSlingFirstPersonDL) && sApi->HasResource(sSlingShoulderDL);
     if (limb == PLAYER_LIMB_RIGHT_HAND) {
         const char* model = firstPerson && sSlingSeed != NULL ? sSlingFirstPersonDL : sSlingDL;
-        if (sApi->HasResource(model)) *displayList = (Gfx*)model;
+        if (sApi->HasResource(model))
+            *displayList = (Gfx*)model;
     } else if (firstPerson && limb == PLAYER_LIMB_RIGHT_SHOULDER) {
         *displayList = (Gfx*)sSlingShoulderDL;
-        // The shoulder position is in its parent's scaled space. Lift the
-        // entire arm in world Y without changing its aim rotation.
         MtxF* parent = Matrix_GetCurrent();
         f32 scaleSq = SQ(parent->yx) + SQ(parent->yy) + SQ(parent->yz);
         if (scaleSq > 0.0f) {
@@ -2304,23 +2320,30 @@ static void DrawSlingshotHand(Player* player, s32 limb, Gfx** displayList, Gfx* 
             position->z += parent->yz * lift;
         }
     } else if (firstPerson && (limb == PLAYER_LIMB_LEFT_FOREARM || limb == PLAYER_LIMB_LEFT_HAND ||
-                              limb == PLAYER_LIMB_RIGHT_FOREARM)) {
+                               limb == PLAYER_LIMB_RIGHT_FOREARM)) {
         *displayList = NULL;
     }
 }
 
-static s32 SeedCount(const char* key) { return sSave.seeds; }
-static void RefillSeeds(const char* key) { sSave.seeds = SeedCapacity(); Store(); }
+static s32 SeedCount(const char* key) {
+    return sSave.seeds;
+}
+static void RefillSeeds(const char* key) {
+    sSave.seeds = SeedCapacity();
+    Store();
+}
 
 static void AddSeeds(const char* key) {
-    if (!sApi->IsCustomItemOwned(SLING)) return;
+    if (!sApi->IsCustomItemOwned(SLING))
+        return;
     s16 amount = strcmp(key, "oot.deku_seeds_5") == 0 ? 5 : 30;
     sSave.seeds = MIN(sSave.seeds + amount, SeedCapacity());
     Store();
 }
 
 static void SetBulletBag(u8 level) {
-    if (RandoInfCustom_IsLogicSimulation() || level == 0) return;
+    if (RandoInfCustom_IsLogicSimulation() || level == 0)
+        return;
     sBulletBagLevel = MAX(sBulletBagLevel, level);
     sApi->SetCustomItemOwned(SLING, true);
     sApi->StorageSet(MOD, "bullet_bag_level", &sBulletBagLevel, sizeof(sBulletBagLevel));
@@ -2328,12 +2351,14 @@ static void SetBulletBag(u8 level) {
 }
 
 static u16 ReadSlingLevel(const SaveContext* save) {
-    if (RandoInfCustom_IsLogicSimulation()) return 0;
+    if (RandoInfCustom_IsLogicSimulation())
+        return 0;
     return sBulletBagLevel == 4 ? 5 : sBulletBagLevel;
 }
 
 static u16 ReadCondensedSlingLevel(const SaveContext* save) {
-    if (RandoInfCustom_IsLogicSimulation()) return 0;
+    if (RandoInfCustom_IsLogicSimulation())
+        return 0;
     return sBulletBagLevel == 4 ? 2 : (sBulletBagLevel > 0 ? 1 : 0);
 }
 
@@ -2346,33 +2371,42 @@ static void ApplyCondensedSlingLevel(SaveContext* save, u16 level) {
 }
 
 static void ResolveSlingshotPickup(Actor* actor, PlayState* play, S2HGetItemEntry* entry, const char** key) {
-    if (key==NULL || *key == NULL || !S2H_MOD_API_HAS(sApi, GetNextProgressiveItem)) return;
-    if (strcmp(*key, SLING) != 0 && strcmp(*key, SLING_PROGRESSIVE) != 0 && strcmp(*key, SLING_CONDENSED) != 0) return;
-    bool held=actor && (actor->parent || (actor->id==ACTOR_EN_ITEM00 && actor->params==ITEM00_NOTHING &&
-                                          ((EnItem00*)actor)->unk152>=0));
-    // Ownership changes while this same actor is still above Link. Freeze the
-    // awarded stage from the moment he accepts it, until that actor is destroyed.
-    const char* next=held && actor==sSlingPickup ? sSlingPickupStage :
-                     sApi->GetNextProgressiveItem(*key,S2H_RANDO_INF_SAVE);
-    if (next == NULL) return;
+    if (key == NULL || *key == NULL || !S2H_MOD_API_HAS(sApi, GetNextProgressiveItem))
+        return;
+    if (strcmp(*key, SLING) != 0 && strcmp(*key, SLING_PROGRESSIVE) != 0 && strcmp(*key, SLING_CONDENSED) != 0)
+        return;
+    bool held = actor && (actor->parent || (actor->id == ACTOR_EN_ITEM00 && actor->params == ITEM00_NOTHING &&
+                                            ((EnItem00*)actor)->unk152 >= 0));
+    const char* next =
+        held && actor == sSlingPickup ? sSlingPickupStage : sApi->GetNextProgressiveItem(*key, S2H_RANDO_INF_SAVE);
+    if (next == NULL)
+        return;
     const S2HCustomItemDefinition* stage = sApi->FindCustomItem(next);
-    if (stage == NULL) return;
-    if(held){sSlingPickup=actor;sSlingPickupStage=next;}
+    if (stage == NULL)
+        return;
+    if (held) {
+        sSlingPickup = actor;
+        sSlingPickupStage = next;
+    }
     *key = next;
-    if (entry != NULL) *entry = stage->getItemEntry;
+    if (entry != NULL)
+        *entry = stage->getItemEntry;
 }
 
 static void StartEquipFlight(PlayState* play, u8 button, u16 item, bool* handled) {
     static const char* const keys[] = { SLING, BOOM, HAMMER, DIN, FARORE, NAYRU };
     PauseContext* pause = &play->pauseCtx;
-    if (*handled || item != ITEM_CUSTOM || pause->pageIndex != PAUSE_ITEM ||
-        button < S2H_ITEM_BUTTON_C_FIRST || button >= S2H_ITEM_BUTTON_C_FIRST + 3) return;
+    if (*handled || item != ITEM_CUSTOM || pause->pageIndex != PAUSE_ITEM || button < S2H_ITEM_BUTTON_C_FIRST ||
+        button >= S2H_ITEM_BUTTON_C_FIRST + 3)
+        return;
     s16 slot = pause->cursorSlot[PAUSE_ITEM];
-    if (slot < 0 || slot >= ITEM_NUM_SLOTS || pause->itemVtx == NULL) return;
+    if (slot < 0 || slot >= ITEM_NUM_SLOTS || pause->itemVtx == NULL)
+        return;
     const char* icon = KaleidoItemManager_GetSlotIcon(slot);
     for (u8 i = 0; icon != NULL && i < ARRAY_COUNT(keys); i++) {
         const S2HCustomItemDefinition* definition = sApi->FindCustomItem(keys[i]);
-        if (definition == NULL || strcmp(icon, definition->iconPath) != 0) continue;
+        if (definition == NULL || strcmp(icon, definition->iconPath) != 0)
+            continue;
         sEquipFlight.key = keys[i];
         sEquipFlight.icon = definition->iconPath;
         sEquipFlight.startFrame = play->state.frames;
@@ -2385,11 +2419,13 @@ static void StartEquipFlight(PlayState* play, u8 button, u16 item, bool* handled
 
 static bool HasSlingshotWheel(void) {
     if (!sApi->IsCustomItemOwned(SLING) ||
-        gSaveContext.save.saveInfo.inventory.items[SLOT_POWDER_KEG] != ITEM_POWDER_KEG) return false;
-    if (CVarGetInteger(SLING_SHOW_KEG, 0)) return true;
+        gSaveContext.save.saveInfo.inventory.items[SLOT_POWDER_KEG] != ITEM_POWDER_KEG)
+        return false;
+    if (CVarGetInteger(SLING_SHOW_KEG, 0))
+        return true;
     S2HCustomItemPlacement placement;
-    return KaleidoItemManager_GetPlacement(SLING, &placement) &&
-           placement.page == S2H_ITEM_PAGE_VANILLA && placement.slot == SLOT_POWDER_KEG;
+    return KaleidoItemManager_GetPlacement(SLING, &placement) && placement.page == S2H_ITEM_PAGE_VANILLA &&
+           placement.slot == SLOT_POWDER_KEG;
 }
 
 static void CycleSlingshotCell(PlayState* play, Input* input, bool* handled) {
@@ -2404,7 +2440,8 @@ static void CycleSlingshotCell(PlayState* play, Input* input, bool* handled) {
                          !pause->itemDescriptionOn && pause->cursorPoint[PAUSE_ITEM] == SLOT_POWDER_KEG &&
                          KaleidoItemManager_IsVanillaPageShown();
     if (focused) {
-        if (!sWheelPrompt) sPreviousAAction = play->interfaceCtx.aButtonDoActionDelayed;
+        if (!sWheelPrompt)
+            sPreviousAAction = play->interfaceCtx.aButtonDoActionDelayed;
         sWheelPrompt = true;
         Interface_SetAButtonDoAction(play, DO_ACTION_DECIDE);
     } else if (sWheelPrompt) {
@@ -2413,7 +2450,8 @@ static void CycleSlingshotCell(PlayState* play, Input* input, bool* handled) {
             Interface_SetAButtonDoAction(play, sPreviousAAction);
         }
     }
-    if (*handled || !focused || !(input->press.button & BTN_A)) return;
+    if (*handled || !focused || !(input->press.button & BTN_A))
+        return;
 
     CVarSetInteger(SLING_SHOW_KEG, !showingKeg);
     KaleidoItemManager_SetPauseVisible(SLING, showingKeg);
@@ -2425,11 +2463,12 @@ static void CycleSlingshotCell(PlayState* play, Input* input, bool* handled) {
 static void DrawEquipFlight(PlayState* play) {
     static const s16 targetX[] = { 226, 250, 274 };
     static const s16 targetY[] = { 10, 28, 10 };
-    if (sEquipFlight.key == NULL) return;
+    if (sEquipFlight.key == NULL)
+        return;
     u32 elapsed = play->state.frames - sEquipFlight.startFrame;
     const char* equipped = sApi->GetEquippedCustomItem(sEquipFlight.button);
-    if (elapsed >= 10 || play->pauseCtx.state != PAUSE_STATE_MAIN ||
-        equipped == NULL || strcmp(equipped, sEquipFlight.key) != 0) {
+    if (elapsed >= 10 || play->pauseCtx.state != PAUSE_STATE_MAIN || equipped == NULL ||
+        strcmp(equipped, sEquipFlight.key) != 0) {
         sEquipFlight.key = NULL;
         return;
     }
@@ -2440,48 +2479,50 @@ static void DrawEquipFlight(PlayState* play) {
     OPEN_DISPS(gfx);
     Gfx_SetupDL42_Overlay(gfx);
     gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, 255);
-    gDPLoadTextureBlock(OVERLAY_DISP++, sEquipFlight.icon, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0,
-                        G_TX_CLAMP, G_TX_CLAMP, 0, 0, G_TX_NOLOD, G_TX_NOLOD);
-    gSPTextureRectangle(OVERLAY_DISP++, x * 4, y * 4, (x + 32) * 4, (y + 32) * 4,
-                        G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
+    gDPLoadTextureBlock(OVERLAY_DISP++, sEquipFlight.icon, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0, G_TX_CLAMP,
+                        G_TX_CLAMP, 0, 0, G_TX_NOLOD, G_TX_NOLOD);
+    gSPTextureRectangle(OVERLAY_DISP++, x * 4, y * 4, (x + 32) * 4, (y + 32) * 4, G_TX_RENDERTILE, 0, 0, 1 << 10,
+                        1 << 10);
     CLOSE_DISPS(gfx);
 }
 
 static void DrawSeedHud(PlayState* play) {
     static const s16 x[] = { 228, 250, 272 };
     static const s16 y[] = { 35, 51, 35 };
-    const s16 alpha[] = { play->interfaceCtx.cLeftAlpha, play->interfaceCtx.cDownAlpha, play->interfaceCtx.cRightAlpha };
+    const s16 alpha[] = { play->interfaceCtx.cLeftAlpha, play->interfaceCtx.cDownAlpha,
+                          play->interfaceCtx.cRightAlpha };
     GraphicsContext* gfx = play->state.gfxCtx;
     OPEN_DISPS(gfx);
     for (u8 i = 0; i < ARRAY_COUNT(x); i++) {
-        if (alpha[i] == 0 || !HasSlingshotKey(sApi->GetEquippedCustomItem(i + S2H_ITEM_BUTTON_C_FIRST))) continue;
+        if (alpha[i] == 0 || !HasSlingshotKey(sApi->GetEquippedCustomItem(i + S2H_ITEM_BUTTON_C_FIRST)))
+            continue;
         Gfx_SetupDL39_Overlay(gfx);
         gDPSetEnvColor(OVERLAY_DISP++, 0, 0, 0, 0);
         bool full = sBulletBagLevel == 4 || sSave.seeds == SeedCapacity();
         u8 tone = sSave.seeds ? 255 : 100;
-        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, full ? 120 : tone, full ? 255 : tone,
-                       full ? 0 : tone, alpha[i]);
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, full ? 120 : tone, full ? 255 : tone, full ? 0 : tone, alpha[i]);
         if (sBulletBagLevel == 4) {
-            gDPLoadTextureBlock_4b(OVERLAY_DISP++, sInfinityTex, G_IM_FMT_I, 16, 16, 0,
-                                   G_TX_CLAMP, G_TX_CLAMP, 0, 0, G_TX_NOLOD, G_TX_NOLOD);
-            gSPTextureRectangle(OVERLAY_DISP++, x[i] * 4, (y[i] - 1) * 4,
-                                (x[i] + 14) * 4, (y[i] + 8) * 4, G_TX_RENDERTILE, 0, 0, 1170, 1820);
+            gDPLoadTextureBlock_4b(OVERLAY_DISP++, sInfinityTex, G_IM_FMT_I, 16, 16, 0, G_TX_CLAMP, G_TX_CLAMP, 0, 0,
+                                   G_TX_NOLOD, G_TX_NOLOD);
+            gSPTextureRectangle(OVERLAY_DISP++, x[i] * 4, (y[i] - 1) * 4, (x[i] + 14) * 4, (y[i] + 8) * 4,
+                                G_TX_RENDERTILE, 0, 0, 1170, 1820);
             continue;
         }
         if (sSave.seeds >= 10) {
-            OVERLAY_DISP = Gfx_DrawTexRectIA8(OVERLAY_DISP, (TexturePtr)sAmmoDigits[sSave.seeds / 10],
-                                              8, 8, x[i], y[i], 8, 8, 1 << 10, 1 << 10);
+            OVERLAY_DISP = Gfx_DrawTexRectIA8(OVERLAY_DISP, (TexturePtr)sAmmoDigits[sSave.seeds / 10], 8, 8, x[i], y[i],
+                                              8, 8, 1 << 10, 1 << 10);
         }
-        OVERLAY_DISP = Gfx_DrawTexRectIA8(OVERLAY_DISP, (TexturePtr)sAmmoDigits[sSave.seeds % 10],
-                                          8, 8, x[i] + 6, y[i], 8, 8, 1 << 10, 1 << 10);
+        OVERLAY_DISP = Gfx_DrawTexRectIA8(OVERLAY_DISP, (TexturePtr)sAmmoDigits[sSave.seeds % 10], 8, 8, x[i] + 6, y[i],
+                                          8, 8, 1 << 10, 1 << 10);
     }
     CLOSE_DISPS(gfx);
     DrawEquipFlight(play);
 }
 
 static void DrawSlingshotWheelPreview(PlayState* play, s32 slot, Vtx* cell) {
-    if (slot != SLOT_POWDER_KEG || play->pauseCtx.pageIndex != PAUSE_ITEM ||
-        !KaleidoItemManager_IsVanillaPageShown() || !HasSlingshotWheel()) return;
+    if (slot != SLOT_POWDER_KEG || play->pauseCtx.pageIndex != PAUSE_ITEM || !KaleidoItemManager_IsVanillaPageShown() ||
+        !HasSlingshotWheel())
+        return;
     const char* icon = CVarGetInteger(SLING_SHOW_KEG, 0) ? sSlingIcon : sKegIcon;
     GraphicsContext* gfx = play->state.gfxCtx;
     const s16 left = cell[0].v.ob[0] - 8;
@@ -2502,10 +2543,11 @@ static void DrawSlingshotWheelPreview(PlayState* play, s32 slot, Vtx* cell) {
 
 static void DrawSeedPause(PlayState* play, s32 slot, s32 item, Vtx* cell) {
     DrawSlingshotWheelPreview(play, slot, cell);
-    if (item != ITEM_CUSTOM) return;
+    if (item != ITEM_CUSTOM)
+        return;
     const char* icon = KaleidoItemManager_GetSlotIcon(slot);
-    if (icon == NULL ||
-        strcmp(icon, OOT_ICON("gItemIconSlingshotTex")) != 0) return;
+    if (icon == NULL || strcmp(icon, OOT_ICON("gItemIconSlingshotTex")) != 0)
+        return;
     GraphicsContext* gfx = play->state.gfxCtx;
     const s16 digits[] = { sSave.seeds / 10, sSave.seeds % 10 };
     OPEN_DISPS(gfx);
@@ -2513,8 +2555,7 @@ static void DrawSeedPause(PlayState* play, s32 slot, s32 item, Vtx* cell) {
     bool infinite = sBulletBagLevel == 4;
     bool full = infinite || sSave.seeds == SeedCapacity();
     u8 tone = sSave.seeds ? 255 : 130;
-    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, full ? 120 : tone, full ? 255 : tone,
-                   full ? 0 : tone, play->pauseCtx.alpha);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, full ? 120 : tone, full ? 255 : tone, full ? 0 : tone, play->pauseCtx.alpha);
     for (u8 i = !infinite && digits[0] == 0 ? 1 : 0; i < ARRAY_COUNT(digits); i++) {
         Vtx* quad = GRAPH_ALLOC(gfx, 4 * sizeof(Vtx));
         memcpy(quad, cell, 4 * sizeof(Vtx));
@@ -2526,8 +2567,8 @@ static void DrawSeedPause(PlayState* play, s32 slot, s32 item, Vtx* cell) {
         }
         gSPVertex(POLY_OPA_DISP++, (uintptr_t)quad, 4, 0);
         if (infinite) {
-            gDPLoadTextureBlock_4b(POLY_OPA_DISP++, sInfinityTex, G_IM_FMT_I, 16, 16, 0,
-                                   G_TX_CLAMP, G_TX_CLAMP, 0, 0, G_TX_NOLOD, G_TX_NOLOD);
+            gDPLoadTextureBlock_4b(POLY_OPA_DISP++, sInfinityTex, G_IM_FMT_I, 16, 16, 0, G_TX_CLAMP, G_TX_CLAMP, 0, 0,
+                                   G_TX_NOLOD, G_TX_NOLOD);
             gSP1Quadrangle(POLY_OPA_DISP++, 0, 2, 3, 1, 0);
             break;
         }
@@ -2574,7 +2615,6 @@ static bool CanSwingHammer(Player* player) {
     return (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && !(player->stateFlags1 & PLAYER_STATE1_8000000);
 }
 
-// The hammer's Great Fairy's Sword melee type would also start vanilla's 2H slash and combo on the same press.
 static void TakeHammerAttack(PlayState* play, Player* player, int32_t action, bool* consumed, bool* startedAction) {
     if (*consumed || !IsHoldingHammer(player)) {
         return;
@@ -2593,7 +2633,6 @@ static void UpdateHammer(PlayState* play, Player* player) {
     }
     Z64Items_KeepHeld(sApi);
     UpdateHammerJumpslash(play, player);
-    // The melee handler already ran this frame; only a swing in progress keeps the press buffered.
     if (player->actionFunc != HammerAttackAction) {
         sHammerSwingPending = false;
     }
@@ -2625,17 +2664,16 @@ static void Tick(Player* player) {
     }
     UpdateHammer(play, player);
     const char* held = sApi->GetEquippedCustomItem(player->heldItemButton);
-    // The registry finishes the held-item transition after the take-out callback.
     if (sSlingAimPending && player->heldItemAction == PLAYER_IA_CUSTOM && HasSlingshotKey(held) &&
         !(player->stateFlags3 & PLAYER_STATE3_START_CHANGING_HELD_ITEM)) {
         StartSlingAim(player, play, true);
     }
     if (sBoomPhase == BOOM_PENDING && held != NULL && strcmp(held, BOOM) == 0 &&
-        player->heldItemAction == PLAYER_IA_CUSTOM &&
-        !(player->stateFlags3 & PLAYER_STATE3_START_CHANGING_HELD_ITEM)) {
+        player->heldItemAction == PLAYER_IA_CUSTOM && !(player->stateFlags3 & PLAYER_STATE3_START_CHANGING_HELD_ITEM)) {
         RaiseBoom(player, play, true);
     }
-    if(sSlingOut && player->actionFunc==AimSling)HoldSlingAimForWheel(player,play);
+    if (sSlingOut && player->actionFunc == AimSling)
+        HoldSlingAimForWheel(player, play);
     if (sBoomPhase == BOOM_AIM) {
         const bool isAiming = player->actionFunc == BoomAimAction || sBoomTargeted;
         if (isAiming && held != NULL && strcmp(held, BOOM) == 0) {
@@ -2650,8 +2688,8 @@ static void Tick(Player* player) {
 }
 
 static void Scene(s16 scene, s8 spawn) {
-    sSlingPickup=NULL;
-    sSlingPickupStage=NULL;
+    sSlingPickup = NULL;
+    sSlingPickupStage = NULL;
     sBoom = NULL;
     sBoomPhase = BOOM_STOWED;
     sBoomTargeted = false;
@@ -2681,7 +2719,10 @@ static void Scene(s16 scene, s8 spawn) {
 }
 
 static void ActorDestroyed(Actor* actor) {
-    if(actor==sSlingPickup){sSlingPickup=NULL;sSlingPickupStage=NULL;}
+    if (actor == sSlingPickup) {
+        sSlingPickup = NULL;
+        sSlingPickupStage = NULL;
+    }
     if (sBoom != NULL && actor != sBoom) {
         OotBoom* boom = (OotBoom*)sBoom;
         if (actor == boom->moveTo) {
@@ -2697,9 +2738,8 @@ static void ActorDestroyed(Actor* actor) {
 }
 
 static void DrawSpellGetItem(PlayState* play, S2HGetItemEntry* entry) {
-    if (entry->drawItemId >= ARRAY_COUNT(sSpellColors) ||
-        !sApi->HasResource(sSpellDiamondDL) || !sApi->HasResource(sSpellOrbDL) ||
-        !sApi->HasResource(sSpellColors[entry->drawItemId])) {
+    if (entry->drawItemId >= ARRAY_COUNT(sSpellColors) || !sApi->HasResource(sSpellDiamondDL) ||
+        !sApi->HasResource(sSpellOrbDL) || !sApi->HasResource(sSpellColors[entry->drawItemId])) {
         return;
     }
     GraphicsContext* gfx = play->state.gfxCtx;
@@ -2707,8 +2747,8 @@ static void DrawSpellGetItem(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(gfx);
     Matrix_Push();
     Gfx_SetupDL25_Xlu(gfx);
-    gSPSegment(POLY_XLU_DISP++, 8, Gfx_TwoTexScrollEx(gfx, 0, frame * 2, -frame * 6, 32, 32,
-                                                   1, frame, -frame * 2, 32, 32, 2, -6, 1, -2));
+    gSPSegment(POLY_XLU_DISP++, 8,
+               Gfx_TwoTexScrollEx(gfx, 0, frame * 2, -frame * 6, 32, 32, 1, frame, -frame * 2, 32, 32, 2, -6, 1, -2));
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfx);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sSpellDiamondDL);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sSpellColors[entry->drawItemId]);
@@ -2718,7 +2758,8 @@ static void DrawSpellGetItem(PlayState* play, S2HGetItemEntry* entry) {
 }
 
 static void DrawBulletBag(PlayState* play, S2HGetItemEntry* entry) {
-    if (!sApi->HasResource(sBagDL)) return;
+    if (!sApi->HasResource(sBagDL))
+        return;
     GraphicsContext* gfx = play->state.gfxCtx;
     bool large = entry->drawItemId != 0;
     OPEN_DISPS(gfx);
@@ -2779,8 +2820,8 @@ static void RegisterItem(const char* key, const char* icon, const char* name, co
 }
 
 static void RegisterSlingshotPickup(const char* key, const char* icon, const char* label, const char* message,
-                                   const char* model, const S2HCustomItemRandomizer* randomizer,
-                                   S2HCustomItemStateFunc onReceive) {
+                                    const char* model, const S2HCustomItemRandomizer* randomizer,
+                                    S2HCustomItemStateFunc onReceive) {
     S2HCustomItemDefinition item = Z64Items_Define(key, icon, NULL);
     item.presentationFlags = S2H_ITEM_HIDE_FROM_KALEIDO | S2H_ITEM_HIDE_FROM_SAVE_EDITOR;
     item.displayName = label;
@@ -2788,7 +2829,8 @@ static void RegisterSlingshotPickup(const char* key, const char* icon, const cha
     item.onReceive = onReceive;
     Z64Items_SetTextbox(&item, message);
     Z64Items_SetGetItemModel(&item, model);
-    if (randomizer != NULL) Z64Items_SetLogic(&item, randomizer);
+    if (randomizer != NULL)
+        Z64Items_SetLogic(&item, randomizer);
     if (model == sBagDL) {
         item.getItemEntry.drawItemId = strcmp(icon, OOT_ICON("gItemIconBulletBag50Tex")) == 0;
         item.getItemEntry.drawFunc = DrawBulletBag;
@@ -2798,11 +2840,15 @@ static void RegisterSlingshotPickup(const char* key, const char* icon, const cha
 
 static void RegisterSlingshotProgression(void) {
     static const S2HProgressiveLevel regular[] = {
-        { SLING }, { "oot.bullet_bag_40" }, { "oot.bullet_bag_50" }, { "oot.bullet_bag_50_extra" },
+        { SLING },
+        { "oot.bullet_bag_40" },
+        { "oot.bullet_bag_50" },
+        { "oot.bullet_bag_50_extra" },
         { "oot.bullet_bag_infinite" },
     };
     static const S2HProgressiveLevel condensed[] = {
-        { "oot.slingshot.condensed_first" }, { "oot.bullet_bag_infinite_condensed" },
+        { "oot.slingshot.condensed_first" },
+        { "oot.bullet_bag_infinite_condensed" },
     };
     static const S2HCustomItemRandomizer regularPool = {
         .structSize = sizeof(S2HCustomItemRandomizer),
@@ -2825,39 +2871,53 @@ static void RegisterSlingshotProgression(void) {
         .poolModeValue = 2,
     };
     static const char* const slingText = "You got the %rFairy Slingshot%w!&Press %y" GLYPH_C "%w to aim and shoot.^"
-                                        "Its Bullet Bag holds %y30 Deku Seeds%w.";
-    static const char* const infiniteText = "You got the %gInfinite Bullet Bag%w!&Your slingshot won't run out&of Deku Seeds.";
+                                         "Its Bullet Bag holds %y30 Deku Seeds%w.";
+    static const char* const infiniteText =
+        "You got the %gInfinite Bullet Bag%w!&Your slingshot won't run out&of Deku Seeds.";
     const char* slingIcon = OOT_ICON("gItemIconSlingshotTex");
     const char* bagIcon = OOT_ICON("gItemIconBulletBag50Tex");
 
-    if (!S2H_MOD_API_HAS(sApi, RegisterProgressiveChain) || !S2H_MOD_API_HAS(sApi, RegisterRandoOption)) return;
+    if (!S2H_MOD_API_HAS(sApi, RegisterProgressiveChain) || !S2H_MOD_API_HAS(sApi, RegisterRandoOption))
+        return;
     sApi->RegisterRandoOption(&sInfinityOption);
     RegisterSlingshotPickup(regular[1].itemKey, OOT_ICON("gItemIconBulletBag40Tex"), "Big Bullet Bag",
                             "You got the %yBig Bullet Bag%w!&It holds up to %y40 Deku Seeds%w.", sBagDL, NULL, NULL);
     for (u8 i = 2; i <= 3; i++) {
         RegisterSlingshotPickup(regular[i].itemKey, bagIcon, "Biggest Bullet Bag",
-                                "You got the %yBiggest Bullet Bag%w!&It holds up to %y50 Deku Seeds%w.",
-                                sBagDL, NULL, NULL);
+                                "You got the %yBiggest Bullet Bag%w!&It holds up to %y50 Deku Seeds%w.", sBagDL, NULL,
+                                NULL);
     }
     RegisterSlingshotPickup(regular[4].itemKey, bagIcon, "Infinite Bullet Bag", infiniteText, sBagDL, NULL, NULL);
     RegisterSlingshotPickup(condensed[0].itemKey, slingIcon, "Fairy Slingshot", slingText, sSlingGetDL, NULL, NULL);
     RegisterSlingshotPickup(condensed[1].itemKey, bagIcon, "Infinite Bullet Bag", infiniteText, sBagDL, NULL, NULL);
-    RegisterSlingshotPickup(SLING_PROGRESSIVE, slingIcon, "Progressive Slingshot", slingText, sSlingGetDL, &regularPool, NULL);
-    RegisterSlingshotPickup(SLING_CONDENSED, slingIcon, "Progressive Slingshot", slingText, sSlingGetDL, &condensedPool, NULL);
+    RegisterSlingshotPickup(SLING_PROGRESSIVE, slingIcon, "Progressive Slingshot", slingText, sSlingGetDL, &regularPool,
+                            NULL);
+    RegisterSlingshotPickup(SLING_CONDENSED, slingIcon, "Progressive Slingshot", slingText, sSlingGetDL, &condensedPool,
+                            NULL);
     RegisterSlingshotPickup("oot.deku_seeds_5", OOT_ICON("gItemIconDekuSeedsTex"), "Deku Seeds (5)",
                             "You got %y5 Deku Seeds%w!", sSeedDL, NULL, AddSeeds);
     RegisterSlingshotPickup("oot.deku_seeds_30", OOT_ICON("gItemIconDekuSeedsTex"), "Deku Seeds (30)",
                             "You got %y30 Deku Seeds%w!", sSeedDL, NULL, AddSeeds);
 
     const S2HProgressiveChain normalChain = {
-        .structSize = sizeof(S2HProgressiveChain), .key = SLING_CHAIN, .pickupKey = SLING_PROGRESSIVE,
-        .levels = regular, .levelCount = ARRAY_COUNT(regular), .firstLevel = 1,
-        .readLevel = ReadSlingLevel, .applyLevel = ApplySlingLevel,
+        .structSize = sizeof(S2HProgressiveChain),
+        .key = SLING_CHAIN,
+        .pickupKey = SLING_PROGRESSIVE,
+        .levels = regular,
+        .levelCount = ARRAY_COUNT(regular),
+        .firstLevel = 1,
+        .readLevel = ReadSlingLevel,
+        .applyLevel = ApplySlingLevel,
     };
     const S2HProgressiveChain condensedChain = {
-        .structSize = sizeof(S2HProgressiveChain), .key = SLING_CONDENSED_CHAIN, .pickupKey = SLING_CONDENSED,
-        .levels = condensed, .levelCount = ARRAY_COUNT(condensed), .firstLevel = 1,
-        .readLevel = ReadCondensedSlingLevel, .applyLevel = ApplyCondensedSlingLevel,
+        .structSize = sizeof(S2HProgressiveChain),
+        .key = SLING_CONDENSED_CHAIN,
+        .pickupKey = SLING_CONDENSED,
+        .levels = condensed,
+        .levelCount = ARRAY_COUNT(condensed),
+        .firstLevel = 1,
+        .readLevel = ReadCondensedSlingLevel,
+        .applyLevel = ApplyCondensedSlingLevel,
     };
     sApi->RegisterProgressiveChain(&normalChain);
     sApi->RegisterProgressiveChain(&condensedChain);
@@ -2865,7 +2925,6 @@ static void RegisterSlingshotProgression(void) {
 
 #include "oot_songs.inc.c"
 
-// Din's dome carries fire arrow damage, so it lights torches and burns webs near Link, not at a distance.
 static void GrantOotItemLogic(void) {
     static const Z64LogicSource sSlingshot = { SLING };
     static const Z64LogicSource sCondensedSlingshot = { "oot.slingshot.condensed_first" };
@@ -2874,7 +2933,7 @@ static void GrantOotItemLogic(void) {
     static const Z64LogicSource sDinsFire = { DIN, 0, true };
     static const char* const sShooting[] = { "CanUseProjectile", "CanHitSwitch", "CanAttack", "CanDamage", NULL };
     static const char* const sThrowing[] = { "CanUseProjectile", "HookshotOrBoomerang", "CanHitSwitch",
-                                             "CanAttack", "CanDamage", NULL };
+                                             "CanAttack",        "CanDamage",           NULL };
     static const char* const sSmashing[] = { "BlastOrSmash", "CanHitSwitch", "CanAttack", "CanDamage", NULL };
     static const char* const sBurning[] = { "HasFireSourceWithTorch", "CanAttack", "CanDamage", NULL };
 
@@ -2890,8 +2949,12 @@ static void GrantOotItemLogic(void) {
     Z64Logic_GrantTorchLighting(&sDinsFire);
 }
 
-S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) { sApi = api; }
-S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) { return &sRequirements; }
+S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
+    sApi = api;
+}
+S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
+    return &sRequirements;
+}
 S2H_MOD_EXPORT void ModInit(void) {
     Load(0);
     S2HActorDefinition actor = { 0 };
@@ -2939,7 +3002,8 @@ S2H_MOD_EXPORT void ModInit(void) {
                  "%rFairy Slingshot&%wHold %y" GLYPH_C "%w to aim and load.&Release to fire.",
                  "You got the %rFairy Slingshot%w!&Hold %y" GLYPH_C "%w to aim and load a seed.&Release it to fire.^"
                  "Press %g" GLYPH_A "%w, %r" GLYPH_B "%w or %y" GLYPH_C_UP "%w to stop aiming.&"
-                 "It holds up to %y30 Deku Seeds%w.", SLOT_POWDER_KEG, sSlingGetDL, -1, TakeSling);
+                 "It holds up to %y30 Deku Seeds%w.",
+                 SLOT_POWDER_KEG, sSlingGetDL, -1, TakeSling);
     RegisterItem(BOOM, OOT_ICON("gItemIconBoomerangTex"), OOT_NAME("gBoomerangItemNameENGTex"),
                  "%rBoomerang&%wHold %y" GLYPH_C "%w to aim. Release to throw.",
                  "You got the %rBoomerang%w!&Hold %y" GLYPH_C "%w to aim, then release to&throw it and stun enemies.",
@@ -2947,8 +3011,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     RegisterItem(HAMMER, OOT_ICON("gItemIconHammerTex"), OOT_NAME("gMegatonHammerItemNameENGTex"),
                  "%rMegaton Hammer&%wPress %y" GLYPH_C "%w to swing the hammer.",
                  "You got the %rMegaton Hammer%w!&Press %y" GLYPH_C "%w to swing the hammer.^"
-                 "Its heavy blows hit like a&Goron punch or pound.", SLOT_SWORD_GREAT_FAIRY, sHammerDL, -1,
-                 RequestHammerSwing);
+                 "Its heavy blows hit like a&Goron punch or pound.",
+                 SLOT_SWORD_GREAT_FAIRY, sHammerDL, -1, RequestHammerSwing);
     RegisterItem(DIN, OOT_ICON("gItemIconDinsFireTex"), OOT_NAME("gDinsFireItemNameENGTex"),
                  "%rDin's Fire&%wPress %y" GLYPH_C "%w to cast. Costs 12 MP.",
                  "You got %rDin's Fire%w!&Press %y" GLYPH_C "%w to unleash a ring of&flame. It costs %y12 MP%w.",
@@ -2960,7 +3024,8 @@ S2H_MOD_EXPORT void ModInit(void) {
                  OOT_SLOT_FARORES_WIND, sSpellDiamondDL, 1, CastFarore);
     RegisterItem(NAYRU, OOT_ICON("gItemIconNayrusLoveTex"), OOT_NAME("gNayrusLoveItemNameENGTex"),
                  "%bNayru's Love&%wPress %y" GLYPH_C "%w to cast. Costs 24 MP.",
-                 "You got %bNayru's Love%w!&Press %y" GLYPH_C "%w to cast a protective&aura for one minute. Costs %y24 MP%w.",
+                 "You got %bNayru's Love%w!&Press %y" GLYPH_C
+                 "%w to cast a protective&aura for one minute. Costs %y24 MP%w.",
                  OOT_SLOT_NAYRUS_LOVE, sSpellDiamondDL, 2, CastNayru);
     RegisterSlingshotProgression();
     GrantOotItemLogic();

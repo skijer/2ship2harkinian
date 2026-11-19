@@ -1,9 +1,3 @@
-/**
- * Dominion Rod: hold the button to aim, let go to fire a golden orb. It possesses a Beamos or an Armos,
- * which then copies Link's steps; the rod's button makes it attack, and anything else lets it go.
- * An orb that reaches a Cane of Somaria summon swaps Link with it.
- */
-
 #include <string.h>
 
 #include "z64items.h"
@@ -50,14 +44,13 @@ static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/gDominionRodNameTex";
 static const ALIGN_ASSET(2) char sRodDL[] = "__OTR__objects/object_nei_dominion_rod/gNeiDominionRodDL";
 
-static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,   BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
+static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
-static const u32 sReleaseButtons = BTN_A | BTN_B | BTN_R | BTN_START | BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT |
-                                   BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT;
+static const u32 sReleaseButtons = BTN_A | BTN_B | BTN_R | BTN_START | BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT | BTN_DUP |
+                                   BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT;
 static const char* const sSummonKeys[] = { "nei.somaria.statue", "nei.somaria.crate", "nei.somaria.bird",
                                            "nei.somaria.platform" };
 
-// Damage 0: the orb takes what it passes over by distance, and the cylinder only reports the rest.
 static ColliderCylinderInit sColliderInit = {
     {
         COL_MATERIAL_NONE,
@@ -143,7 +136,6 @@ static void RemoveLight(PlayState* play) {
     }
 }
 
-// The orb is its light and a cloud of golden sparks.
 static void SpawnOrbSparkle(PlayState* play, s32 count) {
     Vec3f velocity = { 0.0f, 0.0f, 0.0f };
     Vec3f accel = { 0.0f, -0.08f, 0.0f };
@@ -319,8 +311,7 @@ static bool HasHitGeometry(PlayState* play, Vec3f* previousPos) {
     s32 bgId = BGCHECK_SCENE;
     Vec3f hitPos;
 
-    if (!BgCheck_EntityLineTest1(&play->colCtx, previousPos, &sOrbPos, &hitPos, &poly, true, true, true, true,
-                                 &bgId)) {
+    if (!BgCheck_EntityLineTest1(&play->colCtx, previousPos, &sOrbPos, &hitPos, &poly, true, true, true, true, &bgId)) {
         return false;
     }
     sOrbPos = hitPos;
@@ -397,7 +388,6 @@ static void UpdateCatching(PlayState* play) {
     }
 }
 
-// The possessed actor keeps its own update; its steering is Link's step this frame, laid on top of it.
 static void MimicLink(Player* player, Actor* actor, bool followsHeight, bool hops) {
     actor->world.pos.x += player->actor.world.pos.x - sLastLinkPos.x;
     actor->world.pos.z += player->actor.world.pos.z - sLastLinkPos.z;
@@ -468,7 +458,6 @@ static bool DriveActor(Player* player, PlayState* play, Actor* actor, bool isAtt
     }
 }
 
-// A hit only pauses the possession: the actor holds still until Link can act again.
 static void UpdateControlling(Player* player, PlayState* play) {
     u32 rodButton = FindEquippedButtonMask();
     u32 pressed = play->state.input[0].press.button;
@@ -493,8 +482,6 @@ static void UpdateControlling(Player* player, PlayState* play) {
     SparkleEvery(play, 3, 1);
 }
 
-// Holding the button aims, letting go fires. The release only counts once the button was seen held, or the
-// press that took the rod out would fire it during the item-change animation.
 static void UpdateAiming(Player* player, PlayState* play) {
     u32 rodButton = FindEquippedButtonMask();
 
@@ -513,7 +500,6 @@ static void UpdateAiming(Player* player, PlayState* play) {
     }
 }
 
-// Busy only while aiming: with the orb away Link keeps his hands, since a possessed foe copies his steps.
 static int32_t UpdateRodInHand(Player* player, PlayState* play) {
     if (sPhase != DOMROD_AIMING) {
         return 0;
@@ -532,8 +518,6 @@ static void TakeOutRod(PlayState* play, Player* player) {
     sLastInvincibility = player->invincibilityTimer;
 }
 
-// Pressing the button acts from the end of the player's update: the aim claims the camera, and what is set
-// from the item-button pass is undone the same frame. A rod still in hand after a scene change reads as stowed.
 static void RequestAim(Player* player, PlayState* play) {
     if (sPhase == DOMROD_STOWED || sPhase == DOMROD_IN_HAND) {
         sPhase = DOMROD_IN_HAND;
@@ -563,8 +547,6 @@ static void RunPendingAim(Player* player, PlayState* play) {
     }
 }
 
-// The orb and the possession run here, after the action func, so they have the last word of the frame; the
-// item's upper action does not run while Link fights on, so the host's watchdog is told the rod is still out.
 static void UpdateRodWorld(Player* player) {
     PlayState* play = gPlayState;
 
@@ -609,7 +591,6 @@ static void UpdateRodWorld(Player* player) {
     }
 }
 
-// The light list, the camera and the possessed actor all belong to the scene that is ending.
 static void ForgetScene(s16 sceneId, s8 spawnNum) {
     Z64Aiming_Drop();
     sLightNode = NULL;
@@ -618,7 +599,6 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
     sPhase = DOMROD_STOWED;
 }
 
-// Drawn from the play's end, not Link's: in first person he is not drawn, and the reticle must be.
 static void DrawRodEffects(void) {
     PlayState* play = gPlayState;
 
@@ -636,7 +616,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, DOMROD_KEY, DOMROD_KEY, "",
 };
@@ -649,7 +628,6 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomItemDefinition rod = Z64Items_Define(DOMROD_KEY, sIconTex, sNameTex);
 
     Z64Items_SetButtons(&rod, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
-    // Shares the Shovel's cell, after it.
     Z64Items_SetPlacement(&rod, 0, 22, -1);
     Z64Items_SetTextbox(&rod, "You got the %pDominion Rod%w!&An ancient artifact that can&"
                               "possess and control enemies.^"
@@ -662,6 +640,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetAction(&rod, TakeOutRod, UpdateRodInHand);
     Z64Items_SetHeldCallbacks(&rod, RequestAim, PutRodAway, NULL);
     Z64Items_SetGetItemModel(&rod, sRodDL);
+    rod.getItemScale = 0.2f;
     rod.modelGroup = PLAYER_MODELGROUP_DEFAULT;
 
     Z64Items_SetLogic(&rod, &sRandomizerItem);

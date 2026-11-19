@@ -7,10 +7,6 @@
 
 #include <math.h>
 
-// ============================================================================
-// Struct (merged from z_arrow_ice.h)
-// ============================================================================
-
 struct ArrowIce;
 
 typedef void (*ArrowIceActionFunc)(struct ArrowIce*, PlayState*);
@@ -25,11 +21,6 @@ typedef struct ArrowIce {
     /* 0x0164 */ f32 unk_164;
     /* 0x0168 */ ArrowIceActionFunc actionFunc;
 } ArrowIce; // size = 0x016C
-
-
-// ============================================================================
-// Graphics data (merged from z_arrow_ice_gfx.c)
-// ============================================================================
 
 static UNK_TYPE sArrowIceTexture1[] = {
     0x00061507, 0x00000000, 0x295A2B08, 0x10030F03, 0x0D070006, 0x00031625, 0x3F230012, 0x79590000, 0x00102C2A,
@@ -219,13 +210,8 @@ static Gfx sArrowIceVertexDL[] = {
     gsSPEndDisplayList(),
 };
 
-// Vanilla OTR cone geometry (correct wide cone, replaces narrow SW97 inline vertices)
 static const ALIGN_ASSET(2) char sSw97IceMatDL[] = "__OTR__overlays/ovl_Arrow_Ice/gIceArrowMaterialDL";
 static const ALIGN_ASSET(2) char sSw97IceMdlDL[] = "__OTR__overlays/ovl_Arrow_Ice/gIceArrowModelDL";
-
-// ============================================================================
-// Actor code
-// ============================================================================
 
 #define FLAGS 0x02000010
 

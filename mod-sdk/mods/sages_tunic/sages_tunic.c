@@ -1,7 +1,3 @@
-/**
- * Sage's Tunic: one resistance for every medallion Link carries. Water: ice. Fire: heat and flame.
- * Light: electricity. Shadow: grabs and paralysis. Spirit: falls. Forest: wind.
- */
 
 #include "z64items.h"
 
@@ -54,14 +50,12 @@ static bool IsLocalPlayer(Actor* actor) {
     return gPlayState != NULL && actor == &GET_PLAYER(gPlayState)->actor;
 }
 
-// Heat rooms count down only while the hazard reads as heat.
 static void ResistHeat(PlayState* play, int16_t* hazard) {
     if (*hazard == PLAYER_ENV_HAZARD_HOTROOM && Resists(SAGES_RESIST_FIRE)) {
         *hazard = PLAYER_ENV_HAZARD_NONE;
     }
 }
 
-// Skipping the assignment keeps the previous floor type, so a burning floor is walked like any other.
 static void ResistBurningFloors(bool* should, va_list args) {
     Player* player = va_arg(args, Player*);
     PlayState* play = gPlayState;
@@ -77,8 +71,6 @@ static void ResistBurningFloors(bool* should, va_list args) {
     }
 }
 
-// The hit effect is decided in the AT pass and read by the player next update; clearing it here keeps the damage
-// and drops the freeze, the shock or the flames.
 static void ResistElementalHit(Actor* victim, ColliderElement* attack, float* damage) {
     u8 effect;
 
@@ -93,7 +85,6 @@ static void ResistElementalHit(Actor* victim, ColliderElement* attack, float* da
     }
 }
 
-// An enemy shoving Link with a shock leaves the same knockback without the jolt.
 static void ResistShockingKnockback(Player* player, Input* input) {
     if (player->unk_B75 == KNOCKBACK_SHOCK && Resists(SAGES_RESIST_THUNDER)) {
         player->unk_B75 = KNOCKBACK_LARGE;
@@ -112,7 +103,6 @@ static void ResistParalysis(bool* should, va_list args) {
     }
 }
 
-// Like Likes, Wallmasters and the bosses that swallow Link all seize him through this one pointer.
 static s32 GrabUnlessResisted(PlayState* play, Player* player) {
     if (Resists(SAGES_RESIST_STUN)) {
         return false;
@@ -128,7 +118,6 @@ static void WrapGrabPlayer(PlayState* play) {
     play->grabPlayer = GrabUnlessResisted;
 }
 
-// The current sets the player's wind from its own update; this runs straight after it.
 static void ResistCurrentWind(Actor* current) {
     PlayState* play = gPlayState;
     Player* player;
@@ -154,9 +143,12 @@ static void TickTunic(Player* player) {
 
 static void DyeTunic(bool* should, va_list args) {
     va_arg(args, void*);
-    Color_RGB8* color=va_arg(args, Color_RGB8*);
-    if(!IsWorn() || color==NULL)return;
-    color->r=235;color->g=240;color->b=245;
+    Color_RGB8* color = va_arg(args, Color_RGB8*);
+    if (!IsWorn() || color == NULL)
+        return;
+    color->r = 235;
+    color->g = 240;
+    color->b = 245;
 }
 
 static const char* const sRequiredHooks[] = {
@@ -174,15 +166,20 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
-static const ALIGN_ASSET(2) char gGiTunicCollarDL[] = "__OTR__objects/nei_get_item/sages_tunic/object_gi_clothes/gGiTunicCollarDL";
+static const ALIGN_ASSET(2) char gGiTunicCollarDL[] =
+    "__OTR__objects/nei_get_item/sages_tunic/object_gi_clothes/gGiTunicCollarDL";
 static const ALIGN_ASSET(2) char gGiTunicDL[] = "__OTR__objects/nei_get_item/sages_tunic/object_gi_clothes/gGiTunicDL";
-static const ALIGN_ASSET(2) char gGiForestMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiForestMedallionFaceDL";
+static const ALIGN_ASSET(2) char gGiForestMedallionFaceDL[] =
+    "__OTR__objects/oot_object_gi_medal/gGiForestMedallionFaceDL";
 static const ALIGN_ASSET(2) char gGiFireMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiFireMedallionFaceDL";
-static const ALIGN_ASSET(2) char gGiWaterMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiWaterMedallionFaceDL";
-static const ALIGN_ASSET(2) char gGiSpiritMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiSpiritMedallionFaceDL";
-static const ALIGN_ASSET(2) char gGiShadowMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiShadowMedallionFaceDL";
-static const ALIGN_ASSET(2) char gGiLightMedallionFaceDL[] = "__OTR__objects/oot_object_gi_medal/gGiLightMedallionFaceDL";
+static const ALIGN_ASSET(2) char gGiWaterMedallionFaceDL[] =
+    "__OTR__objects/oot_object_gi_medal/gGiWaterMedallionFaceDL";
+static const ALIGN_ASSET(2) char gGiSpiritMedallionFaceDL[] =
+    "__OTR__objects/oot_object_gi_medal/gGiSpiritMedallionFaceDL";
+static const ALIGN_ASSET(2) char gGiShadowMedallionFaceDL[] =
+    "__OTR__objects/oot_object_gi_medal/gGiShadowMedallionFaceDL";
+static const ALIGN_ASSET(2) char gGiLightMedallionFaceDL[] =
+    "__OTR__objects/oot_object_gi_medal/gGiLightMedallionFaceDL";
 static const ALIGN_ASSET(2) char gGiMedallionDL[] = "__OTR__objects/oot_object_gi_medal/gGiMedallionDL";
 static void DrawMedallionFountain(PlayState* play) {
     static const char* const sMedallionFaces[SAGES_RESIST_MAX] = {
@@ -261,11 +258,19 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.column = 3;
     definition.formMask = S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN);
     definition.toggles = 1;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = SAGES_TUNIC_KEY,
+        .hintKey = SAGES_TUNIC_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }
 
-    sApi->RegisterVB(VB_APPLY_TUNIC_COLOR,DyeTunic);
+    sApi->RegisterVB(VB_APPLY_TUNIC_COLOR, DyeTunic);
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, TickTunic);
     S2H_REGISTER_HOOK(sApi, OnPlayerFilterInput, ResistShockingKnockback);
     S2H_REGISTER_HOOK(sApi, OnCollisionResolveDamage, ResistElementalHit);

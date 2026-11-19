@@ -8,7 +8,6 @@
 #include "z64quake.h"
 #include "z64rumble.h"
 
-// Keeps the player from reading input and acting while the spell winds up.
 #define DEMISE_INPUT_LOCK PLAYER_STATE1_20
 
 #define DEMISE_KEY "nei.demise_destruction"
@@ -111,15 +110,13 @@ static void SpawnLightningRing(PlayState* play, Vec3f* center, u8 count) {
     }
 }
 
-// Dust crawling outward along the ground, the tell that the blast is still growing.
 static void SpawnGroundDust(PlayState* play, Vec3f* center, u8 count) {
     Color_RGBA8 env = { 0, 0, 0, 255 };
 
     for (u8 i = 0; i < count; i++) {
         s16 angle = (s16)(i * (0x10000 / count));
         f32 radius = 80.0f + Rand_ZeroOne() * 240.0f;
-        Vec3f pos = { center->x + Math_SinS(angle) * radius, center->y + 2.0f,
-                      center->z + Math_CosS(angle) * radius };
+        Vec3f pos = { center->x + Math_SinS(angle) * radius, center->y + 2.0f, center->z + Math_CosS(angle) * radius };
         Vec3f velocity = { Math_SinS(angle) * 3.0f, 1.0f + Rand_ZeroOne() * 2.0f, Math_CosS(angle) * 3.0f };
         Vec3f accel = { -velocity.x * 0.1f, -0.1f, -velocity.z * 0.1f };
 
@@ -135,7 +132,6 @@ static void RequestQuake(PlayState* play, s16 speed, s16 strength, s16 duration)
     Quake_SetDuration(quake, duration);
 }
 
-// En_Okarina_Effect's storm: the spell brings the weather, not Song of Storms' puzzles.
 static void SummonStorm(PlayState* play) {
     sStormTimer = DEMISE_WINDUP_DURATION + DEMISE_STORM_AFTERMATH;
     if (sOwnsStorm || play->envCtx.precipitation[PRECIP_RAIN_CUR] != 0 ||
@@ -149,7 +145,6 @@ static void SummonStorm(PlayState* play) {
     sOwnsStorm = true;
 }
 
-// The rain drains away a drop count at a time, as Song of Storms' own storm does.
 static void FadeStorm(PlayState* play) {
     if ((play->state.frames % DEMISE_STORM_FADE_STEP_FRAMES) != 0) {
         return;
@@ -175,7 +170,7 @@ static void UpdateStorm(PlayState* play) {
     FadeStorm(play);
 }
 
-// Same dimming the Great Fairy's magic applies around a spin; it has to be re-sent every frame until it is back at 0.
+// Must be re-sent every frame until it is back at 0.
 static void UpdateDarkness(PlayState* play) {
     f32 target = (sPhase == DEMISE_WINDUP) ? DEMISE_DARKNESS : 0.0f;
 
@@ -186,7 +181,6 @@ static void UpdateDarkness(PlayState* play) {
     Environment_AdjustLights(play, sDarkness, 850.0f, 0.2f, 0.0f);
 }
 
-// A scene load rebuilds the lights, so nothing the spell set up belongs to the new scene.
 static void ForgetPreviousScene(PlayState* play) {
     bool isNewScene = (play->sceneId != sSceneId) || (play->state.frames < sLastFrame);
 
@@ -210,7 +204,6 @@ static void Stop(Player* player, PlayState* play) {
     if (sPhase == DEMISE_IDLE) {
         return;
     }
-    // A wind-up cut short must hand the player back, or Link stays frozen with no input.
     if (sPhase == DEMISE_WINDUP) {
         player->stateFlags1 &= ~DEMISE_INPUT_LOCK;
     }
@@ -218,7 +211,6 @@ static void Stop(Player* player, PlayState* play) {
     sApi->ReleaseTimeControl("demise.cast");
     sPhase = DEMISE_IDLE;
     sTimer = 0;
-    // Consuming leaves the meter flashing, and the next cast is refused until the spell resets it.
     Magic_Reset(play);
 }
 
@@ -227,7 +219,6 @@ static bool CanCast(Player* player, PlayState* play) {
            (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND);
 }
 
-// Two frames early: the player is still finishing its own update and would stomp the camera setting back.
 static void Cast(PlayState* play, Player* player) {
     if (!Magic_Consume(play, DEMISE_MAGIC_COST, MAGIC_CONSUME_NOW)) {
         return;
@@ -255,7 +246,6 @@ static void PinPlayerDown(Player* player) {
 static void UpdateWindupEffects(Player* player, PlayState* play) {
     Vec3f* pos = &player->actor.world.pos;
 
-    // Majora's Mask has no Ganon sting; the thunder is the nearest cue for the wind-up's turn.
     if (sTimer == 20) {
         Audio_PlaySfx_AtPos(pos, NA_SE_EV_LIGHTNING);
     }
@@ -327,7 +317,6 @@ static void UpdateWindup(Player* player, PlayState* play) {
     sTimer = 0;
 }
 
-// The blast is one cylinder of explosive-class damage, held live for a few frames after the flash.
 static void UpdateFinish(Player* player, PlayState* play) {
     sCollider.dim.pos.x = (s16)player->actor.world.pos.x;
     sCollider.dim.pos.y = (s16)player->actor.world.pos.y;
@@ -375,7 +364,6 @@ static void UpdateSpell(Player* player) {
     }
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, DEMISE_KEY, DEMISE_KEY, "",
 };
@@ -389,14 +377,14 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
 }
 
 static void PauseSpellWorld(Actor* actor, bool* should) {
-    if (sPhase == DEMISE_WINDUP && actor->id != ACTOR_PLAYER) *should = false;
+    if (sPhase == DEMISE_WINDUP && actor->id != ACTOR_PLAYER)
+        *should = false;
 }
 
-// A thrown boomerang: its explosive flag is a hit, not an En_Bom, so bombable walls and boulders ignore it.
 static void GrantDemiseLogic(void) {
     static const Z64LogicSource sDemise = { DEMISE_KEY };
-    static const char* const sThrowing[] = { "CanUseProjectile", "HookshotOrBoomerang", "CanHitSwitch", "CanAttack",
-                                             "CanDamage", NULL };
+    static const char* const sThrowing[] = { "CanUseProjectile", "HookshotOrBoomerang", "CanHitSwitch",
+                                             "CanAttack",        "CanDamage",           NULL };
 
     if (Z64Logic_Init(sApi)) {
         Z64Logic_GrantCapabilities(&sDemise, sThrowing);

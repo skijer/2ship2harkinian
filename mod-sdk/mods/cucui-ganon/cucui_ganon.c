@@ -82,22 +82,17 @@ typedef struct {
 #include "ganondorf_grounding.inc"
 #include "ganondorf_lyrics.inc"
 
-static const char* const sRequiredHooks[] = { "OnGameFrameUpdate", "OnInterfaceDrawEnd", "ShouldActorInit", "OnAudioTablesReady",
-                                               "OnCollisionResolveDamage" };
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate", "OnInterfaceDrawEnd", "ShouldActorInit",
+                                              "OnAudioTablesReady", "OnCollisionResolveDamage" };
 static const SOHModRequirements sRequirements = {
-    sizeof(SOHModRequirements), sRequiredHooks, ARRAY_COUNT(sRequiredHooks),
+    sizeof(SOHModRequirements),
+    sRequiredHooks,
+    ARRAY_COUNT(sRequiredHooks),
 };
 
-// Ganon's slot in his own arena; NULL logic keeps the vanilla Ganon condition, which is stricter.
 static const SOHBossDefinition sCucuiBoss = {
-    sizeof(SOHBossDefinition),
-    BOSS_KEY,
-    "Cucui Ganon",
-    NULL,
-    SOH_BOSS_SLOT_BIT(S2H_BOSS_SLOT_MAJORA),
-    S2H_BOSS_SLOT_MAJORA,
-    NULL,
-    DANCE_CVAR,
+    sizeof(SOHBossDefinition), BOSS_KEY, "Cucui Ganon", NULL, SOH_BOSS_SLOT_BIT(S2H_BOSS_SLOT_MAJORA),
+    S2H_BOSS_SLOT_MAJORA,      NULL,     DANCE_CVAR,
 };
 
 typedef struct CucuiBoss {
@@ -185,11 +180,27 @@ static int sSpotlightStunCooldown;
 static bool sChaseStrikePending;
 static int sSummonedCount;
 
-enum { MOVE_INTRO, MOVE_IDLE, MOVE_IMMUNE, MOVE_DASH, MOVE_SPIN, MOVE_SPIN_REVERSE, MOVE_RETURN_SPIN,
-       MOVE_SALSA_2, MOVE_SALSA_1, MOVE_SEXY_TURN, MOVE_BACK, MOVE_FORWARD, MOVE_M5,
-       MOVE_CHARGED_TURN, MOVE_OVERHEAD };
+enum {
+    MOVE_INTRO,
+    MOVE_IDLE,
+    MOVE_IMMUNE,
+    MOVE_DASH,
+    MOVE_SPIN,
+    MOVE_SPIN_REVERSE,
+    MOVE_RETURN_SPIN,
+    MOVE_SALSA_2,
+    MOVE_SALSA_1,
+    MOVE_SEXY_TURN,
+    MOVE_BACK,
+    MOVE_FORWARD,
+    MOVE_M5,
+    MOVE_CHARGED_TURN,
+    MOVE_OVERHEAD
+};
 enum { ELEMENT_EXPLOSION, ELEMENT_ICE, ELEMENT_FIRE, ELEMENT_ELECTRIC };
-static const Color_RGBA8 sElementColors[4] = {{255,130,30,255},{90,200,255,255},{255,35,25,255},{255,245,60,255}};
+static const Color_RGBA8 sElementColors[4] = {
+    { 255, 130, 30, 255 }, { 90, 200, 255, 255 }, { 255, 35, 25, 255 }, { 255, 245, 60, 255 }
+};
 
 typedef struct {
     Vec3f pos;
@@ -218,7 +229,8 @@ typedef struct {
 static DanceRock sRocks[12];
 
 static void ReturnMainCamera(PlayState* play, s16 camera, s16 unused) {
-    if (camera > CAM_ID_MAIN) Play_ClearCamera(play, camera);
+    if (camera > CAM_ID_MAIN)
+        Play_ClearCamera(play, camera);
     Play_ChangeCameraStatus(play, CAM_ID_MAIN, CAM_STATUS_ACTIVE);
 }
 
@@ -249,17 +261,16 @@ typedef struct {
     Vec3f handPos[2];
 } CucuiPhantom;
 
-typedef struct { f32 footY; Vec3s joints[25]; } PhantomDancePose;
+typedef struct {
+    f32 footY;
+    Vec3s joints[25];
+} PhantomDancePose;
 #include "PhantomGlanceA_poses.inc"
 #include "PhantomGlanceB_poses.inc"
 #include "PhantomSalsa_poses.inc"
 #include "PhantomSideTurn_poses.inc"
 #include "PhantomSpin_poses.inc"
 #include "PhantomDash_poses.inc"
-
-
-
-
 
 static void ConfigureBallArc(StarBall* ball, Vec3f target) {
     f32 dx = target.x - ball->pos.x;
@@ -274,10 +285,13 @@ static void ConfigureBallArc(StarBall* ball, Vec3f target) {
     ball->lateralBend = 0.0f;
     ball->ownerPhantom = -1;
     ball->travelFrames = (int)(distance / (ball->fast ? 13.0f : 9.0f));
-    if (ball->travelFrames < 12) ball->travelFrames = 12;
-    if (ball->travelFrames > 75) ball->travelFrames = 75;
+    if (ball->travelFrames < 12)
+        ball->travelFrames = 12;
+    if (ball->travelFrames > 75)
+        ball->travelFrames = 75;
     ball->arcHeight = 25.0f + distance * 0.055f;
-    if (ball->arcHeight > 65.0f) ball->arcHeight = 65.0f;
+    if (ball->arcHeight > 65.0f)
+        ball->arcHeight = 65.0f;
     ball->life = ball->travelFrames + 7;
 }
 
@@ -286,10 +300,10 @@ static Vec3f BallArcPoint(const StarBall* ball, f32 t) {
     f32 dz = ball->target.z - ball->start.z;
     f32 length = sqrtf(dx * dx + dz * dz);
     f32 lateral = 4.0f * ball->lateralBend * t * (1.0f - t);
-    if (length < 1.0f) length = 1.0f;
+    if (length < 1.0f)
+        length = 1.0f;
     return (Vec3f){ ball->start.x + dx * t - dz / length * lateral,
-                    ball->start.y + (ball->target.y - ball->start.y) * t +
-                        4.0f * ball->arcHeight * t * (1.0f - t),
+                    ball->start.y + (ball->target.y - ball->start.y) * t + 4.0f * ball->arcHeight * t * (1.0f - t),
                     ball->start.z + dz * t + dx / length * lateral };
 }
 
@@ -297,10 +311,14 @@ static void KeepInsideArena(Vec3f* pos) {
     f32 x = pos->x - ARENA_CENTER_X;
     f32 z = pos->z - ARENA_CENTER_Z;
     f32 radius;
-    if (x > ARENA_HALF_WIDTH) x = ARENA_HALF_WIDTH;
-    if (x < -ARENA_HALF_WIDTH) x = -ARENA_HALF_WIDTH;
-    if (z > ARENA_HALF_WIDTH) z = ARENA_HALF_WIDTH;
-    if (z < -ARENA_HALF_WIDTH) z = -ARENA_HALF_WIDTH;
+    if (x > ARENA_HALF_WIDTH)
+        x = ARENA_HALF_WIDTH;
+    if (x < -ARENA_HALF_WIDTH)
+        x = -ARENA_HALF_WIDTH;
+    if (z > ARENA_HALF_WIDTH)
+        z = ARENA_HALF_WIDTH;
+    if (z < -ARENA_HALF_WIDTH)
+        z = -ARENA_HALF_WIDTH;
     radius = sqrtf(x * x + z * z);
     if (radius > ARENA_SAFE_RADIUS) {
         x *= ARENA_SAFE_RADIUS / radius;
@@ -352,7 +370,6 @@ static void RestoreArenaLighting(void) {
 }
 
 static void BrightenArena(PlayState* play) {
-    // Keep the arena's own ambient light and fog; only actor-local lights are added.
     sLightingPlay = play;
 }
 
@@ -365,7 +382,8 @@ static void UpdateStageLights(CucuiBoss* boss, PlayState* play) {
     f32 cz = Math_CosS(yaw);
     f32 fade = (f32)sStageLightRamp / 20.0f;
 
-    if (sStageLightRamp == 0) return;
+    if (sStageLightRamp == 0)
+        return;
     if (sStageLightNodes[0] == NULL) {
         Lights_PointNoGlowSetInfo(&sStageLightInfo[0], x, y + 120.0f, z, 255, 217, 170, 185);
         sStageLightNodes[0] = LightContext_InsertLight(play, &play->lightCtx, &sStageLightInfo[0]);
@@ -374,13 +392,11 @@ static void UpdateStageLights(CucuiBoss* boss, PlayState* play) {
         Lights_PointNoGlowSetInfo(&sStageLightInfo[1], x, y + 120.0f, z, 172, 175, 255, 185);
         sStageLightNodes[1] = LightContext_InsertLight(play, &play->lightCtx, &sStageLightInfo[1]);
     }
-    if (fade > 1.0f) fade = 1.0f;
-    // Narrow sources illuminate the model, not the entire battle arena.
-    Lights_PointNoGlowSetInfo(&sStageLightInfo[0], x - 48.0f * cz + 22.0f * sx,
-                              y + 115.0f, z + 48.0f * sx + 22.0f * cz,
+    if (fade > 1.0f)
+        fade = 1.0f;
+    Lights_PointNoGlowSetInfo(&sStageLightInfo[0], x - 48.0f * cz + 22.0f * sx, y + 115.0f, z + 48.0f * sx + 22.0f * cz,
                               (u8)(255 * fade), (u8)(222 * fade), (u8)(186 * fade), 185);
-    Lights_PointNoGlowSetInfo(&sStageLightInfo[1], x + 48.0f * cz - 22.0f * sx,
-                              y + 115.0f, z - 48.0f * sx - 22.0f * cz,
+    Lights_PointNoGlowSetInfo(&sStageLightInfo[1], x + 48.0f * cz - 22.0f * sx, y + 115.0f, z - 48.0f * sx - 22.0f * cz,
                               (u8)(180 * fade), (u8)(185 * fade), (u8)(255 * fade), 185);
 }
 
@@ -435,21 +451,20 @@ static void InitSpotlightVtx(void) {
     sSpotlightVtxReady = true;
 }
 
-// Evaluate the drawn OoT hierarchy, including root translation, for hands and feet.
 static void EvaluateGanondorfBones(CucuiBoss* boss, MtxF bones[25]) {
     int i;
     Matrix_Push();
     for (i = 0; i < 25; i++) {
-        Vec3s a = boss->skelAnime.jointTable[i+1];
+        Vec3s a = boss->skelAnime.jointTable[i + 1];
         if (sGroundParents[i] < 0) {
             Vec3s root = boss->skelAnime.jointTable[0];
             Matrix_Translate(root.x, root.y + boss->actor.shape.yOffset, root.z, MTXMODE_NEW);
         } else {
             Vec3f p = sGroundOffsets[i];
             Matrix_Put(&bones[sGroundParents[i]]);
-            Matrix_Translate(p.x,p.y,p.z,MTXMODE_APPLY);
+            Matrix_Translate(p.x, p.y, p.z, MTXMODE_APPLY);
         }
-        Matrix_RotateZYX(a.x,a.y,a.z,MTXMODE_APPLY);
+        Matrix_RotateZYX(a.x, a.y, a.z, MTXMODE_APPLY);
         Matrix_Get(&bones[i]);
     }
     Matrix_Pop();
@@ -466,11 +481,11 @@ static Vec3f PoseLimbWorldPoint(CucuiBoss* boss, int limb, Vec3f local) {
     Matrix_Pop();
     x = posed.x * boss->actor.scale.x;
     z = posed.z * boss->actor.scale.z;
-    return (Vec3f){ boss->actor.world.pos.x + x * Math_CosS(boss->actor.shape.rot.y) +
-                    z * Math_SinS(boss->actor.shape.rot.y),
-                    boss->actor.world.pos.y + posed.y * boss->actor.scale.y,
-                    boss->actor.world.pos.z - x * Math_SinS(boss->actor.shape.rot.y) +
-                    z * Math_CosS(boss->actor.shape.rot.y) };
+    return (Vec3f){
+        boss->actor.world.pos.x + x * Math_CosS(boss->actor.shape.rot.y) + z * Math_SinS(boss->actor.shape.rot.y),
+        boss->actor.world.pos.y + posed.y * boss->actor.scale.y,
+        boss->actor.world.pos.z - x * Math_SinS(boss->actor.shape.rot.y) + z * Math_CosS(boss->actor.shape.rot.y)
+    };
 }
 
 static f32 PoseSoleHeight(CucuiBoss* boss) {
@@ -487,7 +502,8 @@ static f32 PoseSoleHeight(CucuiBoss* boss) {
         for (j = 0; j < count; j++) {
             Vec3f result;
             Matrix_MultVec3f((Vec3f*)&verts[j], &result);
-            if (result.y < lowest) lowest = result.y;
+            if (result.y < lowest)
+                lowest = result.y;
         }
     }
     Matrix_Pop();
@@ -496,38 +512,41 @@ static f32 PoseSoleHeight(CucuiBoss* boss) {
 
 static void ApplyLinkElement(PlayState* play, int element, Vec3f pos) {
     Player* player = GET_PLAYER(play);
-    Vec3f zero = {0};
+    Vec3f zero = { 0 };
     int i;
     if (element == ELEMENT_EXPLOSION) {
-        EffectSsBomb2_SpawnLayered(play,&pos,&zero,&zero,100,25);
-        EffectSsBlast_SpawnWhiteShockwave(play,&pos,&zero,&zero);
+        EffectSsBomb2_SpawnLayered(play, &pos, &zero, &zero, 100, 25);
+        EffectSsBlast_SpawnWhiteShockwave(play, &pos, &zero, &zero);
         Audio_PlayActorSound2(&player->actor, NA_SE_IT_BOMB_EXPLOSION);
     } else if (element == ELEMENT_FIRE) {
-        for (i = 0; i < PLAYER_BODYPART_MAX; i++) player->bodyFlameTimers[i] = 50 + i*2;
+        for (i = 0; i < PLAYER_BODYPART_MAX; i++)
+            player->bodyFlameTimers[i] = 50 + i * 2;
         player->bodyIsBurning = true;
-        EffectSsGFire_Spawn(play,&pos);
+        EffectSsGFire_Spawn(play, &pos);
     } else {
         sLinkStatusElement = element;
         sLinkStatusTimer = element == ELEMENT_ICE ? 40 : 30;
         player->actor.freezeTimer = 2;
-        if (element == ELEMENT_ICE)
-            {
+        if (element == ELEMENT_ICE) {
             Vec3f velocity = { 0, 1, 0 }, accel = { 0, -0.2f, 0 };
             Color_RGBA8 prim = { 180, 230, 255, 255 }, env = { 50, 100, 255, 255 };
             EffectSsEnIce_Spawn(play, &pos, 1.2f, &velocity, &accel, &prim, &env, 20);
-        }
-        else player->bodyShockTimer = 30;
+        } else
+            player->bodyShockTimer = 30;
     }
 }
 
 static void UpdateLinkStatus(PlayState* play) {
     Player* player = GET_PLAYER(play);
-    if (sLinkStatusTimer <= 0) return;
+    if (sLinkStatusTimer <= 0)
+        return;
     player->actor.freezeTimer = 2;
-    if (sLinkStatusElement == ELEMENT_ELECTRIC) player->bodyShockTimer = 3;
+    if (sLinkStatusElement == ELEMENT_ELECTRIC)
+        player->bodyShockTimer = 3;
     if (--sLinkStatusTimer == 0) {
         player->actor.freezeTimer = 0;
-        if (sLinkStatusElement == ELEMENT_ICE) EffectSsIcePiece_SpawnBurst(play,&player->actor.world.pos,0.01f);
+        if (sLinkStatusElement == ELEMENT_ICE)
+            EffectSsIcePiece_SpawnBurst(play, &player->actor.world.pos, 0.01f);
     }
 }
 
@@ -540,12 +559,13 @@ static void SpawnStepRocks(CucuiBoss* boss, PlayState* play) {
     for (i = 0; i < ARRAY_COUNT(sRocks) && spawned < 3; i++) {
         DanceRock* rock = &sRocks[i];
         float angle;
-        if (rock->life > 0) continue;
+        if (rock->life > 0)
+            continue;
         angle = BINANG_TO_RAD(boss->actor.shape.rot.y) + spawned * (2 * M_PI / 3) + sStepCount * 0.7f;
         rock->pos = foot;
         rock->pos.x += sinf(angle) * 48;
         rock->pos.z += cosf(angle) * 48;
-        rock->velocity = (Vec3f){sinf(angle) * 4, 12 + spawned * 2, cosf(angle) * 4};
+        rock->velocity = (Vec3f){ sinf(angle) * 4, 12 + spawned * 2, cosf(angle) * 4 };
         rock->kind = (sStepCount + spawned) & 1;
         rock->scale = rock->kind ? 0.025f : 0.008f;
         rock->life = 60;
@@ -556,31 +576,35 @@ static void SpawnStepRocks(CucuiBoss* boss, PlayState* play) {
 
 static void UpdateRockWave(CucuiBoss* boss, PlayState* play) {
     Player* player = GET_PLAYER(play);
-    Vec3f zero = {0};
+    Vec3f zero = { 0 };
     Vec3f pos;
     int i;
-    if (sWaveTimer <= 0) return;
-    if (--sWaveTimer % 4 != 0) return;
+    if (sWaveTimer <= 0)
+        return;
+    if (--sWaveTimer % 4 != 0)
+        return;
     sWaveStep++;
-    pos = (Vec3f){sWaveOrigin.x+sWaveDirection.x*sWaveStep*65,
-                  sArenaFloorY+8,sWaveOrigin.z+sWaveDirection.z*sWaveStep*65};
+    pos = (Vec3f){ sWaveOrigin.x + sWaveDirection.x * sWaveStep * 65, sArenaFloorY + 8,
+                   sWaveOrigin.z + sWaveDirection.z * sWaveStep * 65 };
     KeepInsideArena(&pos);
-    EffectSsBlast_SpawnWhiteShockwave(play,&pos,&zero,&zero);
-    EffectSsBomb2_SpawnLayered(play,&pos,&zero,&zero,70,15);
-    SpawnDanceDust(play,&pos,50,5,140,10,1);
-    Audio_PlayActorSound2(&boss->actor,NA_SE_IT_BOMB_EXPLOSION);
+    EffectSsBlast_SpawnWhiteShockwave(play, &pos, &zero, &zero);
+    EffectSsBomb2_SpawnLayered(play, &pos, &zero, &zero, 70, 15);
+    SpawnDanceDust(play, &pos, 50, 5, 140, 10, 1);
+    Audio_PlayActorSound2(&boss->actor, NA_SE_IT_BOMB_EXPLOSION);
     for (i = 0; i < ARRAY_COUNT(sRocks); i++) {
-        if (sRocks[i].life > 0) continue;
-        sRocks[i] = (DanceRock){pos,{sWaveDirection.x*2,8,sWaveDirection.z*2},35,sWaveStep&1,
-                                (sWaveStep&1)?0.025f:0.008f};
+        if (sRocks[i].life > 0)
+            continue;
+        sRocks[i] = (DanceRock){
+            pos, { sWaveDirection.x * 2, 8, sWaveDirection.z * 2 }, 35, sWaveStep & 1, (sWaveStep & 1) ? 0.025f : 0.008f
+        };
         break;
     }
     if (sProjectileHitCooldown == 0) {
-        float dx=player->actor.world.pos.x-pos.x, dz=player->actor.world.pos.z-pos.z;
-        if (dx*dx+dz*dz < 65*65 && fabsf(player->actor.world.pos.y-sArenaFloorY)<80) {
-            Actor_SetPlayerKnockbackLargeNoDamage(play,&boss->actor,12,boss->actor.shape.rot.y,6);
-            play->damagePlayer(play,-BALL_DAMAGE);
-            sProjectileHitCooldown=25;
+        float dx = player->actor.world.pos.x - pos.x, dz = player->actor.world.pos.z - pos.z;
+        if (dx * dx + dz * dz < 65 * 65 && fabsf(player->actor.world.pos.y - sArenaFloorY) < 80) {
+            Actor_SetPlayerKnockbackLargeNoDamage(play, &boss->actor, 12, boss->actor.shape.rot.y, 6);
+            play->damagePlayer(play, -BALL_DAMAGE);
+            sProjectileHitCooldown = 25;
         }
     }
 }
@@ -591,7 +615,8 @@ static void UpdateDanceRocks(CucuiBoss* boss, PlayState* play) {
     for (i = 0; i < ARRAY_COUNT(sRocks); i++) {
         DanceRock* rock = &sRocks[i];
         float dx, dy, dz;
-        if (rock->life <= 0) continue;
+        if (rock->life <= 0)
+            continue;
         rock->life--;
         rock->pos.x += rock->velocity.x;
         rock->pos.y += rock->velocity.y;
@@ -601,7 +626,7 @@ static void UpdateDanceRocks(CucuiBoss* boss, PlayState* play) {
         dx = player->actor.world.pos.x - rock->pos.x;
         dy = player->actor.world.pos.y + 35 - rock->pos.y;
         dz = player->actor.world.pos.z - rock->pos.z;
-        if (sProjectileHitCooldown == 0 && dx*dx + dz*dz < 45*45 && fabsf(dy) < 60) {
+        if (sProjectileHitCooldown == 0 && dx * dx + dz * dz < 45 * 45 && fabsf(dy) < 60) {
             Actor_SetPlayerKnockbackLargeNoDamage(play, &boss->actor, 8, (s16)(atan2f(dx, dz) * (0x8000 / M_PI)), 5);
             play->damagePlayer(play, -ROCK_DAMAGE);
             sProjectileHitCooldown = 25;
@@ -620,7 +645,8 @@ static void DrawDanceRocks(PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     for (i = 0; i < ARRAY_COUNT(sRocks); i++) {
         DanceRock* rock = &sRocks[i];
-        if (rock->life <= 0) continue;
+        if (rock->life <= 0)
+            continue;
         Matrix_Push();
         Matrix_Translate(rock->pos.x, rock->pos.y, rock->pos.z, MTXMODE_NEW);
         Matrix_RotateX(rock->life * 0.19f, MTXMODE_APPLY);
@@ -639,18 +665,20 @@ static void DrawDanceRocks(PlayState* play) {
 static void DrawSpotlights(Actor* actor, PlayState* play) {
     int cone, side, i;
     f32 fade;
-    if (!sPlaying || actor != &sBoss->actor || sStageLightRamp == 0 || play != sLightingPlay) return;
-    if (!sSpotlightVtxReady) InitSpotlightVtx();
+    if (!sPlaying || actor != &sBoss->actor || sStageLightRamp == 0 || play != sLightingPlay)
+        return;
+    if (!sSpotlightVtxReady)
+        InitSpotlightVtx();
     fade = (f32)sStageLightRamp / 20.0f;
-    if (fade > 1.0f) fade = 1.0f;
+    if (fade > 1.0f)
+        fade = 1.0f;
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_OFF);
     gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_CULL_BOTH | G_FOG);
     gDPSetCycleType(POLY_XLU_DISP++, G_CYC_1CYCLE);
     gDPSetRenderMode(POLY_XLU_DISP++, G_RM_AA_ZB_XLU_SURF, G_RM_AA_ZB_XLU_SURF2);
-    gDPSetCombineLERP(POLY_XLU_DISP++, 0, 0, 0, SHADE, SHADE, 0, PRIMITIVE, 0,
-                      0, 0, 0, SHADE, SHADE, 0, PRIMITIVE, 0);
+    gDPSetCombineLERP(POLY_XLU_DISP++, 0, 0, 0, SHADE, SHADE, 0, PRIMITIVE, 0, 0, 0, 0, SHADE, SHADE, 0, PRIMITIVE, 0);
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, (u8)(255 * fade));
     Matrix_Push();
     Matrix_Translate(sSpotlightTarget.x, sArenaFloorY, sSpotlightTarget.z, MTXMODE_NEW);
@@ -660,8 +688,7 @@ static void DrawSpotlights(Actor* actor, PlayState* play) {
         gSPVertex(POLY_XLU_DISP++, (uintptr_t)sSpotlightVtx[cone], 17, 0);
         for (side = 0; side < 8; side++) {
             int next = (side + 1) & 7;
-            gSP2Triangles(POLY_XLU_DISP++, 0, 1 + side, 1 + next, 0,
-                          1 + side, 9 + side, 9 + next, 0);
+            gSP2Triangles(POLY_XLU_DISP++, 0, 1 + side, 1 + next, 0, 1 + side, 9 + side, 9 + next, 0);
             gSP1Triangle(POLY_XLU_DISP++, 1 + side, 9 + next, 1 + next, 0);
         }
     }
@@ -678,7 +705,8 @@ static void DrawSpotlights(Actor* actor, PlayState* play) {
     for (i = 0; i < ARRAY_COUNT(sStarBalls); i++) {
         StarBall* ball = &sStarBalls[i];
         f32 scale = (play->gameplayFrames & 1) ? 6.0f : 5.25f;
-        if (ball->life <= 0) continue;
+        if (ball->life <= 0)
+            continue;
         Matrix_Push();
         Matrix_Translate(ball->pos.x, ball->pos.y, ball->pos.z, MTXMODE_NEW);
         Matrix_ReplaceRotation(&play->billboardMtxF);
@@ -686,26 +714,28 @@ static void DrawSpotlights(Actor* actor, PlayState* play) {
         Matrix_RotateZ(play->gameplayFrames * 1.1f + i, MTXMODE_APPLY);
         Gfx_SetupDL_25Xlu(play->state.gfxCtx);
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
-        if (ball->returning) gDPSetEnvColor(POLY_XLU_DISP++, 0, 255, 255, 0);
-        else { Color_RGBA8 color = sElementColors[ball->element]; gDPSetEnvColor(POLY_XLU_DISP++, color.r, color.g, color.b, 0); }
+        if (ball->returning)
+            gDPSetEnvColor(POLY_XLU_DISP++, 0, 255, 255, 0);
+        else {
+            Color_RGBA8 color = sElementColors[ball->element];
+            gDPSetEnvColor(POLY_XLU_DISP++, color.r, color.g, color.b, 0);
+        }
         gDPPipeSync(POLY_XLU_DISP++);
-        gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx),
-                  G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
         gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gPhantomEnergyBallDL);
         Matrix_Pop();
     }
     if (sChargeAmount > 0 && sStunTimer == 0 && !sShowcase) {
-        Vec3f hand = PoseLimbWorldPoint((CucuiBoss*)actor, sMove == MOVE_OVERHEAD ? 5 : 9,
-                                        (Vec3f){500,0,0});
+        Vec3f hand = PoseLimbWorldPoint((CucuiBoss*)actor, sMove == MOVE_OVERHEAD ? 5 : 9, (Vec3f){ 500, 0, 0 });
         Color_RGBA8 color = sElementColors[sChargeElement];
         Matrix_Push();
         Matrix_Translate(hand.x, hand.y, hand.z, MTXMODE_NEW);
         Matrix_ReplaceRotation(&play->billboardMtxF);
-        Matrix_Scale(2+sChargeAmount*7,2+sChargeAmount*7,2+sChargeAmount*7,MTXMODE_APPLY);
+        Matrix_Scale(2 + sChargeAmount * 7, 2 + sChargeAmount * 7, 2 + sChargeAmount * 7, MTXMODE_APPLY);
         Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-        gDPSetPrimColor(POLY_XLU_DISP++,0,0,255,255,255,255);
-        gDPSetEnvColor(POLY_XLU_DISP++,color.r,color.g,color.b,0);
-        gSPMatrix(POLY_XLU_DISP++,MATRIX_NEWMTX(play->state.gfxCtx),G_MTX_LOAD|G_MTX_MODELVIEW);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+        gDPSetEnvColor(POLY_XLU_DISP++, color.r, color.g, color.b, 0);
+        gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_LOAD | G_MTX_MODELVIEW);
         gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gPhantomEnergyBallDL);
         Matrix_Pop();
     }
@@ -760,11 +790,11 @@ static f32 RootYForFootContacts(CucuiBoss* boss, const GanondorfDancePose* pose)
             sArenaFloorY + 120.0f,
             boss->actor.world.pos.z - foot->x * sx + foot->z * cz,
         };
-        f32 floorY = BgCheck_EntityRaycastFloor5(gPlayState, &gPlayState->colCtx, &floor, &bgId,
-                                                  &boss->actor, &probe);
+        f32 floorY = BgCheck_EntityRaycastFloor5(gPlayState, &gPlayState->colCtx, &floor, &bgId, &boss->actor, &probe);
         if (floor != NULL && floorY > BGCHECK_Y_MIN && fabsf(floorY - sArenaFloorY) < 70.0f) {
             f32 candidate = floorY - foot->y;
-            if (!found || candidate > targetY) targetY = candidate;
+            if (!found || candidate > targetY)
+                targetY = candidate;
             found = true;
         }
     }
@@ -834,13 +864,16 @@ static void ApplyPose(CucuiBoss* boss, const GanondorfDancePose* poses, uint32_t
         boss->actor.world.pos.z = sAnchor.z - x * Math_SinS(yaw) + z * Math_CosS(yaw);
     }
     targetY = RootYForFootContacts(boss, pose);
-    // Small floor corrections keep a support foot grounded without shifting
-    // the whole skeleton to a different height at each action boundary.
-    if (targetY > sStableRootY + 7.0f) targetY = sStableRootY + 7.0f;
-    if (targetY < sStableRootY - 7.0f) targetY = sStableRootY - 7.0f;
-    if (targetY > boss->actor.world.pos.y + 1.75f) targetY = boss->actor.world.pos.y + 1.75f;
-    if (targetY < boss->actor.world.pos.y - 1.75f) targetY = boss->actor.world.pos.y - 1.75f;
-    if (sMove == MOVE_INTRO) targetY = sArenaFloorY - PoseSoleHeight(boss);
+    if (targetY > sStableRootY + 7.0f)
+        targetY = sStableRootY + 7.0f;
+    if (targetY < sStableRootY - 7.0f)
+        targetY = sStableRootY - 7.0f;
+    if (targetY > boss->actor.world.pos.y + 1.75f)
+        targetY = boss->actor.world.pos.y + 1.75f;
+    if (targetY < boss->actor.world.pos.y - 1.75f)
+        targetY = boss->actor.world.pos.y - 1.75f;
+    if (sMove == MOVE_INTRO)
+        targetY = sArenaFloorY - PoseSoleHeight(boss);
     boss->actor.world.pos.y = targetY;
     boss->actor.velocity.x = 0.0f;
     boss->actor.velocity.y = 0.0f;
@@ -852,21 +885,55 @@ static void ApplyPose(CucuiBoss* boss, const GanondorfDancePose* poses, uint32_t
 static const GanondorfDancePose* MovePoses(int move, int* first, int* count) {
     *first = 0;
     switch (move) {
-        case MOVE_INTRO: *count = ARRAY_COUNT(sBossIntroPoses); return sBossIntroPoses;
-        case MOVE_IDLE: *count = 60; return sBossIdlePoses;
-        case MOVE_OVERHEAD: *first = 60; *count = 60; return sBossIdlePoses;
-        case MOVE_CHARGED_TURN: *count = ARRAY_COUNT(sBossSpinPoses); return sBossSpinPoses;
-        case MOVE_IMMUNE: *count = ARRAY_COUNT(sBossImmunePoses); return sBossImmunePoses;
-        case MOVE_DASH: *count = ARRAY_COUNT(sBossDashPoses); return sBossDashPoses;
-        case MOVE_SPIN: *count = ARRAY_COUNT(sBossSpinPoses); return sBossSpinPoses;
-        case MOVE_SPIN_REVERSE: *count = ARRAY_COUNT(sBossSpinReversePoses); return sBossSpinReversePoses;
-        case MOVE_RETURN_SPIN: *count = ARRAY_COUNT(sBossSpinPoses); return sBossSpinPoses;
-        case MOVE_SALSA_2: *count = ARRAY_COUNT(sBossSalsa2Poses); return sBossSalsa2Poses;
-        case MOVE_SALSA_1: *count = ARRAY_COUNT(sBossSalsa1Poses); return sBossSalsa1Poses;
-        case MOVE_SEXY_TURN: *first = 340; *count = 80; return sDancePoses;
-        case MOVE_BACK: *first = 480; *count = 60; return sDancePoses;
-        case MOVE_FORWARD: *first = 560; *count = 80; return sDancePoses;
-        default: *count = ARRAY_COUNT(sDancePoses); return sDancePoses;
+        case MOVE_INTRO:
+            *count = ARRAY_COUNT(sBossIntroPoses);
+            return sBossIntroPoses;
+        case MOVE_IDLE:
+            *count = 60;
+            return sBossIdlePoses;
+        case MOVE_OVERHEAD:
+            *first = 60;
+            *count = 60;
+            return sBossIdlePoses;
+        case MOVE_CHARGED_TURN:
+            *count = ARRAY_COUNT(sBossSpinPoses);
+            return sBossSpinPoses;
+        case MOVE_IMMUNE:
+            *count = ARRAY_COUNT(sBossImmunePoses);
+            return sBossImmunePoses;
+        case MOVE_DASH:
+            *count = ARRAY_COUNT(sBossDashPoses);
+            return sBossDashPoses;
+        case MOVE_SPIN:
+            *count = ARRAY_COUNT(sBossSpinPoses);
+            return sBossSpinPoses;
+        case MOVE_SPIN_REVERSE:
+            *count = ARRAY_COUNT(sBossSpinReversePoses);
+            return sBossSpinReversePoses;
+        case MOVE_RETURN_SPIN:
+            *count = ARRAY_COUNT(sBossSpinPoses);
+            return sBossSpinPoses;
+        case MOVE_SALSA_2:
+            *count = ARRAY_COUNT(sBossSalsa2Poses);
+            return sBossSalsa2Poses;
+        case MOVE_SALSA_1:
+            *count = ARRAY_COUNT(sBossSalsa1Poses);
+            return sBossSalsa1Poses;
+        case MOVE_SEXY_TURN:
+            *first = 340;
+            *count = 80;
+            return sDancePoses;
+        case MOVE_BACK:
+            *first = 480;
+            *count = 60;
+            return sDancePoses;
+        case MOVE_FORWARD:
+            *first = 560;
+            *count = 80;
+            return sDancePoses;
+        default:
+            *count = ARRAY_COUNT(sDancePoses);
+            return sDancePoses;
     }
 }
 
@@ -877,19 +944,22 @@ static void BeginMove(CucuiBoss* boss, int move) {
     }
     sAnchor = boss->actor.world.pos;
     sAnchor.y = sArenaFloorY;
-    if (move == MOVE_RETURN_SPIN) sReturnStart = boss->actor.world.pos;
+    if (move == MOVE_RETURN_SPIN)
+        sReturnStart = boss->actor.world.pos;
     sChargeAmount = 0;
-    if (move == MOVE_IDLE) sChargeElement=(int)Rand_ZeroFloat(4);
-    if (move == MOVE_OVERHEAD) sChargeElement=ELEMENT_FIRE;
+    if (move == MOVE_IDLE)
+        sChargeElement = (int)Rand_ZeroFloat(4);
+    if (move == MOVE_OVERHEAD)
+        sChargeElement = ELEMENT_FIRE;
     sMove = move;
     sMoveFrame = 0;
     sPreviousMoveFrame = -1;
     sDrawMoveFrame = 0;
-    if (move == MOVE_DASH) sDashElapsed = 0;
+    if (move == MOVE_DASH)
+        sDashElapsed = 0;
     sMoveCount++;
 }
 
-// Phase two remains sealed until all four crew members have been defeated.
 static bool CrewDefeated(void) {
     return sSummonedCount == PHANTOM_COUNT && sPhantomsAlive == 0;
 }
@@ -906,24 +976,28 @@ static void BeginPhaseTwo(CucuiBoss* boss) {
 static bool DamageCucui(CucuiBoss* boss, bool returnedBall, bool rearArrow) {
     bool chargedHit = returnedBall || (rearArrow && sPhase == 1);
     bool opensStun = false;
-    if (sPhase == 2 && (!CrewDefeated() || (!chargedHit && sStunTimer == 0))) return false;
+    if (sPhase == 2 && (!CrewDefeated() || (!chargedHit && sStunTimer == 0)))
+        return false;
     if (chargedHit) {
         opensStun = ++sReflectedHits >= (sPhase == 2 ? 1 : 3);
-        if (opensStun) sReflectedHits = 0;
+        if (opensStun)
+            sReflectedHits = 0;
         if (returnedBall && !opensStun) {
             Audio_PlayActorSound2(&boss->actor, NA_SE_EN_GANON_HIT_THUNDER);
             return true;
         }
     }
     sHealth -= returnedBall ? RETURN_DAMAGE : BACK_DAMAGE;
-    if (sHealth < 1) sHealth = 1; // Final defeat sequence remains pending.
+    if (sHealth < 1)
+        sHealth = 1;
     Actor_SetColorFilter(&boss->actor, 0x4000, 255, 0, 12);
     Audio_PlayActorSound2(&boss->actor, returnedBall ? NA_SE_EN_GANON_DAMAGE2 : NA_SE_EN_GANON_DAMAGE1);
     if (opensStun) {
         int i;
-        // Give Link a clear approach after the third return; remove lingering hazards.
-        for (i = 0; i < ARRAY_COUNT(sStarBalls); i++) sStarBalls[i].life = 0;
-        for (i = 0; i < ARRAY_COUNT(sRocks); i++) sRocks[i].life = 0;
+        for (i = 0; i < ARRAY_COUNT(sStarBalls); i++)
+            sStarBalls[i].life = 0;
+        for (i = 0; i < ARRAY_COUNT(sRocks); i++)
+            sRocks[i].life = 0;
         sStunTimer = STUN_DURATION;
         sStunStage = 0;
         sWaveTimer = 0;
@@ -937,8 +1011,8 @@ static bool DamageCucui(CucuiBoss* boss, bool returnedBall, bool rearArrow) {
         Animation_MorphToPlayOnce(&boss->skelAnime, (AnimationHeader*)gGanondorfLightEnergyHitAnim, -3.0f);
         Audio_PlayActorSound2(&boss->actor, NA_SE_EN_GANON_HIT_THUNDER);
     }
-    // A phase change must not consume the attack window earned by the third return.
-    if (sHealth <= BOSS_PHASE2_HEALTH && sPhase == 1 && sStunTimer == 0) BeginPhaseTwo(boss);
+    if (sHealth <= BOSS_PHASE2_HEALTH && sPhase == 1 && sStunTimer == 0)
+        BeginPhaseTwo(boss);
     return true;
 }
 
@@ -955,23 +1029,23 @@ static void StartBossHurtbox(CucuiBoss* boss, PlayState* play) {
 }
 
 static void StopBossHurtbox(CucuiBoss* boss, PlayState* play) {
-    if (!sBossHurtboxReady) return;
+    if (!sBossHurtboxReady)
+        return;
     Collider_DestroyCylinder(play, &sBossHurtbox);
     sBossHurtboxReady = false;
 }
 
 static void UpdateBossHurtbox(CucuiBoss* boss, PlayState* play) {
-    if (!sBossHurtboxReady || sShowcase || sStageLightRamp == 0 || sPostIntroSpin || sMove == MOVE_INTRO) return;
+    if (!sBossHurtboxReady || sShowcase || sStageLightRamp == 0 || sPostIntroSpin || sMove == MOVE_INTRO)
+        return;
     Collider_UpdateCylinder(&boss->actor, &sBossHurtbox);
     sBossHurtbox.dim.pos.y = (s16)sArenaFloorY;
     CollisionCheck_SetAC(play, &play->colChkCtx, &sBossHurtbox.base);
 }
 
 static ColliderCylinderInit sPhantomColliderInit = {
-    { COL_MATERIAL_HIT5, AT_NONE, AC_ON | AC_TYPE_PLAYER, OC1_ON | OC1_TYPE_PLAYER,
-      OC2_TYPE_1, COLSHAPE_CYLINDER },
-    { ELEM_MATERIAL_UNK1, { 0, 0, 0 }, { 0xFFCFFFFF, 0, 0 },
-      ATELEM_NONE, ACELEM_ON, OCELEM_ON },
+    { COL_MATERIAL_HIT5, AT_NONE, AC_ON | AC_TYPE_PLAYER, OC1_ON | OC1_TYPE_PLAYER, OC2_TYPE_1, COLSHAPE_CYLINDER },
+    { ELEM_MATERIAL_UNK1, { 0, 0, 0 }, { 0xFFCFFFFF, 0, 0 }, ATELEM_NONE, ACELEM_ON, OCELEM_ON },
     { 32, 122, 0, { 0, 0, 0 } },
 };
 
@@ -996,10 +1070,12 @@ static void PhantomInit(Actor* actor, PlayState* play) {
 
 static void PhantomDestroy(Actor* actor, PlayState* play) {
     CucuiPhantom* phantom = (CucuiPhantom*)actor;
-    if (sCrew[phantom->index] == actor) sCrew[phantom->index] = NULL;
+    if (sCrew[phantom->index] == actor)
+        sCrew[phantom->index] = NULL;
     Collider_DestroyCylinder(play, &phantom->collider);
     SkelAnime_Free(&phantom->skelAnime, play);
-    if (phantom->life > 0 && sPhantomsAlive > 0) sPhantomsAlive--;
+    if (phantom->life > 0 && sPhantomsAlive > 0)
+        sPhantomsAlive--;
 }
 
 static void SpawnPhantomBall(CucuiPhantom* phantom, Player* player, int hand) {
@@ -1007,7 +1083,8 @@ static void SpawnPhantomBall(CucuiPhantom* phantom, Player* player, int hand) {
     for (i = 8; i < ARRAY_COUNT(sStarBalls); i++) {
         StarBall* ball = &sStarBalls[i];
         Vec3f target;
-        if (ball->life > 0) continue;
+        if (ball->life > 0)
+            continue;
         ball->pos = phantom->handPos[hand];
         ball->returning = 0;
         ball->kind = 1;
@@ -1037,39 +1114,54 @@ static void PhantomUpdate(Actor* actor, PlayState* play) {
             bool explosive = hit != NULL && (hit->atDmgInfo.dmgFlags & DMG_EXPLOSIVE) != 0;
             f32 hx = player->actor.world.pos.x - actor->world.pos.x;
             f32 hz = player->actor.world.pos.z - actor->world.pos.z;
-            s16 angle = (s16)((s16)(atan2f(hx,hz)*(0x8000/M_PI)) - actor->shape.rot.y);
+            s16 angle = (s16)((s16)(atan2f(hx, hz) * (0x8000 / M_PI)) - actor->shape.rot.y);
             if (explosive || ABS((s32)angle) >= 0x4000) {
                 phantom->life = 0;
-                if (sPhantomsAlive > 0) sPhantomsAlive--;
-                EffectSsKiraKira_SpawnDispersed(play, &actor->world.pos, (Vec3f[]){ {0, 1, 0} },
-                                                (Vec3f[]){ {0, 0, 0} },
-                                                (Color_RGBA8[]){ {190, 175, 255, 255} },
-                                                (Color_RGBA8[]){ {80, 30, 185, 255} }, 500, 24);
+                if (sPhantomsAlive > 0)
+                    sPhantomsAlive--;
+                EffectSsKiraKira_SpawnDispersed(play, &actor->world.pos, (Vec3f[]){ { 0, 1, 0 } },
+                                                (Vec3f[]){ { 0, 0, 0 } }, (Color_RGBA8[]){ { 190, 175, 255, 255 } },
+                                                (Color_RGBA8[]){ { 80, 30, 185, 255 } }, 500, 24);
                 Actor_Kill(actor);
                 return;
             }
-            EffectSsFhgFlash_SpawnShock(play,NULL,&actor->focus.pos,110,0);
+            EffectSsFhgFlash_SpawnShock(play, NULL, &actor->focus.pos, 110, 0);
         }
     }
-    // Streams retargeted from the actual Blender preview onto object_gnd, not human joint indices.
     {
         const PhantomDancePose* poses;
         int mode = (play->gameplayFrames / 110 + phantom->index) % 6;
         int count, frame, j;
         float blend;
-        if (mode == 0) { poses = sPhantomSalsaPoses; count = ARRAY_COUNT(sPhantomSalsaPoses); }
-        else if (mode == 1) { poses = sPhantomSideTurnPoses; count = ARRAY_COUNT(sPhantomSideTurnPoses); }
-        else if (mode == 2) { poses = sPhantomSpinPoses; count = ARRAY_COUNT(sPhantomSpinPoses); }
-        else if (mode == 3) { poses = sPhantomDashPoses; count = ARRAY_COUNT(sPhantomDashPoses); }
-        else if (mode == 4) { poses = sPhantomGlanceAPoses; count = ARRAY_COUNT(sPhantomGlanceAPoses); }
-        else { poses = sPhantomGlanceBPoses; count = ARRAY_COUNT(sPhantomGlanceBPoses); }
-        if (mode != phantom->danceMode) { phantom->danceMode = mode; phantom->danceFrame = 0; }
+        if (mode == 0) {
+            poses = sPhantomSalsaPoses;
+            count = ARRAY_COUNT(sPhantomSalsaPoses);
+        } else if (mode == 1) {
+            poses = sPhantomSideTurnPoses;
+            count = ARRAY_COUNT(sPhantomSideTurnPoses);
+        } else if (mode == 2) {
+            poses = sPhantomSpinPoses;
+            count = ARRAY_COUNT(sPhantomSpinPoses);
+        } else if (mode == 3) {
+            poses = sPhantomDashPoses;
+            count = ARRAY_COUNT(sPhantomDashPoses);
+        } else if (mode == 4) {
+            poses = sPhantomGlanceAPoses;
+            count = ARRAY_COUNT(sPhantomGlanceAPoses);
+        } else {
+            poses = sPhantomGlanceBPoses;
+            count = ARRAY_COUNT(sPhantomGlanceBPoses);
+        }
+        if (mode != phantom->danceMode) {
+            phantom->danceMode = mode;
+            phantom->danceFrame = 0;
+        }
         frame = phantom->danceFrame++ % count;
         blend = frame < 6 ? 0.25f : 1.0f;
-        phantom->skelAnime.jointTable[0] = (Vec3s){0};
+        phantom->skelAnime.jointTable[0] = (Vec3s){ 0 };
         for (j = 0; j < 25; j++) {
             Vec3s goal = poses[frame].joints[j];
-            Vec3s* joint = &phantom->skelAnime.jointTable[j+1];
+            Vec3s* joint = &phantom->skelAnime.jointTable[j + 1];
             joint->x = LerpAngle(joint->x, goal.x, blend);
             joint->y = LerpAngle(joint->y, goal.y, blend);
             joint->z = LerpAngle(joint->z, goal.z, blend);
@@ -1079,11 +1171,11 @@ static void PhantomUpdate(Actor* actor, PlayState* play) {
             dx = player->actor.world.pos.x - actor->world.pos.x;
             dz = player->actor.world.pos.z - actor->world.pos.z;
             if (mode == 0 && (phantom->danceFrame == 13 || phantom->danceFrame == 37))
-                SpawnPhantomBall(phantom,player,phantom->danceFrame == 37);
+                SpawnPhantomBall(phantom, player, phantom->danceFrame == 37);
             if (mode == 1 && (phantom->danceFrame == 30 || phantom->danceFrame == 66))
-                SpawnPhantomBall(phantom,player,(phantom->danceFrame == 66));
+                SpawnPhantomBall(phantom, player, (phantom->danceFrame == 66));
             if (mode == 2 && phantom->danceFrame == 48)
-                SpawnPhantomBall(phantom,player,phantom->index & 1);
+                SpawnPhantomBall(phantom, player, phantom->index & 1);
         } else {
             dx = sBoss->actor.world.pos.x - actor->world.pos.x;
             dz = sBoss->actor.world.pos.z - actor->world.pos.z;
@@ -1098,9 +1190,9 @@ static void PhantomUpdate(Actor* actor, PlayState* play) {
                 KeepInsideArena(&actor->world.pos);
             }
         }
-        if (phantom->contactCooldown > 0) phantom->contactCooldown--;
-        if ((mode == 2 || mode == 3) && phantom->contactCooldown == 0 &&
-            dx * dx + dz * dz < 72.0f * 72.0f) {
+        if (phantom->contactCooldown > 0)
+            phantom->contactCooldown--;
+        if ((mode == 2 || mode == 3) && phantom->contactCooldown == 0 && dx * dx + dz * dz < 72.0f * 72.0f) {
             Actor_SetPlayerKnockbackLargeNoDamage(play, actor, 8.0f, actor->shape.rot.y, 5.0f);
             play->damagePlayer(play, -16);
             phantom->contactCooldown = 35;
@@ -1115,15 +1207,17 @@ static void PhantomUpdate(Actor* actor, PlayState* play) {
 }
 
 static s32 PhantomOverrideLimb(PlayState* play, s32 limbIndex, Gfx** dl, Vec3f* pos, Vec3s* rot, void* data) {
-    // The original spear is a separate limb and never belongs to this dance crew.
-    if (limbIndex == 13) *dl = NULL;
+    if (limbIndex == 13)
+        *dl = NULL;
     return 0;
 }
 
 static void PhantomPostLimb(PlayState* play, s32 limbIndex, Gfx** dl, Vec3s* rot, void* data) {
     CucuiPhantom* phantom = data;
-    if (limbIndex == 7) Matrix_MultVec3f(&(Vec3f){500,0,0}, &phantom->handPos[0]);
-    if (limbIndex == 11) Matrix_MultVec3f(&(Vec3f){500,0,0}, &phantom->handPos[1]);
+    if (limbIndex == 7)
+        Matrix_MultVec3f(&(Vec3f){ 500, 0, 0 }, &phantom->handPos[0]);
+    if (limbIndex == 11)
+        Matrix_MultVec3f(&(Vec3f){ 500, 0, 0 }, &phantom->handPos[1]);
 }
 
 static void PhantomDraw(Actor* actor, PlayState* play) {
@@ -1135,7 +1229,6 @@ static void PhantomDraw(Actor* actor, PlayState* play) {
     gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)noEffectDL);
     SkelAnime_DrawSkeletonOpa(play, &phantom->skelAnime, PhantomOverrideLimb, PhantomPostLimb, phantom);
     CLOSE_DISPS(play->state.gfxCtx);
-
 }
 
 static void SpawnSalsaBall(CucuiBoss* boss, Player* player, int hand) {
@@ -1143,8 +1236,9 @@ static void SpawnSalsaBall(CucuiBoss* boss, Player* player, int hand) {
     f32 side = hand == 0 ? -1.0f : 1.0f;
     for (i = 8; i < ARRAY_COUNT(sStarBalls); i++) {
         StarBall* ball = &sStarBalls[i];
-        if (ball->life > 0) continue;
-        ball->pos = PoseLimbWorldPoint(boss, hand == 0 ? 5 : 9, (Vec3f){500,0,0});
+        if (ball->life > 0)
+            continue;
+        ball->pos = PoseLimbWorldPoint(boss, hand == 0 ? 5 : 9, (Vec3f){ 500, 0, 0 });
         ball->returning = 0;
         ball->kind = 1;
         {
@@ -1163,8 +1257,9 @@ static StarBall* SpawnExtraBall(CucuiBoss* boss, Player* player, bool sky) {
     for (i = 8; i < ARRAY_COUNT(sStarBalls); i++) {
         StarBall* ball = &sStarBalls[i];
         Vec3f target;
-        if (ball->life > 0) continue;
-        ball->pos = PoseLimbWorldPoint(boss, sky ? 5 : 9, (Vec3f){500,0,0});
+        if (ball->life > 0)
+            continue;
+        ball->pos = PoseLimbWorldPoint(boss, sky ? 5 : 9, (Vec3f){ 500, 0, 0 });
         ball->returning = 0;
         ball->kind = sky ? 4 : 3;
         target = player->actor.world.pos;
@@ -1181,7 +1276,7 @@ static StarBall* SpawnExtraBall(CucuiBoss* boss, Player* player, bool sky) {
             ball->travelFrames = ball->fast ? 48 : 62;
             ball->life = ball->travelFrames + 7;
         } else {
-            ball->velocity = (Vec3f){0, 2, 0};
+            ball->velocity = (Vec3f){ 0, 2, 0 };
             ball->life = 110;
         }
         return ball;
@@ -1191,18 +1286,20 @@ static StarBall* SpawnExtraBall(CucuiBoss* boss, Player* player, bool sky) {
 
 static bool SwordTouchesBall(Player* player, Vec3f from, Vec3f to) {
     int i;
-    if (player->meleeWeaponState == 0) return false;
+    if (player->meleeWeaponState == 0)
+        return false;
     for (i = 0; i < ARRAY_COUNT(player->meleeWeaponInfo); i++) {
         WeaponInfo* weapon = &player->meleeWeaponInfo[i];
         f32 vx, vy, vz, length2;
         int sample;
-        if (!weapon->active) continue;
+        if (!weapon->active)
+            continue;
         vx = weapon->tip.x - weapon->base.x;
         vy = weapon->tip.y - weapon->base.y;
         vz = weapon->tip.z - weapon->base.z;
         length2 = vx * vx + vy * vy + vz * vz;
-        if (length2 < 0.01f) continue;
-        // Test the whole projectile step so a fast ball cannot cross the sword between updates.
+        if (length2 < 0.01f)
+            continue;
         for (sample = 0; sample <= 2; sample++) {
             f32 fraction = sample * 0.5f;
             f32 wx = from.x + (to.x - from.x) * fraction - weapon->base.x;
@@ -1210,12 +1307,15 @@ static bool SwordTouchesBall(Player* player, Vec3f from, Vec3f to) {
             f32 wz = from.z + (to.z - from.z) * fraction - weapon->base.z;
             f32 t = (wx * vx + wy * vy + wz * vz) / length2;
             f32 dx, dy, dz;
-            if (t < 0.0f) t = 0.0f;
-            if (t > 1.0f) t = 1.0f;
+            if (t < 0.0f)
+                t = 0.0f;
+            if (t > 1.0f)
+                t = 1.0f;
             dx = wx - vx * t;
             dy = wy - vy * t;
             dz = wz - vz * t;
-            if (dx * dx + dy * dy + dz * dz < BALL_SWORD_RADIUS * BALL_SWORD_RADIUS) return true;
+            if (dx * dx + dy * dy + dz * dz < BALL_SWORD_RADIUS * BALL_SWORD_RADIUS)
+                return true;
         }
     }
     return false;
@@ -1228,22 +1328,26 @@ static void UpdateStarBalls(CucuiBoss* boss, PlayState* play) {
     Vec3f zero = { 0.0f, 0.0f, 0.0f };
     int i;
 
-    if (sProjectileHitCooldown > 0) sProjectileHitCooldown--;
+    if (sProjectileHitCooldown > 0)
+        sProjectileHitCooldown--;
     for (i = 0; i < ARRAY_COUNT(sStarBalls); i++) {
         StarBall* ball = &sStarBalls[i];
         Vec3f previousPos;
         f32 dx, dz;
-        if (ball->life <= 0) continue;
+        if (ball->life <= 0)
+            continue;
         previousPos = ball->pos;
         prim = (Color_RGBA8){ 255, 255, 255, 255 };
-        env = ball->returning ? (Color_RGBA8){ 0, 255, 255, 255 } :
-                               (Color_RGBA8){ 165, 255, 75, 255 };
+        env = ball->returning ? (Color_RGBA8){ 0, 255, 255, 255 } : (Color_RGBA8){ 165, 255, 75, 255 };
         if (ball->returning) {
             Actor* target = &boss->actor;
             f32 dy, length;
             if (ball->targetPhantom >= 0) {
                 target = sCrew[ball->targetPhantom];
-                if (target == NULL || target->update == NULL) { ball->life = 0; continue; }
+                if (target == NULL || target->update == NULL) {
+                    ball->life = 0;
+                    continue;
+                }
             }
             dy = target->focus.pos.y - ball->pos.y;
             dx = target->world.pos.x - ball->pos.x;
@@ -1254,33 +1358,35 @@ static void UpdateStarBalls(CucuiBoss* boss, PlayState* play) {
                     CucuiPhantom* phantom = (CucuiPhantom*)target;
                     if (phantom->life > 0) {
                         phantom->life = 0;
-                        if (sPhantomsAlive > 0) sPhantomsAlive--;
+                        if (sPhantomsAlive > 0)
+                            sPhantomsAlive--;
                         Audio_PlayActorSound2(target, NA_SE_EN_FANTOM_HIT_THUNDER);
-                        EffectSsFhgFlash_SpawnShock(play,NULL,&ball->pos,180,0);
+                        EffectSsFhgFlash_SpawnShock(play, NULL, &ball->pos, 180, 0);
                         Actor_Kill(target);
                     }
                 } else if (!DamageCucui(boss, true, false)) {
-                    EffectSsFhgFlash_SpawnShock(play,NULL,&ball->pos,160,0);
+                    EffectSsFhgFlash_SpawnShock(play, NULL, &ball->pos, 160, 0);
                     Audio_PlayActorSound2(&boss->actor, NA_SE_EN_FANTOM_HIT_THUNDER);
                 }
                 ball->life = 0;
                 continue;
             }
-            if (length < 1.0f) length = 1.0f;
+            if (length < 1.0f)
+                length = 1.0f;
             ball->velocity = (Vec3f){ dx / length * 12.0f, dy / length * 12.0f, dz / length * 12.0f };
             ball->pos.x += ball->velocity.x;
             ball->pos.y += ball->velocity.y;
             ball->pos.z += ball->velocity.z;
             ball->life--;
         } else if (ball->kind == 3) {
-            // Gentle homing: capped speed and turn response so Link can evade or volley.
             float dy = player->actor.world.pos.y + 55 - ball->pos.y;
             float length;
             float speed = ball->fast ? 12.0f : 8.0f;
             dx = player->actor.world.pos.x - ball->pos.x;
             dz = player->actor.world.pos.z - ball->pos.z;
-            length = sqrtf(dx*dx + dy*dy + dz*dz);
-            if (length < 1) length = 1;
+            length = sqrtf(dx * dx + dy * dy + dz * dz);
+            if (length < 1)
+                length = 1;
             ball->velocity.x += (dx / length * speed - ball->velocity.x) * 0.18f;
             ball->velocity.y += (dy / length * speed - ball->velocity.y) * 0.18f;
             ball->velocity.z += (dz / length * speed - ball->velocity.z) * 0.18f;
@@ -1294,7 +1400,7 @@ static void UpdateStarBalls(CucuiBoss* boss, PlayState* play) {
                 ball->pos = BallArcPoint(ball, t);
                 if (ball->age == ball->travelFrames) {
                     ball->pos.y = sArenaFloorY + 22.0f;
-                    EffectSsKiraKira_SpawnDispersed(play,&ball->pos,&zero,&zero,&prim,&env,350,12);
+                    EffectSsKiraKira_SpawnDispersed(play, &ball->pos, &zero, &zero, &prim, &env, 350, 12);
                 }
             }
             ball->life--;
@@ -1304,12 +1410,15 @@ static void UpdateStarBalls(CucuiBoss* boss, PlayState* play) {
             ball->returning = 1;
             ball->life = 220;
             ball->targetPhantom = -1;
-            { int target; for (target = 0; target < PHANTOM_COUNT; target++) {
-                if (sCrew[target] && sCrew[target]->update && player->focusActor == sCrew[target]) {
-                    ball->targetPhantom = target;
-                    break;
+            {
+                int target;
+                for (target = 0; target < PHANTOM_COUNT; target++) {
+                    if (sCrew[target] && sCrew[target]->update && player->focusActor == sCrew[target]) {
+                        ball->targetPhantom = target;
+                        break;
+                    }
                 }
-            } }
+            }
             Audio_PlayActorSound2(&boss->actor, NA_SE_EN_FANTOM_HIT_THUNDER);
             continue;
         }
@@ -1317,16 +1426,16 @@ static void UpdateStarBalls(CucuiBoss* boss, PlayState* play) {
         dz = ball->pos.z - player->actor.world.pos.z;
         if (!ball->returning && sProjectileHitCooldown == 0 &&
             dx * dx + dz * dz < BALL_LINK_HURT_RADIUS * BALL_LINK_HURT_RADIUS &&
-            ball->pos.y >= player->actor.world.pos.y + 25.0f &&
-            ball->pos.y <= player->actor.world.pos.y + 85.0f) {
+            ball->pos.y >= player->actor.world.pos.y + 25.0f && ball->pos.y <= player->actor.world.pos.y + 85.0f) {
             Actor* source = &boss->actor;
-            if (ball->ownerPhantom >= 0 && ball->ownerPhantom < PHANTOM_COUNT &&
-                sCrew[ball->ownerPhantom] != NULL && sCrew[ball->ownerPhantom]->update != NULL)
+            if (ball->ownerPhantom >= 0 && ball->ownerPhantom < PHANTOM_COUNT && sCrew[ball->ownerPhantom] != NULL &&
+                sCrew[ball->ownerPhantom]->update != NULL)
                 source = sCrew[ball->ownerPhantom];
             Actor_SetPlayerKnockbackLargeNoDamage(play, source, 11.0f, (s16)(i * 0x2000), 6.0f);
             play->damagePlayer(play, -BALL_DAMAGE);
-            ApplyLinkElement(play,ball->element,ball->pos);
-            if (ball->element == ELEMENT_ELECTRIC) sChaseStrikePending=true;
+            ApplyLinkElement(play, ball->element, ball->pos);
+            if (ball->element == ELEMENT_ELECTRIC)
+                sChaseStrikePending = true;
             sProjectileHitCooldown = 25;
             ball->life = 0;
         }
@@ -1343,20 +1452,23 @@ static void UpdateLyrics(PlayState* play) {
     int wanted = 0;
     int cumulative = 0;
     if (sFinalStage != 0 || sMove == MOVE_INTRO || sPostIntroSpin || sStageLightRamp == 0 ||
-        play->actorCtx.titleCtx.durationTimer > 0 ||
-        !sMusicStarted || sMusicFrame < MUSIC_LOOP_FRAME) return;
+        play->actorCtx.titleCtx.durationTimer > 0 || !sMusicStarted || sMusicFrame < MUSIC_LOOP_FRAME)
+        return;
     if (sLyricStartFrame == 0) {
         uint32_t elapsed = sMusicFrame - MUSIC_LOOP_FRAME;
         uint32_t nextBeat = (elapsed * 60 + LOOP_FRAMES - 1) / LOOP_FRAMES;
         sLyricStartFrame = MUSIC_LOOP_FRAME + (nextBeat * LOOP_FRAMES + 59) / 60;
     }
-    if (sMusicFrame < sLyricStartFrame) return;
+    if (sMusicFrame < sLyricStartFrame)
+        return;
     beat = (uint32_t)(((uint64_t)(sMusicFrame - sLyricStartFrame) * 60 / LOOP_FRAMES) % LYRIC_TOTAL_BEATS);
     for (wanted = 0; wanted < ARRAY_COUNT(sLyrics); wanted++) {
         cumulative += sLyrics[wanted].beats;
-        if (beat < (uint32_t)cumulative) break;
+        if (beat < (uint32_t)cumulative)
+            break;
     }
-    if (wanted >= ARRAY_COUNT(sLyrics)) wanted = 0;
+    if (wanted >= ARRAY_COUNT(sLyrics))
+        wanted = 0;
     sLyricCurrent = wanted;
 }
 
@@ -1364,20 +1476,19 @@ static void OnFrameLyrics(void) {
     PlayState* play = gPlayState;
     Player* player;
     Actor* target;
-    if (play == NULL || !sPlaying || play->sceneId != SCENE_LAST_BS ||
-        play->pauseCtx.state != 0 || play->pauseCtx.debugEditor != 0) return;
+    if (play == NULL || !sPlaying || play->sceneId != SCENE_LAST_BS || play->pauseCtx.state != 0 ||
+        play->pauseCtx.debugEditor != 0)
+        return;
     player = GET_PLAYER(play);
     target = player->focusActor;
-    // Let C-Up bring up the real Navi hint even when the game's target pointer
-    // briefly drops during a dance. A focused Phantom takes priority.
-    if ((play->state.input[0].press.button & BTN_CUP) &&
-        play->msgCtx.msgMode == MSGMODE_NONE && play->msgCtx.msgLength == 0) {
+    if ((play->state.input[0].press.button & BTN_CUP) && play->msgCtx.msgMode == MSGMODE_NONE &&
+        play->msgCtx.msgLength == 0) {
         if (target == NULL || target->update == NULL || target->hintId == 0xFF)
             target = (sBoss != NULL && sBoss->actor.update != NULL) ? &sBoss->actor : NULL;
     }
     if (target != NULL && target->update != NULL && target->hintId != 0xFF &&
-        (play->state.input[0].press.button & BTN_CUP) &&
-        play->msgCtx.msgMode == MSGMODE_NONE && play->msgCtx.msgLength == 0) {
+        (play->state.input[0].press.button & BTN_CUP) && play->msgCtx.msgMode == MSGMODE_NONE &&
+        play->msgCtx.msgLength == 0) {
         Message_StartTextbox(play, 0x1900 + target->hintId, target);
         return;
     }
@@ -1392,12 +1503,18 @@ static void PrepareLyricLines(const char* source, char* top, char* bottom) {
     while (*p != 0 && n + 1 < sizeof(ascii)) {
         if (*p == 0xC3 && p[1] != 0) {
             unsigned char ch = p[1];
-            if (ch == 0xA1 || ch == 0x81) ascii[n++] = 'a';
-            else if (ch == 0xA9 || ch == 0x89) ascii[n++] = 'e';
-            else if (ch == 0xAD || ch == 0x8D) ascii[n++] = 'i';
-            else if (ch == 0xB3 || ch == 0x93) ascii[n++] = 'o';
-            else if (ch == 0xBA || ch == 0x9A) ascii[n++] = 'u';
-            else if (ch == 0xB1 || ch == 0x91) ascii[n++] = 'n';
+            if (ch == 0xA1 || ch == 0x81)
+                ascii[n++] = 'a';
+            else if (ch == 0xA9 || ch == 0x89)
+                ascii[n++] = 'e';
+            else if (ch == 0xAD || ch == 0x8D)
+                ascii[n++] = 'i';
+            else if (ch == 0xB3 || ch == 0x93)
+                ascii[n++] = 'o';
+            else if (ch == 0xBA || ch == 0x9A)
+                ascii[n++] = 'u';
+            else if (ch == 0xB1 || ch == 0x91)
+                ascii[n++] = 'n';
             p += 2;
         } else if (*p == 0xC2 && (p[1] == 0xA1 || p[1] == 0xBF)) {
             p += 2;
@@ -1411,15 +1528,19 @@ static void PrepareLyricLines(const char* source, char* top, char* bottom) {
     split = n;
     if (split > 34) {
         split = 34;
-        while (split > 0 && ascii[split] != ' ') split--;
-        if (split == 0) split = 34;
+        while (split > 0 && ascii[split] != ' ')
+            split--;
+        if (split == 0)
+            split = 34;
     }
-    for (size_t i = 0; i < split; i++) top[i] = ascii[i];
+    for (size_t i = 0; i < split; i++)
+        top[i] = ascii[i];
     top[split] = 0;
     if (split < n) {
         size_t start = ascii[split] == ' ' ? split + 1 : split;
         size_t i = 0;
-        while (start < n && i < 34) bottom[i++] = ascii[start++];
+        while (start < n && i < 34)
+            bottom[i++] = ascii[start++];
         bottom[i] = 0;
     } else {
         bottom[0] = 0;
@@ -1433,10 +1554,9 @@ static void DrawLyrics(PlayState* play) {
     char top[36];
     char bottom[36];
     int x;
-    if (play == NULL || !sPlaying || sLyricCurrent < 0 ||
-        play->sceneId != SCENE_LAST_BS || play->pauseCtx.state != 0 ||
-        play->pauseCtx.debugEditor != 0 || play->msgCtx.msgMode != MSGMODE_NONE ||
-        play->msgCtx.msgLength != 0) return;
+    if (play == NULL || !sPlaying || sLyricCurrent < 0 || play->sceneId != SCENE_LAST_BS || play->pauseCtx.state != 0 ||
+        play->pauseCtx.debugEditor != 0 || play->msgCtx.msgMode != MSGMODE_NONE || play->msgCtx.msgLength != 0)
+        return;
     PrepareLyricLines(sLyrics[sLyricCurrent].text, top, bottom);
     OPEN_DISPS(play->state.gfxCtx);
     gDPPipeSync(OVERLAY_DISP++);
@@ -1479,8 +1599,10 @@ static void BeginFinalBlow(CucuiBoss* boss, PlayState* play) {
     sChargeAmount = 0;
     sSpotlightChasing = false;
     sChaseStrikePending = false;
-    for (i = 0; i < ARRAY_COUNT(sStarBalls); i++) sStarBalls[i].life = 0;
-    for (i = 0; i < ARRAY_COUNT(sRocks); i++) sRocks[i].life = 0;
+    for (i = 0; i < ARRAY_COUNT(sStarBalls); i++)
+        sStarBalls[i].life = 0;
+    for (i = 0; i < ARRAY_COUNT(sRocks); i++)
+        sRocks[i].life = 0;
     boss->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED;
     player->actor.world.pos.x = boss->actor.world.pos.x - Math_SinS(boss->actor.shape.rot.y) * 100.0f;
     player->actor.world.pos.y = sArenaFloorY;
@@ -1500,10 +1622,11 @@ static void BeginFinalBlow(CucuiBoss* boss, PlayState* play) {
 }
 
 static void UpdateFinalBlow(CucuiBoss* boss, PlayState* play) {
-    static const Color_RGBA8 bloodPrim = {120,0,0,255};
-    static const Color_RGBA8 bloodEnv = {120,0,0,255};
+    static const Color_RGBA8 bloodPrim = { 120, 0, 0, 255 };
+    static const Color_RGBA8 bloodEnv = { 120, 0, 0, 255 };
     int i;
-    if (sFinalStage != 1) return;
+    if (sFinalStage != 1)
+        return;
     sFinalTimer++;
     SkelAnime_Update(&boss->skelAnime);
     boss->actor.world.pos.y = sArenaFloorY - PoseSoleHeight(boss);
@@ -1512,38 +1635,38 @@ static void UpdateFinalBlow(CucuiBoss* boss, PlayState* play) {
         pos.y = sArenaFloorY + 100.0f;
         Audio_PlayActorSound2(&boss->actor, NA_SE_EN_GANON_DAMAGE2);
         for (i = 0; i < 24; i++) {
-            Vec3f velocity = { Rand_CenteredFloat(5.0f), Rand_ZeroFloat(3.0f) + 1.0f,
-                               Rand_CenteredFloat(5.0f) };
-            Vec3f accel = {0.0f,-0.6f,0.0f};
-            func_8002836C(play,&pos,&velocity,&accel,(Color_RGBA8*)&bloodPrim,
-                          (Color_RGBA8*)&bloodEnv,60,0,17);
+            Vec3f velocity = { Rand_CenteredFloat(5.0f), Rand_ZeroFloat(3.0f) + 1.0f, Rand_CenteredFloat(5.0f) };
+            Vec3f accel = { 0.0f, -0.6f, 0.0f };
+            func_8002836C(play, &pos, &velocity, &accel, (Color_RGBA8*)&bloodPrim, (Color_RGBA8*)&bloodEnv, 60, 0, 17);
         }
     }
     if (sFinalTimer == 58)
-        Animation_MorphToPlayOnce(&boss->skelAnime,(AnimationHeader*)gGanondorfVomitStartAnim,-3.0f);
+        Animation_MorphToPlayOnce(&boss->skelAnime, (AnimationHeader*)gGanondorfVomitStartAnim, -3.0f);
     if (sFinalTimer == 94) {
-        Animation_MorphToPlayOnce(&boss->skelAnime,(AnimationHeader*)gGanondorfYellStartAnim,-3.0f);
-        Audio_PlayActorSound2(&boss->actor,NA_SE_EN_GANON_DEAD);
+        Animation_MorphToPlayOnce(&boss->skelAnime, (AnimationHeader*)gGanondorfYellStartAnim, -3.0f);
+        Audio_PlayActorSound2(&boss->actor, NA_SE_EN_GANON_DEAD);
     }
-    if (sFinalTimer == 124) Audio_PlayActorSound2(&boss->actor,NA_SE_EN_GANON_TOKETU);
-    if (sFinalTimer == 150) Audio_PlayActorSound2(&boss->actor,NA_SE_EN_FANTOM_DEAD);
+    if (sFinalTimer == 124)
+        Audio_PlayActorSound2(&boss->actor, NA_SE_EN_GANON_TOKETU);
+    if (sFinalTimer == 150)
+        Audio_PlayActorSound2(&boss->actor, NA_SE_EN_FANTOM_DEAD);
     if (sFinalTimer >= 94) {
         f32 rise = (f32)(sFinalTimer - 94) * 3.0f;
         boss->actor.world.pos.y += rise;
     }
     if (sFinalTimer >= 110) {
         Vec3f pos = boss->actor.world.pos;
-        Vec3f velocity = {0.0f,1.0f,0.0f};
-        Vec3f accel = {0.0f,0.0f,0.0f};
-        Color_RGBA8 prim = {180,145,255,255};
-        Color_RGBA8 env = {55,15,155,255};
+        Vec3f velocity = { 0.0f, 1.0f, 0.0f };
+        Vec3f accel = { 0.0f, 0.0f, 0.0f };
+        Color_RGBA8 prim = { 180, 145, 255, 255 };
+        Color_RGBA8 env = { 55, 15, 155, 255 };
         pos.y += 80.0f;
         for (i = 0; i < 6; i++) {
             Vec3f speck = pos;
             speck.x += Rand_CenteredFloat(95.0f);
             speck.y += Rand_CenteredFloat(100.0f);
             speck.z += Rand_CenteredFloat(95.0f);
-            EffectSsKiraKira_SpawnDispersed(play,&speck,&velocity,&accel,&prim,&env,500,12);
+            EffectSsKiraKira_SpawnDispersed(play, &speck, &velocity, &accel, &prim, &env, 500, 12);
         }
         Actor_SetScale(&boss->actor, 0.01f * (170 - sFinalTimer) / 60.0f);
     }
@@ -1554,20 +1677,20 @@ static void UpdateFinalBlow(CucuiBoss* boss, PlayState* play) {
         eye.x += Math_CosS(boss->actor.shape.rot.y) * 230.0f;
         eye.z -= Math_SinS(boss->actor.shape.rot.y) * 230.0f;
         eye.y += 105.0f;
-        Play_CameraSetAtEye(play,sFinalCamera,&at,&eye);
-        Play_CameraSetFov(play,sFinalCamera,55.0f);
+        Play_CameraSetAtEye(play, sFinalCamera, &at, &eye);
+        Play_CameraSetFov(play, sFinalCamera, 55.0f);
     }
     if (sFinalTimer >= 170) {
-        Actor_SetScale(&boss->actor,0.0f);
+        Actor_SetScale(&boss->actor, 0.0f);
         boss->actor.draw = NULL;
-        StopBossHurtbox(boss,play);
+        StopBossHurtbox(boss, play);
         RestoreArenaLighting();
         if (sFinalCamera > 0) {
-            ReturnMainCamera(play,sFinalCamera,0);
+            ReturnMainCamera(play, sFinalCamera, 0);
             sFinalCamera = 0;
         }
-        Cutscene_StopManual(play,&play->csCtx);
-        Player_SetCsActionWithHaltedActors(play,&boss->actor,7);
+        Cutscene_StopManual(play, &play->csCtx);
+        Player_SetCsActionWithHaltedActors(play, &boss->actor, 7);
         AudioSeq_QueueSeqCmd((0x1 << 28) | (SEQ_PLAYER_BGM_MAIN << 24) | 0x100FF);
         sFinalStage = 2;
         Vec3f warp = { ARENA_CENTER_X, sArenaFloorY + 2.0f, ARENA_CENTER_Z };
@@ -1583,80 +1706,90 @@ static void DanceAction(CucuiBoss* boss, PlayState* play) {
     const GanondorfDancePose* poses;
 
     if (sFinalStage != 0) {
-        UpdateFinalBlow(boss,play);
+        UpdateFinalBlow(boss, play);
         return;
     }
 
     UpdateLinkStatus(play);
-    UpdateRockWave(boss,play);
+    UpdateRockWave(boss, play);
     if (sStunTimer == 0 && sReflectedHits > 0 && play->gameplayFrames % (sReflectedHits == 1 ? 8 : 3) == 0) {
         Vec3f spark = boss->actor.world.pos;
         spark.y = sArenaFloorY + 70 + Rand_ZeroFloat(90);
-        spark.x += Rand_CenteredFloat(60); spark.z += Rand_CenteredFloat(60);
-        EffectSsFhgFlash_SpawnShock(play,NULL,&spark,sStunTimer>0?180:80+sReflectedHits*45,0);
+        spark.x += Rand_CenteredFloat(60);
+        spark.z += Rand_CenteredFloat(60);
+        EffectSsFhgFlash_SpawnShock(play, NULL, &spark, sStunTimer > 0 ? 180 : 80 + sReflectedHits * 45, 0);
     }
     if (sStunTimer > 0) {
         bool finished = SkelAnime_Update(&boss->skelAnime);
         if (finished && sStunStage == 0) {
-            Animation_MorphToPlayOnce(&boss->skelAnime,(AnimationHeader*)gGanondorfDownedAnim,-3);
-            sStunStage=1;
+            Animation_MorphToPlayOnce(&boss->skelAnime, (AnimationHeader*)gGanondorfDownedAnim, -3);
+            sStunStage = 1;
         } else if (finished && sStunStage == 1) {
-            Animation_MorphToPlayOnce(&boss->skelAnime,(AnimationHeader*)gGanondorfLandAnim,-3);
-            Audio_PlayActorSound2(&boss->actor,NA_SE_EN_GANON_DOWN);
-            sStunStage=2;
+            Animation_MorphToPlayOnce(&boss->skelAnime, (AnimationHeader*)gGanondorfLandAnim, -3);
+            Audio_PlayActorSound2(&boss->actor, NA_SE_EN_GANON_DOWN);
+            sStunStage = 2;
         } else if (finished && sStunStage == 2) {
-            Animation_MorphToLoop(&boss->skelAnime,(AnimationHeader*)gGanondorfVulnerableAnim,-3);
-            sStunStage=3;
+            Animation_MorphToLoop(&boss->skelAnime, (AnimationHeader*)gGanondorfVulnerableAnim, -3);
+            sStunStage = 3;
         }
         boss->actor.world.pos.y = sArenaFloorY - PoseSoleHeight(boss);
         boss->actor.focus.pos = boss->actor.world.pos;
         boss->actor.focus.pos.y = sArenaFloorY + 45.0f;
-        boss->actor.speed=0; boss->actor.velocity=(Vec3f){0}; boss->actor.gravity=0;
+        boss->actor.speed = 0;
+        boss->actor.velocity = (Vec3f){ 0 };
+        boss->actor.gravity = 0;
         if (sStunStage == 3 && --sStunTimer == 0) {
-            Audio_PlayActorSound2(&boss->actor,NA_SE_EN_GANON_RESTORE);
-            if (sPhase==1 && sHealth<=BOSS_PHASE2_HEALTH) BeginPhaseTwo(boss);
-            else BeginMove(boss,MOVE_IDLE);
+            Audio_PlayActorSound2(&boss->actor, NA_SE_EN_GANON_RESTORE);
+            if (sPhase == 1 && sHealth <= BOSS_PHASE2_HEALTH)
+                BeginPhaseTwo(boss);
+            else
+                BeginMove(boss, MOVE_IDLE);
         }
-        UpdateStarBalls(boss,play);
-        UpdateDanceRocks(boss,play);
+        UpdateStarBalls(boss, play);
+        UpdateDanceRocks(boss, play);
         return;
     }
-    if (sDashCooldown > 0) sDashCooldown--;
+    if (sDashCooldown > 0)
+        sDashCooldown--;
     if (sVolleyRemaining > 0) {
-        if (sVolleyTimer > 0) sVolleyTimer--;
+        if (sVolleyTimer > 0)
+            sVolleyTimer--;
         else {
             SpawnSalsaBall(boss, player, sVolleyHand);
             sVolleyRemaining--;
             sVolleyTimer = 9;
         }
     }
-    if (sSpotlightStunCooldown > 0) sSpotlightStunCooldown--;
-    if (sPhase == 2 && sSummonedCount == PHANTOM_COUNT && sPhantomsAlive == 0) sEnraged = true;
+    if (sSpotlightStunCooldown > 0)
+        sSpotlightStunCooldown--;
+    if (sPhase == 2 && sSummonedCount == PHANTOM_COUNT && sPhantomsAlive == 0)
+        sEnraged = true;
     if (sPhase == 2 && sSummonTimer > 0 && sMove == MOVE_IMMUNE) {
         sSummonTimer--;
-        if (sSummonTimer <= 48 && sSummonTimer % 12 == 0 && sSummonedCount < PHANTOM_COUNT &&
-            sPhantomActorId >= 0) {
+        if (sSummonTimer <= 48 && sSummonTimer % 12 == 0 && sSummonedCount < PHANTOM_COUNT && sPhantomActorId >= 0) {
             int index = sSummonedCount;
             f32 angle = (f32)index * ((f32)M_PI / 2.0f) + (f32)M_PI / 4.0f;
             Vec3f pos = { ARENA_CENTER_X + cosf(angle) * 245.0f, sArenaFloorY + 65.0f,
                           ARENA_CENTER_Z + sinf(angle) * 245.0f };
             if (Actor_Spawn(&play->actorCtx, play, sPhantomActorId, pos.x, pos.y, pos.z, 0, 0, 0, index) != NULL)
                 sSummonedCount++;
-            else sSummonTimer += 12; // Retry after actor-capacity pressure clears.
+            else
+                sSummonTimer += 12;
         }
     }
 
     if (sFrame < DESCENT_FRAMES) {
-        f32 turnT = (f32)(sFrame+1)/24.0f;
-        f32 t = (f32)((s32)sFrame-23)/(DESCENT_FRAMES-24);
-        if (turnT>1) turnT=1;
-        if (t<0) t=0;
+        f32 turnT = (f32)(sFrame + 1) / 24.0f;
+        f32 t = (f32)((s32)sFrame - 23) / (DESCENT_FRAMES - 24);
+        if (turnT > 1)
+            turnT = 1;
+        if (t < 0)
+            t = 0;
         f32 eased = t * t * (3.0f - 2.0f * t);
         int i;
 
         boss->actor.world.pos = sOriginalPosition;
-        boss->actor.world.pos.y +=
-            (sArenaFloorY - sBossIntroPoses[0].footY - sOriginalPosition.y) * eased;
+        boss->actor.world.pos.y += (sArenaFloorY - sBossIntroPoses[0].footY - sOriginalPosition.y) * eased;
         boss->actor.shape.yOffset = sOriginalYOffset * (1.0f - eased);
         boss->actor.world.rot.y = LerpAngle(sOriginalRotation.y, 0, turnT);
         boss->actor.shape.rot.y = boss->actor.world.rot.y;
@@ -1669,7 +1802,8 @@ static void DanceAction(CucuiBoss* boss, PlayState* play) {
         }
         {
             f32 safeY = sArenaFloorY - PoseSoleHeight(boss);
-            if (boss->actor.world.pos.y < safeY) boss->actor.world.pos.y = safeY;
+            if (boss->actor.world.pos.y < safeY)
+                boss->actor.world.pos.y = safeY;
         }
         sFrame++;
     } else {
@@ -1679,7 +1813,8 @@ static void DanceAction(CucuiBoss* boss, PlayState* play) {
         if (sMove == MOVE_INTRO && sMoveFrame >= ARRAY_COUNT(sBossIntroPoses)) {
             boss->actor.flags |= ACTOR_FLAG_ATTENTION_ENABLED;
             sPostIntroSpin = true;
-            if (sStageLightRamp == 0) sStageLightRamp = 1;
+            if (sStageLightRamp == 0)
+                sStageLightRamp = 1;
             sSpotlightTarget = boss->actor.world.pos;
             BeginMove(boss, MOVE_SPIN);
         }
@@ -1688,25 +1823,36 @@ static void DanceAction(CucuiBoss* boss, PlayState* play) {
             if (sMove == MOVE_M5) {
                 sMoveFrame = count - 1;
             } else if (sMove == MOVE_SALSA_2 && sVolleyRemaining > 0) {
-                sMoveFrame = count-1;
+                sMoveFrame = count - 1;
             } else if (sMove == MOVE_IDLE) {
                 sIdleCharged = true;
-                BeginMove(boss,MOVE_CHARGED_TURN);
+                BeginMove(boss, MOVE_CHARGED_TURN);
             } else if (sMove == MOVE_CHARGED_TURN) {
                 f32 dx = player->actor.world.pos.x - boss->actor.world.pos.x;
                 f32 dz = player->actor.world.pos.z - boss->actor.world.pos.z;
-                if (dx * dx + dz * dz >= DASH_TRIGGER_DISTANCE * DASH_TRIGGER_DISTANCE &&
-                    sDashCooldown == 0) {
+                if (dx * dx + dz * dz >= DASH_TRIGGER_DISTANCE * DASH_TRIGGER_DISTANCE && sDashCooldown == 0) {
                     BeginMove(boss, MOVE_DASH);
                     sDashCooldown = 180;
                 } else {
                     switch (sAttackCycle++ % 6) {
-                        case 0: BeginMove(boss,MOVE_IMMUNE); break;
-                        case 1: BeginMove(boss,MOVE_SALSA_2); break;
-                        case 2: BeginMove(boss,MOVE_SEXY_TURN); break;
-                        case 3: BeginMove(boss,MOVE_BACK); break;
-                        case 4: BeginMove(boss,MOVE_OVERHEAD); break;
-                        default: BeginMove(boss,MOVE_SALSA_1); break;
+                        case 0:
+                            BeginMove(boss, MOVE_IMMUNE);
+                            break;
+                        case 1:
+                            BeginMove(boss, MOVE_SALSA_2);
+                            break;
+                        case 2:
+                            BeginMove(boss, MOVE_SEXY_TURN);
+                            break;
+                        case 3:
+                            BeginMove(boss, MOVE_BACK);
+                            break;
+                        case 4:
+                            BeginMove(boss, MOVE_OVERHEAD);
+                            break;
+                        default:
+                            BeginMove(boss, MOVE_SALSA_1);
+                            break;
                     }
                 }
             } else if (sMove == MOVE_BACK) {
@@ -1715,8 +1861,10 @@ static void DanceAction(CucuiBoss* boss, PlayState* play) {
                 BeginMove(boss, sChaseStrikePending ? MOVE_SEXY_TURN : MOVE_SALSA_2);
                 sChaseStrikePending = false;
             } else if (sMove == MOVE_DASH) {
-                if (sDashElapsed < 90) sMoveFrame = 18;
-                else BeginMove(boss, MOVE_RETURN_SPIN);
+                if (sDashElapsed < 90)
+                    sMoveFrame = 18;
+                else
+                    BeginMove(boss, MOVE_RETURN_SPIN);
             } else if (sMove == MOVE_IMMUNE && sPhase == 2 && sSummonedCount < PHANTOM_COUNT) {
                 BeginMove(boss, MOVE_IMMUNE);
             } else if (sMove == MOVE_IMMUNE || sMove == MOVE_SEXY_TURN) {
@@ -1724,22 +1872,20 @@ static void DanceAction(CucuiBoss* boss, PlayState* play) {
             } else {
                 if (sPostIntroSpin && sMove == MOVE_SPIN) {
                     sPostIntroSpin = false;
-                    ReleaseIntroCamera(boss,play);
+                    ReleaseIntroCamera(boss, play);
                     BeginMove(boss, sShowcase ? MOVE_M5 : MOVE_IDLE);
                 } else {
-                    BeginMove(boss, sPhase == 2 && sSummonTimer > 0 && sSummonedCount == 0 ?
-                              MOVE_IMMUNE : MOVE_IDLE);
+                    BeginMove(boss, sPhase == 2 && sSummonTimer > 0 && sSummonedCount == 0 ? MOVE_IMMUNE : MOVE_IDLE);
                 }
             }
             poses = MovePoses(sMove, &first, &count);
         }
         if (sMove == MOVE_INTRO && sMoveFrame >= 52 && sStageLightRamp == 0) {
-            sStageLightRamp=1;
-            sSpotlightTarget=boss->actor.world.pos;
+            sStageLightRamp = 1;
+            sSpotlightTarget = boss->actor.world.pos;
         }
         if (sMove == MOVE_INTRO && sStageLightRamp > 0 && !sTitleShown) {
-            TitleCard_InitBossName(&play->state, &play->actorCtx.titleCtx, (void*)sBossTitleTex,
-                                   160, 180, 128, 40);
+            TitleCard_InitBossName(&play->state, &play->actorCtx.titleCtx, (void*)sBossTitleTex, 160, 180, 128, 40);
             sTitleShown = true;
         }
         dx = player->actor.world.pos.x - boss->actor.world.pos.x;
@@ -1759,11 +1905,14 @@ static void DanceAction(CucuiBoss* boss, PlayState* play) {
                 sSpotlightTarget.z += chaseDz / chaseDistance * step;
             }
             sSpotlightChaseAge++;
-            if (sSpotlightChaseAge >= 100) { sSpotlightChasing=false; sSpotlightStunCooldown=100; }
+            if (sSpotlightChaseAge >= 100) {
+                sSpotlightChasing = false;
+                sSpotlightStunCooldown = 100;
+            }
             chaseDistance -= step;
             if (chaseDistance < SPOT_HIT_RADIUS && sSpotlightStunCooldown == 0 && sSpotlightChaseAge >= 12) {
-                ApplyLinkElement(play,ELEMENT_ELECTRIC,player->actor.world.pos);
-                sLinkStatusTimer=35;
+                ApplyLinkElement(play, ELEMENT_ELECTRIC, player->actor.world.pos);
+                sLinkStatusTimer = 35;
                 sSpotlightStunCooldown = 150;
                 sSpotlightChasing = false;
                 sChaseStrikePending = true;
@@ -1774,32 +1923,34 @@ static void DanceAction(CucuiBoss* boss, PlayState* play) {
             BeginMove(boss, MOVE_SEXY_TURN);
             sChaseStrikePending = false;
         }
-        if (sMove != MOVE_M5 && sMove != MOVE_INTRO && sMove != MOVE_RETURN_SPIN &&
-            sMove != MOVE_OVERHEAD && sMove != MOVE_CHARGED_TURN &&
-            !(sMove == MOVE_DASH && sMoveFrame >= DASH_WINDUP) && distance > 1.0f) {
+        if (sMove != MOVE_M5 && sMove != MOVE_INTRO && sMove != MOVE_RETURN_SPIN && sMove != MOVE_OVERHEAD &&
+            sMove != MOVE_CHARGED_TURN && !(sMove == MOVE_DASH && sMoveFrame >= DASH_WINDUP) && distance > 1.0f) {
             s16 targetYaw = (s16)(atan2f(dx, dz) * (0x8000 / M_PI));
             s16 turn = (s16)(targetYaw - boss->actor.shape.rot.y);
-            if (turn > 0x900) turn = 0x900;
-            if (turn < -0x900) turn = -0x900;
+            if (turn > 0x900)
+                turn = 0x900;
+            if (turn < -0x900)
+                turn = -0x900;
             boss->actor.shape.rot.y = sMove == MOVE_IDLE ? targetYaw : boss->actor.shape.rot.y + turn;
         }
         if (sMove == MOVE_DASH && sMoveFrame >= DASH_WINDUP) {
             f32 step;
             if (MoveBeat(DASH_WINDUP)) {
                 if (distance > 1.0f) {
-                    sDashDirection=(Vec3f){dx/distance,0,dz/distance};
+                    sDashDirection = (Vec3f){ dx / distance, 0, dz / distance };
                 } else {
-                    sDashDirection=(Vec3f){Math_SinS(boss->actor.shape.rot.y),0,
-                                           Math_CosS(boss->actor.shape.rot.y)};
+                    sDashDirection =
+                        (Vec3f){ Math_SinS(boss->actor.shape.rot.y), 0, Math_CosS(boss->actor.shape.rot.y) };
                 }
-                sDashRemaining=distance+100;
-                if (sDashRemaining>650) sDashRemaining=650;
-                boss->actor.shape.rot.y=(s16)(atan2f(dx,dz)*(0x8000/M_PI));
+                sDashRemaining = distance + 100;
+                if (sDashRemaining > 650)
+                    sDashRemaining = 650;
+                boss->actor.shape.rot.y = (s16)(atan2f(dx, dz) * (0x8000 / M_PI));
             }
-            step=sDashRemaining<32?sDashRemaining:32;
-            boss->actor.world.pos.x+=sDashDirection.x*step;
-            boss->actor.world.pos.z+=sDashDirection.z*step;
-            sDashRemaining-=step;
+            step = sDashRemaining < 32 ? sDashRemaining : 32;
+            boss->actor.world.pos.x += sDashDirection.x * step;
+            boss->actor.world.pos.z += sDashDirection.z * step;
+            sDashRemaining -= step;
             KeepInsideArena(&boss->actor.world.pos);
             sAnchor = boss->actor.world.pos;
             sAnchor.y = sArenaFloorY;
@@ -1827,34 +1978,36 @@ static void DanceAction(CucuiBoss* boss, PlayState* play) {
             sAnchor.y = sArenaFloorY;
         }
         if (sMove == MOVE_IMMUNE && MoveBeat(6)) {
-            sWaveOrigin=boss->actor.world.pos;
-            sWaveDirection=(Vec3f){distance>1?dx/distance:0,0,distance>1?dz/distance:1};
-            sWaveTimer=32;sWaveStep=0;
+            sWaveOrigin = boss->actor.world.pos;
+            sWaveDirection = (Vec3f){ distance > 1 ? dx / distance : 0, 0, distance > 1 ? dz / distance : 1 };
+            sWaveTimer = 32;
+            sWaveStep = 0;
         }
         if (sMove == MOVE_SEXY_TURN) {
-          int i;
-          for (i = 0; i < 8; i++) {
-            StarBall* ball = &sStarBalls[i];
-            s16 yaw = (s16)(boss->actor.shape.rot.y + i * 0x2000);
-            Vec3f target;
-            if (!MoveBeat(i * 9) || ball->life > 0) continue;
-            ball->pos = PoseLimbWorldPoint(boss, (i & 1) ? 5 : 9, (Vec3f){500,0,0});
-            ball->velocity.x = Math_SinS(yaw) * 8.0f;
-            ball->velocity.y = 0.0f;
-            ball->velocity.z = Math_CosS(yaw) * 8.0f;
-            ball->life = 70;
-            ball->kind = 0;
-            ball->returning = 0;
-            target = ball->pos;
-            target.x += Math_SinS(yaw) * 430.0f;
-            target.z += Math_CosS(yaw) * 430.0f;
-            KeepInsideArena(&target);
-            target.y = sArenaFloorY + 22.0f;
-            ConfigureBallArc(ball, target);
-            ball->arcHeight=170;
-            ball->travelFrames=ball->fast?46:60;
-            ball->life=ball->travelFrames+7;
-          }
+            int i;
+            for (i = 0; i < 8; i++) {
+                StarBall* ball = &sStarBalls[i];
+                s16 yaw = (s16)(boss->actor.shape.rot.y + i * 0x2000);
+                Vec3f target;
+                if (!MoveBeat(i * 9) || ball->life > 0)
+                    continue;
+                ball->pos = PoseLimbWorldPoint(boss, (i & 1) ? 5 : 9, (Vec3f){ 500, 0, 0 });
+                ball->velocity.x = Math_SinS(yaw) * 8.0f;
+                ball->velocity.y = 0.0f;
+                ball->velocity.z = Math_CosS(yaw) * 8.0f;
+                ball->life = 70;
+                ball->kind = 0;
+                ball->returning = 0;
+                target = ball->pos;
+                target.x += Math_SinS(yaw) * 430.0f;
+                target.z += Math_CosS(yaw) * 430.0f;
+                KeepInsideArena(&target);
+                target.y = sArenaFloorY + 22.0f;
+                ConfigureBallArc(ball, target);
+                ball->arcHeight = 170;
+                ball->travelFrames = ball->fast ? 46 : 60;
+                ball->life = ball->travelFrames + 7;
+            }
         }
         if (sMove == MOVE_SEXY_TURN && sMoveFrame >= 24 && sMoveFrame <= 32 && distance < TURN_HIT_RADIUS &&
             sProjectileHitCooldown == 0) {
@@ -1869,34 +2022,46 @@ static void DanceAction(CucuiBoss* boss, PlayState* play) {
             sVolleyTimer = 9;
         }
         if (!sShowcase) {
-            if (sMove == MOVE_IDLE) sChargeAmount=(f32)(sMoveFrame+1)/60;
+            if (sMove == MOVE_IDLE)
+                sChargeAmount = (f32)(sMoveFrame + 1) / 60;
             if (sMove == MOVE_CHARGED_TURN && MoveBeat(0) && sIdleCharged) {
-                StarBall* ball=SpawnExtraBall(boss,player,false);
-                if (ball) { ball->kind=1;ball->element=sChargeElement; }
-                sIdleCharged=false;
+                StarBall* ball = SpawnExtraBall(boss, player, false);
+                if (ball) {
+                    ball->kind = 1;
+                    ball->element = sChargeElement;
+                }
+                sIdleCharged = false;
             }
             if (sMove == MOVE_OVERHEAD) {
-                sChargeAmount=sMoveFrame<42?(f32)(sMoveFrame+1)/42:0;
+                sChargeAmount = sMoveFrame < 42 ? (f32)(sMoveFrame + 1) / 42 : 0;
                 if (MoveBeat(42)) {
-                    StarBall* ball=SpawnExtraBall(boss,player,true);
-                    if (ball) { ball->element=ELEMENT_FIRE;ball->arcHeight=150; }
+                    StarBall* ball = SpawnExtraBall(boss, player, true);
+                    if (ball) {
+                        ball->element = ELEMENT_FIRE;
+                        ball->arcHeight = 150;
+                    }
                 }
             }
             if (sMove == MOVE_BACK && MoveBeat(20)) {
-                StarBall* ball=SpawnExtraBall(boss,player,false);
+                StarBall* ball = SpawnExtraBall(boss, player, false);
                 if (ball) {
-                    ball->kind=1;ball->element=ELEMENT_ELECTRIC;ball->fast=false;
-                    ball->travelFrames=(int)(distance/6.0f);
-                    if (ball->travelFrames<28) ball->travelFrames=28;
-                    ball->life=ball->travelFrames+7;ball->arcHeight=20;
+                    ball->kind = 1;
+                    ball->element = ELEMENT_ELECTRIC;
+                    ball->fast = false;
+                    ball->travelFrames = (int)(distance / 6.0f);
+                    if (ball->travelFrames < 28)
+                        ball->travelFrames = 28;
+                    ball->life = ball->travelFrames + 7;
+                    ball->arcHeight = 20;
                 }
             }
         }
-        if (!sShowcase && sMove == MOVE_FORWARD &&
-            (MoveBeat(12) || MoveBeat(36))) SpawnStepRocks(boss, play);
+        if (!sShowcase && sMove == MOVE_FORWARD && (MoveBeat(12) || MoveBeat(36)))
+            SpawnStepRocks(boss, play);
         poses = MovePoses(sMove, &first, &count);
-        ApplyPose(boss, poses + first, sMoveFrame, sMove != MOVE_DASH && sMove != MOVE_FORWARD &&
-                  sMove != MOVE_BACK && sMove != MOVE_SEXY_TURN && sMove != MOVE_RETURN_SPIN && sMove != MOVE_IDLE);
+        ApplyPose(boss, poses + first, sMoveFrame,
+                  sMove != MOVE_DASH && sMove != MOVE_FORWARD && sMove != MOVE_BACK && sMove != MOVE_SEXY_TURN &&
+                      sMove != MOVE_RETURN_SPIN && sMove != MOVE_IDLE);
         KeepInsideArena(&boss->actor.world.pos);
         KeepOnArenaFloor(boss, play, previousPosition);
         sDrawMoveFrame = sMoveFrame;
@@ -1927,7 +2092,8 @@ static void DanceAction(CucuiBoss* boss, PlayState* play) {
     boss->actor.velocity = (Vec3f){ 0.0f, 0.0f, 0.0f };
     boss->actor.speed = 0.0f;
     boss->actor.gravity = 0.0f;
-    if (boss->subCamId != 0) AimShowcaseCamera(boss,play);
+    if (boss->subCamId != 0)
+        AimShowcaseCamera(boss, play);
 }
 
 static void StopDance(CucuiBoss* boss) {
@@ -1956,8 +2122,10 @@ static void OnBossDamage(Actor* victim, ColliderInfo* attack, float* damage) {
     if (!sPlaying || sShowcase || sBoss == NULL || victim != &sBoss->actor || attack == NULL || damage == NULL) {
         return;
     }
-    if (sFinalStage != 0) { *damage = 0.0f; return; }
-    // Every accepted hit is applied immediately; there is no timed invulnerability.
+    if (sFinalStage != 0) {
+        *damage = 0.0f;
+        return;
+    }
     {
         Player* player = GET_PLAYER(gPlayState);
         f32 dx = player->actor.world.pos.x - sBoss->actor.world.pos.x;
@@ -1966,11 +2134,10 @@ static void OnBossDamage(Actor* victim, ColliderInfo* attack, float* damage) {
     }
     if (sStageLightRamp > 0 && ABS((s32)angle) >= 0x4000) {
         bool arrow = (attack->atDmgInfo.dmgFlags & DMG_ARROW) != 0;
-        bool accepted = DamageCucui(sBoss,false,arrow);
+        bool accepted = DamageCucui(sBoss, false, arrow);
         if (accepted && !arrow && sPhase == 2 && sHealth <= 1 && sStunTimer > 0 && sStunStage == 3)
-            BeginFinalBlow(sBoss,gPlayState);
+            BeginFinalBlow(sBoss, gPlayState);
     }
-    // Native beast damage state is not compatible with the human skeleton.
     *damage = 0.0f;
 }
 
@@ -1978,7 +2145,6 @@ static void OnGanondorfUpdate(void* actorPtr) {
     CucuiBoss* boss = (CucuiBoss*)actorPtr;
     int i;
 
-    // The final-battle actor uses Ganondorf's human skeleton before transforming.
     if (gPlayState == NULL || gPlayState->sceneId != SCENE_LAST_BS || boss->actor.update == NULL) {
         return;
     }
@@ -1990,11 +2156,9 @@ static void OnGanondorfUpdate(void* actorPtr) {
         sMusicFrame = 0;
     }
     if (sPlaying) {
-        // The mod deals contact damage explicitly during attacks.
         UpdateBossHurtbox(boss, gPlayState);
         boss->actor.focus.pos = boss->actor.world.pos;
-        boss->actor.focus.pos.y = sStunTimer > 0 ? sArenaFloorY + 45.0f :
-                                    boss->actor.world.pos.y + 95.0f;
+        boss->actor.focus.pos.y = sStunTimer > 0 ? sArenaFloorY + 45.0f : boss->actor.world.pos.y + 95.0f;
     }
     if (!sMusicStarted) {
         PlayMusic(sIntroMusic);
@@ -2002,11 +2166,16 @@ static void OnGanondorfUpdate(void* actorPtr) {
         sMusicFrame = 0;
     }
     if (sMusicStarted) {
-        if (sStageLightRamp > 0 && sStageLightRamp < 20) sStageLightRamp++;
-        if (sStageLightRamp > 0) BrightenArena(gPlayState);
-        if (sMusicFrame == MUSIC_ENTRY_FRAME) PlayMusic(sEntryMusic);
-        if (sMusicFrame == MUSIC_LOOP_FRAME) PlayMusic(sMutedMusic);
-        if (sMusicFrame == MUSIC_LOOP_FRAME + LOOP_FRAMES) PlayMusic(sFullMusic);
+        if (sStageLightRamp > 0 && sStageLightRamp < 20)
+            sStageLightRamp++;
+        if (sStageLightRamp > 0)
+            BrightenArena(gPlayState);
+        if (sMusicFrame == MUSIC_ENTRY_FRAME)
+            PlayMusic(sEntryMusic);
+        if (sMusicFrame == MUSIC_LOOP_FRAME)
+            PlayMusic(sMutedMusic);
+        if (sMusicFrame == MUSIC_LOOP_FRAME + LOOP_FRAMES)
+            PlayMusic(sFullMusic);
         sMusicFrame++;
     }
     if (sPlaying) {
@@ -2023,14 +2192,13 @@ static void OnGanondorfUpdate(void* actorPtr) {
     boss->actor.shape.shadowDraw = ActorShadow_DrawCircle;
     boss->actor.shape.shadowScale = 115.0f;
     boss->actor.shape.shadowAlpha = 150;
-    if (sBossNaviHintId != 0xFF) boss->actor.hintId = sBossNaviHintId;
+    if (sBossNaviHintId != 0xFF)
+        boss->actor.hintId = sBossNaviHintId;
     for (i = 0; i <= DANCE_LIMBS; i++) {
         sInitialJoints[i] = boss->skelAnime.jointTable[i];
         sPreviousJoints[i] = i == 0 ? sNeutralJoints[0] : sBossIntroPoses[0].joints[i - 1];
     }
     sAnchor = boss->actor.world.pos;
-    // The standing animation puts its root above the actor origin. Resolve
-    // the actual arena floor rather than Link's animated cutscene position.
     sArenaFloorY = FindArenaFloorY(boss, gPlayState);
     sStableRootY = sArenaFloorY - sBossIntroPoses[0].footY;
     sAnchor.y = sArenaFloorY;
@@ -2052,14 +2220,19 @@ static void OnGanondorfUpdate(void* actorPtr) {
     sTitleShown = false;
     sLyricCurrent = -1;
     sLyricStartFrame = 0;
-    sLinkStatusTimer=0;sWaveTimer=0;sChargeAmount=0;sIdleCharged=false;
-    Audio_PlayActorSound2(&boss->actor,NA_SE_EV_TRIFORCE_FLASH);
+    sLinkStatusTimer = 0;
+    sWaveTimer = 0;
+    sChargeAmount = 0;
+    sIdleCharged = false;
+    Audio_PlayActorSound2(&boss->actor, NA_SE_EV_TRIFORCE_FLASH);
     sReflectedHits = 0;
     sShotSerial = 0;
-    for (i = 0; i < PHANTOM_COUNT; i++) sCrew[i] = NULL;
+    for (i = 0; i < PHANTOM_COUNT; i++)
+        sCrew[i] = NULL;
     sExtraVolleyClock = 0;
     sStepCount = 0;
-    for (i = 0; i < ARRAY_COUNT(sRocks); i++) sRocks[i].life = 0;
+    for (i = 0; i < ARRAY_COUNT(sRocks); i++)
+        sRocks[i].life = 0;
     sProjectileHitCooldown = 0;
     sVolleyRemaining = sVolleyTimer = 0;
     sSpotlightChaseAge = 0;
@@ -2075,7 +2248,8 @@ static void OnGanondorfUpdate(void* actorPtr) {
     sPhantomsAlive = 0;
     sEnraged = false;
     sShowcase = false;
-    for (i = 0; i < ARRAY_COUNT(sStarBalls); i++) sStarBalls[i].life = 0;
+    for (i = 0; i < ARRAY_COUNT(sStarBalls); i++)
+        sStarBalls[i].life = 0;
     sPlaying = true;
     DanceAction(boss, gPlayState);
     UpdateBossHurtbox(boss, gPlayState);
@@ -2102,8 +2276,8 @@ static void CucuiInit(Actor* actor, PlayState* play) {
     actor->attentionRangeType = ATTENTION_RANGE_3;
     actor->colChkInfo.health = BOSS_MAX_HEALTH;
     actor->hintId = sBossNaviHintId;
-    SkelAnime_InitFlex(play, &boss->skelAnime, (FlexSkeletonHeader*)gGanondorfSkel,
-                       NULL, boss->joints, boss->morphs, 26);
+    SkelAnime_InitFlex(play, &boss->skelAnime, (FlexSkeletonHeader*)gGanondorfSkel, NULL, boss->joints, boss->morphs,
+                       26);
     memcpy(boss->joints, sNeutralJoints, sizeof(boss->joints));
     actor->world.pos.y = FindArenaFloorY(boss, play) + 400.0f;
     Cutscene_StartManual(play, &play->csCtx);
@@ -2112,19 +2286,22 @@ static void CucuiInit(Actor* actor, PlayState* play) {
     if (boss->subCamId > CAM_ID_MAIN) {
         Play_ChangeCameraStatus(play, CAM_ID_MAIN, CAM_STATUS_WAIT);
         Play_ChangeCameraStatus(play, boss->subCamId, CAM_STATUS_ACTIVE);
-    } else boss->subCamId = 0;
+    } else
+        boss->subCamId = 0;
     OnGanondorfUpdate(actor);
 }
 
 static void CucuiUpdate(Actor* actor, PlayState* play) {
     CucuiBoss* boss = (CucuiBoss*)actor;
-    if (sPlaying) DanceAction(boss, play);
+    if (sPlaying)
+        DanceAction(boss, play);
     OnGanondorfUpdate(actor);
 }
 
 static void CucuiDestroy(Actor* actor, PlayState* play) {
     CucuiBoss* boss = (CucuiBoss*)actor;
-    if (boss->subCamId > CAM_ID_MAIN) ReleaseIntroCamera(boss, play);
+    if (boss->subCamId > CAM_ID_MAIN)
+        ReleaseIntroCamera(boss, play);
     OnGanondorfDestroy(actor);
     SkelAnime_Free(&boss->skelAnime, play);
 }
@@ -2142,9 +2319,11 @@ static void CucuiDraw(Actor* actor, PlayState* play) {
 }
 
 static void ReplaceMajora(Actor* actor, bool* should) {
-    if (!*should || sBossActorId < 0 || !Z64Boss_IsFightHere(sApi, BOSS_KEY, gPlayState)) return;
-    Actor* boss = sBoss != NULL ? &sBoss->actor : Actor_Spawn(&gPlayState->actorCtx, gPlayState, sBossActorId,
-        ARENA_CENTER_X, actor->world.pos.y, ARENA_CENTER_Z, 0, actor->shape.rot.y, 0, 0);
+    if (!*should || sBossActorId < 0 || !Z64Boss_IsFightHere(sApi, BOSS_KEY, gPlayState))
+        return;
+    Actor* boss = sBoss != NULL ? &sBoss->actor
+                                : Actor_Spawn(&gPlayState->actorCtx, gPlayState, sBossActorId, ARENA_CENTER_X,
+                                              actor->world.pos.y, ARENA_CENTER_Z, 0, actor->shape.rot.y, 0, 0);
     if (boss != NULL) {
         actor->destroy = NULL;
         *should = false;
@@ -2172,8 +2351,8 @@ SOH_MOD_EXPORT void ModInit(void) {
     boss.key = BOSS_KEY;
     boss.description = "Cucui Ganon";
     boss.category = ACTORCAT_BOSS;
-    boss.actorFlags = ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE |
-                      ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
+    boss.actorFlags = ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE | ACTOR_FLAG_UPDATE_CULLING_DISABLED |
+                      ACTOR_FLAG_DRAW_CULLING_DISABLED;
     boss.objectId = OBJECT_GAMEPLAY_KEEP;
     boss.instanceSize = sizeof(CucuiBoss);
     boss.init = CucuiInit;
@@ -2187,8 +2366,8 @@ SOH_MOD_EXPORT void ModInit(void) {
         phantom.key = PHANTOM_KEY;
         phantom.description = "Phantom Ganon (Boss_Ganondrof)";
         phantom.category = ACTORCAT_ENEMY;
-        phantom.actorFlags = ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE |
-                             ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
+        phantom.actorFlags = ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE | ACTOR_FLAG_UPDATE_CULLING_DISABLED |
+                             ACTOR_FLAG_DRAW_CULLING_DISABLED;
         // OTR asset paths resolve independently of the room's object bank.
         phantom.objectId = OBJECT_GAMEPLAY_KEEP;
         phantom.instanceSize = sizeof(CucuiPhantom);
@@ -2196,13 +2375,13 @@ SOH_MOD_EXPORT void ModInit(void) {
         phantom.destroy = PhantomDestroy;
         phantom.update = PhantomUpdate;
         phantom.draw = PhantomDraw;
-        phantom.naviHint = "Phantom Ganon&%cIt dances like Ganondorf. Strike&its back or use bomb arrows.^"
-                           "%c%cReflect its light balls with your&sword to defeat it.";
+        phantom.naviHint = "Phantom Ganon&It dances like Ganondorf. Strike&its back or use bomb arrows.^"
+                           "Reflect its light balls with your&sword to defeat it.";
         sPhantomActorId = sApi->RegisterActor(&phantom);
     }
-    sBossNaviHintId = ModMessages_RegisterTatlHint(BOSS_HINT_KEY,
-        "Papi chulo Ganondorf&%cHe dances and throws light balls.&Strike his back. Reflect three&"
-        "balls to stun him.^%c%cIn phase two, defeat all four&Phantoms first.");
+    sBossNaviHintId = ModMessages_RegisterTatlHint(
+        BOSS_HINT_KEY, "Papi chulo Ganondorf&He dances and throws light balls.&Strike his back. Reflect three&"
+                       "balls to stun him.^In phase two, defeat all four&Phantoms first.");
     SOH_REGISTER_HOOK(sApi, OnGameFrameUpdate, OnFrameLyrics);
     SOH_REGISTER_HOOK(sApi, OnInterfaceDrawEnd, DrawLyrics);
     SOH_REGISTER_HOOK(sApi, OnAudioTablesReady, RegisterMusic);
@@ -2220,6 +2399,5 @@ SOH_MOD_EXPORT void ModInit(void) {
         toggle.tooltip = "Ganondorf descends, performs the intro, then fights Link. Restart the scene to replay.";
         toggle.defaultInt = 0;
         sApi->RegisterMenuWidget(&toggle);
-
     }
 }

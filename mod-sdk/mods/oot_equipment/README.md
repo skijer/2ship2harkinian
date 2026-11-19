@@ -13,11 +13,11 @@ The layout supplies the four original OoT cursor corners. The host anchors them 
 To rebuild the private pickup assets from a local, player-owned OoT archive:
 
 ```powershell
-python mod-sdk/mods/oot_equipment/tools/import_get_item_assets.py <path-to-oot.o2r>
+python mod-sdk/mods/oot_equipment/tools/import_get_item_assets.py.txt <path-to-oot.o2r>
 ```
 
 After building, check the packaged resource graphs and cursor formats:
 
 ```powershell
-python <mods-checkout>/mod-sdk/mods/oot_equipment/tools/verify_get_item_assets.py --packages x64/Release/mods --game .
+python <mods-checkout>/mod-sdk/mods/oot_equipment/tools/verify_get_item_assets.py.txt --packages x64/Release/mods --game .
 ```

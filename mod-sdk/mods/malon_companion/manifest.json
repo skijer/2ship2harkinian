@@ -7,8 +7,8 @@
   ],
   "description": "Malon follows Link, fights with her bow, rides Epona and can be carried and thrown. Romani animations retargeted to both native Malon models.",
   "requires": [
-    "objects/object_ma1/gMalonChildSkel",
-    "objects/object_ma2/gMalonAdultSkel",
+    "objects/oot_object_ma1/gMalonChildSkel",
+    "objects/oot_object_ma2/gMalonAdultSkel",
     "animations/nei_malon/child/run",
     "animations/nei_malon/adult/run"
   ],

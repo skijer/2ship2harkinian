@@ -1,5 +1,3 @@
-// Wolf Link: the Shadow Crystal turns Link into Twilight Princess' wolf. Behaviour is the port of TP's wolf
-// procs (Dusklight decomp, d_a_alink_wolf.inc); numbers keep TP's HIO tables and convert at the point of use.
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,7 +39,6 @@
 #define VOICE_REQUESTS 4
 #define MIX_RATE 32000.0f
 
-// Host cutscene frames to the flash peak: pose (PutOnLastFrame / TakeOffLastFrame) plus the 6-frame flash.
 #define SHIFT_IN_PEAK_FRAMES (0x53 + 6)
 #define SHIFT_OUT_PEAK_FRAMES (0x37 + 6)
 #define SHIFT_IN_FADE_STEP 9
@@ -51,9 +48,9 @@
 
 // MM leaves these bits unnamed: dead, talking, loading, getting an item, carrying, ledge climb, first person,
 // ladder or hang, the textbox freeze, swimming and horse.
-#define BLOCKING_STATE1                                                                                      \
-    (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_200 | PLAYER_STATE1_400 |                    \
-     PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_4 | PLAYER_STATE1_100000 | PLAYER_STATE1_200000 |         \
+#define BLOCKING_STATE1                                                                             \
+    (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_200 | PLAYER_STATE1_400 |           \
+     PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_4 | PLAYER_STATE1_100000 | PLAYER_STATE1_200000 | \
      PLAYER_STATE1_20000000 | PLAYER_STATE1_8000000 | PLAYER_STATE1_800000)
 #define STATE1_SWIMMING PLAYER_STATE1_8000000
 #define STATE1_FIRST_PERSON PLAYER_STATE1_100000
@@ -142,7 +139,6 @@ typedef enum {
     FIELD_AUDIO,
 } BlobField;
 
-// TP BCK names as exported from the rig; the WANM comments are daAlink_WANM indices.
 typedef enum {
     WANM_WAIT,                 // wl_waita
     WANM_WALK_A,               // wl_walka
@@ -191,18 +187,18 @@ static const char* const sAnimNames[WANM_COUNT] = {
 };
 
 typedef enum {
-    PROC_WOLF_MOVE,           // Link's own actions drive wait / walk / run / air
-    PROC_WOLF_LAND,           // procWolfLand
-    PROC_WOLF_DASH,           // procWolfDash
-    PROC_WOLF_DASH_REVERSE,   // procWolfDashReverse
-    PROC_WOLF_WAIT_ATTACK,    // procWolfWaitAttack
-    PROC_WOLF_JUMP_ATTACK,    // procWolfJumpAttack
-    PROC_WOLF_JUMP_AT_LAND,   // procWolfJumpAttack{Slide,Normal}Land
-    PROC_WOLF_ROLL_ATTACK,    // procWolfRollAttack
-    PROC_WOLF_ATTACK_REVERSE, // procWolfAttackReverse
-    PROC_WOLF_DAMAGE,         // hurt pose over Link's own damage action
-    PROC_WOLF_SIDESTEP,       // procWolfSideStep
-    PROC_WOLF_SIDESTEP_LAND,  // procWolfSideStepLand
+    PROC_WOLF_MOVE,
+    PROC_WOLF_LAND,
+    PROC_WOLF_DASH,
+    PROC_WOLF_DASH_REVERSE,
+    PROC_WOLF_WAIT_ATTACK,
+    PROC_WOLF_JUMP_ATTACK,
+    PROC_WOLF_JUMP_AT_LAND,
+    PROC_WOLF_ROLL_ATTACK,
+    PROC_WOLF_ATTACK_REVERSE,
+    PROC_WOLF_DAMAGE,
+    PROC_WOLF_SIDESTEP,
+    PROC_WOLF_SIDESTEP_LAND,
 } WolfProc;
 
 typedef enum {
@@ -239,7 +235,6 @@ typedef enum {
     SHIFT_TO_LINK,
 } WolfShift;
 
-// daAlinkHIO_anm_c: {endFrame, speed, startFrame, interpolation, cancelFrame}
 typedef struct {
     f32 end;
     f32 speed;
@@ -263,7 +258,6 @@ typedef struct {
     f32 height;
 } TpWaitAttack;
 
-// daAlinkHIO_wlMoveNoP_c0::m
 #define NOP_MAX_SPEED 25.0f
 #define NOP_IDLE_ANM_SPEED 1.0f
 #define NOP_WALK_ANM_SPEED 0.8f
@@ -273,7 +267,6 @@ typedef struct {
 #define NOP_WALK_TO_JOG 0.6f
 #define NOP_DECELERATION 1.8f
 
-// daAlinkHIO_wlMove_c0::m
 #define DASH_IDLE_ANM_SPEED 1.6f
 #define DASH_WALK_ANM_SPEED 1.1f
 #define DASH_BRISK_ANM_SPEED 2.2f
@@ -296,7 +289,6 @@ typedef struct {
 static const TpAnm kADashAnm = { 8, 1.0f, 0, 1, 20 };
 static const TpAnm kDashReboundAnm = { 41, 1.0f, 0, 3, 20 };
 
-// daAlinkHIO_wlAtWa{Lr,Sc,Tl}_c0::m
 static const TpWaitAttack kAtWaLr = {
     { 41, 0.9f, 4, 3, 16 }, 5, 3, 0.0f, 10.0f, 4.0f, 11.0f, 18.0f, 5.0f, 70, 70, 150
 };
@@ -307,7 +299,6 @@ static const TpWaitAttack kAtWaTl = {
     { 42, 1.05f, 3, 3, 28 }, 0, 3, 10.0f, 5.0f, 10.0f, 14.0f, 25.0f, 0.0f, 40, 150, 100
 };
 
-// daAlinkHIO_wlAtNjump_c0::m
 static const TpAnm kNjumpAerialAnm = { 6, 1.0f, 4, 3, 7 };
 #define NJUMP_INIT_SPEED 30.0f
 #define NJUMP_MAX_H 40.0f
@@ -319,20 +310,17 @@ static const TpAnm kNjumpAerialAnm = { 6, 1.0f, 4, 3, 7 };
 #define NJUMP_RADIUS 60.0f
 #define NJUMP_HEIGHT 120.0f
 
-// daAlinkHIO_wlAtLand_c0::m
 static const TpAnm kLandNormalAnm = { 19, 0.9f, 0, 2, 2 };
 static const TpAnm kLandFrontSlideAnm = { 14, 1.0f, 0, 3, 1 };
 static const TpAnm kLandBackSlideAnm = { 19, 1.1f, 0, 2, 1 };
 #define LAND_SLIDE_DECEL 2.0f
 
-// daAlinkHIO_wlAttack_c0::m
 static const TpAnm kJumpBackLandAnm = { 59, 1.2f, 0, 2, 5 };
 #define COMBO_DURATION 5
 #define COMBO_FINISHER 4
 #define JUMP_BACK_SPEED_H 10.0f
 #define JUMP_BACK_SPEED_V 12.0f
 
-// daAlinkHIO_wlSideStep_c0::m
 static const TpAnm kSideJumpAnm = { 5, 1.0f, 0, 3, 6 };
 static const TpAnm kSideLandAnm = { 23, 1.0f, 1, 2, 2 };
 static const TpAnm kBackJumpAnm = { 4, 0.9f, 0, 3, 5 };
@@ -342,7 +330,6 @@ static const TpAnm kBackLandAnm = { 23, 1.0f, 1, 2, 3 };
 #define BACK_JUMP_H 23.0f
 #define BACK_JUMP_V 30.0f
 
-// daAlinkHIO_wlAtRoll_c0::m
 static const TpAnm kRollAnm = { 40, 1.0f, 4, 3, 23 };
 #define ROLL_RADIUS 250.0f
 #define ROLL_HEIGHT 155.0f
@@ -351,14 +338,12 @@ static const TpAnm kRollAnm = { 40, 1.0f, 4, 3, 23 };
 #define ROLL_ACTIVE_START 4.0f
 #define ROLL_ACTIVE_END 13.0f
 
-// daAlinkHIO_wlAutoJump_c0::m
 static const TpAnm kAutoJumpAnm = { 3, 1.2f, 1, 2, 4 };
 static const TpAnm kAutoLandAnm = { 24, 1.0f, 1, 2, 2 };
 static const TpAnm kAutoClimbAnm = { 5, 0.5f, 2, 5, 7 };
 #define TP_WOLF_GRAVITY (-3.6f)
 #define AIR_ANM_TRANSITION_HEIGHT 300.0f
 
-// Link's full-stick run target; only a reference for TP's wolf/human ratios.
 #define LINK_RUN_SPEED 6.58f
 #define LINK_GRAVITY (-1.0f)
 #define TP_TO_LINK_FRAMES (20.0f / 30.0f)
@@ -495,12 +480,10 @@ static f32 RenderScale(void) {
     return scale < 0.05f ? 0.3f : scale;
 }
 
-// TP per-30Hz-frame horizontal speed to Link's per-20Hz-frame, relative to Link's run.
 static f32 TpSpeed(f32 tp) {
     return tp * (LINK_RUN_SPEED / TP_HUMAN_RUN) * (30.0f / 20.0f) * SpeedScale();
 }
 
-// Vertical launches keep TP's flight time (t = 2v/g) under Link's gravity.
 static f32 TpVSpeed(f32 tp) {
     return tp * (LINK_GRAVITY / TP_WOLF_GRAVITY) * (20.0f / 30.0f);
 }
@@ -513,7 +496,6 @@ static s16 TpFrames(f32 tp) {
     return (s16)(tp * TP_TO_LINK_FRAMES + 0.5f);
 }
 
-// Collider extents are in TP units, the units the mesh is in.
 static f32 TpLength(f32 tp) {
     return tp * RenderScale();
 }
@@ -600,7 +582,6 @@ static bool UnpackTexture(u32 width, u32 height) {
     return true;
 }
 
-// Parents first, whatever order the armature was exported in.
 static bool BuildBoneOrder(void) {
     u32 offset = BlobField_Get(FIELD_PARENTS);
     bool placed[MAX_BONES] = { false };
@@ -739,7 +720,6 @@ static void BuildMeshDisplayList(void) {
     gSPEndDisplayList(gfx++);
 }
 
-// Every triangle is exported twice with opposite winding, so back-face culling is the two-sided lighting.
 static void BuildMaterialDisplayList(u32 width, u32 height) {
     Gfx* gfx = sMaterialDL;
     u32 geometryMode = G_SHADING_SMOOTH | G_LIGHTING | G_SHADE | G_FOG | G_ZBUFFER;
@@ -799,7 +779,6 @@ static bool CopyBlobResource(void) {
     return true;
 }
 
-// Loaded once and kept: the audio thread reads sounds straight out of the blob.
 static bool LoadAssets(void) {
     if (sAssetsLoaded || sAssetsFailed) {
         return sAssetsLoaded;
@@ -844,7 +823,6 @@ static bool LoadAssets(void) {
     return true;
 }
 
-// T(pos) x R(euler ZYX) x S in the column-major mf[col][row] the rig was exported for.
 static void BuildLocalMatrix(const WolfBoneFrame* frame, MtxF* out) {
     f32 degToRad = M_PIf / 180.0f;
     f32 cx = cosf(frame->rx * degToRad);
@@ -875,7 +853,6 @@ static f32 LerpAngle(f32 from, f32 to, f32 t) {
     return from + delta * t;
 }
 
-// 30 fps clips advance 1.5 frames a tick: each bone blends between the frames around the fractional one.
 static void BlendBoneFrame(const WolfBoneFrame* a, const WolfBoneFrame* b, f32 t, WolfBoneFrame* out) {
     out->tx = a->tx + (b->tx - a->tx) * t;
     out->ty = a->ty + (b->ty - a->ty) * t;
@@ -980,7 +957,6 @@ static void DrawWolfMesh(PlayState* play, Player* player) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// World position of a paw from the last skinning pass: model space through the actor's pos, yaw and scale.
 static bool GetPawWorldPos(Player* player, s32 paw, Vec3f* out) {
     if (!sHasPose) {
         return false;
@@ -1030,7 +1006,6 @@ static s32 FindSound(const char* name) {
     return -1;
 }
 
-// A busy mixer drops the grunt: the game thread only fills an empty request, the audio thread empties it.
 static void PlayVoice(const char* name) {
     s32 sound = FindSound(name);
     if (sound < 0) {
@@ -1084,7 +1059,6 @@ static void MixWolfVoice(int16_t* samples, uint32_t frameCount) {
     }
 }
 
-// setSingleAnimeWolf(anim, speed, startFrame, endFrame): endFrame < 0 plays the whole clip.
 static void SetAnim(WolfAnim anim, f32 tpRate, f32 startFrame, f32 endFrame, bool loop) {
     const WolfClip* clip = &sClips[sWolf.clipIndex[anim]];
     f32 last = clip->frameCount - 1.0f;
@@ -1114,7 +1088,6 @@ static bool IsAnimDone(void) {
     return !sWolf.loop && sWolf.frame >= sWolf.end;
 }
 
-// frameCtrl->checkPass(f): true on the tick the counter crosses f.
 static bool DidFramePass(f32 frame) {
     return sWolf.prevFrame < frame && sWolf.frame >= frame;
 }
@@ -1155,7 +1128,6 @@ static WolfInput ReadInput(Player* player, PlayState* play) {
     return in;
 }
 
-// getCutDirection: the stick against the wolf's facing.
 static WolfDir GetCutDirection(const WolfInput* in, Player* player) {
     if (in->stickMag < STICK_DEADZONE) {
         return DIR_NONE;
@@ -1182,7 +1154,6 @@ static void FaceLockOn(Player* player) {
     }
 }
 
-// The proc drives speed, yaw and airtime from the form update; this action only keeps Link's own away.
 static void WolfProcAction(Player* player, PlayState* play) {
 }
 
@@ -1244,7 +1215,6 @@ static void ResetCombo(void) {
     sWolf.comboReserved = false;
 }
 
-// setComboReserb: a B press while an attack is busy waits for its cancel window.
 static void ReserveCombo(const WolfInput* in) {
     if (in->bPress) {
         sWolf.comboReserved = true;
@@ -1315,7 +1285,6 @@ static void StartWaitAttack(PlayState* play, Player* player, WolfWaitAttack atta
     PlayVoice(attack == ATTACK_TAIL ? "WOLFATTACK_WIND_TAIL__1" : "WOLFATTACK_WIND_S");
 }
 
-// Aims the arc at the lock-on target: h = d / t with the flight time the height difference gives.
 static void AimLunge(Player* player, WolfLunge lunge, f32* h, f32* v) {
     Actor* target = player->focusActor;
     if (target == NULL) {
@@ -1375,7 +1344,6 @@ static void StartLungeLand(PlayState* play, Player* player, bool slide, bool bac
     Actor_PlaySfx(&player->actor, NA_SE_PL_WALK_GROUND);
 }
 
-// setCylAtParam(..., radius * 0.5, 155): the radius grows to the full value during the active frames.
 static void StartSpin(PlayState* play, Player* player, bool right) {
     TakeOver(play, player);
     sWolf.proc = PROC_WOLF_ROLL_ATTACK;
@@ -1401,7 +1369,6 @@ static void StartAttackReverse(PlayState* play, Player* player) {
     PlayVoice("WL_V_DAMAGE");
 }
 
-// TP launches along current.angle.y while shape_angle keeps facing the target: the hop never turns away.
 static void StartSideStep(PlayState* play, Player* player, WolfHop hop) {
     s16 facing = player->actor.shape.rot.y;
     s16 launch;
@@ -1441,7 +1408,6 @@ static void StartSideStepLand(PlayState* play, Player* player) {
     Actor_PlaySfx(&player->actor, NA_SE_PL_WALK_GROUND);
 }
 
-// Link's own damage action keeps running; the wolf only shows where the hit came from.
 static void StartDamage(PlayState* play, Player* player) {
     Release(play, player);
     sWolf.proc = PROC_WOLF_DAMAGE;
@@ -1477,7 +1443,6 @@ static void UpdateAirborneMove(PlayState* play, Player* player, const WolfInput*
     }
 }
 
-// setBlendWolfMoveAnime: the gait follows the speed Link's own locomotion reached.
 static void UpdateGait(Player* player) {
     f32 multiplier = IsDashMode() ? A_DASH_MAX_SPEED / TP_HUMAN_RUN : NOP_MAX_SPEED / TP_HUMAN_RUN;
     f32 maxSpeed = LINK_RUN_SPEED * multiplier * SpeedScale();
@@ -1511,7 +1476,6 @@ static void UpdateGait(Player* player) {
     }
 }
 
-// checkNextActionFromButton / checkMoveDoAction: B attacks; A hops under lock-on and dashes while moving.
 static bool TryButtonAction(PlayState* play, Player* player, const WolfInput* in) {
     if (in->blocked) {
         return false;
@@ -1747,7 +1711,6 @@ static void UpdateDamage(PlayState* play, Player* player, const WolfInput* in) {
     }
 }
 
-// checkWolfAttackAction: the combo count and the stick against the facing pick the move.
 static bool TryAttack(PlayState* play, Player* player, const WolfInput* in) {
     static const WolfWaitAttack secondHit[] = { ATTACK_BITE_RIGHT, ATTACK_BITE_RIGHT, ATTACK_BITE_RIGHT,
                                                 ATTACK_BITE_LEFT, ATTACK_BITE_LEFT };
@@ -1787,7 +1750,6 @@ static bool TryAttack(PlayState* play, Player* player, const WolfInput* in) {
     return true;
 }
 
-// checkNextActionWolf: without requireInput the proc is over and falls back to Move; with it, only input leaves.
 static bool TryNextAction(PlayState* play, Player* player, const WolfInput* in, bool requireInput) {
     if (in->blocked) {
         if (!requireInput) {
@@ -1866,7 +1828,6 @@ static void UpdateTimers(void) {
     }
 }
 
-// Link's draw is skipped, so nothing else fills the parts the camera, the cylinder and lock-on read.
 static void PlaceBodyParts(Player* player) {
     f32 scale = RenderScale();
     Vec3f center = player->actor.world.pos;
@@ -1894,7 +1855,6 @@ static void UpdateWolf(PlayState* play, Player* player) {
     WolfInput in = ReadInput(player, play);
     UpdateTimers();
 
-    // Damage or a cutscene that replaced the proc's action already owns Link: nothing is handed back then.
     if (sWolf.ownsPlayer && player->actionFunc != WolfProcAction) {
         sWolf.ownsPlayer = false;
         StartMove(play, player);
@@ -1972,7 +1932,6 @@ static void ClearShift(void) {
     sEmerge = 1.0f;
 }
 
-// TP's change: the body darkens into a silhouette up to the flash peak, and the new one grows out of black.
 static void UpdateShift(void) {
     if (sShift == SHIFT_NONE) {
         return;
@@ -2013,7 +1972,6 @@ static void DarkenBody(Actor* actor, PlayState* play, Color_RGBA8* grayscale) {
     grayscale->a = sBlackout;
 }
 
-// First-person aiming hides the body; the cutscene marker states keep it.
 static void DrawWolfBody(Actor* actor, bool* shouldDraw) {
     if (!sIsWolf || !sAssetsLoaded) {
         return;
@@ -2031,7 +1989,6 @@ static void MuteLinkVoice(Actor* actor, s32 kind, u16* sfxId, bool* handled) {
     }
 }
 
-// TP wolf/human run ratio, or the A-dash's while dash mode lasts.
 static void ScaleWolfSpeed(Player* player, s32 kind, f32* scale) {
     if (!sIsWolf) {
         return;
@@ -2040,7 +1997,6 @@ static void ScaleWolfSpeed(Player* player, s32 kind, f32* scale) {
     *scale *= ratio * SpeedScale();
 }
 
-// A, B, R and the lock-on A belong to the wolf's procs; the rest of Link's actions stay his.
 static int32_t KeepForWolf(PlayState* play, Player* player) {
     return S2H_FORM_ACTION_BLOCKED;
 }
@@ -2058,7 +2014,8 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
 }
 
 static bool CanUseCrystal(Player* player, PlayState* play) {
-    return IsOnGround(player) && !(player->stateFlags1 & (STATE1_SWIMMING | STATE1_FIRST_PERSON | PLAYER_STATE1_20000000));
+    return IsOnGround(player) &&
+           !(player->stateFlags1 & (STATE1_SWIMMING | STATE1_FIRST_PERSON | PLAYER_STATE1_20000000));
 }
 
 static void UseCrystal(PlayState* play, Player* player) {
@@ -2081,6 +2038,7 @@ static void RegisterCrystal(void) {
     crystal.flags |= S2H_CUSTOM_ITEM_INSTANT;
     Z64Items_SetPlacement(&crystal, WOLF_CRYSTAL_PAGE, WOLF_CRYSTAL_SLOT, WOLF_CRYSTAL_WHEEL_PRIORITY);
     Z64Items_SetGetItemModel(&crystal, sCrystalDL);
+    crystal.getItemScale = 0.6f;
     Z64Items_SetTextbox(&crystal, "You got the %rShadow Crystal%w!&A shard of twilight that remembers&the shape of "
                                   "a beast.^"
                                   "Use it with %y\xA1%w to take the form of a&wolf, and again to be yourself.");
@@ -2132,7 +2090,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// The wolf bites and spins; his sword-flagged hits fight, but he holds no blade for MM's sword checks.
 static void GrantWolfLogic(void) {
     static const Z64LogicSource sCrystal = { WOLF_CRYSTAL_KEY };
     static const char* const sBiting[] = { "CanHitSwitch", "CanAttack", "CanDamage", NULL };

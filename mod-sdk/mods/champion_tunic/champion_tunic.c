@@ -1,8 +1,3 @@
-/**
- * Champion's Tunic: a sidehop or backflip past an incoming attack while locked on slows the world and offers a
- * flurry rush; swinging takes it. Aiming anything in mid air slows the world and holds Link up: bullet time.
- */
-
 #include <math.h>
 
 #include "z64items.h"
@@ -14,7 +9,6 @@
 
 #define CHAMPION_TUNIC_KEY "nei.equip.champion_tunic"
 #define TIME_OWNER CHAMPION_TUNIC_KEY
-// The lowest claim on world speed: any hard stop wins over bullet time.
 #define TIME_PRIORITY 1
 #define SLOW_FACTOR 0.33f
 #define OFFER_FRAMES 45
@@ -81,7 +75,6 @@ static bool IsAimableAction(s8 itemAction) {
     return (itemAction >= PLAYER_IA_BOW && itemAction <= PLAYER_IA_HOOKSHOT) || itemAction == PLAYER_IA_ZORA_BOOMERANG;
 }
 
-// heldItemAction lags itemAction while the airborne hand-off runs; either side keeps the permission alive.
 static bool HoldsAimableItem(Player* player) {
     return IsAimableAction(player->heldItemAction) || IsAimableAction(player->itemAction);
 }
@@ -90,7 +83,6 @@ static bool IsAiming(Player* player) {
     return player->unk_AA5 == PLAYER_UNKAA5_3;
 }
 
-// A dead actor's memory is freed, so its pointer is trusted only while it is still in the actor lists.
 static bool IsActorAlive(PlayState* play, Actor* actor) {
     if (actor == NULL) {
         return false;
@@ -163,8 +155,6 @@ static bool GetColliderCenter(Collider* collider, Vec3f* out) {
     }
 }
 
-// The attack list is complete only between the actor updates and the next frame's wipe, which is where the draw
-// runs. Positions are kept, never pointers, so nothing goes stale before the next update reads them.
 static void SnapshotIncomingAttacks(PlayState* play, Player* player) {
     sChampion.attackCount = 0;
     for (s32 i = 0; i < play->colChkCtx.colATCount && sChampion.attackCount < ATTACK_SNAPSHOT_MAX; i++) {
@@ -173,7 +163,8 @@ static void SnapshotIncomingAttacks(PlayState* play, Player* player) {
         if (collider == NULL || !(collider->atFlags & AT_ON)) {
             continue;
         }
-        if (collider->actor == &player->actor || (collider->actor != NULL && collider->actor->parent == &player->actor)) {
+        if (collider->actor == &player->actor ||
+            (collider->actor != NULL && collider->actor->parent == &player->actor)) {
             continue;
         }
         if (GetColliderCenter(collider, &sChampion.attackPos[sChampion.attackCount])) {
@@ -214,8 +205,6 @@ static bool IsRegisteredAC(PlayState* play, Collider* collider) {
     return false;
 }
 
-// Enemies go untouchable between hits, which would eat every swing after the first. The victim's hurtboxes are
-// put back for the next frame's attack pass, once each.
 static void KeepTargetHittable(PlayState* play) {
     for (s32 i = 0; i < sChampion.targetColliderCount; i++) {
         Collider* collider = sChampion.targetColliders[i];
@@ -228,8 +217,7 @@ static void KeepTargetHittable(PlayState* play) {
     }
 }
 
-// prevPos moves with world.pos and bgCheckFlags is cleared so the engine does not read the blink as a sweep and
-// drag Link back. The height is the enemy's, so a flying target does not leave him standing on air.
+// prevPos moves with world.pos and bgCheckFlags is cleared so the engine does not read the blink as a sweep.
 static void BlinkToTarget(Player* player, Actor* target) {
     f32 dx = player->actor.world.pos.x - target->world.pos.x;
     f32 dz = player->actor.world.pos.z - target->world.pos.z;
@@ -282,7 +270,6 @@ static void ReturnToIdle(PlayState* play) {
     }
 }
 
-// The dodge only buys the slow motion: Link is not moved and stays vulnerable, and a hit cancels it.
 static void OfferFlurry(Player* player, PlayState* play) {
     sChampion.state = CHAMPION_OFFER;
     sChampion.timer = OFFER_FRAMES;
@@ -320,7 +307,6 @@ static void UpdateIdle(Player* player, PlayState* play) {
         EnterBulletTime(player, play);
         return;
     }
-    // Any frame of the hop counts: on its first frame the blade is usually still travelling toward Link.
     if (isHopping && sChampion.cooldown == 0 && Player_IsZTargeting(player) && IsAttackNearby(player)) {
         OfferFlurry(player, play);
     }
@@ -340,7 +326,6 @@ static void UpdateOffer(Player* player, PlayState* play, bool tookDamage) {
     }
 }
 
-// Many enemies gate their invulnerability on the damage flash, so it is cut short every frame of the rush.
 static void UpdateRush(PlayState* play, bool tookDamage) {
     if (tookDamage || !IsActorAlive(play, sChampion.target)) {
         ReturnToIdle(play);
@@ -352,7 +337,6 @@ static void UpdateRush(PlayState* play, bool tookDamage) {
     }
 }
 
-// The fall is suspended and nothing else: aiming is the game's own first-person aim.
 static void UpdateBulletTime(Player* player, PlayState* play) {
     if (IsGrounded(player) || !HoldsAimableItem(player) || !IsAiming(player)) {
         ReturnToIdle(play);
@@ -362,10 +346,9 @@ static void UpdateBulletTime(Player* player, PlayState* play) {
     SetScreenTint(play, TINT_BULLET_ALPHA);
 }
 
-// A blade quad keeps AT_HIT for the rest of its swing, so a landed blow is its rising edge.
 static void CountFlurryHit(PlayState* play, Player* player) {
-    bool isHitting = (player->meleeWeaponQuads[0].base.atFlags & AT_HIT) ||
-                     (player->meleeWeaponQuads[1].base.atFlags & AT_HIT);
+    bool isHitting =
+        (player->meleeWeaponQuads[0].base.atFlags & AT_HIT) || (player->meleeWeaponQuads[1].base.atFlags & AT_HIT);
     bool isNewHit = isHitting && !sChampion.wasHitting;
     u8 limit = Player_IsHoldingTwoHandedWeapon(player) ? HITS_TWO_HAND : HITS_ONE_HAND;
 
@@ -439,7 +422,6 @@ static void WatchCollisionsAfterUpdate(void) {
     }
 }
 
-// Only in the air: on the ground vanilla keeps every one of its ways out of the aim.
 static void AllowMidairAim(bool* should, va_list args) {
     Player* player = va_arg(args, Player*);
 
@@ -464,9 +446,12 @@ static void ReleaseTunic(const char* key) {
 
 static void DyeTunic(bool* should, va_list args) {
     va_arg(args, void*);
-    Color_RGB8* color=va_arg(args, Color_RGB8*);
-    if(!IsWorn() || color==NULL)return;
-    color->r=0x38; color->g=0xB6; color->b=0xF1;
+    Color_RGB8* color = va_arg(args, Color_RGB8*);
+    if (!IsWorn() || color == NULL)
+        return;
+    color->r = 0x38;
+    color->g = 0xB6;
+    color->b = 0xF1;
 }
 
 static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnPlayDrawBegin", "OnCollisionRegisterAC",
@@ -483,9 +468,10 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
-static const ALIGN_ASSET(2) char gGiTunicCollarDL[] = "__OTR__objects/nei_get_item/champion_tunic/object_gi_clothes/gGiTunicCollarDL";
-static const ALIGN_ASSET(2) char gGiTunicDL[] = "__OTR__objects/nei_get_item/champion_tunic/object_gi_clothes/gGiTunicDL";
+static const ALIGN_ASSET(2) char gGiTunicCollarDL[] =
+    "__OTR__objects/nei_get_item/champion_tunic/object_gi_clothes/gGiTunicCollarDL";
+static const ALIGN_ASSET(2) char gGiTunicDL[] =
+    "__OTR__objects/nei_get_item/champion_tunic/object_gi_clothes/gGiTunicDL";
 static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
@@ -518,11 +504,19 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.formMask = S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN);
     definition.toggles = 1;
     definition.onUnequip = ReleaseTunic;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = CHAMPION_TUNIC_KEY,
+        .hintKey = CHAMPION_TUNIC_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }
 
-    sApi->RegisterVB(VB_APPLY_TUNIC_COLOR,DyeTunic);
+    sApi->RegisterVB(VB_APPLY_TUNIC_COLOR, DyeTunic);
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, TickTunic);
     S2H_REGISTER_HOOK(sApi, OnPlayDrawBegin, WatchCollisionsAfterUpdate);
     S2H_REGISTER_HOOK(sApi, OnCollisionRegisterAC, RememberTargetCollider);

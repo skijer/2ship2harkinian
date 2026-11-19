@@ -1,7 +1,3 @@
-/**
- * Pegasus Boots: holding B where a spin attack would charge turns the charge into a blade-first dash, with a wind
- * cone in front that strikes while there is magic to pay for it. Walls, crates and trees stop it with a bonk.
- */
 
 #include <math.h>
 
@@ -70,24 +66,18 @@ static struct {
     bool needsResetOnLanding;
 } sPegasus;
 
-// The torso and arms take the stab pose; everything from the waist down keeps running.
 static u8 sUpperBodyMap[PLAYER_LIMB_MAX];
 static Vec3s sStabPose[PLAYER_LIMB_MAX];
 static Vec3s sRunPose[PLAYER_LIMB_MAX];
 
 static Vtx sConeVtx[] = {
-    VTX(0, 0, 0, 512, 2048, 0xFF, 0xFF, 0xFF, 0xFF),
-    VTX(4000, 8000, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0x00),
-    VTX(2828, 8000, 2828, 256, 0, 0xFF, 0xFF, 0xFF, 0x00),
-    VTX(0, 8000, 4000, 512, 0, 0xFF, 0xFF, 0xFF, 0x00),
-    VTX(-2828, 8000, 2828, 768, 0, 0xFF, 0xFF, 0xFF, 0x00),
-    VTX(-4000, 8000, 0, 1024, 0, 0xFF, 0xFF, 0xFF, 0x00),
-    VTX(-2828, 8000, -2828, 1280, 0, 0xFF, 0xFF, 0xFF, 0x00),
-    VTX(0, 8000, -4000, 1536, 0, 0xFF, 0xFF, 0xFF, 0x00),
+    VTX(0, 0, 0, 512, 2048, 0xFF, 0xFF, 0xFF, 0xFF),          VTX(4000, 8000, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0x00),
+    VTX(2828, 8000, 2828, 256, 0, 0xFF, 0xFF, 0xFF, 0x00),    VTX(0, 8000, 4000, 512, 0, 0xFF, 0xFF, 0xFF, 0x00),
+    VTX(-2828, 8000, 2828, 768, 0, 0xFF, 0xFF, 0xFF, 0x00),   VTX(-4000, 8000, 0, 1024, 0, 0xFF, 0xFF, 0xFF, 0x00),
+    VTX(-2828, 8000, -2828, 1280, 0, 0xFF, 0xFF, 0xFF, 0x00), VTX(0, 8000, -4000, 1536, 0, 0xFF, 0xFF, 0xFF, 0x00),
     VTX(2828, 8000, -2828, 1792, 0, 0xFF, 0xFF, 0xFF, 0x00),
 };
 
-// Segment 8 carries the per-frame texture scroll; the texture itself is loaded by path before this runs.
 static Gfx sConeDL[] = {
     gsDPSetCombineLERP(TEXEL1, PRIMITIVE, PRIM_LOD_FRAC, TEXEL0, TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, PRIMITIVE,
                        ENVIRONMENT, COMBINED, ENVIRONMENT, COMBINED, 0, SHADE, 0),
@@ -128,8 +118,6 @@ static void PlaySfx(Player* player, u16 sfxId) {
     Audio_PlaySfx_AtPos(&player->actor.world.pos, sfxId);
 }
 
-// The dash rides the spin-charge walk; leaving that action live afterwards moves the stick against the locked
-// facing, which is the inverted-controls state.
 static void ResetToIdle(Player* player, PlayState* play) {
     player->speedXZ = 0.0f;
     player->actor.speed = 0.0f;
@@ -168,15 +156,16 @@ static void StrikeWithWind(Player* player, PlayState* play) {
         Collider_SetCylinder(play, &sWindCollider, &player->actor, &sWindColliderInit);
         sPegasus.isColliderReady = true;
     }
-    sWindCollider.dim.pos.x = (s16)(player->actor.world.pos.x + Math_SinS(player->actor.shape.rot.y) * PEGASUS_COL_FORWARD);
+    sWindCollider.dim.pos.x =
+        (s16)(player->actor.world.pos.x + Math_SinS(player->actor.shape.rot.y) * PEGASUS_COL_FORWARD);
     sWindCollider.dim.pos.y = (s16)player->actor.world.pos.y;
-    sWindCollider.dim.pos.z = (s16)(player->actor.world.pos.z + Math_CosS(player->actor.shape.rot.y) * PEGASUS_COL_FORWARD);
+    sWindCollider.dim.pos.z =
+        (s16)(player->actor.world.pos.z + Math_CosS(player->actor.shape.rot.y) * PEGASUS_COL_FORWARD);
     sWindCollider.base.atFlags |= AT_ON | AT_TYPE_PLAYER;
     CollisionCheck_SetAT(play, &play->colChkCtx, &sWindCollider.base);
     if (!(sWindCollider.base.atFlags & AT_HIT)) {
         return;
     }
-    // Without this the wind breaks a crate before the wall touch registers, and the dash only sometimes stops.
     struck = sWindCollider.base.at;
     if (struck != NULL && (struck->id == ACTOR_OBJ_KIBAKO || struck->id == ACTOR_OBJ_KIBAKO2)) {
         sPegasus.smashedCrate = true;
@@ -198,8 +187,8 @@ static void PayForWind(Player* player, PlayState* play) {
     }
 }
 
-// Frame loads land at once, but the charge walk blends its legs through a queued interpolation that runs later
-// and would overwrite them; both poses go in as queued copies behind it.
+// The charge walk's queued leg interpolation runs later and would overwrite direct loads, so poses are queued behind
+// it.
 static void PoseDash(Player* player, PlayState* play) {
     f32 lastFrame = Animation_GetLastFrame((void*)gPlayerAnim_link_normal_run_free);
 
@@ -222,7 +211,6 @@ static bool IsFacingWall(Player* player) {
     return (player->actor.bgCheckFlags & BGCHECKFLAG_WALL) && ABS(yawToWall) < 0x2000;
 }
 
-// The same signals a roll leaves: a crate wall breaks, a tree drops what it holds.
 static bool HitsObstacle(Player* player, PlayState* play) {
     Actor* touched = player->cylinder.base.oc;
 
@@ -248,7 +236,6 @@ static bool HitsObstacle(Player* player, PlayState* play) {
     return false;
 }
 
-// A roll's own bonk: the charge action stays underneath and the dash ends when hip_down has played out.
 static void Bonk(Player* player, PlayState* play) {
     PlayerAnimation_Change(play, &player->skelAnime, (PlayerAnimationHeader*)gPlayerAnim_link_normal_hip_down_free,
                            1.0f, 0.0f, Animation_GetLastFrame((void*)gPlayerAnim_link_normal_hip_down_free),
@@ -279,7 +266,6 @@ static void UpdateIdle(Player* player, Input* input) {
     PlaySfx(player, NA_SE_PL_WALK_GROUND);
 }
 
-// A cancelled windup needs no reset: the charge action still owns Link and ends itself.
 static void UpdateWindup(Player* player, PlayState* play, Input* input) {
     if (!CHECK_BTN_ALL(input->cur.button, BTN_B)) {
         StopDash(player, play, false);
@@ -366,7 +352,6 @@ static void TickDash(Player* player) {
     }
 }
 
-// Nothing Link is told to do lands while he is picking himself up off the floor.
 static void HoldStillWhileBonked(Player* player, Input* input) {
     if (sPegasus.state != PEGASUS_BONK) {
         return;
@@ -398,15 +383,15 @@ static void DrawWindCone(Player* player, PlayState* play) {
     gDPSetTextureLUT(POLY_XLU_DISP++, G_TT_NONE);
     gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
     gDPLoadTextureBlock(POLY_XLU_DISP++, gSoaringWarpCsWindCapsuleTex, G_IM_FMT_I, G_IM_SIZ_8b, WIND_TEXTURE_WIDTH,
-                        WIND_TEXTURE_HEIGHT, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 5,
-                        G_TX_NOLOD, G_TX_NOLOD);
+                        WIND_TEXTURE_HEIGHT, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 5, G_TX_NOLOD,
+                        G_TX_NOLOD);
     gDPLoadMultiBlock(POLY_XLU_DISP++, gSoaringWarpCsWindCapsuleTex, 0x0100, 1, G_IM_FMT_I, G_IM_SIZ_8b,
-                      WIND_TEXTURE_WIDTH, WIND_TEXTURE_HEIGHT, 0, G_TX_NOMIRROR | G_TX_WRAP,
-                      G_TX_NOMIRROR | G_TX_WRAP, 4, 5, 14, 14);
+                      WIND_TEXTURE_WIDTH, WIND_TEXTURE_HEIGHT, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP,
+                      4, 5, 14, 14);
     gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, -(s32)frames, (s32)(frames * 20),
-                                           WIND_TEXTURE_WIDTH, WIND_TEXTURE_HEIGHT, 1, -(s32)(frames * 2),
-                                           (s32)(frames * 10), WIND_TEXTURE_WIDTH, WIND_TEXTURE_HEIGHT));
+               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, -(s32)frames, (s32)(frames * 20), WIND_TEXTURE_WIDTH,
+                                           WIND_TEXTURE_HEIGHT, 1, -(s32)(frames * 2), (s32)(frames * 10),
+                                           WIND_TEXTURE_WIDTH, WIND_TEXTURE_HEIGHT));
     gSPDisplayList(POLY_XLU_DISP++, sConeDL);
     Matrix_Pop();
     CLOSE_DISPS(play->state.gfxCtx);
@@ -423,7 +408,6 @@ static void DrawOnPlayer(Actor* actor, PlayState* play) {
     }
 }
 
-// The collider is bound to the player actor, and a new scene brings a new one.
 static void ForgetSceneState(s16 sceneId, s8 spawnNum) {
     sPegasus.state = PEGASUS_IDLE;
     sPegasus.isColliderReady = false;
@@ -450,9 +434,9 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
 #define GI_DL_CAPACITY 512
-static const ALIGN_ASSET(2) char gGiHoverBootsDL[] = "__OTR__objects/nei_get_item/pegasus_boots/object_gi_hoverboots/gGiHoverBootsDL";
+static const ALIGN_ASSET(2) char gGiHoverBootsDL[] =
+    "__OTR__objects/nei_get_item/pegasus_boots/object_gi_hoverboots/gGiHoverBootsDL";
 static u32 CrimsonRamp(u32 rgba) {
     u8 r = (rgba >> 24) & 0xFF;
     u8 g = (rgba >> 16) & 0xFF;
@@ -464,8 +448,8 @@ static u32 CrimsonRamp(u32 rgba) {
 }
 
 static bool IsTwoWordCommand(u8 opcode) {
-    return opcode == 0x20 || opcode == 0x24 || opcode == 0x25 || opcode == 0x27 || opcode == 0x31 ||
-           opcode == 0x32 || opcode == 0x33 || opcode == 0x35 || opcode == 0x36 || opcode == 0x42;
+    return opcode == 0x20 || opcode == 0x24 || opcode == 0x25 || opcode == 0x27 || opcode == 0x31 || opcode == 0x32 ||
+           opcode == 0x33 || opcode == 0x35 || opcode == 0x36 || opcode == 0x42;
 }
 
 static Gfx* BuildCrimsonBootsDL(void) {
@@ -539,6 +523,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.formMask = S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN);
     definition.toggles = 1;
     definition.onUnequip = ReleaseDash;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = PEGASUS_BOOTS_KEY,
+        .hintKey = PEGASUS_BOOTS_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }

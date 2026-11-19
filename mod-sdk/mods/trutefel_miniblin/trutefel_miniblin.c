@@ -1,9 +1,7 @@
 /*
  * File: z_en_miniblin.c
  * Description: Miniblin, similar to the bokoblins in The Wind Waker. Tries stealing a red rupee from the player.
- * Authors: @syeo501 (Model) @trueffel (Code) — 2ship/MM port by Skijer's NEI.
- *
- * Eye textures are OTR path char arrays resolved by the port's gSPSegment shim.
+ * Authors: @syeo501 (Model) @trueffel (Code)
  */
 
 #include "2s2h/ModApi/ModApi.h"
@@ -12,8 +10,7 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
-#include "objects/gameplay_keep/gameplay_keep.h" // MM's own gRupeeRedTex / gRupeeDL (OTR paths)
-
+#include "objects/gameplay_keep/gameplay_keep.h"
 #include "object_miniblin_assets.h"
 #include "object_miniblin_assets.inc.c"
 
@@ -43,7 +40,6 @@ typedef struct EnMiniblin {
     u8 aboutToSteal;
 } EnMiniblin;
 
-// z-targetable, hostile, update outside cull zone, hookshot pulls the actor (OoT FLAG_0|2|4|9)
 #define MINIBLIN_FLAGS                                                                        \
     (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE | ACTOR_FLAG_UPDATE_CULLING_DISABLED | \
      ACTOR_FLAG_HOOKSHOT_PULLS_ACTOR)
@@ -77,8 +73,7 @@ void EnMiniblin_Disappear(EnMiniblin* self, PlayState* play);
 void EnMiniblin_SetupDie(EnMiniblin* self, PlayState* play);
 void EnMiniblin_Die(EnMiniblin* self, PlayState* play);
 
-// Body hurtbox. Bumper mask 0xF7CFFFFF = MM's vanilla "accept every player attack" mask (see
-// z_en_skb.c) — MM's dmg bit layout differs from OoT's, so OoT's 0xFFCFFFFF is NOT reused.
+// MM's damage bit layout differs from OoT's: 0xF7CFFFFF is MM's "accept every player attack" mask.
 static ColliderCylinderInit sMiniblinCylinderInit = {
     {
         COL_MATERIAL_HIT5,
@@ -99,8 +94,6 @@ static ColliderCylinderInit sMiniblinCylinderInit = {
     { 20, 45, 0, { 0, 0, 0 } },
 };
 
-// Tail attack quad. Toucher dmgFlags: generic enemy-attack mask (OoT used the raw 0x20000000
-// bit, which means something else in MM's table).
 static ColliderQuadInit sMiniblinQuadInit = {
     {
         COL_MATERIAL_NONE,
@@ -131,9 +124,6 @@ typedef enum {
     /* 6 */ MINIBLIN_ANIMATION_DEATH
 } EnMiniblinAnimation;
 
-// MM's AnimationInfo has the exact same layout as OoT's (animation, playSpeed, startFrame,
-// frameCount, mode, morphFrames) and MM's Actor_ChangeAnimationByInfo == OoT's
-// Animation_ChangeByInfo. The ANIMMODE_* interp/partial modes all exist in MM.
 static AnimationInfo sMiniblinAnimationInfo[] = {
     { &gMiniblinSkelIdleAnim, 1.0f, 0.0f, -1.0f, ANIMMODE_LOOP, 3.0f },
     { &gMiniblinSkelJumpAnim, 4.0f, 0.0f, -1.0f, ANIMMODE_LOOP_INTERP, 3.0f },
@@ -152,7 +142,6 @@ typedef enum {
     /* 4 */ MINIBLIN_EYES_HIT
 } EnMiniblinEyeList;
 
-// OTR path strings — resolved by the gSPSegment shim at draw time, NOT dereferenced here.
 static const char* const sMiniblinEyeTextures[] = {
     gMiniblinSkel_eye_normal_rgba16, gMiniblinSkel_eye_halfclosed_rgba16, gMiniblinSkel_eye_closed_rgba16,
     gMiniblinSkel_eye_laugh_rgba16,  gMiniblinSkel_eye_hit_rgba16,
@@ -166,14 +155,6 @@ typedef enum {
     /* 14 */ ENMINIBLIN_DMGEFF_FIRE
 } EnMiniblinDamageEffect;
 
-/**
- * MM damage table (32 columns, MM weapon order — rebuilt from the OoT original preserving intent):
- *   deku nut / boomerang-class (Zora boomerang) / hookshot / stun columns -> 0 dmg + STUN;
- *   swords 1 (Sword col covers Kokiri-class), spins/beams 2-3, explosives (incl. Powder Keg) 2,
- *   arrows 2; fire arrow keeps 2 + FIRE, ice 4 + ICE, light 4 + LIGHT (OoT's separate magic
- *   columns don't exist in MM, so the elemental effects ride the arrows);
- *   Goron punch/pound = OoT hammer 2.
- */
 static DamageTable sMiniblinDamageTable = {
     /* Deku Nut       */ DMG_ENTRY(0, ENMINIBLIN_DMGEFF_STUN),
     /* Deku Stick     */ DMG_ENTRY(2, ENMINIBLIN_DMGEFF_NONE),
@@ -209,8 +190,6 @@ static DamageTable sMiniblinDamageTable = {
     /* Powder Keg     */ DMG_ENTRY(2, ENMINIBLIN_DMGEFF_NONE),
 };
 
-// MM CollisionCheckInfoInit2 field ORDER differs from OoT: health, cylRadius, cylHeight,
-// cylYShift, mass. Positional (no designated initializers — this TU compiles as C++).
 static CollisionCheckInfoInit2 sMiniblinColChkInit = {
     /* health    */ 4,
     /* cylRadius */ 25,
@@ -232,7 +211,6 @@ void EnMiniblin_ChangeEyes(EnMiniblin* self, s16 eyeIndex) {
 }
 
 void EnMiniblin_UpdateEyes(EnMiniblin* self) {
-    // Eye blinking logic
     if (self->eyeIndex <= MINIBLIN_EYES_CLOSED) {
         if (DECR(self->blinkTimer) == 0) {
             self->eyeIndex++;
@@ -258,7 +236,7 @@ void EnMiniblin_Init(Actor* thisx, PlayState* play) {
     ActorShape_Init(&self->actor.shape, 0.0f, ActorShadow_DrawCircle, 100.0f);
     Actor_SetScale(&self->actor, 0.0035f);
     EnMiniblin_ChangeEyes(self, MINIBLIN_EYES_NORMAL);
-    thisx->attentionRangeType = ATTENTION_RANGE_3; // OoT targetMode = 3
+    thisx->attentionRangeType = ATTENTION_RANGE_3;
     thisx->gravity = -1.0f;
 
     EnMiniblin_InitAndSetCollision(self, play);
@@ -285,12 +263,11 @@ void EnMiniblin_Update(Actor* thisx, PlayState* play) {
     EnMiniblin_UpdateBgCheck(self, play);
     EnMiniblin_UpdateEyes(self);
 
-    if (self->actionFunc != EnMiniblin_Die) { // No need for colliders if the Miniblin is dead
+    if (self->actionFunc != EnMiniblin_Die) {
         Collider_UpdateCylinder(&self->actor, &self->collider);
 
         if (DECR(self->hurtboxCooldown) == 0 && self->actionFunc != EnMiniblin_TailAttack &&
             self->actionFunc != EnMiniblin_Laugh && self->actionFunc != EnMiniblin_Disappear) {
-            // Miniblin can only take damage by the player if not already hit or doing specific animations
             CollisionCheck_SetAC(play, &play->colChkCtx, &self->collider.base);
         }
 
@@ -298,7 +275,6 @@ void EnMiniblin_Update(Actor* thisx, PlayState* play) {
     }
 
     if (self->actionFunc == EnMiniblin_TailAttack) {
-        // Miniblin can only damage the player when in attack mode
         CollisionCheck_SetAT(play, &play->colChkCtx, &self->quad.base);
     }
 }
@@ -310,7 +286,6 @@ void EnMiniblin_Draw(Actor* thisx, PlayState* play) {
 
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
-    // Different eye textures — OTR path handed to the gSPSegment shim (no SegmentedToVirtual).
     gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sMiniblinEyeTextures[self->eyeIndex]);
 
     SkelAnime_DrawFlexOpa(play, self->skelAnime.skeleton, self->skelAnime.jointTable, self->skelAnime.dListCount,
@@ -338,7 +313,7 @@ void EnMiniblin_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s*
     OPEN_DISPS(play->state.gfxCtx);
 
     switch (limbIndex) {
-        case GMINIBLINSKEL_TAILEND_LIMB: // The tail of the Miniblin can attack the player
+        case GMINIBLINSKEL_TAILEND_LIMB:
             Matrix_MultVec3f(&sMiniblinTailQuadVertex[0], &self->quad.dim.quad[0]);
             Matrix_MultVec3f(&sMiniblinTailQuadVertex[1], &self->quad.dim.quad[1]);
             Matrix_MultVec3f(&sMiniblinTailQuadVertex[2], &self->quad.dim.quad[2]);
@@ -347,9 +322,6 @@ void EnMiniblin_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s*
                                      &self->quad.dim.quad[2], &self->quad.dim.quad[3]);
 
             if (self->aboutToSteal == true) {
-                // The miniblin stole a rupee of the player. Display the rupee on his tail.
-                // MM's gameplay_keep rupee draws like OoT's: segment 8 = color texture, then gRupeeDL
-                // (see z_en_item00.c EnItem00_DrawRupee) — both are OTR paths here.
                 Matrix_Push();
 
                 Matrix_Scale(3.0f, 3.0f, 3.0f, MTXMODE_APPLY);
@@ -365,7 +337,7 @@ void EnMiniblin_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s*
                 Matrix_Pop();
             }
             break;
-        case GMINIBLINSKEL_HAND_L_LIMB: // If the miniblin stole a rupee, he runs away with it in his left hand
+        case GMINIBLINSKEL_HAND_L_LIMB:
             if (self->rupeeStolen == true) {
                 Matrix_Push();
 
@@ -382,7 +354,7 @@ void EnMiniblin_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s*
                 Matrix_Pop();
             }
             break;
-        case GMINIBLINSKEL_BODY_LIMB: // This is just for fixing the (Tatl) target position
+        case GMINIBLINSKEL_BODY_LIMB:
             Matrix_MultVec3f(&sMiniblinZeroVec, &self->actor.focus.pos);
             break;
     }
@@ -399,7 +371,6 @@ void EnMiniblin_CheckDamage(EnMiniblin* self, PlayState* play) {
         if (self->actor.colChkInfo.damageEffect != ENMINIBLIN_DMGEFF_STUN) {
             EnMiniblin_SetupDamage(self, play);
         } else {
-            // Stunning effect because of e.g. a deku nut
             Actor_SetColorFilter(&self->actor, COLORFILTER_COLORFLAG_BLUE, 120, COLORFILTER_BUFFLAG_OPA, 60);
             Actor_ApplyDamage(&self->actor);
             EnMiniblin_SetupStunned(self, play);
@@ -410,7 +381,6 @@ void EnMiniblin_CheckDamage(EnMiniblin* self, PlayState* play) {
         }
     }
     if ((self->actor.bgCheckFlags & BGCHECKFLAG_WATER) && self->actionFunc != EnMiniblin_Die) {
-        // Currently, the miniblin dies if he falls into a water box
         EnMiniblin_SetupDie(self, play);
     }
 }
@@ -430,10 +400,8 @@ void EnMiniblin_SetupDoNothing(EnMiniblin* self, PlayState* play) {
 }
 
 void EnMiniblin_DoNothing(EnMiniblin* self, PlayState* play) {
-    // Idling around
     SkelAnime_Update(&self->skelAnime);
     if (self->actor.xzDistToPlayer < 280.0f) {
-        // Miniblin spots the player
         EnMiniblin_SetupApproachPlayer(self, play);
     }
 }
@@ -446,12 +414,10 @@ void EnMiniblin_SetupApproachPlayer(EnMiniblin* self, PlayState* play) {
 void EnMiniblin_ApproachPlayer(EnMiniblin* self, PlayState* play) {
     SkelAnime_Update(&self->skelAnime);
     if (Animation_OnFrame(&self->skelAnime, 17.0f)) {
-        // Optimal frame for playing the sound effect as he touches the ground
         Actor_PlaySfx(&self->actor, NA_SE_EN_TEKU_WALK);
     }
 
     if (self->skelAnime.curFrame < 18.0f) {
-        // The miniblin shouldn't rotate or move when the feet are clearly on the ground
         Math_ApproachF(&self->actor.speed, 20.0f / 3.0f, 0.5f, 2.0f);
         Math_ApproachS(&self->actor.world.rot.y, self->actor.yawTowardsPlayer, 3, 2000);
         Math_ApproachS(&self->actor.shape.rot.y, self->actor.world.rot.y, 2, 3000);
@@ -460,18 +426,14 @@ void EnMiniblin_ApproachPlayer(EnMiniblin* self, PlayState* play) {
     }
 
     if (self->actor.bgCheckFlags & BGCHECKFLAG_GROUND) {
-        // Since the miniblin jumps towards the player, stopping his velocity as
-        // soon as he touches the ground looks more natural
         self->actor.velocity.y = 0.0f;
     }
 
     if (self->actor.xzDistToPlayer < 35.0f) {
-        // The tail can now hit the player
         EnMiniblin_SetupTailAttack(self, play);
     }
 
     if (self->actor.xzDistToPlayer > 280.0f) {
-        // Player is too far away to still follow him
         EnMiniblin_SetupDoNothing(self, play);
     }
 }
@@ -485,15 +447,12 @@ void EnMiniblin_SetupTailAttack(EnMiniblin* self, PlayState* play) {
 
 void EnMiniblin_TailAttack(EnMiniblin* self, PlayState* play) {
     if (self->quad.base.atFlags & AT_HIT) {
-        // NA_SE_EV_NALE_MAGIC has no MM equivalent — Koume's magic sting is the closest match.
         Actor_PlaySfx(&self->actor, NA_SE_EN_KOUME_MAGIC);
         if (gSaveContext.save.saveInfo.playerData.rupees >= 20 && self->rupeeStolen == false) {
-            // Miniblin only steals rupees if the player has enough or if he didn't already steal one
 
             if (Rand_ZeroOne() < 0.4f) {
-                // ~40% chance for the Miniblin to steal a rupee
 
-                Rupees_ChangeBy(-20); // currently only steals a red rupee. This could be randomized
+                Rupees_ChangeBy(-20);
                 self->aboutToSteal = true;
             }
         }
@@ -511,7 +470,6 @@ void EnMiniblin_TailAttack(EnMiniblin* self, PlayState* play) {
 
 void EnMiniblin_SetupStunned(EnMiniblin* self, PlayState* play) {
     self->actor.speed = 0.0f;
-    // NA_SE_EN_GOMA_JR_FREEZE doesn't exist in MM — common enemy freeze/stun sfx instead.
     Actor_PlaySfx(&self->actor, NA_SE_EN_COMMON_FREEZE);
     Animation_PlayOnceSetSpeed(&self->skelAnime, &gMiniblinSkelIdleAnim, 0.0f);
     Actor_SetColorFilter(&self->actor, COLORFILTER_COLORFLAG_BLUE, 120, COLORFILTER_BUFFLAG_OPA, 60);
@@ -521,12 +479,8 @@ void EnMiniblin_SetupStunned(EnMiniblin* self, PlayState* play) {
 void EnMiniblin_Stunned(EnMiniblin* self, PlayState* play) {
     if (self->actor.colorFilterTimer == 0) {
         if (self->rupeeStolen == true) {
-            // Miniblin continues to try fleeing if he already has a rupee
             EnMiniblin_SetupFlee(self, play);
         } else {
-            // Miniblin will still try to get a rupee of the player.
-            // EnMiniblin_DoNothing will immediately switch to
-            // EnMiniblin_ApproachPlayer if the player is in the near
             EnMiniblin_SetupDoNothing(self, play);
         }
     }
@@ -535,8 +489,7 @@ void EnMiniblin_Stunned(EnMiniblin* self, PlayState* play) {
 void EnMiniblin_SetupFlee(EnMiniblin* self, PlayState* play) {
     self->timer = 100;
     EnMiniblin_ChangeAnimation(self, MINIBLIN_ANIMATION_JUMP);
-    // OoT Audio_PlaySfxGeneral(pitch 1.5) -> MM's positional pitched wrapper (MM's AtPos
-    // wrappers want the actor's PROJECTED position, not world pos — see z_shot_sun.c).
+    // MM's AtPos wrappers want the actor's projected position, not world pos.
     Audio_PlaySfx_AtPosWithFreq(&self->actor.projectedPos, NA_SE_VO_IN_LOST, 1.5f);
     EnMiniblin_SetupAction(self, EnMiniblin_Flee);
 }
@@ -549,7 +502,6 @@ void EnMiniblin_Flee(EnMiniblin* self, PlayState* play) {
 
     if (self->skelAnime.curFrame < 18.0f) {
         Math_ApproachF(&self->actor.speed, 25.0f / 3.0f, 0.5f, 2.0f);
-        // opposite direction of the yaw towards player
         Math_ApproachS(&self->actor.world.rot.y, self->actor.yawTowardsPlayer + 0x8000, 3, 2000);
         Math_ApproachS(&self->actor.shape.rot.y, self->actor.world.rot.y, 2, 3000);
     } else {
@@ -558,15 +510,12 @@ void EnMiniblin_Flee(EnMiniblin* self, PlayState* play) {
 
     if (self->rupeeStolen == true) {
         if (DECR(self->timer) == 0) {
-            // The Miniblin had enough time fleeing
             EnMiniblin_SetupLaugh(self, play);
         }
     }
 
     if (self->actor.xzDistToPlayer > 150.0f || (self->actor.bgCheckFlags & BGCHECKFLAG_WALL)) {
-        // If the miniblin didn't get a rupee, he will try getting back to the player in order to steal one
         if (self->rupeeStolen == false) {
-            // this can also switch immediately to EnMiniblin_ApproachPlayer if the player is in the near
             EnMiniblin_SetupDoNothing(self, play);
         }
     }
@@ -584,12 +533,10 @@ void EnMiniblin_SetupDamage(EnMiniblin* self, PlayState* play) {
 
 void EnMiniblin_Damage(EnMiniblin* self, PlayState* play) {
     if (SkelAnime_Update(&self->skelAnime)) {
-        if (DECR(self->damageTimer) == 0) { // timer for seeing the Miniblin taking damage
+        if (DECR(self->damageTimer) == 0) {
             if (self->rupeeStolen == true) {
-                // Miniblin already has a rupee and continues fleeing
                 EnMiniblin_SetupFlee(self, play);
             } else {
-                // Miniblin will continue trying to get a rupee
                 EnMiniblin_SetupDoNothing(self, play);
             }
         }
@@ -598,31 +545,28 @@ void EnMiniblin_Damage(EnMiniblin* self, PlayState* play) {
 
 void EnMiniblin_SetupLaugh(EnMiniblin* self, PlayState* play) {
     self->actor.speed = 0.0f;
-    self->actor.shape.rot.y = self->actor.yawTowardsPlayer; // Miniblin rotates to the player and laughs in his face
+    self->actor.shape.rot.y = self->actor.yawTowardsPlayer;
     EnMiniblin_ChangeAnimation(self, MINIBLIN_ANIMATION_LAUGH);
     EnMiniblin_ChangeEyes(self, MINIBLIN_EYES_LAUGH);
-    // OoT played this with pitch 3.5 + volume boost; MM's WithFreq wrapper keeps the pitch
-    // (the extra volume-scale argument has no MM equivalent).
     Audio_PlaySfx_AtPosWithFreq(&self->actor.projectedPos, NA_SE_EN_STAL_WARAU, 3.5f);
     EnMiniblin_SetupAction(self, EnMiniblin_Laugh);
 }
 
 void EnMiniblin_Laugh(EnMiniblin* self, PlayState* play) {
     if (SkelAnime_Update(&self->skelAnime)) {
-        // The Miniblin successfully stole a rupee and despawns
         EnMiniblin_SetupDisappear(self, play);
     }
 }
 
 void EnMiniblin_SetupDisappear(EnMiniblin* self, PlayState* play) {
     self->actor.speed = 0.0f;
-    self->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED; // Actor not targetable anymore
+    self->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED;
     self->timer = 12;
     EnMiniblin_SetupAction(self, EnMiniblin_Disappear);
 }
 
 void EnMiniblin_Disappear(EnMiniblin* self, PlayState* play) {
-    Math_StepToF(&self->actor.scale.x, 0.0f, 0.00034f); // Miniblin shrinks in his scale while despawning
+    Math_StepToF(&self->actor.scale.x, 0.0f, 0.00034f);
     self->actor.scale.y = self->actor.scale.z = self->actor.scale.x;
     if (DECR(self->timer) == 0) {
         Actor_Kill(&self->actor);
@@ -633,7 +577,7 @@ void EnMiniblin_SetupDie(EnMiniblin* self, PlayState* play) {
     self->timer = 12;
     self->deathTimer = 12;
     self->actor.speed = 0.0f;
-    self->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED; // Miniblin not targetable anymore
+    self->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED;
     self->actor.shape.shadowAlpha = 0;
     Actor_PlaySfx(&self->actor, NA_SE_EN_STALKID_DEAD);
     Enemy_StartFinishingBlow(play, &self->actor);
@@ -648,15 +592,12 @@ void EnMiniblin_Die(EnMiniblin* self, PlayState* play) {
             if (self->deathTimer != 0) {
                 self->deathTimer--;
             }
-            Math_StepToF(&self->actor.scale.x, 0.0f, 0.00034f); // Miniblin shrinks in his scale while dying
+            Math_StepToF(&self->actor.scale.x, 0.0f, 0.00034f);
             self->actor.scale.y = self->actor.scale.z = self->actor.scale.x;
             if (self->deathTimer == 0) {
                 if (self->rupeeStolen == true) {
-                    // The player gets his rupee back if the Miniblin had one stolen
                     Item_DropCollectible(play, &self->actor.world.pos, ITEM00_RUPEE_RED);
                 }
-                // The Miniblin might also drop some random collectibles (0xE0 is a valid MM
-                // random-drop param — see z_boss_05.c)
                 Item_DropCollectibleRandom(play, &self->actor, &self->actor.world.pos, 0xE0);
                 Actor_Kill(&self->actor);
             }
@@ -668,7 +609,6 @@ S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
 }
 
-// The flex skeleton's limb DLs are OTR paths resolved at draw time, so GAMEPLAY_KEEP is the only bank needed.
 S2H_MOD_EXPORT void ModInit(void) {
     if (!S2H_MOD_API_HAS(sApi, RegisterActor)) {
         return;

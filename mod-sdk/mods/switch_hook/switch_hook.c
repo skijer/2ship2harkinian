@@ -101,7 +101,6 @@ s32 Player_SetAction(PlayState* play, Player* this, PlayerActionFunc actionFunc,
 static void ShotAction(Player* player, PlayState* play);
 static void AimAction(Player* player, PlayState* play);
 
-// Spending the last charge greys the hook out for two minutes, and it comes back full rather than by one.
 static void TickCharges(void) {
     if (sDepletedTimer > 0) {
         if (--sDepletedTimer == 0) {
@@ -136,8 +135,6 @@ static bool IsSwappable(Actor* actor) {
     return false;
 }
 
-// Whatever sits closest to the line Link is facing wins, height ignored: the hook aims itself, so the
-// player only has to look roughly at what they want to trade places with.
 static Actor* ScanForSelection(Player* player, PlayState* play) {
     Actor* best = NULL;
     s16 bestError = SWITCH_HOOK_SELECT_CONE;
@@ -190,7 +187,6 @@ static bool IsActorAlive(PlayState* play, Actor* actor) {
     return false;
 }
 
-// Rounded, not truncated: the s16 shapes would lose up to a unit per frame and lag behind the model.
 static s16 RoundToS16(f32 value) {
     return (s16)(value >= 0.0f ? value + 0.5f : value - 0.5f);
 }
@@ -234,8 +230,8 @@ static void ShiftCollider(Collider* collider, Vec3f* delta) {
                 }
                 // The plane is n . p + originDist = 0: without this every test still answers against
                 // the triangle's original plane.
-                tri->plane.originDist -= tri->plane.normal.x * delta->x + tri->plane.normal.y * delta->y +
-                                         tri->plane.normal.z * delta->z;
+                tri->plane.originDist -=
+                    tri->plane.normal.x * delta->x + tri->plane.normal.y * delta->y + tri->plane.normal.z * delta->z;
             }
             break;
         }
@@ -247,7 +243,6 @@ static void ShiftCollider(Collider* collider, Vec3f* delta) {
                 quad->dim.quad[i].y += delta->y;
                 quad->dim.quad[i].z += delta->z;
             }
-            // The cached edge midpoints are world space too, and they drive the quad-vs-quad tests.
             quad->dim.dcMid.x += delta->x;
             quad->dim.dcMid.y += delta->y;
             quad->dim.dcMid.z += delta->z;
@@ -326,7 +321,6 @@ static void CollectColliders(AnchorSlot* slot, Collider** list, s32 count) {
     }
 }
 
-// Snapshot the actor at rest: the offsets have to describe where its hitboxes sit before the teleport.
 static void CaptureColliders(PlayState* play, u8 slotIndex, Actor* actor) {
     AnchorSlot* slot = &sAnchorSlots[slotIndex];
 
@@ -348,9 +342,8 @@ static void ReanchorOne(AnchorSlot* slot, ColliderAnchor* anchor) {
     if (!GetColliderReference(anchor->collider, &reference)) {
         return;
     }
-    // The owner rebuilt this collider since the last pass, so its answer wins and the offset follows it.
-    if (anchor->hasLastSet && (reference.x != anchor->lastSet.x || reference.y != anchor->lastSet.y ||
-                               reference.z != anchor->lastSet.z)) {
+    if (anchor->hasLastSet &&
+        (reference.x != anchor->lastSet.x || reference.y != anchor->lastSet.y || reference.z != anchor->lastSet.z)) {
         anchor->offset.x = reference.x - slot->owner->world.pos.x;
         anchor->offset.y = reference.y - slot->owner->world.pos.y;
         anchor->offset.z = reference.z - slot->owner->world.pos.z;
@@ -362,8 +355,6 @@ static void ReanchorOne(AnchorSlot* slot, ColliderAnchor* anchor) {
                     slot->owner->world.pos.z + anchor->offset.z - reference.z };
 
     ShiftCollider(anchor->collider, &delta);
-    // Record where it actually landed: the s16 shapes round, and the ideal would read as "the owner
-    // moved it" on the very next frame.
     anchor->hasLastSet = GetColliderReference(anchor->collider, &anchor->lastSet);
 }
 
@@ -387,8 +378,6 @@ static void ReanchorSlotFocus(AnchorSlot* slot) {
     slot->hasFocusLast = true;
 }
 
-// An actor does not stay where it is put: its own update pushes it out of walls and drops it to the
-// floor, so the hitboxes are repositioned absolutely, every frame, until both sides settle.
 static void ReanchorColliders(PlayState* play) {
     for (u8 index = 0; index < SWITCH_HOOK_ANCHOR_SLOTS; index++) {
         AnchorSlot* slot = &sAnchorSlots[index];
@@ -448,7 +437,6 @@ static void StartSwap(Player* player, PlayState* play, Actor* target) {
     player->speedXZ = 0.0f;
     player->invincibilityTimer = SWITCH_HOOK_INVINCIBLE_FRAMES;
     Actor_SetColorFilter(target, 0, 255, 0, SWITCH_HOOK_TINT_FRAMES);
-    // The chain sound is a looping one, and it has to be stopped where it was raised.
     AudioSfx_StopById(NA_SE_IT_HOOKSHOT_CHAIN);
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_IT_HOOKSHOT_STICK_OBJ);
     sSwapTarget = target;
@@ -605,7 +593,6 @@ static void AimAction(Player* player, PlayState* play) {
     sApi->KeepCustomItemHeld();
 }
 
-// Aiming by hand trades the auto-aim away: there is no selection, so the hook takes whatever it passes.
 static void AimOrFire(Player* player, PlayState* play) {
     if (sPhase == SWITCH_HOOK_AIMING) {
         s16 yaw;
@@ -652,7 +639,6 @@ static void StowSwitchHook(Player* player, PlayState* play) {
     sSwapTarget = NULL;
 }
 
-// The hook keeps Link still while it flies, so the upper body is only busy then.
 static int32_t HoldSwitchHook(Player* player, PlayState* play) {
     if (sPhase == SWITCH_HOOK_IN_HAND) {
         sHookPos = player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND];
@@ -660,7 +646,6 @@ static int32_t HoldSwitchHook(Player* player, PlayState* play) {
     return 0;
 }
 
-// The live selection is tinted blue so the player can see what the shot will trade places with.
 static void MarkSelection(Player* player, PlayState* play) {
     if (sPhase != SWITCH_HOOK_IN_HAND) {
         return;
@@ -718,8 +703,8 @@ static void DrawChain(PlayState* play, Vec3f* from, Vec3f* to) {
     f32 dz = to->z - from->z;
     f32 yaw = Math_Atan2F_XY(dz, dx);
     f32 pitch = Math_Atan2F_XY(sqrtf(SQ(dx) + SQ(dz)), -dy);
-    s32 links = CLAMP((s32)(sqrtf(SQ(dx) + SQ(dy) + SQ(dz)) / SWITCH_HOOK_CHAIN_LINK_SPACING), 1,
-                      SWITCH_HOOK_CHAIN_LINK_MAX);
+    s32 links =
+        CLAMP((s32)(sqrtf(SQ(dx) + SQ(dy) + SQ(dz)) / SWITCH_HOOK_CHAIN_LINK_SPACING), 1, SWITCH_HOOK_CHAIN_LINK_MAX);
 
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
@@ -752,7 +737,6 @@ static void DrawSwitchHook(Actor* actor, PlayState* play) {
     }
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, SWITCH_HOOK_KEY, SWITCH_HOOK_KEY, "",
 };
@@ -786,6 +770,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetAction(&hook, TakeOutSwitchHook, HoldSwitchHook);
     Z64Items_SetHeldCallbacks(&hook, AimOrFire, StowSwitchHook, NULL);
     Z64Items_SetGetItemModel(&hook, sGiveDL);
+    hook.getItemScale = 0.0045f;
     hook.modelGroup = PLAYER_MODELGROUP_DEFAULT;
 
     Z64Items_SetLogic(&hook, &sRandomizerItem);

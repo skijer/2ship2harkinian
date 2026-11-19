@@ -1,10 +1,3 @@
-/**
- * Cane of Pacci: a tap flips what Link aims at onto its back, helpless, the way a hammered Tektite goes over.
- * Holding the button lifts it instead and letting go throws it, and how much the cane can lift is the strength
- * of Link's form: nothing as a Deku, pots and light foes as a Human, heavy foes and big rocks as a Zora, blocks
- * as a Goron.
- */
-
 #include <math.h>
 #include <string.h>
 
@@ -29,7 +22,6 @@
 #define PACCI_TINT_FRAMES 4
 #define PACCI_HURT_TINT_FRAMES 12
 
-// En_Tite's flip onto its back, constant for constant, and a thrown pot's tumble and mass.
 #define PACCI_FLIP_LAUNCH_VEL_Y 11.0f
 #define PACCI_FLIP_GRAVITY -1.0f
 #define PACCI_FLIP_MIN_VEL_Y -22.0f
@@ -48,7 +40,6 @@
 #define PACCI_LIFT_SPIN 0x400
 #define PACCI_LIFT_THROW_BASE_SPEED 8.0f
 #define PACCI_LIFT_THROW_SPEED_PER_STRENGTH 4.0f
-// Nearly flat: the object already hangs above Link, so the arc starts up there.
 #define PACCI_LIFT_THROW_VEL_Y 0.5f
 #define PACCI_LIFT_GRAVITY -1.4f
 #define PACCI_LIFT_FLIGHT_FRAMES 90
@@ -57,7 +48,6 @@
 #define PACCI_BURST_DAMAGE_PER_STRENGTH 4
 #define PACCI_BURST_MIN_DAMAGE 8
 
-// Enemy weight classes: past these masses a foe needs the next strength.
 #define PACCI_LIGHT_MASS 50
 #define PACCI_MEDIUM_MASS 150
 
@@ -82,7 +72,6 @@ typedef enum {
     PACCI_SWINGING,
 } PacciCanePhase;
 
-// Everything a flip overwrites, so a foe that survives it gets its own behaviour back exactly as it was.
 typedef struct {
     Actor* actor;
     u8 phase;
@@ -135,8 +124,8 @@ static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/
 static const ALIGN_ASSET(2) char sCaneDL[] = "__OTR__objects/object_pacci_cane/g_somaria_cane_dl";
 static const ALIGN_ASSET(2) char sCaneGiveDL[] = "__OTR__objects/object_pacci_cane/g_somaria_cane_give_dl";
 static const ALIGN_ASSET(2) char sCastAnim[] = "__OTR__misc/link_animetion/gPlayerAnim_nei_somaria";
-static const ALIGN_ASSET(2) char sRaisedAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_fighter_power_kiru_wait";
-// Majora's Mask has no hammer swing clip; the end of the sword's charged wait is the closest overhead strike.
+static const ALIGN_ASSET(2) char sRaisedAnim[] =
+    "__OTR__objects/gameplay_keep/gPlayerAnim_link_fighter_power_kiru_wait";
 static const ALIGN_ASSET(2) char sThrowAnim[] =
     "__OTR__objects/gameplay_keep/gPlayerAnim_link_fighter_power_kiru_wait_end";
 static const ALIGN_ASSET(2) char sBeamDL[] = "__OTR__objects/object_dy_obj/gGreatFairySpiralBeamDL";
@@ -148,18 +137,15 @@ static const ALIGN_ASSET(2) char sFlareRingDL[] = "__OTR__objects/gameplay_keep/
 static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
-// Foes that would break if knocked over, and song spots that have no body to move.
-static const s16 sUntouchable[] = { ACTOR_EN_IK,      ACTOR_EN_TORCH2, ACTOR_EN_DINOFOS,        ACTOR_EN_WALLMAS,
-                                    ACTOR_EN_FLOORMAS, ACTOR_EN_RD,     ACTOR_EN_FZ,            ACTOR_EN_VM,
-                                    ACTOR_EN_RR,       ACTOR_EN_OKARINA_TAG, ACTOR_EN_OKARINA_EFFECT };
-// The only scenery the Goron may carry: loose blocks and crates, never lifts, doors or floors.
+static const s16 sUntouchable[] = {
+    ACTOR_EN_IK, ACTOR_EN_TORCH2, ACTOR_EN_DINOFOS, ACTOR_EN_WALLMAS,     ACTOR_EN_FLOORMAS,      ACTOR_EN_RD,
+    ACTOR_EN_FZ, ACTOR_EN_VM,     ACTOR_EN_RR,      ACTOR_EN_OKARINA_TAG, ACTOR_EN_OKARINA_EFFECT
+};
 static const s16 sLiftableScenery[] = { ACTOR_OBJ_OSHIHIKI, ACTOR_OBJ_KIBAKO2 };
 
 static const Color_RGBA8 sSparklePrim = { 255, 255, 190, 255 };
 static const Color_RGBA8 sSparkleEnv = { 255, 150, 0, 255 };
 
-// While flipped the target carries this collider instead of its own: AT smashes what it falls on, like a
-// thrown pot, and AC is what makes a downed foe hittable at all.
 static ColliderCylinderInit sFlipColliderInit = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_ON | AC_TYPE_PLAYER, OC1_NONE, OC2_NONE, COLSHAPE_CYLINDER },
     { ELEM_MATERIAL_UNK0,
@@ -171,7 +157,6 @@ static ColliderCylinderInit sFlipColliderInit = {
     { 30, 46, -12, { 0, 0, 0 } },
 };
 
-// Owned by Link, not by the thrown object: an actor's AT never hits its own AC, and this must hurt both.
 static ColliderCylinderInit sBurstColliderInit = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_CYLINDER },
     { ELEM_MATERIAL_UNK0,
@@ -237,7 +222,6 @@ static PacciFlip* FindFlip(Actor* actor) {
     return NULL;
 }
 
-// A foe killed while flipped leaves its entry behind: the effect outlives the cane, so reap before taking one.
 static PacciFlip* TakeFlip(void) {
     for (u8 i = 0; i < PACCI_POOL_SIZE; i++) {
         if (sFlips[i].actor != NULL && sFlips[i].actor->update == NULL) {
@@ -268,7 +252,6 @@ static void RestoreFlipped(PacciFlip* flip) {
     flip->actor = NULL;
 }
 
-// Anything physical that is not Link, a boss or an NPC, and that the game actually draws.
 static bool IsTargetable(Actor* actor) {
     if (actor == NULL || actor->update == NULL || actor->draw == NULL || actor->id == ACTOR_PLAYER ||
         actor->category == ACTORCAT_BOSS || actor->category == ACTORCAT_NPC) {
@@ -289,7 +272,6 @@ static bool IsBigRock(Actor* actor) {
     return actor->id == ACTOR_EN_ISHI && ENISHI_GET_SIZE_FLAG(actor) != 0;
 }
 
-// The strength vanilla asks for the same weight: a big rock wants a Zora, a block a Goron.
 static s32 RequiredStrength(Actor* actor) {
     if (actor->category == ACTORCAT_BG) {
         return PLAYER_STRENGTH_GORON;
@@ -310,12 +292,10 @@ static bool IsLiftable(Actor* actor) {
     if (actor->category == ACTORCAT_BG && !IsIdOneOf(actor->id, sLiftableScenery, ARRAY_COUNT(sLiftableScenery))) {
         return false;
     }
-    return (actor->category == ACTORCAT_ENEMY || actor->category == ACTORCAT_PROP ||
-            actor->category == ACTORCAT_BG) &&
+    return (actor->category == ACTORCAT_ENEMY || actor->category == ACTORCAT_PROP || actor->category == ACTORCAT_BG) &&
            IsTargetable(actor) && Player_GetStrength() >= RequiredStrength(actor);
 }
 
-// What Link is looking at wins over what is merely closer: the cone is measured from his facing.
 static Actor* ScanAhead(PlayState* play, bool (*filter)(Actor*)) {
     static const u8 sCategories[] = { ACTORCAT_ENEMY, ACTORCAT_PROP, ACTORCAT_BG };
     Player* player = GET_PLAYER(play);
@@ -328,8 +308,8 @@ static Actor* ScanAhead(PlayState* play, bool (*filter)(Actor*)) {
                 continue;
             }
             f32 distance = Math_Vec3f_DistXZ(&player->actor.world.pos, &actor->world.pos);
-            s32 yawError = ABS((s16)(Math_Vec3f_Yaw(&player->actor.world.pos, &actor->world.pos) -
-                                     player->actor.shape.rot.y));
+            s32 yawError =
+                ABS((s16)(Math_Vec3f_Yaw(&player->actor.world.pos, &actor->world.pos) - player->actor.shape.rot.y));
 
             if (distance > PACCI_SCAN_MIN_DIST && distance <= PACCI_SCAN_RANGE && yawError < bestYawError) {
                 bestYawError = yawError;
@@ -358,7 +338,6 @@ static void GetVfxTargetPos(Vec3f* pos) {
     pos->y += sVfx.grabHeight;
 }
 
-// A quadratic arch from hand to target, bowed sideways and rippling with the frame counter.
 static void GetCurvePoint(Vec3f* pos, Vec3f* start, Vec3f* end, f32 t, f32 sideOffset, u32 frame) {
     f32 inv = 1.0f - t;
     f32 dx = end->x - start->x;
@@ -480,7 +459,6 @@ static void DrawSprite(PlayState* play, Vec3f* pos, f32 scale, const char* dList
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// The Great Fairy's spiral beam is 8000 units long and 1200 wide in its own space.
 static void DrawBeamSegment(PlayState* play, Vec3f* start, Vec3f* end, f32 radius, Color_RGB8 color, u8 alpha) {
     f32 dy = end->y - start->y;
     f32 xzLength = Math_Vec3f_DistXZ(start, end);
@@ -533,14 +511,12 @@ static void DrawGrip(PlayState* play, Vec3f* hand, Vec3f* target, f32 reach, f32
     for (u8 i = 0; i < PACCI_VFX_GRIP_POINTS; i++) {
         s16 angle = (s16)(i * (0x10000 / PACCI_VFX_GRIP_POINTS) + (sVfx.target->shape.rot.z - sVfx.startRotZ));
         f32 side = Math_CosS(angle) * gripRadius;
-        Vec3f point = { target->x + sideX * side, target->y + Math_SinS(angle) * gripRadius,
-                        target->z + sideZ * side };
+        Vec3f point = { target->x + sideX * side, target->y + Math_SinS(angle) * gripRadius, target->z + sideZ * side };
 
         DrawSprite(play, &point, 0.014f * pulse, sSparklesDL);
     }
 }
 
-// The cast visual: a beam from the cane hand to the target, sparkles along it and a ring gripping the target.
 static void DrawVfx(PlayState* play, Player* player) {
     Vec3f hand;
     Vec3f target;
@@ -554,8 +530,7 @@ static void DrawVfx(PlayState* play, Player* player) {
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
     gSPSegment(POLY_XLU_DISP++, 0x08,
                (uintptr_t)Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, play->gameplayFrames * 2, 0, 0x20, 0x40, 1,
-                                             play->gameplayFrames, play->gameplayFrames * -8, 0x10, 0x10, 2, 0, 1,
-                                             -8));
+                                             play->gameplayFrames, play->gameplayFrames * -8, 0x10, 0x10, 2, 0, 1, -8));
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 190, alpha);
     gDPSetEnvColor(POLY_XLU_DISP++, 255, 150, 0, alpha);
     CLOSE_DISPS(play->state.gfxCtx);
@@ -587,7 +562,6 @@ static void DrawVfx(PlayState* play, Player* player) {
     DrawSprite(play, &target, 0.034f * pulse, sFlash2DL);
 }
 
-// Impact burst: the thrown object and whatever it hit take a real hit, with their own flinch, death and drop.
 static void SpawnBurst(PlayState* play, Player* player, Vec3f* pos, bool isHeavy) {
     s32 strength = Player_GetStrength();
 
@@ -596,7 +570,6 @@ static void SpawnBurst(PlayState* play, Player* player, Vec3f* pos, bool isHeavy
         sIsBurstReady = true;
     }
     Collider_SetCylinder(play, &sBurst, &player->actor, &sBurstColliderInit);
-    // Rocks only break to a pound, and the Goron throws hard enough to deliver one.
     sBurst.elem.atDmgInfo.dmgFlags =
         isHeavy || strength >= PLAYER_STRENGTH_GORON ? (DMG_GORON_POUND | DMG_THROWN_OBJECT) : DMG_THROWN_OBJECT;
     sBurst.elem.atDmgInfo.damage = (u8)MAX(PACCI_BURST_MIN_DAMAGE, strength * PACCI_BURST_DAMAGE_PER_STRENGTH);
@@ -631,7 +604,6 @@ static void FallStep(PacciFlip* flip, Actor* actor, PlayState* play) {
     Actor_UpdateBgCheckInfo(play, actor, 5.0f, 15.0f, 0.0f, PACCI_BG_CHECK_FLAGS);
 }
 
-// AC and OC stay live the whole time so a downed foe can be hit; AT only while it falls.
 static void SubmitFlipColliders(PacciFlip* flip, Actor* actor, PlayState* play, bool isAirborne) {
     Collider_UpdateCylinder(actor, &flip->collider);
     if (isAirborne) {
@@ -641,8 +613,6 @@ static void SubmitFlipColliders(PacciFlip* flip, Actor* actor, PlayState* play, 
     CollisionCheck_SetOC(play, &play->colChkCtx, &flip->collider.base);
 }
 
-// A hit on a downed foe comes off its health without waking it; only the killing blow gives it back, with
-// colChkInfo untouched, so its own update runs its own death.
 static bool TakeDownedHit(PacciFlip* flip, Actor* actor) {
     if (!(flip->collider.base.acFlags & AC_HIT)) {
         return false;
@@ -675,7 +645,6 @@ static void UpdateAirborne(PacciFlip* flip, Actor* actor, PlayState* play) {
         Actor_SpawnFloorDustRing(play, actor, &actor->world.pos, 20.0f, 11, 4.0f, 0, 0, false);
         Actor_PlaySfx(actor, NA_SE_EN_STAL_DAMAGE);
     }
-    // A flipped prop lands like a dropped pot and takes the impact; only foes stay down, helpless.
     if (actor->category != ACTORCAT_ENEMY) {
         Vec3f impact = actor->world.pos;
         bool isHeavy = IsBigRock(actor);
@@ -716,7 +685,6 @@ static void UpdateRighting(PacciFlip* flip, Actor* actor, PlayState* play) {
     }
 }
 
-// The flipped actor's update: its own AI does not run at all while this one stands in for it.
 static void FlippedUpdate(Actor* actor, PlayState* play) {
     PacciFlip* flip = FindFlip(actor);
 
@@ -772,14 +740,12 @@ static bool CastFlip(PlayState* play, Player* player) {
     target->speed = 0.0f;
     target->colChkInfo.mass = PACCI_FLIP_THROWN_MASS;
     target->bgCheckFlags &= ~(BGCHECKFLAG_GROUND | BGCHECKFLAG_GROUND_TOUCH);
-    // Culling would stop this update too and freeze the foe mid-air; the flags go back with origFlags.
     target->flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
     Actor_PlaySfx(target, NA_SE_EN_STAL_DAMAGE);
     StartVfx(play, player, target, false);
     return true;
 }
 
-// A held foe's update: the cane owns its movement and collision, and a live no-op keeps it off the kill list.
 static void HeldEnemyUpdate(Actor* actor, PlayState* play) {
 }
 
@@ -795,7 +761,6 @@ static void LetGo(void) {
         actor->terminalVelocity = sLift.origTerminalVelocity;
         actor->room = sLift.origRoom;
         actor->colorFilterTimer = 0;
-        // Heavy enough to throw is heavy enough to hold down a floor switch.
         actor->flags |= ACTOR_FLAG_CAN_PRESS_SWITCHES;
     }
     sLift.held = NULL;
@@ -833,14 +798,12 @@ static bool TryGrab(PlayState* play, Player* player) {
         target->update = HeldEnemyUpdate;
         target->flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
     }
-    // A held object must survive the room it was picked up in unloading.
     target->room = -1;
     Actor_PlaySfx(target, NA_SE_EN_STAL_DAMAGE);
     StartVfx(play, player, target, true);
     return true;
 }
 
-// Aimed at Link's lock-on target when he has one, straight ahead otherwise; the stronger he is, the faster.
 static void Throw(Player* player) {
     Actor* actor = sLift.held;
     Actor* focus = player->focusActor;
@@ -853,8 +816,9 @@ static void Throw(Player* player) {
         LetGo();
         return;
     }
-    yaw = focus != NULL && focus != actor && focus->update != NULL ? Math_Vec3f_Yaw(&actor->world.pos, &focus->world.pos)
-                                                                   : player->actor.shape.rot.y;
+    yaw = focus != NULL && focus != actor && focus->update != NULL
+              ? Math_Vec3f_Yaw(&actor->world.pos, &focus->world.pos)
+              : player->actor.shape.rot.y;
     actor->world.rot.y = yaw;
     actor->shape.rot.y = yaw;
     actor->speed = PACCI_LIFT_THROW_BASE_SPEED + PACCI_LIFT_THROW_SPEED_PER_STRENGTH * Player_GetStrength();
@@ -884,7 +848,6 @@ static void HoldAloft(Player* player, Actor* actor) {
     Actor_SetColorFilter(actor, COLORFILTER_COLORFLAG_RED, 255, 0, 8);
 }
 
-// Landed, hit a wall, hit something, or flew too long: both ends of the impact take a real hit.
 static void FlyThrown(PlayState* play, Player* player, Actor* actor) {
     Actor_MoveWithGravity(actor);
     Actor_UpdateBgCheckInfo(play, actor, 5.0f, 15.0f, 0.0f, PACCI_BG_CHECK_FLAGS);
@@ -961,7 +924,6 @@ static void OnRelease(PlayState* play, Player* player) {
     }
 }
 
-// Only strength can lift: as a Deku the hold does nothing, and anything too heavy is refused.
 static void OnHoldReached(PlayState* play, Player* player) {
     if (Player_GetStrength() == PLAYER_STRENGTH_DEKU || !TryGrab(play, player)) {
         PlayErrorSfx();
@@ -1012,7 +974,6 @@ static bool WasJustHurt(Player* player) {
     return isHurt;
 }
 
-// The raised pose belongs to the hold: frame 0 of the wait animation, frozen, with the legs left alone.
 static void HoldRaisedPose(PlayState* play, Player* player) {
     if (!sIsPoseHeld) {
         StartUpperAnim(play, player, (PlayerAnimationHeader*)sRaisedAnim, 0.0f);
@@ -1022,7 +983,6 @@ static void HoldRaisedPose(PlayState* play, Player* player) {
     PlayerAnimation_Update(play, &player->skelAnimeUpper);
 }
 
-// The return value is Link's "upper body is busy": only while the cane is actually swinging or raised.
 static int32_t UpdateCane(Player* player, PlayState* play) {
     if (sPhase == PACCI_CASTING || sPhase == PACCI_SWINGING) {
         Player_StopHorizontalMovement(player);
@@ -1048,16 +1008,13 @@ static void TakeOutCane(PlayState* play, Player* player) {
     sHoldTimer = 0;
     sIsTrackingPress = false;
     sIsPoseHeld = false;
-    // The press that drew the cane is not a cast.
     sIsWaitingForRelease = true;
     sLastInvincibility = player->invincibilityTimer;
 }
 
-// Tap and hold are told apart from the raw button in TrackButton; the press itself only has to be consumed.
 static void PressCane(Player* player, PlayState* play) {
 }
 
-// Flipped foes keep their state on purpose: knock one over, switch to the sword, hit it while it is down.
 static void PutCaneAway(Player* player, PlayState* play) {
     sPhase = PACCI_STOWED;
     sHoldTimer = 0;
@@ -1092,7 +1049,6 @@ static void UpdatePacciWorld(Player* player) {
     TrackButton(play, player);
 }
 
-// The host draws generic held models on the left hand. Pacci explicitly owns the right-hand limb.
 static void DrawPacciInRightHand(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
     if (player != GET_PLAYER(play) || sPhase == PACCI_STOWED) {
@@ -1108,7 +1064,6 @@ static void DrawPacciInRightHand(Actor* actor, PlayState* play) {
     Matrix_Translate(hand.x, hand.y, hand.z, MTXMODE_NEW);
     Matrix_RotateYF(atan2f(dx, dz), MTXMODE_APPLY);
     Matrix_RotateXF(-atan2f(dy, sqrtf(dx * dx + dz * dz)), MTXMODE_APPLY);
-    // Calibrated by the user in Ship on 2026-10-14; two decimal places retain the measured pose.
     Matrix_Translate(1.64f, -0.75f, 19.51f, MTXMODE_APPLY);
     Matrix_RotateXF(DEG_TO_RAD(83.14f), MTXMODE_APPLY);
     Matrix_RotateYF(DEG_TO_RAD(62.96f), MTXMODE_APPLY);
@@ -1127,7 +1082,6 @@ static void DrawPacciEffects(void) {
     }
 }
 
-// Every actor the cane was holding or flipping belongs to the scene that is ending.
 static void ForgetScene(s16 sceneId, s8 spawnNum) {
     for (u8 i = 0; i < PACCI_POOL_SIZE; i++) {
         sFlips[i].actor = NULL;
@@ -1141,7 +1095,6 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
     sIsTrackingPress = false;
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, PACCI_KEY, PACCI_KEY, "",
 };
@@ -1162,7 +1115,6 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomItemDefinition cane = Z64Items_Define(PACCI_KEY, sIconTex, sNameTex);
 
     Z64Items_SetButtons(&cane, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
-    // Shares the Cane of Somaria's cell, after it.
     Z64Items_SetPlacement(&cane, 0, 21, -1);
     Z64Items_SetTextbox(&cane, "You got the %yCane of Pacci%w! Its&magic %yflips%w what it touches&"
                                "onto its back. Hold %y\xB2%w to %ylift%w it&instead and let go to throw it.^"
@@ -1172,6 +1124,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetAction(&cane, TakeOutCane, UpdateCane);
     Z64Items_SetHeldCallbacks(&cane, PressCane, PutCaneAway, NULL);
     Z64Items_SetGetItemModel(&cane, sCaneGiveDL);
+    cane.getItemScale = 0.18f;
 
     Z64Items_SetLogic(&cane, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &cane)) {

@@ -64,7 +64,6 @@ static void ToggleGrip(PlayState* play, Player* player) {
     StartGripping(player);
 }
 
-// While gripping, every wall counts as climbable.
 static void GrantClimbing(bool* should, va_list args) {
     if (sIsGripping) {
         *should = true;
@@ -106,7 +105,6 @@ static void StopGrippingOnLoad(s32 fileNum) {
     StopGripping();
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, MITTS_KEY, MITTS_KEY, "",
 };
@@ -136,6 +134,7 @@ S2H_MOD_EXPORT void ModInit(void) {
                                   "Press again to stop. Drains magic.");
     Z64Items_SetAction(&mitts, ToggleGrip, NULL);
     Z64Items_SetGetItemModel(&mitts, sGiveDL);
+    mitts.getItemScale = 0.9f;
     mitts.flags |= S2H_CUSTOM_ITEM_INSTANT;
 
     Z64Items_SetLogic(&mitts, &sRandomizerItem);

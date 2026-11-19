@@ -1,7 +1,3 @@
-/**
- * Magic Cape: while switched on, every spell costs half and the Lens of Truth drains at half speed.
- * Ganondorf's cloak (OoT En_Ganon_Mant, copied by build_assets.py) hangs from Link's shoulders with Verlet physics.
- */
 
 #include <math.h>
 #include <string.h>
@@ -61,21 +57,20 @@ static const f32 sDistMult[CAPE_JOINTS] = {
     0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f,
 };
 
-#define CAPE_MAP_STRAND(n)                                                                                       \
-    (n) + CAPE_JOINTS * 0, (n) + CAPE_JOINTS * 1, (n) + CAPE_JOINTS * 2, (n) + CAPE_JOINTS * 3,                   \
-        (n) + CAPE_JOINTS * 4, (n) + CAPE_JOINTS * 5, (n) + CAPE_JOINTS * 6, (n) + CAPE_JOINTS * 7,               \
-        (n) + CAPE_JOINTS * 8, (n) + CAPE_JOINTS * 9, (n) + CAPE_JOINTS * 10, (n) + CAPE_JOINTS * 11
+#define CAPE_MAP_STRAND(n)                                                                                             \
+    (n) + CAPE_JOINTS * 0, (n) + CAPE_JOINTS * 1, (n) + CAPE_JOINTS * 2, (n) + CAPE_JOINTS * 3, (n) + CAPE_JOINTS * 4, \
+        (n) + CAPE_JOINTS * 5, (n) + CAPE_JOINTS * 6, (n) + CAPE_JOINTS * 7, (n) + CAPE_JOINTS * 8,                    \
+        (n) + CAPE_JOINTS * 9, (n) + CAPE_JOINTS * 10, (n) + CAPE_JOINTS * 11
 
-// The vertex order of Ganondorf's own cloak mesh.
 static const u16 sVertexMap[CAPE_STRANDS * CAPE_JOINTS] = {
     CAPE_MAP_STRAND(11), CAPE_MAP_STRAND(10), CAPE_MAP_STRAND(9), CAPE_MAP_STRAND(8),
     CAPE_MAP_STRAND(7),  CAPE_MAP_STRAND(6),  CAPE_MAP_STRAND(5), CAPE_MAP_STRAND(4),
     CAPE_MAP_STRAND(3),  CAPE_MAP_STRAND(2),  CAPE_MAP_STRAND(1), CAPE_MAP_STRAND(0),
 };
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate",  "OnPlayerPostLimbDraw", "OnActorDrawEnd",
-                                              "OnMagicResolveCost", "ShouldActorInit",   "OnActorInit",
-                                              "ShouldActorUpdate",  "OnActorUpdate",     "OnSceneInit" };
+static const char* const sRequiredHooks[] = { "OnPlayerUpdate",     "OnPlayerPostLimbDraw", "OnActorDrawEnd",
+                                              "OnMagicResolveCost", "ShouldActorInit",      "OnActorInit",
+                                              "ShouldActorUpdate",  "OnActorUpdate",        "OnSceneInit" };
 
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -99,7 +94,6 @@ static bool IsActive(void) {
     return sApi->IsEquipmentOwned(MAGIC_CAPE_KEY) && sApi->IsEquipmentToggleOn(MAGIC_CAPE_KEY);
 }
 
-// The spin attack keeps its full price: its charge previews one cost and its release pays another.
 static void HalveSpellCost(int16_t* amount) {
     if (IsActive() && !sCape.isSpinAttackCharging && *amount > 0) {
         *amount /= 2;
@@ -114,7 +108,6 @@ static void LeaveSpinAttackCost(Actor* actor) {
     sCape.isSpinAttackCharging = false;
 }
 
-// The lens pays one point each time its timer runs out; the timer jumping back up is that payment.
 static void HalveLensDrain(PlayState* play) {
     s16 timer = play->interfaceCtx.magicConsumptionTimer;
 
@@ -163,7 +156,6 @@ static void ClampVelocity(Vec3f* velocity) {
     velocity->z = CLAMP(velocity->z, -CAPE_VEL_CLAMP, CAPE_VEL_CLAMP);
 }
 
-// EnGanonMant_UpdateStrand, scaled to Link.
 static void UpdateStrand(Vec3f* actorPos, CapeStrand* strand, CapeStrand* neighbor, s16 strandNum, f32 backSwayMag,
                          f32 sideSwayMag, f32 minY) {
     Vec3f delta;
@@ -229,7 +221,6 @@ static void UpdateStrand(Vec3f* actorPos, CapeStrand* strand, CapeStrand* neighb
     strand->rotations[CAPE_JOINTS - 1] = strand->rotations[CAPE_JOINTS - 2];
 }
 
-// Two vertex buffers alternate, as OoT's own cloak does, so a frame never edits the one being drawn.
 static const char* GetCurrentVertices(void) {
     return (sCape.frame % 2) ? sMant1Vtx : sMant2Vtx;
 }
@@ -259,8 +250,6 @@ static void UpdateVertices(void) {
     }
 }
 
-// The roots fan out in a semicircle between the shoulders; the first tick after an init collapses every joint
-// onto its root so the cloth does not settle in from the world origin.
 static void SimulateCloth(Player* player) {
     Vec3f* left = &sCape.shoulders[0];
     Vec3f* right = &sCape.shoulders[1];
@@ -311,7 +300,6 @@ static bool IsClothHidden(Player* player) {
 static void TickCape(Player* player) {
     PlayState* play = gPlayState;
 
-    // A skipped update never reaches OnActorUpdate, which would leave every later spell at full price.
     sCape.isSpinAttackCharging = false;
     if (play == NULL || player != GET_PLAYER(play)) {
         return;
@@ -328,7 +316,6 @@ static void TickCape(Player* player) {
     sCape.hasUpdatedThisFrame = true;
 }
 
-// The cloth runs its physics where it draws, once per updated frame, off the shoulders the limbs just placed.
 static void DrawCloth(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
 
@@ -355,8 +342,8 @@ static void DrawCloth(Actor* actor, PlayState* play) {
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sMantMaterialDL);
     gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)vertices);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sMantDL);
-    // The skeleton's cull jump lives on segment 0x0C: left on the cape's vertices, the next limb drawn would run
-    // vertex data as opcodes.
+    // The skeleton's cull jump lives on segment 0x0C: left on the cape's vertices, the next limb would run them as
+    // opcodes.
     gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)gCullBackDList);
     CLOSE_DISPS(play->state.gfxCtx);
     sCape.capturedShoulders = 0;
@@ -379,7 +366,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Two authored poses of the hanging cloth, alternated so it waves while it hangs.
 static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     const char* cape = ((play->gameplayFrames >> 3) & 1) ? sGetItemCapeWaveDL : sGetItemCapeDL;
 
@@ -413,6 +399,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.onUnequip = HideCloth;
     definition.formMask = S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN);
     definition.getItemModelPath = sGetItemCapeDL;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = MAGIC_CAPE_KEY,
+        .hintKey = MAGIC_CAPE_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!sApi->RegisterCustomEquipment(&definition)) {
         return;
     }

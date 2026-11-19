@@ -1,14 +1,3 @@
-/**
- * elemental_wand: six rods in one staff (Skijer's NEI).
- *
- * One item, one cell, one wheel: Sand, Tornado, Water, Meteor, Storm and the Shadow Scepter share the staff
- * and which one is live is the wheel's selection. Casting is a double sword swing over the walk, and the rod
- * itself fires on a frame of the second slash.
- *
- * Which rods are yours is a randomizer setting (Randomizer > Mods): the six medallions, one item lighting
- * all six, or a rod per pickup.
- */
-
 #include <math.h>
 #include <string.h>
 
@@ -32,8 +21,6 @@ static Gfx sEmptyDL[] = { gsSPEndDisplayList() };
 #define WAND_PI 3.14159265f
 #define WAND_DEGREES_TO_RADIANS (WAND_PI / 180.0f)
 
-// Dialled in game and baked by NEI. The staff measures 350 units tall, which is why its scale is not a
-// rod's. Order: rotation Y, X, Z, then the offsets along the shaft's own axes, then scale.
 #define WAND_HELD_ROT_Y 180.0f
 #define WAND_HELD_ROT_X 91.034f
 #define WAND_HELD_ROT_Z 111.724f
@@ -41,7 +28,6 @@ static Gfx sEmptyDL[] = { gsSPEndDisplayList() };
 #define WAND_HELD_OFFSET_Z (-3.218f)
 #define WAND_HELD_SCALE 0.12f
 
-// How far into the second slash the rod goes off: the summon belongs to the animation, not to the button.
 #define WAND_CAST_FRACTION 0.35f
 
 typedef enum {
@@ -54,7 +40,6 @@ typedef enum {
     WAND_MODE_MAX,
 } WandMode;
 
-// The randomizer treatments, in the order the dropdown lists them.
 typedef enum {
     WAND_SHUFFLE_MEDALLIONS,
     WAND_SHUFFLE_SINGLE,
@@ -108,8 +93,6 @@ static const ALIGN_ASSET(2) char sBoeMaterialDL[] = "__OTR__objects/object_mkk/g
 static const ALIGN_ASSET(2) char sBoeModelDL[] = "__OTR__objects/object_mkk/gBlackBoeBodyModelDL";
 static const ALIGN_ASSET(2) char sBoeEndDL[] = "__OTR__objects/object_mkk/gBlackBoeEndDL";
 
-// Sand and Water undercut the rest because they are movement and get spammed; Storm costs the most because
-// it fires world flags. The Tornado is 0 on purpose: it bills itself while the column climbs.
 static const WandRod sRods[WAND_MODE_MAX] = {
     { sSandOpa, sSandXlu, "nei.medallion.spirit", 2 },  { sTornadoOpa, sTornadoXlu, "nei.medallion.forest", 0 },
     { sWaterOpa, sWaterXlu, "nei.medallion.water", 2 }, { sMeteorOpa, sMeteorXlu, "nei.medallion.fire", 3 },
@@ -121,10 +104,8 @@ static const Z64WheelEntry sWheelEntries[WAND_MODE_MAX] = {
     { sIconMeteor, "Meteor Rod" }, { sIconStorm, "Storm Rod" },     { sIconScepter, "Shadow Scepter" },
 };
 
-static const char* const sSeparateKeys[WAND_MODE_MAX] = {
-    "nei.wand.sand", "nei.wand.tornado", "nei.wand.water",
-    "nei.wand.meteor", "nei.wand.storm", "nei.wand.shadow"
-};
+static const char* const sSeparateKeys[WAND_MODE_MAX] = { "nei.wand.sand",   "nei.wand.tornado", "nei.wand.water",
+                                                          "nei.wand.meteor", "nei.wand.storm",   "nei.wand.shadow" };
 static bool IsWandKey(const char* key) {
     return key != NULL && strcmp(key, WAND_KEY) == 0;
 }
@@ -141,9 +122,8 @@ static void ReceiveWandFunction(const char* itemKey, const char* variantKey) {
 
 static const char* const sShuffleValues[] = { "Medallions", "One item", "Function pickups" };
 
-// Indexed by Player.heldItemButton, which keeps a slot for A between the C buttons and the D-pad.
-static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,     BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
-                                                         BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN,  BTN_DUP };
+static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
+                                                         BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
 static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnActorDrawEnd",       "OnSceneInit",
                                               "OnSaveLoad",     "OnPlayerPostLimbDraw", "OnInterfaceDrawEnd" };
@@ -153,7 +133,6 @@ static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sR
 #define SAND_MAX_SLABS 8
 #define SAND_SLAB_SCALE 0.05f
 #define SAND_HOLD_INTERVAL 6
-// Under 1.0 so consecutive slabs overlap instead of leaving a seam to fall through.
 #define SAND_STEP_FRACTION 0.85f
 #define SAND_FALLBACK_DIST 40.0f
 #define SAND_CRUMBLE_FRAMES 24
@@ -168,12 +147,10 @@ static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sR
 // this actor again except its destroy, which only reads dyna.bgId.
 #define SAND_CRUMBLE(actor) ((actor)->home.rot.x)
 
-// The player update runs at 20 Hz, so a full column is three seconds.
 #define WIND_CHARGE_MIN 15
 #define WIND_CHARGE_FULL 60
 #define WIND_LAUNCH_MIN 8.0f
 #define WIND_LAUNCH_MAX 32.0f
-// Eight ticks fall inside the climb, so a full gale costs exactly 8 and a partial one costs its share.
 #define WIND_DRAIN_INTERVAL 7
 #define WIND_FLUTTER_INTERVAL 4
 #define WIND_BOOST 1.55f
@@ -198,7 +175,6 @@ static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sR
 #define WIND_QUAKE_SPEED 32000
 #define WIND_QUAKE_AMPLITUDE 6
 #define WIND_QUAKE_FRAMES 11
-// A continuous id, only ever played MINUS the flag and re-issued every frame, which is also what stops it.
 #define WIND_LOOP_SFX (NA_SE_EV_WIND_TRAP - SFX_FLAG)
 #define WIND_RIBBONS 5
 #define WIND_RIBBON_SPREAD 2.0f
@@ -206,8 +182,6 @@ static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sR
 #define WIND_RIBBON_STEP 0.06f
 #define WIND_RIBBON_TURNS 0x18000
 
-// Link's ~60 units are about 1.6 m and the update runs at 20 Hz, so the gale is roughly twelve metres of
-// ground: a long jump rather than a flight.
 #define GALE_ANTICIPATE_FRAMES 2
 #define GALE_IMPULSE_FRAMES 2
 #define GALE_FLIGHT_FRAMES 18
@@ -251,12 +225,9 @@ typedef enum {
 #define METEOR_LAUNCH_SPEED 28.0f
 #define METEOR_LAUNCH_RISE 6.0f
 #define METEOR_FUSE_FRAMES 170
-// Nothing detonates it for these first frames: thrown from hand height it is still inside Link's own space.
 #define METEOR_ARM_FRAMES 5
-// The AT collider only exists while the bomb is ALREADY exploding, so enemy contact is proximity.
 #define METEOR_ENEMY_TRIGGER_RADIUS 42.0f
 #define METEOR_BOMB_SCALE 0.01f
-// Peak and speed both fall as 1/(1 + k*n): slow, where vanilla's restitution dies in two hops.
 #define METEOR_HOP_PERIOD 16.0f
 #define METEOR_HOP_HEIGHT 46.0f
 #define METEOR_HOP_DECAY 0.3f
@@ -265,12 +236,10 @@ typedef enum {
 #define METEOR_TINT_G 45
 #define METEOR_TINT_B 30
 #define METEOR_TINT_MIX 255
-// Both on home.rot, which En_Bom never touches. Hop time is AIRBORNE until the throw lands.
 #define METEOR_HOP_TIME(actor) ((actor)->home.rot.x)
 #define METEOR_AGE(actor) ((actor)->home.rot.z)
 #define METEOR_AIRBORNE (-1)
 
-// En_Okarina_Effect's own storm is the whole cast; the song's magic reset is not part of it.
 #define STORM_OKARINA_PARAMS 1
 #define STORM_SPAWN_Y_OFFSET (-30.0f)
 #define STORM_RAY_SPEED 18.0f
@@ -409,7 +378,6 @@ static u8 OwnedRodBits(void) {
     return rods;
 }
 
-// Which rods answer. The three treatments differ only in what lights an entry, never in what the staff is.
 static void SyncUnlockedRods(void) {
     u8 rule = ShuffleRule();
     bool hasStaff = rule == WAND_SHUFFLE_SINGLE && sApi->IsCustomItemOwned(WAND_KEY);
@@ -425,14 +393,14 @@ static void SyncUnlockedRods(void) {
                 isOwned = sApi->IsCustomItemOwned(sSeparateKeys[mode]);
                 break;
             default:
-                isOwned = sApi->IsCustomItemOwned(sRods[mode].medallionKey) || sApi->IsCustomItemOwned(sSeparateKeys[mode]);
+                isOwned =
+                    sApi->IsCustomItemOwned(sRods[mode].medallionKey) || sApi->IsCustomItemOwned(sSeparateKeys[mode]);
                 break;
         }
         Z64Wheel_SetEntryUnlocked(mode, isOwned);
     }
 }
 
-// Ownership and the selected distribution mode decide which wheel entries are available.
 static void LightNextRod(const char* key) {
     SyncUnlockedRods();
 }
@@ -440,7 +408,8 @@ static void LightNextRod(const char* key) {
 static u16 FindButtonMask(void) {
     if (gPlayState != NULL) {
         u8 held = GET_PLAYER(gPlayState)->heldItemButton;
-        if (held < S2H_ITEM_BUTTON_COUNT && IsWandKey(sApi->GetEquippedCustomItem(held))) return sItemButtons[held];
+        if (held < S2H_ITEM_BUTTON_COUNT && IsWandKey(sApi->GetEquippedCustomItem(held)))
+            return sItemButtons[held];
     }
     for (u8 button = 0; button < S2H_ITEM_BUTTON_COUNT; button++) {
         const char* equipped = sApi->GetEquippedCustomItem(button);
@@ -462,7 +431,6 @@ static bool HasLockOn(Player* player) {
     return Player_IsZTargeting(player) && player->focusActor != NULL && player->focusActor->update != NULL;
 }
 
-// Failing to pay costs nothing else: the rod that declined reports it and the swing is never started.
 static bool SpendMagic(PlayState* play, s16 cost) {
     if (cost <= 0) {
         return true;
@@ -470,7 +438,6 @@ static bool SpendMagic(PlayState* play, s16 cost) {
     if (!Magic_Consume(play, cost, MAGIC_CONSUME_NOW)) {
         return false;
     }
-    // Consuming leaves the meter flashing and refusing every later request until the spell resets it.
     Magic_Reset(play);
     return true;
 }
@@ -514,8 +481,6 @@ static void SpawnDust(PlayState* play, Vec3f* center, f32 minRadius, f32 maxRadi
     }
 }
 
-// The slab is MEASURED off its own registered collision: world units from the actor origin up to the surface
-// Link stands on, and out to its nearest edge. Both are constant, so the first slab pays for it.
 static void MeasureSlab(PlayState* play, Actor* slab) {
     s32 bgId = ((DynaPolyActor*)slab)->bgId;
     CollisionHeader* header;
@@ -536,8 +501,6 @@ static void MeasureSlab(PlayState* play, Actor* slab) {
     sIsSandMeasured = true;
 }
 
-// One step ahead of Link, with its walking surface at his feet. The player's own origin sits on the floor,
-// which is why the slab is dropped by its top offset rather than by a number picked to look right.
 static void NextSlabSpot(Player* player, Vec3f* out) {
     s16 yaw = player->actor.shape.rot.y;
     f32 distance = sIsSandMeasured ? sSandReach * SAND_STEP_FRACTION : SAND_FALLBACK_DIST;
@@ -547,7 +510,6 @@ static void NextSlabSpot(Player* player, Vec3f* out) {
     out->z = player->actor.world.pos.z + Math_CosS(yaw) * distance;
 }
 
-// A slab that has started crumbling does not count: it is on its way out.
 static bool IsSpotCovered(Vec3f* spot) {
     for (u8 index = 0; index < SAND_MAX_SLABS; index++) {
         Actor* slab = sSandSlabs[index];
@@ -570,19 +532,12 @@ static void ForgetSlab(Actor* slab) {
     }
 }
 
-/**
- * The slab's whole life. No shake and no fall: standing on it starts a countdown, and the countdown eats it.
- *
- * The countdown never touches actor->scale, only the draw: the dynapoly is built from the actor's transform,
- * so scaling the actor would shrink the floor out from under Link while he is still standing on it.
- */
 static void UpdateSlab(Actor* thisx, PlayState* play) {
     if (SAND_CRUMBLE(thisx) == 0) {
         if (!DynaPolyActor_IsPlayerOnTop((DynaPolyActor*)thisx)) {
             return;
         }
         SAND_CRUMBLE(thisx) = SAND_CRUMBLE_FRAMES;
-        // A fixed world position, not the actor's: the slab is killed partway through the sound.
         SoundSource_PlaySfxAtFixedWorldPos(play, &thisx->world.pos, SAND_SFX_TICKS, NA_SE_EV_FALL_DOWN_DIRT);
     }
     SAND_CRUMBLE(thisx)--;
@@ -603,7 +558,6 @@ static void DrawSlab(Actor* thisx, PlayState* play) {
     gDPSetEnvColor(POLY_OPA_DISP++, SAND_ENV_R, SAND_ENV_G, SAND_ENV_B, 255);
     CLOSE_DISPS(play->state.gfxCtx);
 
-    // Applied to the matrix Actor_Draw already set up: this shrinks the model and leaves the collision alone.
     Matrix_Scale(remaining, remaining, remaining, MTXMODE_APPLY);
     Gfx_DrawDListOpa(play, (Gfx*)sSlabDL);
 }
@@ -616,8 +570,6 @@ static void ForgetSandSlabs(void) {
     sSandHoldTimer = 0;
 }
 
-// Overflow only: the oldest is told to start crumbling and then let go of, so a held button cannot fill the
-// actor list. It finishes on its own; the countdown lives on the actor.
 static void EvictSlab(u8 slot) {
     Actor* slab = sSandSlabs[slot];
 
@@ -627,7 +579,6 @@ static void EvictSlab(u8 slot) {
     sSandSlabs[slot] = NULL;
 }
 
-// ObjLift_Init kills itself when the flag is already set, and nothing runs between the two flag writes.
 static Actor* SpawnLift(PlayState* play, Vec3f* pos, s16 yaw) {
     bool wasFlagSet = Flags_GetSwitch(play, SAND_SWITCH_FLAG) != 0;
     Actor* lift;
@@ -662,21 +613,17 @@ static bool CastSand(Player* player, PlayState* play) {
     if (!EnsureLiftObject(play)) {
         return false;
     }
-    // Placed blind, with no raycast on purpose: that is what lets a slab hang in mid-air over a gap.
     NextSlabSpot(player, &pos);
     slab = SpawnLift(play, &pos, yaw);
     if (slab == NULL) {
         return false;
     }
 
-    // destroy is left alone: ObjLift_Destroy is what unregisters the dynapoly.
     slab->update = UpdateSlab;
     slab->draw = DrawSlab;
     Actor_SetScale(slab, SAND_SLAB_SCALE);
     SAND_CRUMBLE(slab) = 0;
 
-    // The collision only exists once Init has registered it, so the first slab is the one that can be
-    // measured, and once measured it is moved to where it should have gone.
     MeasureSlab(play, slab);
     if (sIsSandMeasured) {
         NextSlabSpot(player, &pos);
@@ -691,8 +638,6 @@ static bool CastSand(Player* player, PlayState* play) {
     return true;
 }
 
-// What makes the rod a road: it only lays a slab when the step ahead has nothing standable under it, so
-// holding the button and walking keeps producing ground, and standing still stops costing magic.
 static bool ShouldLaySlab(Player* player, bool isHeld) {
     Vec3f spot;
 
@@ -773,7 +718,6 @@ static void StartWindRibbons(PlayState* play) {
     sAreWindRibbonsLive = true;
 }
 
-// Each streak climbs the column's surface, flaring out as it turns around it.
 static void FeedWindRibbons(PlayState* play) {
     f32 reach = WIND_HEIGHT * sWindGrow;
     f32 spread = WIND_RADIUS * sWindGrow * WIND_RIBBON_SPREAD;
@@ -806,7 +750,6 @@ static void StopUpdraft(PlayState* play) {
     }
     sIsWindUp = false;
     StopWindRibbons(play);
-    // En_Light has no lifetime of its own, so whoever spawns one owns it until they say otherwise.
     for (u8 index = 0; index < WIND_FLAME_MAX; index++) {
         if (sWindFlames[index] != NULL) {
             Actor_Kill(sWindFlames[index]);
@@ -845,7 +788,6 @@ static void StartUpdraft(PlayState* play, Vec3f* origin) {
     sWindGrow = WIND_GROW_MIN;
     sWindOrigin = *origin;
 
-    // Everything erupts at once; the tick culls it back when the burst is over.
     for (u8 index = 0; index < WIND_FLAME_MAX; index++) {
         sWindFlamePhase[index] = (f32)index * (2.0f * WAND_PI / WIND_FLAME_MAX) + Rand_ZeroFloat(0.6f);
         sWindFlames[index] = SpawnFlame(play, origin);
@@ -862,7 +804,6 @@ static void TickUpdraft(PlayState* play, bool isHolding, f32 fill) {
     isBursting = sWindAge < WIND_FLAME_BURST_FRAMES;
     sWindAge++;
 
-    // The wind only holds while it is being built; let go and what is left dies away instead of cutting out.
     if (isHolding) {
         sWindFade = 1.0f;
         sWindGrow = WIND_GROW_MIN + (1.0f - WIND_GROW_MIN) * CLAMP(fill, 0.0f, 1.0f);
@@ -884,7 +825,6 @@ static void TickUpdraft(PlayState* play, bool isHolding, f32 fill) {
         if (sWindFlames[index] == NULL) {
             continue;
         }
-        // Once the burst is spent only a few stay, gathered in close around the column.
         if (!isBursting && index >= WIND_FLAME_KEEP) {
             Actor_Kill(sWindFlames[index]);
             sWindFlames[index] = NULL;
@@ -898,7 +838,6 @@ static void TickUpdraft(PlayState* play, bool isHolding, f32 fill) {
     }
 }
 
-// The cone is modelled standing on its base along +Y, which is where the column wants it anyway.
 static void DrawUpdraft(PlayState* play) {
     f32 height = WIND_HEIGHT * sWindGrow;
     f32 spread = WIND_RADIUS * sWindGrow;
@@ -926,7 +865,6 @@ static void EndWindCharge(Player* player, PlayState* play) {
     }
 }
 
-// The charge decides the height; the boost below then keeps the next hop or slash strong.
 static void LaunchOnColumn(PlayState* play, Player* player) {
     f32 fill = (f32)sWindCharge / (f32)WIND_CHARGE_FULL;
 
@@ -935,11 +873,6 @@ static void LaunchOnColumn(PlayState* play, Player* player) {
     Player_PlaySfx(player, NA_SE_PL_ROLL);
 }
 
-/**
- * Rooted while the column builds. An action func of its own rather than a paused one: anything that takes
- * the player (damage, a cutscene, a textbox) replaces it, and the charge notices next frame that it is no
- * longer the one driving.
- */
 static void ChargeWindAction(Player* player, PlayState* play) {
     Player_StopHorizontalMovement(player);
     Player_Anim_PlayLoop(play, player, Player_GetIdleAnim(player));
@@ -965,15 +898,13 @@ static void TickWindCharge(PlayState* play, Player* player, bool isHeld) {
         TickUpdraft(play, false, 0.0f);
         return;
     }
-    // Anything that took the stance away drops the charge without launching him.
-    if (player->actionFunc != (PlayerActionFunc)ChargeWindAction || !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
+    if (player->actionFunc != (PlayerActionFunc)ChargeWindAction ||
+        !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
         EndWindCharge(player, play);
         TickUpdraft(play, false, 0.0f);
         return;
     }
 
-    // Only the CLIMB is billed and only the climb flutters: sitting on a full column is silent and free, so
-    // holding it is a question of when to leave, never of how much magic is left.
     if (sWindCharge < WIND_CHARGE_FULL) {
         sWindCharge++;
         if ((sWindCharge % WIND_FLUTTER_INTERVAL) == 0) {
@@ -1000,8 +931,6 @@ static void TickWindCharge(PlayState* play, Player* player, bool isHeld) {
     TickUpdraft(play, false, 0.0f);
 }
 
-// Multiplies whatever vertical launch just happened for a short window after a gale, so a charge that ends in
-// a side hop becomes real distance.
 static void BoostNextJump(Player* player) {
     if (sWindBoostTimer <= 0 || player->actor.velocity.y <= 0.0f) {
         return;
@@ -1018,10 +947,8 @@ static void EndGale(Player* player, PlayState* play) {
     }
 }
 
-// A lock-on gives the BEARING only: the power is fixed, so overshooting is part of the tool.
 static bool CastGale(Player* player, PlayState* play) {
-    if (sGalePhase != GALE_OFF || !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) ||
-        !SpendMagic(play, GALE_COST)) {
+    if (sGalePhase != GALE_OFF || !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) || !SpendMagic(play, GALE_COST)) {
         return false;
     }
     sGaleYaw = HasLockOn(player) ? Math_Vec3f_Yaw(&player->actor.world.pos, &player->focusActor->focus.pos)
@@ -1044,7 +971,7 @@ static void PlayGaleAnim(PlayState* play, Player* player, const char* animPath, 
 
 static void KickOffGale(PlayState* play, Player* player) {
     player->actor.velocity.y = GALE_RISE;
-    player->actor.gravity = 0.0f; // the arc is integrated below, not by the engine
+    player->actor.gravity = 0.0f;
     player->actor.bgCheckFlags &= ~BGCHECKFLAG_GROUND;
     player->stateFlags1 |= PLAYER_STATE1_40000;
     player->fallStartHeight = (s16)player->actor.world.pos.y;
@@ -1076,8 +1003,6 @@ static bool HasGaleHitSomething(Player* player, s16 flown) {
     return (player->actor.bgCheckFlags & solid) != 0;
 }
 
-// The flight is driven from the mod's tick, which runs after the action func: the body is the last word of
-// the frame that way, and the action func itself is only there to keep vanilla out of the wheel.
 static void RideGaleAction(Player* player, PlayState* play) {
     PlayerAnimation_Update(play, &player->skelAnime);
 }
@@ -1117,7 +1042,7 @@ static void TickGale(PlayState* play, Player* player) {
                 break;
             }
             if (player->actor.bgCheckFlags & (BGCHECKFLAG_WALL | BGCHECKFLAG_GROUND_TOUCH)) {
-                Player_StopHorizontalMovement(player); // hitting something kills the run; a timeout keeps it
+                Player_StopHorizontalMovement(player);
             }
             sGalePhase = GALE_FALL;
             sGaleTimer = GALE_FALL_LIMIT;
@@ -1135,7 +1060,7 @@ static void TickGale(PlayState* play, Player* player) {
             Player_PlaySfx(player, NA_SE_PL_BOUND_DIRT);
             break;
 
-        default: // GALE_ROLL: hand the body back and let the engine stand him up itself
+        default:
             if (sGaleTimer <= 0) {
                 EndGale(player, play);
             }
@@ -1143,8 +1068,6 @@ static void TickGale(PlayState* play, Player* player) {
     }
 }
 
-// No Majora's Mask actor is a water geyser, so the column is a slab that rises and sinks under a water tint.
-// The vanilla oscillation is kept: it is what sells the column as water rather than a lift.
 static void UpdateGeyser(Actor* thisx, PlayState* play) {
     f32 bob = Math_SinS((s16)(play->gameplayFrames * WATER_BOB_RATE)) * WATER_BOB_AMPLITUDE;
 
@@ -1170,7 +1093,6 @@ static bool CastWater(Player* player, PlayState* play) {
     Vec3f pos;
     s16 yaw = player->actor.shape.rot.y;
 
-    // Already up: the cast is the lift control, so it just flips which way the column is going.
     if (sWaterGeyser != NULL && sWaterGeyser->update == UpdateGeyser) {
         sWaterTargetHeight = sWaterTargetHeight > WATER_REST_HEIGHT ? WATER_REST_HEIGHT : WATER_RIDE_HEIGHT;
         return true;
@@ -1195,8 +1117,6 @@ static bool CastWater(Player* player, PlayState* play) {
     return true;
 }
 
-// Wrapped, not replaced: EnBom_Draw also billboards and runs Collider_UpdateSpheres, which is what gives the
-// explosion its hitbox.
 static void DrawTintedBomb(Actor* thisx, PlayState* play) {
     if (sMeteorBombDraw == NULL) {
         return;
@@ -1211,26 +1131,22 @@ static void DrawTintedBomb(Actor* thisx, PlayState* play) {
     sMeteorBombDraw(thisx, play);
 
     OPEN_DISPS(play->state.gfxCtx);
-    gSPGrayscale(POLY_OPA_DISP++, false); // both buffers, or the rest of the frame comes out red too
+    gSPGrayscale(POLY_OPA_DISP++, false);
     gSPGrayscale(POLY_XLU_DISP++, false);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Read live rather than captured at launch, so switching target mid-flight redirects the bomb and dropping Z
-// lets it run straight on.
 static Actor* MeteorTarget(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
     return HasLockOn(player) ? player->focusActor : NULL;
 }
 
-// Measured from the bomb's SHADOW: an enemy's world.pos sits on the floor, so a bomb mid-arc is a whole hop
-// height away from a target it is passing straight through.
 static bool IsMeteorTouchingEnemy(Actor* thisx, PlayState* play) {
     Vec3f shadow = { thisx->world.pos.x, thisx->floorHeight, thisx->world.pos.z };
 
     if (thisx->floorHeight <= BGCHECK_Y_MIN) {
-        shadow.y = thisx->world.pos.y; // over a pit there is no shadow; it is falling, so use itself
+        shadow.y = thisx->world.pos.y;
     }
     return FindNearestEnemy(play, &shadow, METEOR_ENEMY_TRIGGER_RADIUS) != NULL;
 }
@@ -1243,13 +1159,12 @@ static void HopMeteor(Actor* thisx) {
     f32 falloff = 1.0f / (1.0f + METEOR_HOP_DECAY * (f32)hopIndex);
 
     thisx->world.pos.y = thisx->floorHeight + fabsf(sinf(WAND_PI * phase)) * METEOR_HOP_HEIGHT * falloff;
-    thisx->velocity.y = 0.0f; // or the vanilla floor bounce fights the curve
+    thisx->velocity.y = 0.0f;
     thisx->speed = METEOR_LAUNCH_SPEED * falloff;
     METEOR_HOP_TIME(thisx)++;
 }
 
 static void UpdateMeteor(Actor* thisx, PlayState* play) {
-    // Read before the vanilla update: EnBom_Move consumes both bits as it bounces.
     bool hasHitWall = (thisx->bgCheckFlags & BGCHECKFLAG_WALL) != 0;
     bool hasLanded = (thisx->bgCheckFlags & BGCHECKFLAG_GROUND_TOUCH) != 0;
     Actor* target;
@@ -1258,16 +1173,13 @@ static void UpdateMeteor(Actor* thisx, PlayState* play) {
         if (METEOR_AGE(thisx) < METEOR_ARM_FRAMES) {
             METEOR_AGE(thisx)++;
         } else if (hasHitWall || IsMeteorTouchingEnemy(thisx, play)) {
-            // Anything solid sets it off. Only the floor may be hit over and over: that is the skip.
             ((EnBom*)thisx)->timer = 0;
         }
-        // The throw itself is vanilla gravity out of Link's hand; the skip begins where it lands.
         if (hasLanded && METEOR_HOP_TIME(thisx) == METEOR_AIRBORNE) {
             METEOR_HOP_TIME(thisx) = 0;
         }
         target = MeteorTarget(play);
         if (target != NULL) {
-            // world.rot.y is the heading the bomb's speed is driven along, so turning it steers.
             Math_ScaledStepToS(&thisx->world.rot.y, Math_Vec3f_Yaw(&thisx->world.pos, &target->focus.pos),
                                METEOR_STEER_RATE);
         }
@@ -1328,7 +1240,6 @@ static void TickStormRay(PlayState* play, Player* player) {
     sStormRay.pos.y += sStormRay.vel.y;
     sStormRay.pos.z += sStormRay.vel.z;
 
-    // The bolt IS the visual: the effect draws and animates itself, so the rod owns no draw at all.
     if ((sStormRay.life % STORM_BOLT_EVERY) == 0) {
         s16 roll = STORM_BOLT_ROLL + (s16)Rand_CenteredFloat(STORM_BOLT_ROLL_JITTER);
 
@@ -1353,21 +1264,18 @@ static bool FireStormRay(Player* player, PlayState* play, Actor* target) {
     s16 pitch;
 
     if (sStormRay.isActive) {
-        return false; // one ray at a time
+        return false;
     }
     sStormRay.pos = player->actor.world.pos;
     sStormRay.pos.y += STORM_RAY_SPAWN_HEIGHT;
 
     if (target != NULL) {
-        // focus.pos, not world.pos: that is the point the game itself considers "where you aimed".
         yaw = Math_Vec3f_Yaw(&sStormRay.pos, &target->focus.pos);
         pitch = Math_Vec3f_Pitch(&sStormRay.pos, &target->focus.pos);
     } else {
         yaw = player->actor.shape.rot.y;
         pitch = 0;
     }
-    // Rebuilding this from Math_SinS by hand gets the pitch sign backwards, which is why it goes through the
-    // matrix stack the way the elemental rods' own conversion does.
     Matrix_Push();
     Matrix_RotateYS(yaw, MTXMODE_NEW);
     Matrix_RotateXS(pitch, MTXMODE_APPLY);
@@ -1397,8 +1305,6 @@ static bool CastStorm(Player* player, PlayState* play) {
     return CallStorm(player, play);
 }
 
-// A frozen enemy is the Deku Nut effect: the freeze stops its update and the colour filter is what makes it
-// read as stunned.
 static void StunEnemy(Actor* enemy) {
     enemy->freezeTimer = SHADOW_STUN_FRAMES;
     Actor_SetColorFilter(enemy, COLORFILTER_COLORFLAG_BLUE, SHADOW_FILTER_STRENGTH, COLORFILTER_BUFFLAG_OPA,
@@ -1410,7 +1316,6 @@ static void ForgetShadowBolt(void) {
     sShadowBolt.target = NULL;
 }
 
-// Re-acquired every frame rather than trusted: the enemy the bolt left chasing can die before it arrives.
 static void TickShadowBolt(PlayState* play) {
     Actor* hit;
 
@@ -1442,7 +1347,6 @@ static void DrawShadowBolt(PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
     Matrix_Translate(sShadowBolt.pos.x, sShadowBolt.pos.y, sShadowBolt.pos.z, MTXMODE_NEW);
-    // The Boe is a flat billboard: its own draw replaces the rotation the same way.
     Matrix_ReplaceRotation(&play->billboardMtxF);
     Matrix_Scale(SHADOW_SCALE, SHADOW_SCALE, SHADOW_SCALE, MTXMODE_APPLY);
 
@@ -1460,13 +1364,12 @@ static bool CastShadow(Player* player, PlayState* play) {
     s16 yaw = player->actor.shape.rot.y;
 
     if (sShadowBolt.isActive) {
-        return false; // one bolt at a time
+        return false;
     }
     sShadowBolt.pos.x = player->actor.world.pos.x + Math_SinS(yaw) * SHADOW_SPAWN_DIST;
     sShadowBolt.pos.y = player->actor.world.pos.y + SHADOW_SPAWN_HEIGHT;
     sShadowBolt.pos.z = player->actor.world.pos.z + Math_CosS(yaw) * SHADOW_SPAWN_DIST;
 
-    // No enemy in reach is not a failed cast: the bolt flies off Link's nose and fades on its timer.
     sShadowBolt.target = FindNearestEnemy(play, &player->actor.world.pos, SHADOW_SEEK_RANGE);
     sShadowBolt.yaw = yaw;
     sShadowBolt.life = SHADOW_LIFE_FRAMES;
@@ -1476,8 +1379,6 @@ static bool CastShadow(Player* player, PlayState* play) {
     return true;
 }
 
-// Magic is spent only on success, so a rod that declines (no room for the actor, a geyser already up) costs
-// nothing and reports the error itself.
 static bool CastRod(Player* player, PlayState* play, u8 mode) {
     bool didCast;
 
@@ -1510,8 +1411,8 @@ static bool CastRod(Player* player, PlayState* play, u8 mode) {
 }
 
 static bool StartSwingClip(PlayState* play, Player* player, u8 clip) {
-    PlayerAnimationHeader* anim = ResourceMgr_LoadPlayerAnimAsHeader(clip == WAND_SWING_FORE ? sSwingForeAnim
-                                                                                             : sSwingBackAnim);
+    PlayerAnimationHeader* anim =
+        ResourceMgr_LoadPlayerAnimAsHeader(clip == WAND_SWING_FORE ? sSwingForeAnim : sSwingBackAnim);
 
     if (anim == NULL) {
         return false;
@@ -1522,8 +1423,6 @@ static bool StartSwingClip(PlayState* play, Player* player, u8 clip) {
 }
 
 static bool StartSwing(PlayState* play, Player* player, u8 mode) {
-    // The carry animation owns the arms when a rod put something in Link's hands, and the swing would tear
-    // the held actor off them.
     if (player->stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR) {
         return false;
     }
@@ -1532,11 +1431,6 @@ static bool StartSwing(PlayState* play, Player* player, u8 mode) {
     return StartSwingClip(play, player, WAND_SWING_FORE);
 }
 
-/**
- * The swing plays on the upper body, so the legs keep walking or running underneath it and the rod can be cast
- * on the move; returning 1 is what claims Link's arms. The rod goes off on a frame of the second slash: the
- * summon belongs to the animation, not to the button.
- */
 static int32_t SwingWandUpper(Player* player, PlayState* play) {
     if (!sIsWandOut || sSwingClip == WAND_SWING_NONE) {
         return 0;
@@ -1560,8 +1454,6 @@ static void TakeOutWand(PlayState* play, Player* player) {
     sSwingClip = WAND_SWING_NONE;
 }
 
-// The press is only recorded here: resolving it inside the player's own action handler list would let the
-// frame's own action func overwrite whatever the rod installed.
 static void PressWand(Player* player, PlayState* play) {
     sIsPressPending = true;
 }
@@ -1578,8 +1470,6 @@ static bool CanUseWand(Player* player, PlayState* play) {
     return !func_800B7118(player) && Z64Wheel_CountUnlocked() > 0;
 }
 
-// A rod that owns something outside the staff keeps running with it stowed: the bomb is mid-flight, the
-// column still stands and the bolt has not reached anything yet.
 static void UpdateWand(Player* player) {
     PlayState* play = gPlayState;
     bool isHeld;
@@ -1589,7 +1479,6 @@ static void UpdateWand(Player* player) {
         return;
     }
 
-    // Everything a rod leaves in the world is an actor the new scene has already thrown away.
     if (sLastScene != play->sceneId) {
         sLastScene = play->sceneId;
         ForgetSandSlabs();
@@ -1612,25 +1501,22 @@ static void UpdateWand(Player* player) {
     BoostNextJump(player);
 
     if (!sIsWandOut) {
-        sSwingClip = WAND_SWING_NONE; // put away mid-swing: the arms go back to the item change
+        sSwingClip = WAND_SWING_NONE;
         sWasWandOut = false;
         sIsPressPending = false;
         return;
     }
 
     mode = CurrentMode();
-    // Holding the button lays a sand road. The Tornado's own hold is its charge, ticked above.
     if (mode == WAND_SAND && sSwingClip == WAND_SWING_NONE && ShouldLaySlab(player, isHeld)) {
         if (HasMagic(play, sRods[WAND_SAND].magicCost)) {
             CastRod(player, play, WAND_SAND);
         }
     }
 
-    // The press that drew the staff is not a cast: sWasWandOut is what tells them apart.
     if (sIsPressPending && sWasWandOut && sSwingClip == WAND_SWING_NONE && sGalePhase == GALE_OFF && !sIsWindCharging) {
         bool didFire;
 
-        // Locked on, the Tornado fires Link himself instead of raising a column: no swing, no charge.
         if (mode == WAND_TORNADO && HasLockOn(player)) {
             didFire = CastGale(player, play);
         } else {
@@ -1644,8 +1530,6 @@ static void UpdateWand(Player* player) {
     sWasWandOut = true;
 }
 
-// Nothing touches the matrix between the hand limb and the end of the post-limb pass while the staff is out,
-// so this is the hand bone's own matrix: the rod follows the arm instead of floating beside Link.
 static void CaptureHandMatrix(Player* player, s32 limbIndex) {
     if (limbIndex != PLAYER_LIMB_RIGHT_HAND) {
         return;
@@ -1661,12 +1545,10 @@ static void DrawWandInHand(Player* player, PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
     Matrix_Put(&sHandMatrix);
-    // That matrix carries Link's own 0.01 body scale: dividing it back out leaves the offsets in world units.
     Matrix_Scale(unscale, unscale, unscale, MTXMODE_APPLY);
     Matrix_RotateYF(WAND_HELD_ROT_Y * WAND_DEGREES_TO_RADIANS, MTXMODE_APPLY);
     Matrix_RotateXF(WAND_HELD_ROT_X * WAND_DEGREES_TO_RADIANS, MTXMODE_APPLY);
     Matrix_RotateZF(WAND_HELD_ROT_Z * WAND_DEGREES_TO_RADIANS, MTXMODE_APPLY);
-    // The offsets come after the rotations, so each slides the staff along its OWN shaft.
     Matrix_Translate(0.0f, WAND_HELD_OFFSET_Y, WAND_HELD_OFFSET_Z, MTXMODE_APPLY);
     Matrix_Scale(WAND_HELD_SCALE, WAND_HELD_SCALE, WAND_HELD_SCALE, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
@@ -1679,7 +1561,6 @@ static void DrawWandInHand(Player* player, PlayState* play) {
 }
 
 static void DrawWand(Actor* actor, PlayState* play) {
-    // Both of these outlive the staff being out: the column burns and the bolt flies whatever Link is doing.
     DrawUpdraft(play);
     DrawShadowBolt(play);
 
@@ -1706,7 +1587,6 @@ static void ReloadRods(s16 fileNum) {
     SyncUnlockedRods();
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, WAND_KEY, WAND_KEY, "",
 };
@@ -1719,8 +1599,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Mirrors SyncUnlockedRods against the seed's simulated inventory: which pickup lights the Meteor Rod depends
-// on the shuffle rule, which reads the seed's own value while it generates.
 static bool CanCallMeteorForLogic(void* userData) {
     bool isLit;
 
@@ -1738,10 +1616,8 @@ static bool CanCallMeteorForLogic(void* userData) {
     return isLit && sApi->LogicHasCapability("HasMagic");
 }
 
-// The Meteor Rod drops a native En_Bom on its target, so it opens everything bombs do.
 static void GrantWandLogic(void) {
-    static const char* const sBombing[] = { "HasExplosives", "BlastOrSmash", "CanHitSwitch", "CanAttack",
-                                            "CanDamage" };
+    static const char* const sBombing[] = { "HasExplosives", "BlastOrSmash", "CanHitSwitch", "CanAttack", "CanDamage" };
 
     if (!Z64Logic_Init(sApi)) {
         return;
@@ -1780,6 +1656,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetHeldCallbacks(&wand, PressWand, PutWandAway, NULL);
     Z64Items_SetCanUse(&wand, CanUseWand);
     Z64Items_SetGetItemModel(&wand, sSandOpa);
+    wand.getItemScale = 0.22f;
     wand.modelGroup = PLAYER_MODELGROUP_DEFAULT;
     wand.onReceive = LightNextRod;
 
@@ -1800,7 +1677,8 @@ S2H_MOD_EXPORT void ModInit(void) {
         "You got the %yStorm Rod%w!&Channel the power of a storm.",
         "You got the %pShadow Scepter%w!&Command the shadows."
     };
-    static const char* const icons[WAND_MODE_MAX] = { sIconSand, sIconTornado, sIconWater, sIconMeteor, sIconStorm, sIconScepter };
+    static const char* const icons[WAND_MODE_MAX] = { sIconSand,   sIconTornado, sIconWater,
+                                                      sIconMeteor, sIconStorm,   sIconScepter };
     for (u8 mode = 0; mode < WAND_MODE_MAX; mode++) {
         S2HCustomPickupVariant pickup = Z64Items_DefinePickup(WAND_KEY, sVariantNames[mode], sSeparateKeys[mode]);
         pickup.iconPath = icons[mode];
@@ -1813,7 +1691,8 @@ S2H_MOD_EXPORT void ModInit(void) {
         randomizer.poolModeOption = WAND_SHUFFLE_OPTION;
         randomizer.poolModeValue = WAND_SHUFFLE_RODS;
         pickup.randomizer = &randomizer;
-        if (!Z64Items_RegisterPickup(sApi, &pickup)) return;
+        if (!Z64Items_RegisterPickup(sApi, &pickup))
+            return;
     }
     sApi->RegisterRandoOption(&shuffle);
     GrantWandLogic();

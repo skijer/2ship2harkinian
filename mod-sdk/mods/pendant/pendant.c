@@ -1,8 +1,3 @@
-/**
- * Pendant of Memories: three borrowed moves on B. From a sheathed stand near an enemy, a Mortal Draw that kills
- * in one cut; in mid air, a ground pound that bounces off what it hits; locked on after three side hops, a
- * parry leap over the enemy. A on its cell turns the moves off.
- */
 
 #include <math.h>
 
@@ -43,7 +38,6 @@
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__icon_item_static_yar/gItemIconPendantOfMemoriesTex";
 static const ALIGN_ASSET(2) char sName[] = "__OTR__item_name_static/gItemNamePendantOfMemoriesENGTex";
 
-
 static const ALIGN_ASSET(2) char sDrawAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_fighter_power_kiru_start";
 static const ALIGN_ASSET(2) char sPlantAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_fighter_power_kiru_wait";
 static const ALIGN_ASSET(2) char sLandingAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_normal_landing";
@@ -70,7 +64,11 @@ static ColliderCylinder sStrikeCollider;
 
 static ColliderCylinderInit sStrikeColliderInit = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_CYLINDER },
-    { ELEM_MATERIAL_UNK2, { DMG_SWORD, 0x00, 0x08 }, { 0, 0, 0 }, ATELEM_ON | ATELEM_SFX_NORMAL, ACELEM_NONE,
+    { ELEM_MATERIAL_UNK2,
+      { DMG_SWORD, 0x00, 0x08 },
+      { 0, 0, 0 },
+      ATELEM_ON | ATELEM_SFX_NORMAL,
+      ACELEM_NONE,
       OCELEM_NONE },
     { 80, 80, 0, { 0, 0, 0 } },
 };
@@ -132,7 +130,6 @@ static bool IsPlayingAnim(Player* player, const char* path) {
     return player->skelAnime.animation == ResourceMgr_LoadPlayerAnimAsHeader(path);
 }
 
-// The actor lists are the only proof a remembered pointer still names a live actor.
 static bool IsActorAlive(PlayState* play, Actor* actor) {
     if (actor == NULL) {
         return false;
@@ -210,8 +207,8 @@ static Actor* FindMortalDrawTarget(Player* player, PlayState* play) {
 }
 
 static bool CanMortalDraw(Player* player, PlayState* play) {
-    return IsBPressed(play) && Player_GetMeleeWeaponHeld(player) == PLAYER_MELEEWEAPON_NONE &&
-           !IsZTargeting(player) && IsGrounded(player) && player->speedXZ <= 1.0f;
+    return IsBPressed(play) && Player_GetMeleeWeaponHeld(player) == PLAYER_MELEEWEAPON_NONE && !IsZTargeting(player) &&
+           IsGrounded(player) && player->speedXZ <= 1.0f;
 }
 
 static void StartMortalDraw(Player* player, PlayState* play, Actor* target) {
@@ -225,7 +222,6 @@ static void StartMortalDraw(Player* player, PlayState* play, Actor* target) {
     player->speedXZ = 0.0f;
     player->actor.velocity.x = 0.0f;
     player->actor.velocity.z = 0.0f;
-    // The swing brings its own clip, so the iaijutsu draw goes on after it.
     func_80833864(play, player, PLAYER_MWA_JUMPSLASH_START);
     ChangeAnim(play, player, sDrawAnim, 2.0f, 0.0f, GetLastFrame(sDrawAnim), ANIMMODE_ONCE, -3.0f);
     player->meleeWeaponQuads[0].elem.atDmgInfo.damage = MORTAL_DRAW_DAMAGE;
@@ -234,8 +230,8 @@ static void StartMortalDraw(Player* player, PlayState* play, Actor* target) {
 }
 
 static void UpdateMortalDraw(Player* player, PlayState* play) {
-    bool hasHit = (player->meleeWeaponQuads[0].base.atFlags & AT_HIT) ||
-                  (player->meleeWeaponQuads[1].base.atFlags & AT_HIT);
+    bool hasHit =
+        (player->meleeWeaponQuads[0].base.atFlags & AT_HIT) || (player->meleeWeaponQuads[1].base.atFlags & AT_HIT);
 
     sPendant.timer++;
     player->speedXZ = 0.0f;
@@ -253,7 +249,6 @@ static void UpdateMortalDraw(Player* player, PlayState* play) {
     }
 }
 
-// Link freezes for the hitstop; the enemy's own hit reaction freezes it.
 static void UpdateHitstop(Player* player) {
     player->skelAnime.playSpeed = 0.0f;
     player->speedXZ = 0.0f;
@@ -266,7 +261,6 @@ static void UpdateHitstop(Player* player) {
     }
 }
 
-// The sword stays drawn afterwards, as in Twilight Princess.
 static void UpdateDrawRecovery(Player* player) {
     player->speedXZ = 0.0f;
     if (++sPendant.timer >= MORTAL_DRAW_RECOVERY) {
@@ -290,7 +284,6 @@ static void PlantSwordPose(Player* player, PlayState* play, f32 playSpeed, f32 m
     ChangeAnim(play, player, sPlantAnim, playSpeed, GetLastFrame(sPlantAnim), 0.0f, ANIMMODE_ONCE, morph);
 }
 
-// The sword is raised with the plant pose played backwards and frozen on its last frame.
 static void StartGroundPound(Player* player, PlayState* play) {
     sPendant.state = PENDANT_GPOUND_STALL;
     sPendant.timer = 0;
@@ -309,7 +302,6 @@ static void UpdateGroundPoundStall(Player* player, PlayState* play) {
     sPendant.timer = 0;
     player->actor.velocity.y = GPOUND_FALL_VELOCITY;
     player->actor.gravity = GPOUND_FALL_GRAVITY;
-    // The swing sets the sword's damage and takes over the animation, so the slam pose goes on after it.
     func_80833864(play, player, PLAYER_MWA_JUMPSLASH_START);
     PlantSwordPose(player, play, -2.0f, 0.0f);
 }
@@ -329,11 +321,9 @@ static void UpdateGroundPoundFall(Player* player, PlayState* play) {
     sPendant.timer++;
     player->actor.gravity = GPOUND_FALL_GRAVITY;
     player->speedXZ = 0.0f;
-    // The melee action keeps putting its own clip back.
     if (!IsPlayingAnim(player, sPlantAnim)) {
         PlantSwordPose(player, play, -2.0f, 0.0f);
     }
-    // Last frame's hit is read before the collider is registered again: a pogo off whatever it struck.
     if (ConsumeStrikeHit()) {
         player->actor.velocity.y = GPOUND_BOUNCE_VELOCITY;
         player->actor.gravity = DEFAULT_GRAVITY;
@@ -435,7 +425,6 @@ static void SilenceSwordQuads(Player* player) {
     player->meleeWeaponState = PLAYER_MELEE_WEAPON_STATE_0;
 }
 
-// One hit only, on the enemy itself: the melee system would otherwise land a second one on the way down.
 static void StrikeParryTarget(Player* player, PlayState* play) {
     if (sPendant.hasParryHit) {
         SilenceSwordQuads(player);
@@ -470,8 +459,8 @@ static void UpdateParryArc(Player* player, PlayState* play) {
     }
     player->actor.world.pos.x = sPendant.arcStart.x + (sPendant.arcEnd.x - sPendant.arcStart.x) * t;
     player->actor.world.pos.z = sPendant.arcStart.z + (sPendant.arcEnd.z - sPendant.arcStart.z) * t;
-    player->actor.world.pos.y = sPendant.arcStart.y + (sPendant.arcEnd.y - sPendant.arcStart.y) * t +
-                                PARRY_ARC_HEIGHT * 4.0f * t * (1.0f - t);
+    player->actor.world.pos.y =
+        sPendant.arcStart.y + (sPendant.arcEnd.y - sPendant.arcStart.y) * t + PARRY_ARC_HEIGHT * 4.0f * t * (1.0f - t);
     HoldStill(player);
     player->cylinder.base.ocFlags1 &= ~OC1_ON;
     StrikeParryTarget(player, play);
@@ -563,7 +552,6 @@ static void TickPendant(Player* player) {
     }
 }
 
-// The collider is bound to the player actor, and a new scene brings a new one.
 static void ForgetSceneState(s16 sceneId, s8 spawnNum) {
     ResetMoves();
     sPendant.isColliderReady = false;
@@ -586,7 +574,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
 static const ALIGN_ASSET(2) char sGetItemDL[] = "__OTR__objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL";
 static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(play->state.gfxCtx);
@@ -619,6 +606,14 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.toggles = 1;
     definition.onUnequip = TurnOff;
     definition.getItemModelPath = sGetItemDL;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = PENDANT_KEY,
+        .hintKey = PENDANT_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!sApi->RegisterCustomEquipment(&definition)) {
         return;
     }

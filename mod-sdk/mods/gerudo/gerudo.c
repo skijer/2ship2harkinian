@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64formmasks.h"
 #include "z64logic.h"
 
 #include "align_asset_macro.h"
@@ -15,7 +16,6 @@
 #define GERUDO_MASK_KEY "nei.gerudo_form_mask"
 #define GERUDO_FORM_KEY "nei.gerudo"
 #define GERUDO_MODEL_PATH "objects/forms/gerudo"
-// Gerudo shares Captain's Hat cell in the Majora mask grid.
 #define GERUDO_MASK_PAGE 1
 #define GERUDO_MASK_SLOT 21
 #define GERUDO_MASK_WHEEL_PRIORITY (-1)
@@ -72,18 +72,15 @@
 #define VOICE_SLOTS 4
 #define VOICE_ADVANCE 0.5f
 
-// The rage bar sits under MM's magic meter, in the 320x240 interface space.
 #define RAGE_BAR_X 20
 #define RAGE_BAR_Y 54
 #define RAGE_BAR_HEIGHT 5
 #define RAGE_BAR_NORMAL_WIDTH 50
 #define RAGE_BAR_DOUBLE_WIDTH 100
 
-// MM leaves these bits unnamed: dead, talking, loading, getting an item, carrying, swimming, first person, ledge
-// climb, ladder, horse, damage knockback and the textbox freeze.
-#define BUSY_STATE1                                                                                          \
-    (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_200 | PLAYER_STATE1_400 |                    \
-     PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_8000000 | PLAYER_STATE1_100000 | PLAYER_STATE1_4 |         \
+#define BUSY_STATE1                                                                                  \
+    (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_200 | PLAYER_STATE1_400 |            \
+     PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_8000000 | PLAYER_STATE1_100000 | PLAYER_STATE1_4 | \
      PLAYER_STATE1_200000 | PLAYER_STATE1_800000 | PLAYER_STATE1_4000000 | PLAYER_STATE1_20000000)
 #define STATE1_SHIELDING PLAYER_STATE1_400000
 #define STATE1_SWIMMING PLAYER_STATE1_8000000
@@ -91,7 +88,6 @@
 #define STATE1_DAMAGED PLAYER_STATE1_4000000
 #define STATE2_SPIN_ATTACKING PLAYER_STATE2_20000
 #define STATE2_NO_Z_TARGET_ROTATION PLAYER_STATE2_20
-// Both ends of the walk cycle MM samples, and the animation columns that hold a sword.
 #define WALK_FRAMES 29
 #define RUN_FRAMES 20
 #define FIGHTER_COLUMNS ((1 << PLAYER_ANIMTYPE_1) | (1 << PLAYER_ANIMTYPE_3))
@@ -108,7 +104,6 @@
 #define CLIP_JUMP_SLASH MHR("ForwardRisingDoubleAerialSlash_Variant18")
 #define CLIP_FRONT_SLASH MHR("BackwardRisingDoubleAerialSlash")
 #define CLIP_AERIAL MHR("StationaryRisingTripleAerialSlash")
-// Malon's gMalonAdultSingAnim, retargeted onto Link by NEI's tools/bake_oot_npc_link_anims.py.
 #define CLIP_SING "__OTR__misc/link_animetion/gPlayerAnim_mhr_npc_malon_sing"
 #define CLIP_FURY "__OTR__misc/link_animetion/gPlayerAnim_mhr_gs_wirebug_attack04"
 static const ALIGN_ASSET(2) char sMaskDL[] = "__OTR__objects/object_link_child/gLinkChildGerudoMaskDL";
@@ -118,7 +113,6 @@ static const ALIGN_ASSET(2) char sScimitarDL[] = "__OTR__" GERUDO_MODEL_PATH
                                                  "/object_link_boy/gLinkAdultLeftHandHoldingMasterSwordNearDL";
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__icon_item_static_yar/gItemIconCaptainsHatTex";
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__item_name_static/gItemNameCaptainsHatENGTex";
-static const ALIGN_ASSET(2) char sGetItemDL[] = "__OTR__objects/object_gi_mask18/gGiCaptainsHatFaceDL";
 
 typedef struct {
     s16 begin;
@@ -147,8 +141,6 @@ typedef enum {
     ROW_COUNT,
 } SwingRowId;
 
-// NEI's measured dual-blade rows: windows are source frames, per hand; swingEnd is where the next hit chains
-// and A rolls out, the rest of the clip is the recovery. A spin hits with a body cylinder instead of the blades.
 static const SwingRow sRows[ROW_COUNT] = {
     { MHR("AlternatingCrossSlashLeftRight"), 1.7f, 25, { 13, 25 }, { 13, 25 }, false, PLAYER_MWA_FORWARD_SLASH_1H },
     { MHR("StationaryRisingSingleAerialSlash"), 1.7f, 28, { 1, 28 }, { 1, 28 }, false, PLAYER_MWA_FORWARD_COMBO_1H },
@@ -165,7 +157,6 @@ typedef struct {
     u8 variants;
 } GerudoVoice;
 
-// The Gerudo voice pack NEI shipped, by Link voice id; ids missing here stay silent, never Link's.
 static const GerudoVoice sVoices[] = {
     { 0x6800, 4 }, { 0x6801, 2 }, { 0x6802, 2 }, { 0x6803, 2 }, { 0x6804, 1 }, { 0x6805, 6 }, { 0x6806, 1 },
     { 0x6808, 2 }, { 0x6809, 6 }, { 0x680A, 1 }, { 0x680B, 1 }, { 0x680E, 1 }, { 0x680F, 1 }, { 0x6810, 1 },
@@ -178,16 +169,9 @@ static const GerudoVoice sVoices[] = {
 #define VOICE_SAMPLES_MAX 96
 
 static const char* const sRequiredHooks[] = {
-    "OnPlayerActionHandler",
-    "OnPlayerResolveAnim",
-    "OnPlayerResolveMotionScale",
-    "OnPlayerResolveLimbDraw",
-    "OnPlayerPostLimbDraw",
-    "OnActorPlaySfx",
-    "OnInterfaceDrawEnd",
-    "OnSceneInit",
-    "OnCollisionResolveDamage",
-    "OnOcarinaInput",
+    "OnPlayerActionHandler",    "OnPlayerResolveAnim", "OnPlayerResolveMotionScale", "OnPlayerResolveLimbDraw",
+    "OnPlayerPostLimbDraw",     "OnActorPlaySfx",      "OnInterfaceDrawEnd",         "OnSceneInit",
+    "OnCollisionResolveDamage", "OnOcarinaInput",
 };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -229,7 +213,6 @@ typedef enum {
     GERUDO_MOVE_FURY,
 } GerudoMove;
 
-// z_player.c's own table of damage by weapon: the layout of its MeleeWeaponDamageInfo.
 typedef struct {
     s32 dmgFlags;
     u8 dmgTransformedNormal;
@@ -360,14 +343,12 @@ static bool CanAct(Player* player) {
     return !(player->stateFlags1 & BUSY_STATE1) && player->csAction == PLAYER_CSACTION_NONE;
 }
 
-// Only the swords count: a stick or the Zora boomerang is not a pair of scimitars.
 static bool HoldsSword(Player* player) {
     s32 weapon = Player_GetMeleeWeaponHeld(player);
 
     return weapon >= PLAYER_MELEEWEAPON_SWORD_KOKIRI && weapon <= PLAYER_MELEEWEAPON_SWORD_GILDED;
 }
 
-// The guard counts as fighting too: it is the blades that block.
 static bool IsFighter(Player* player) {
     return HoldsSword(player) || (player->stateFlags1 & STATE1_SHIELDING);
 }
@@ -382,9 +363,7 @@ static u8 GetTierDamage(Player* player, bool isStrong) {
     return isStrong ? info->dmgHumanStrong : info->dmgHumanNormal;
 }
 
-// ---- clips ----
-
-// NEI's in-place range loader: the MHR clips carry their root travel, so the root is pinned to the first
+// In-place range loader: the MHR clips carry their root travel, so the root is pinned to the first
 // frame's; nearest-frame resampling on purpose, since interpolating packed angles smears any that wraps.
 static PlayerAnimationHeader* LoadClip(const char* path, s16 first, s16 last, s16 frames) {
     for (s32 i = 0; i < sClipCacheCount; i++) {
@@ -442,10 +421,6 @@ static void PlayClip(PlayState* play, Player* player, PlayerAnimationHeader* cli
     sPrevFrame = start;
 }
 
-// ---- locomotion ----
-
-// Only while fighting: stowed, she moves exactly like Link. Walk and run sample one shared cycle at 29 and 20
-// frames, so both are resampled to those lengths.
 static PlayerAnimationHeader* GetFighterGroupClip(s32 group) {
     switch (group) {
         case PLAYER_ANIMGROUP_wait:
@@ -496,14 +471,10 @@ static void ScaleSprintAndRoll(Player* player, s32 kind, f32* scale) {
     }
 }
 
-// ---- rage ----
-
-// Magic is the upgrade: none, single and double buy one, two and four bars of rage.
 static s16 GetRageCapacity(void) {
     return (s16)(RAGE_BASE << CLAMP(gSaveContext.save.saveInfo.playerData.magicLevel, 0, 2));
 }
 
-// Only a live enemy pays: AT_HIT also fires on grass, pots and signs.
 static bool IsRageWorthy(Actor* victim) {
     return victim != NULL && (victim->category == ACTORCAT_ENEMY || victim->category == ACTORCAT_BOSS);
 }
@@ -513,7 +484,6 @@ static void GainRage(s32 hits) {
     sRageMeter = MIN(sRageMeter + MAX(capacity / RAGE_HITS_TO_FILL, 1) * hits, capacity);
 }
 
-// Read inside the action, before the player resets the quads' AT flags; Fury never refills itself.
 static void BankBladeHits(Player* player) {
     bool isHit = false;
 
@@ -533,7 +503,6 @@ static void BankBladeHits(Player* player) {
     }
 }
 
-// A damage table caps a hit at 15; Fury's charged value is dealt as is, clamped to what the u8 health counter holds.
 static void DealFuryDamage(Actor* victim, ColliderElement* attack, f32* damage) {
     if (!IsGerudo() || sMove != GERUDO_MOVE_FURY || victim == NULL || gPlayState == NULL) {
         return;
@@ -546,13 +515,10 @@ static void DealFuryDamage(Actor* victim, ColliderElement* attack, f32* damage) 
     }
 }
 
-// ---- blades and body cylinder ----
-
 static bool IsInWindow(const Window* window, f32 prev, f32 cur) {
     return window->end >= window->begin && cur >= (f32)window->begin && prev <= (f32)window->end;
 }
 
-// A blade the form does not own keeps the damage of the sword in hand.
 static void SetBladeFlags(Player* player, u32 dmgFlags, u8 damage, bool ownsFlags) {
     sBladeDmgFlags = dmgFlags;
     sBladeDamage = damage;
@@ -561,7 +527,6 @@ static void SetBladeFlags(Player* player, u32 dmgFlags, u8 damage, bool ownsFlag
     func_80833728(player, 1, dmgFlags, damage);
 }
 
-// meleeWeaponState is what the player registers the quads under and what plays the swing sound.
 static void GateBlades(PlayState* play, Player* player, u8 mask) {
     sBladeMask = mask;
     if (mask != 0 && player->meleeWeaponState == 0) {
@@ -626,6 +591,7 @@ static void PlaceRightBlade(PlayState* play, Player* player) {
     Matrix_MultVec3f(&quadTip, &tip);
     Matrix_MultVec3f(&quadBase, &base);
     ColliderQuad* quad = &player->meleeWeaponQuads[1];
+    quad->base.atFlags |= AT_ON;
     quad->elem.atDmgInfo.dmgFlags = sBladeDmgFlags;
     if (sOwnsBladeFlags) {
         quad->elem.atDmgInfo.damage = sBladeDamage;
@@ -643,10 +609,15 @@ static void StopRightTrail(void) {
 
 static void GateBladesAtHands(PlayState* play, Player* player, s32 limbIndex) {
     if (limbIndex == PLAYER_LIMB_LEFT_HAND) {
+        ColliderQuad* quad = &player->meleeWeaponQuads[0];
+
         if (!(sBladeMask & 1)) {
-            player->meleeWeaponQuads[0].base.atFlags &= ~AT_ON;
-        } else if (sOwnsBladeFlags) {
-            player->meleeWeaponQuads[0].elem.atDmgInfo.damage = sBladeDamage;
+            quad->base.atFlags &= ~AT_ON;
+            return;
+        }
+        quad->base.atFlags |= AT_ON;
+        if (sOwnsBladeFlags) {
+            quad->elem.atDmgInfo.damage = sBladeDamage;
         }
         return;
     }
@@ -668,7 +639,6 @@ static const Vec3f sHandShieldCorners[4] = {
     { 1500.0f, 3000.0f, -600.0f },
 };
 
-// The blades are what block, shield or none: vanilla only stamps the shield quad for a real shield in hand.
 static void GuardWithBlades(PlayState* play, Player* player, s32 limbIndex) {
     Vec3f corners[4];
 
@@ -697,8 +667,6 @@ static void DrawAtHands(Player* player, s32 limbIndex) {
     GuardWithBlades(play, player, limbIndex);
 }
 
-// ---- moves ----
-
 static void StartMove(PlayState* play, Player* player, u8 move) {
     Player_SetAction(play, player, GerudoAction, 0);
     Player_StopHorizontalMovement(player);
@@ -724,7 +692,6 @@ static void Plant(Player* player) {
     player->speedXZ = 0.0f;
 }
 
-// A wall-checked step along her facing, for moves that travel without the stick.
 static void StepForward(PlayState* play, Player* player, f32 distance) {
     f32 sinYaw = Math_SinS(player->actor.shape.rot.y);
     f32 cosYaw = Math_CosS(player->actor.shape.rot.y);
@@ -747,8 +714,6 @@ static void EnsureRightTrail(PlayState* play) {
         Effect_Add(play, &sTrailRight, EFFECT_BLURE2, 0, 0, &sTrailInit);
     }
 }
-
-// -- swings --
 
 static s32 ChooseRow(PlayState* play, Player* player) {
     if (Player_CanSpinAttack(player)) {
@@ -778,7 +743,6 @@ static void StartSwing(PlayState* play, Player* player, s32 row) {
     PlayClip(play, player, LoadWholeClip(swing->clip), swing->speed, ANIMMODE_ONCE, -3.0f);
 }
 
-// The charge release throws its cross in a burst: that stretch plays three times faster than the rest.
 static f32 GetSwingSpeed(const SwingRow* swing, f32 frame) {
     if (sRow == ROW_CHARGE_RELEASE && frame >= CHARGE_FAST_BEGIN && frame <= CHARGE_FAST_END) {
         return swing->speed * CHARGE_FAST_SCALE;
@@ -811,7 +775,6 @@ static void GateSwing(PlayState* play, Player* player, const SwingRow* swing, f3
 
 static void StartCharge(PlayState* play, Player* player);
 
-// Past the swing's end B chains the next hit and A rolls out; B held to the very end becomes the charge.
 static void RunSwing(PlayState* play, Player* player) {
     const SwingRow* swing = &sRows[sRow];
     f32 swingEnd = swing->swingEnd >= 0 ? (f32)swing->swingEnd : Animation_GetLastFrame(player->skelAnime.animation);
@@ -852,10 +815,6 @@ static void RunSwing(PlayState* play, Player* player) {
     EndMove(play, player);
 }
 
-// -- charge --
-
-// The stance's opening is a short slice and the rest its held loop: the charge only accumulates once the opening
-// ends.
 static void StartCharge(PlayState* play, Player* player) {
     StartMove(play, player, GERUDO_MOVE_CHARGE);
     player->unk_B08 = 0.0f;
@@ -875,7 +834,6 @@ static void CreepWhileCharging(PlayState* play, Player* player) {
     }
 }
 
-// Every release is the tumble cross, thrown forward by the lunge.
 static void ReleaseCharge(PlayState* play, Player* player) {
     sIsLungePending = true;
     StartSwing(play, player, ROW_CHARGE_RELEASE);
@@ -899,8 +857,6 @@ static void RunCharge(PlayState* play, Player* player) {
     }
 }
 
-// -- front slash --
-
 static void StartFrontSlash(PlayState* play, Player* player) {
     StartMove(play, player, GERUDO_MOVE_FRONT_SLASH);
     PlayClip(play, player, LoadWholeClip(CLIP_FRONT_SLASH), 1.2f, ANIMMODE_ONCE, -3.0f);
@@ -908,7 +864,6 @@ static void StartFrontSlash(PlayState* play, Player* player) {
     Player_PlaySfx(player, NA_SE_VO_LI_SWORD_N);
 }
 
-// Covers the jump slash's distance in its first 30 frames; A or B cancels it from the first frame.
 static void RunFrontSlash(PlayState* play, Player* player) {
     Plant(player);
     bool isDone = PlayerAnimation_Update(play, &player->skelAnime);
@@ -930,9 +885,6 @@ static void RunFrontSlash(PlayState* play, Player* player) {
     }
 }
 
-// -- jump slash --
-
-// A big launch that flies at the lock-on, blades lit the whole way; with none she keeps vanilla's arc.
 static void StartJumpSlash(PlayState* play, Player* player) {
     StartMove(play, player, GERUDO_MOVE_JUMP_SLASH);
     player->meleeWeaponAnimation = PLAYER_MWA_JUMPSLASH_START;
@@ -959,7 +911,6 @@ static void HomeOnTarget(Player* player, Actor* target) {
     player->speedXZ = MIN(CLAMP(distance / JUMP_SLASH_LEAD, JUMP_SLASH_SPEED_MIN, JUMP_SLASH_SPEED_MAX), distance);
 }
 
-// The launch clip's frames 6-9 are two turns of the same cycle, so they loop for as long as the flight lasts.
 static void RunJumpSlash(PlayState* play, Player* player) {
     player->actor.gravity = JUMP_GRAVITY;
     if (PlayerAnimation_Update(play, &player->skelAnime) && !sIsJumpLooping) {
@@ -982,8 +933,6 @@ static void RunJumpSlash(PlayState* play, Player* player) {
     StartSwing(play, player, ROW_JUMP_LAND);
 }
 
-// -- aerial slash --
-
 static void StartAerial(PlayState* play, Player* player) {
     StartMove(play, player, GERUDO_MOVE_AERIAL);
     SetBladeFlags(player, DMG_SWORD, GetTierDamage(player, false), false);
@@ -1005,8 +954,6 @@ static void RunAerial(PlayState* play, Player* player) {
         EndMove(play, player);
     }
 }
-
-// -- Urbosa's Fury --
 
 typedef struct {
     Color_RGBA8 gold;
@@ -1106,7 +1053,6 @@ static void SpawnResidualRing(PlayState* play, Player* player, s32 stage) {
     }
 }
 
-// The room darkens to a storm, the strike cuts it for an instant flash, and a shallow blue dark drains away.
 static f32 GetFuryDarkness(f32 frame) {
     if (frame >= 28.0f && frame < 68.0f) {
         return ((frame - 28.0f) / 40.0f) * 0.84f;
@@ -1120,7 +1066,6 @@ static f32 GetFuryDarkness(f32 frame) {
     return 0.0f;
 }
 
-// NEI's Urbosa's Fury timeline on the clip's own frames; every piece is a stock gameplay_keep effect.
 static void TickFuryVfx(PlayState* play, Player* player, f32 frame) {
     static const f32 sConvergeMarks[] = { 57.0f, 67.0f, 75.0f };
     static const f32 sResidualMarks[] = { 88.0f, 98.0f, 108.0f };
@@ -1149,7 +1094,6 @@ static void TickFuryVfx(PlayState* play, Player* player, f32 frame) {
     sFuryPrevFrame = frame;
 }
 
-// The adjustment is a latch: an interrupted Fury has to hand the lights back, with intensity zero.
 static void RestoreFuryLights(PlayState* play) {
     if (sFuryPrevFrame < 0.0f) {
         return;
@@ -1178,7 +1122,6 @@ static void FadeImpactDim(PlayState* play) {
     play->envCtx.screenFillColor[3] -= FURY_DIM_FADE;
 }
 
-// The whole meter is spent, and the blast hits as hard as it was full.
 static void StartFury(PlayState* play, Player* player) {
     f32 charge = (f32)sRageMeter / (f32)GetRageCapacity();
 
@@ -1194,7 +1137,6 @@ static void StartFury(PlayState* play, Player* player) {
     Player_PlaySfx(player, NA_SE_VO_LI_AUTO_JUMP);
 }
 
-// The blast is the collider, growing out of her from the first frame; she rides it out untouchable.
 static void RunFury(PlayState* play, Player* player) {
     static const Window sFuryWindows[2] = { { 20, 28 }, { 80, 110 } };
 
@@ -1249,12 +1191,9 @@ static void GerudoAction(Player* player, PlayState* play) {
     }
 }
 
-// ---- action overrides ----
-
 static bool CanJumpFromFloor(PlayState* play, Player* player) {
     return play->roomCtx.curRoom.type != ROOM_TYPE_INDOORS && player->actor.floorPoly != NULL &&
-           SurfaceType_GetFloorType(&play->colCtx, player->actor.floorPoly, player->actor.floorBgId) !=
-               FLOOR_TYPE_7 &&
+           SurfaceType_GetFloorType(&play->colCtx, player->actor.floorPoly, player->actor.floorBgId) != FLOOR_TYPE_7 &&
            SurfaceType_GetFloorEffect(&play->colCtx, player->actor.floorPoly, player->actor.floorBgId) !=
                FLOOR_EFFECT_1;
 }
@@ -1282,7 +1221,6 @@ static int32_t HandleSlash(PlayState* play, Player* player) {
     return S2H_FORM_ACTION_STARTED;
 }
 
-// Vanilla fires the roll on the press; telling a tap from a hold needs the release, so the press is kept here.
 static int32_t HandleA(PlayState* play, Player* player) {
     if (!IsPressed(play, BTN_A) || !HoldsSword(player) || Player_IsZTargeting(player) || !IsGrounded(player)) {
         return S2H_FORM_ACTION_VANILLA;
@@ -1292,7 +1230,6 @@ static int32_t HandleA(PlayState* play, Player* player) {
     return S2H_FORM_ACTION_BLOCKED;
 }
 
-// A kept back by HandleA reaches this handler too, which would hop without a lock-on.
 static int32_t HandleZTargetA(PlayState* play, Player* player) {
     if (!Player_IsZTargeting(player)) {
         return sIsAPending ? S2H_FORM_ACTION_BLOCKED : S2H_FORM_ACTION_VANILLA;
@@ -1306,8 +1243,6 @@ static int32_t HandleZTargetA(PlayState* play, Player* player) {
     StartJumpSlash(play, player);
     return S2H_FORM_ACTION_STARTED;
 }
-
-// ---- per-frame input ----
 
 static void TrackA(PlayState* play, Player* player) {
     bool isEnabled = HoldsSword(player) && !IsGerudoBusy(player) && IsGrounded(player) && !IsRolling(player) &&
@@ -1335,7 +1270,6 @@ static void TrackA(PlayState* play, Player* player) {
     }
 }
 
-// R then B spends the meter on Urbosa's Fury; vanilla's crouch stab loses the same press.
 static void TryFury(PlayState* play, Player* player) {
     if (!HoldsSword(player) || IsGerudoBusy(player) || !IsGrounded(player) || !CanAct(player) || sRageMeter <= 0) {
         return;
@@ -1345,7 +1279,6 @@ static void TryFury(PlayState* play, Player* player) {
     }
 }
 
-// The press that started a hop or a jump arrives on its first airborne frame too, so it waits a frame.
 static void TryAerial(PlayState* play, Player* player) {
     sAirFrames = IsGrounded(player) ? 0 : MIN(sAirFrames + 1, 1000);
     if (!HoldsSword(player) || IsGerudoBusy(player) || IsGrounded(player) || !CanAct(player) ||
@@ -1365,8 +1298,6 @@ static void CountComboGap(Player* player) {
     }
 }
 
-// ---- body ----
-
 static void DrawScimitars(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
     if (!IsGerudo() || !HoldsSword(player)) {
         return;
@@ -1375,8 +1306,6 @@ static void DrawScimitars(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbD
         *dList = (Gfx*)sScimitarDL;
     }
 }
-
-// ---- voice ----
 
 static void LoadVoices(void) {
     char path[64];
@@ -1402,7 +1331,6 @@ static s32 FindVoice(u16 sfxId) {
     return -1;
 }
 
-// She never speaks with Link's voice: an id the pack has no clip for stays silent.
 static void SpeakAsGerudo(Actor* actor, s32 kind, u16* sfxId, bool* handled) {
     if (!IsGerudo() || kind != SOH_ACTOR_SFX_VOICE) {
         return;
@@ -1466,8 +1394,6 @@ static bool IsPlayingOcarinaClip(Player* player, const char* name) {
     return anim != NULL && strstr(anim, name) != NULL;
 }
 
-// Vanilla opens the ocarina when its intro clip ends. She has no instrument to draw, so a clip that ends at
-// once stands in for it and she starts singing straight away, like MM's forms without a draw animation.
 static bool SkipOcarinaIntro(PlayState* play, Player* player) {
     PlayerAnimationHeader* sing = LoadWholeClip(CLIP_SING);
 
@@ -1509,7 +1435,6 @@ static void ReleaseVoiceInstrument(void) {
     }
 }
 
-// The ocarina stays out across the message session, so the latch only lets go once no message is up.
 static void UpdateOcarinaVoice(PlayState* play, Player* player) {
     bool isSessionOpen = play->msgCtx.msgMode != MSGMODE_NONE;
 
@@ -1522,13 +1447,11 @@ static void UpdateOcarinaVoice(PlayState* play, Player* player) {
     if (!sIsOcarinaOut || SkipOcarinaIntro(play, player) || !isSessionOpen) {
         return;
     }
-    // Re-applied every frame: the message system sets the instrument again around opening, and the last write wins.
     AudioOcarina_SetInstrument(OCARINA_INSTRUMENT_FEMALE_VOICE);
     sIsInstrumentLent = true;
     PoseSinging(play, player);
 }
 
-// She sings with empty hands; the ocarina is baked into the right one.
 static void HideOcarina(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
     if (!IsGerudo() || limbIndex != PLAYER_LIMB_RIGHT_HAND || !sIsOcarinaOut || !IsHoldingOcarina(player)) {
         return;
@@ -1536,13 +1459,10 @@ static void HideOcarina(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDLi
     *dList = (Gfx*)sEmptyHandDL;
 }
 
-// The scimitars take the hands whatever else wants them: the ocarina's hand comes after, so it wins.
 static void ResolveGerudoLimb(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
     DrawScimitars(player, limbIndex, dList, limbDList, pos);
     HideOcarina(player, limbIndex, dList, limbDList, pos);
 }
-
-// ---- rage meter ----
 
 static void FillRect(PlayState* play, s16 left, s16 top, s16 right, s16 bottom, u8 r, u8 g, u8 b) {
     OPEN_DISPS(play->state.gfxCtx);
@@ -1556,7 +1476,6 @@ static void FillRect(PlayState* play, s16 left, s16 top, s16 right, s16 bottom, 
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Under the magic meter: amber while it fills, pulsing white once Fury is affordable.
 static void DrawRageMeter(PlayState* play) {
     if (!IsGerudo() || sRageMeter <= 0 || play->pauseCtx.state != 0) {
         return;
@@ -1577,8 +1496,6 @@ static void DrawRageMeter(PlayState* play) {
         FillRect(play, left, RAGE_BAR_Y, left + fillWidth, RAGE_BAR_Y + RAGE_BAR_HEIGHT, 240, 140, 20);
     }
 }
-
-// ---- lifetime ----
 
 static void ResetMoves(PlayState* play, Player* player) {
     if (player != NULL && play != NULL && IsGerudoBusy(player)) {
@@ -1611,7 +1528,6 @@ static void ExitGerudo(PlayState* play, Player* player) {
     }
 }
 
-// Damage, a cutscene or the water can take the player from a move without passing through its end.
 static void DropInterruptedMove(PlayState* play, Player* player) {
     if (sMove == GERUDO_MOVE_NONE || IsGerudoBusy(player)) {
         return;
@@ -1642,29 +1558,35 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
     ResetMoves(NULL, NULL);
 }
 
-// ---- mask ----
-
 static bool CanWearMask(Player* player, PlayState* play) {
-    return IsGrounded(player) && !(player->stateFlags1 & (STATE1_SWIMMING | STATE1_FIRST_PERSON | PLAYER_STATE1_20000000));
+    return IsGrounded(player) &&
+           !(player->stateFlags1 & (STATE1_SWIMMING | STATE1_FIRST_PERSON | PLAYER_STATE1_20000000));
 }
 
 static void WearMask(PlayState* play, Player* player) {
     sApi->ToggleForm(GERUDO_FORM_KEY);
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, GERUDO_MASK_KEY, GERUDO_MASK_KEY, "",
 };
 
-// Majora's Mask has no Gerudo Mask to replace, so the item stands on its own, wearing the Captain's Hat's art.
+static void DrawMaskPickup(PlayState* play, S2HGetItemEntry* entry) {
+    (void)entry;
+    GetItem_Draw(play, GID_MASK_CAPTAIN);
+}
+
+static void AssignMaskFromPause(const char* key) {
+    Z64FormMasks_AssignToPressedButton(sApi, key);
+}
+
 static void RegisterMask(void) {
     S2HCustomItemDefinition mask = Z64Items_Define(GERUDO_MASK_KEY, sIconTex, sNameTex);
 
     Z64Items_SetButtons(&mask, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     mask.flags |= S2H_CUSTOM_ITEM_INSTANT | S2H_CUSTOM_ITEM_WEARABLE;
     Z64Items_SetPlacement(&mask, GERUDO_MASK_PAGE, GERUDO_MASK_SLOT, GERUDO_MASK_WHEEL_PRIORITY);
-    Z64Items_SetGetItemModel(&mask, sGetItemDL);
+    mask.getItemEntry.drawFunc = DrawMaskPickup;
     Z64Items_SetTextbox(&mask, "You got the %rGerudo Mask%w!&The face of a desert warrior.^Wear it with %y\xA1%w to "
                                "become a %rGerudo%w: twin scimitars, a blade guard, and the fury of Urbosa.");
     Z64Items_SetPauseText(&mask, "%rGerudo Mask&%wPress %y\xA1%w to become a Gerudo.&%y\xA0%w: dual blades  Hold "
@@ -1672,12 +1594,11 @@ static void RegisterMask(void) {
     Z64Items_SetCanUse(&mask, CanWearMask);
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);
+    mask.onPauseToggle = AssignMaskFromPause;
     Z64Items_Register(sApi, &mask);
+    Z64FormMasks_PlaceMask(sApi, GERUDO_MASK_KEY, GERUDO_MASK_SLOT);
 }
 
-// ---- form ----
-
-// A Gerudo grips like a Zora; oot_collectables adds the strength upgrades on top.
 static void ResolveGerudoStrength(bool* should, va_list args) {
     s32* strength = va_arg(args, s32*);
 
@@ -1720,7 +1641,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// The Gerudo's scimitars carry sword damage, so they cut and fight wherever MM's logic asks for a sword.
 static void GrantGerudoLogic(void) {
     static const Z64LogicSource sMask = { GERUDO_MASK_KEY };
     static const char* const sSlashing[] = { "CanUseSword", "CanHitSwitch", "CanAttack", "CanDamage", NULL };

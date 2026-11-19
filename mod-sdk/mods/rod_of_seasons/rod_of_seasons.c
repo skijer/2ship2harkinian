@@ -8,8 +8,6 @@
 #include "objects/object_link_child/object_link_child.h"
 
 #define SEASONS_KEY "nei.rod_of_seasons"
-// The pose NEI dialled in and baked: the staff is 96 units tall, so the scale is the share of Link's own
-// height it takes up.
 #define SEASONS_HELD_SCALE 0.4f
 #define SEASONS_HELD_ROT_Y 72.414f
 #define SEASONS_HELD_ROT_X 109.655f
@@ -23,7 +21,6 @@
 #define SEASONS_SPARKLE_SPREAD 35.0f
 #define SEASONS_WATER_GONE -32000
 #define SEASONS_MAX_WATERBOXES 32
-// How far below his feet the frozen surface may sit and still count as the floor he is standing on.
 #define SEASONS_ICE_FOOTING 2.0f
 
 typedef enum {
@@ -48,14 +45,11 @@ static const ALIGN_ASSET(2) char sSummerIcon[] = "__OTR__textures/icon_item_cust
 static const ALIGN_ASSET(2) char sAutumnIcon[] = "__OTR__textures/icon_item_custom/gItemIconSeasonAutumnTex";
 static const ALIGN_ASSET(2) char sWinterIcon[] = "__OTR__textures/icon_item_custom/gItemIconSeasonWinterTex";
 
-// The rod itself never changes on the pause screen or its button: the season rides along as a coin in the corner.
 static const ALIGN_ASSET(2) char sSpringRod[] = "__OTR__textures/icon_item_custom/gItemIconRodOfSeasonsSpringTex";
 static const ALIGN_ASSET(2) char sSummerRod[] = "__OTR__textures/icon_item_custom/gItemIconRodOfSeasonsSummerTex";
 static const ALIGN_ASSET(2) char sAutumnRod[] = "__OTR__textures/icon_item_custom/gItemIconRodOfSeasonsAutumnTex";
 static const ALIGN_ASSET(2) char sWinterRod[] = "__OTR__textures/icon_item_custom/gItemIconRodOfSeasonsWinterTex";
 
-// Offsets onto whatever light the scene already has, so they shade every room without knowing anything
-// about it. Winter pulls red down hardest and barely touches blue, which reads as cold rather than dark.
 static const SeasonEntry sSeasons[SEASON_COUNT] = {
     { { 0, 0, 0 }, { 0, 0, 0 }, { 255, 255, 255 }, NA_SE_SY_TRE_BOX_APPEAR },
     { { 0, 0, 0 }, { 0, 0, 0 }, { 190, 245, 200 }, NA_SE_EV_CHICKEN_CRY_A },
@@ -72,20 +66,14 @@ static const Z64WheelEntry sWheelEntries[SEASON_COUNT] = {
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/gRodOfSeasonsNameTex";
 static const ALIGN_ASSET(2) char sRodDL[] = "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL";
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate",
-                                              "OnActorDrawEnd",
-                                              "OnBgCheckRaycastFloor",
-                                              "OnSceneInit",
-                                              "OnPlayerPostLimbDraw",
-                                              "OnResolveEnvHazard",
-                                              "OnPlayerResolveLimbDraw",
-                                              "OnActorResolveBgCheckFlags",
-                                              "OnInterfaceDrawEnd",
-                                              "OnSaveLoad" };
+static const char* const sRequiredHooks[] = { "OnPlayerUpdate",          "OnActorDrawEnd",
+                                              "OnBgCheckRaycastFloor",   "OnSceneInit",
+                                              "OnPlayerPostLimbDraw",    "OnResolveEnvHazard",
+                                              "OnPlayerResolveLimbDraw", "OnActorResolveBgCheckFlags",
+                                              "OnInterfaceDrawEnd",      "OnSaveLoad" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
-// One item and one slot, found four times over: the seed spreads the copies, and each one wakes a season.
 static const S2HCustomItemRandomizer sRodLogic = {
     sizeof(S2HCustomItemRandomizer),
     S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT | S2H_CUSTOM_ITEM_RANDO_PROGRESSIVE,
@@ -108,8 +96,6 @@ static bool sHasHandMatrix;
 
 void Player_AnimSfx_PlayVoice(Player* player, u16 sfxId);
 
-// Which seasons Link carries, and which one the world is wearing, both live in the wheel, and the wheel
-// lives in the save file: one file's spring is not another's.
 static u8 CurrentSeason(void) {
     u32 selection = Z64Wheel_GetSelection();
 
@@ -120,7 +106,6 @@ static bool IsSeasonOwned(u8 season) {
     return season != SEASON_OFF && Z64Wheel_IsEntryUnlocked(season);
 }
 
-// The scene's own weather writes these same fields, so the rod may only undo what the rod set.
 static void TakeRain(EnvironmentContext* env, u8 drops) {
     env->precipitation[PRECIP_RAIN_MAX] = drops;
     env->precipitation[PRECIP_RAIN_CUR] = drops;
@@ -166,7 +151,6 @@ static void ClearWeather(PlayState* play) {
     ShadeWorld(&play->envCtx, SEASON_OFF);
 }
 
-// Majora's Mask has no petal effect, so spring is a drift of pink sparkles around Link.
 static void SpawnPetals(PlayState* play, Player* player) {
     static Color_RGBA8 prim = { 255, 190, 215, 255 };
     static Color_RGBA8 env = { 255, 120, 170, 255 };
@@ -180,8 +164,6 @@ static void SpawnPetals(PlayState* play, Player* player) {
     EffectSsKirakira_SpawnDispersed(play, &pos, &velocity, &accel, &prim, &env, 200, 40);
 }
 
-// Environment_Update rebuilds all of this every pass, which is also what carries the season through a scene
-// load: every write here is idempotent, so it simply happens again.
 static void ApplySeason(PlayState* play, Player* player) {
     EnvironmentContext* env = &play->envCtx;
     u8 season = CurrentSeason();
@@ -204,7 +186,6 @@ static void ApplySeason(PlayState* play, Player* player) {
             ReleaseSnow(env);
             break;
         case SEASON_AUTUMN:
-            // Particles on screen suppress the engine's whole rain pass, so the flakes drain out first.
             ReleaseSnow(env);
             TakeRain(env, SEASONS_RAIN_DROPS);
             Audio_PlaySfx(NA_SE_EV_RAIN - SFX_FLAG);
@@ -219,9 +200,7 @@ static void ApplySeason(PlayState* play, Player* player) {
     }
 }
 
-// Summer drains every basin. The scene's own header is shared cached memory, so the surfaces are put back
-// the moment the season lets go of them, and re-applied each frame because the actors that own their water
-// rewrite the same fields.
+// The scene header is shared cached memory, so drained surfaces are restored the moment summer lets go.
 static WaterBox* sDriedHeader;
 static s32 sDriedSurfaces[SEASONS_MAX_WATERBOXES];
 static u16 sDriedCount;
@@ -256,8 +235,6 @@ static void DryWaterBoxes(PlayState* play) {
     }
 }
 
-// Winter puts out the hot rooms, and only those: an underwater hazard is not heat, and waiving every one of
-// them would hand Link endless air.
 static void ThawHotRooms(PlayState* play, s16* hazard) {
     if (*hazard != PLAYER_ENV_HAZARD_HOTROOM || CurrentSeason() != SEASON_WINTER || !IsSeasonOwned(SEASON_WINTER)) {
         return;
@@ -281,8 +258,6 @@ static void SpawnSeasonSparkles(Player* player, PlayState* play, u8 season) {
     }
 }
 
-// Locked seasons are not offered: the button turns through what Link carries, plus the blank setting that
-// hands the weather back to the scene. The wheel itself only ever shows the unlocked ones.
 static u8 NextAvailableSeason(u8 from) {
     for (u8 step = 1; step <= SEASON_COUNT; step++) {
         u8 candidate = (from + step) % SEASON_COUNT;
@@ -307,21 +282,16 @@ static void TurnWorldToSeason(Player* player, PlayState* play, u8 season) {
     sAppliedSeason = season;
 }
 
-// The wheel is the picker NEI uses for this rod: it stops the world and waits for an answer, so the season
-// is chosen rather than cycled past. Whoever writes the selection, the world follows it a frame later.
 static void TurnSeason(Player* player, PlayState* play) {
     if (!Z64Wheel_Open()) {
         Z64Wheel_SetSelection(NextAvailableSeason(CurrentSeason()));
     }
 }
 
-// A scene that has just loaded already stands in the season the save holds.
 static void SyncSeasonOnSceneInit(s16 sceneId, s8 spawnNum) {
     sAppliedSeason = CurrentSeason();
 }
 
-// Winter freezes every surface: the floor raycast answers with the water's own surface, so Link stands on it
-// instead of sinking. Only for Link, only while he is above the water and not already swimming in it.
 static bool IsStandingOnIce(PlayState* play, Player* player) {
     f32 surface;
     WaterBox* waterBox;
@@ -339,8 +309,8 @@ static bool IsStandingOnIce(PlayState* play, Player* player) {
     return player->actor.world.pos.y >= surface - SEASONS_ICE_FOOTING;
 }
 
-static void FreezeWaterUnderfoot(CollisionContext* colCtx, Vec3f* pos, Actor* actor, CollisionPoly** poly,
-                                 s32* bgId, f32* floorY) {
+static void FreezeWaterUnderfoot(CollisionContext* colCtx, Vec3f* pos, Actor* actor, CollisionPoly** poly, s32* bgId,
+                                 f32* floorY) {
     PlayState* play = gPlayState;
     Player* player = play == NULL ? NULL : GET_PLAYER(play);
     f32 surface;
@@ -359,8 +329,7 @@ static void FreezeWaterUnderfoot(CollisionContext* colCtx, Vec3f* pos, Actor* ac
     *floorY = surface;
 }
 
-// The engine's own "no ripples this frame" bit: walking on ice is walking on a solid, so the water it stands on
-// never notices.
+// The engine's own "no ripples this frame" bit.
 static void SkipRipplesOnIce(Actor* actor, s32* flags) {
     PlayState* play = gPlayState;
 
@@ -382,7 +351,6 @@ static void StowRod(Player* player, PlayState* play) {
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_PL_CHANGE_ARMS);
 }
 
-// The staff is gripped, not palmed: the same closed fist the Hookshot puts on that hand.
 static void CloseRodHand(Player* player, int32_t limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
     if (!sIsRodDrawn || limbIndex != PLAYER_LIMB_RIGHT_HAND) {
         return;
@@ -399,8 +367,6 @@ static u8 CountLockedSeasons(void) {
     return locked;
 }
 
-// Whichever one turns up: each pickup hands over a season Link is missing, so the four of them add up to
-// the whole year however the seed spreads them out.
 static u8 PickMissingSeason(void) {
     u8 locked = CountLockedSeasons();
 
@@ -431,8 +397,8 @@ static void GrantSeason(void) {
     sWokenSeason = season;
 }
 
-// Every copy of the rod in the pool is this same item: what a copy hands over is a season, not a second rod.
-static const char* const sPickupKeys[SEASON_COUNT] = { "", "nei.seasons.spring", "nei.seasons.summer", "nei.seasons.autumn", "nei.seasons.winter" };
+static const char* const sPickupKeys[SEASON_COUNT] = { "", "nei.seasons.spring", "nei.seasons.summer",
+                                                       "nei.seasons.autumn", "nei.seasons.winter" };
 static const char* const sVariantNames[SEASON_COUNT] = { "", "spring", "summer", "autumn", "winter" };
 static void ReceiveSeason(const char* itemKey, const char* variantKey) {
     for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++) {
@@ -445,7 +411,8 @@ static void ReceiveSeason(const char* itemKey, const char* variantKey) {
 }
 
 static void WakeSeason(const char* key) {
-    for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++) Z64Wheel_SetEntryUnlocked(season, true);
+    for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++)
+        Z64Wheel_SetEntryUnlocked(season, true);
 }
 
 static const char* WakeMessage(u8 season) {
@@ -463,7 +430,6 @@ static const char* WakeMessage(u8 season) {
     }
 }
 
-// The pickup has its own textbox running, so the season it woke waits until Link has the screen back.
 static void AnnounceWokenSeason(PlayState* play, Player* player) {
     if (Message_GetState(&play->msgCtx) != TEXT_STATE_NONE || Player_InCsMode(play)) {
         return;
@@ -472,7 +438,6 @@ static void AnnounceWokenSeason(PlayState* play, Player* player) {
     sWokenSeason = SEASON_OFF;
 }
 
-// The season is world state, not a spell: it keeps running whether or not the rod sits on a button.
 static void KeepSeasonRunning(Player* player) {
     PlayState* play = gPlayState;
     u8 season;
@@ -480,9 +445,9 @@ static void KeepSeasonRunning(Player* player) {
     if (play == NULL || player == NULL || !sApi->IsCustomItemOwned(SEASONS_KEY)) {
         return;
     }
-    // Carrying the rod means carrying at least one season, whichever way it arrived.
     for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++) {
-        if (sApi->IsCustomItemOwned(sPickupKeys[season])) Z64Wheel_SetEntryUnlocked(season, true);
+        if (sApi->IsCustomItemOwned(sPickupKeys[season]))
+            Z64Wheel_SetEntryUnlocked(season, true);
     }
     if (sWokenSeason != SEASON_OFF) {
         AnnounceWokenSeason(play, player);
@@ -508,8 +473,6 @@ static int32_t HoldRod(Player* player, PlayState* play) {
     return 0;
 }
 
-// Nothing touches the matrix between the hand limb and the end of the post-limb pass while the rod is out, so
-// this is the hand bone's own matrix: the staff follows the arm instead of floating beside Link.
 static void CaptureHandMatrix(Player* player, int32_t limbIndex) {
     if (limbIndex != PLAYER_LIMB_RIGHT_HAND) {
         return;
@@ -528,11 +491,9 @@ static void DrawRodInHand(Actor* actor, PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
     Matrix_Put(&sHandMatrix);
-    // That matrix carries Link's own 0.01 body scale: dividing it back out leaves the offsets in world units.
     Matrix_Scale(unscale, unscale, unscale, MTXMODE_APPLY);
     Matrix_RotateYF(DEG_TO_RAD(SEASONS_HELD_ROT_Y), MTXMODE_APPLY);
     Matrix_RotateXF(DEG_TO_RAD(SEASONS_HELD_ROT_X), MTXMODE_APPLY);
-    // The offsets come after the rotations, so each slides the staff along its OWN shaft.
     Matrix_Translate(0.0f, SEASONS_HELD_OFFSET_Y, SEASONS_HELD_OFFSET_Z, MTXMODE_APPLY);
     Matrix_Scale(SEASONS_HELD_SCALE, SEASONS_HELD_SCALE, SEASONS_HELD_SCALE, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
@@ -566,6 +527,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetAction(&rod, TakeOutRod, HoldRod);
     Z64Items_SetHeldCallbacks(&rod, TurnSeason, StowRod, NULL);
     Z64Items_SetGetItemModel(&rod, sRodDL);
+    rod.getItemScale = 0.7f;
     rod.modelGroup = PLAYER_MODELGROUP_DEFAULT;
     rod.onReceive = WakeSeason;
     S2HCustomItemRandomizer rodLogic = sRodLogic;
@@ -580,7 +542,9 @@ S2H_MOD_EXPORT void ModInit(void) {
         S2HCustomPickupVariant pickup = Z64Items_DefinePickup(SEASONS_KEY, sVariantNames[season], sPickupKeys[season]);
         pickup.iconPath = sWheelEntries[season].itemIconPath;
         pickup.getItemModelPath = sRodDL;
-        static const u8 flameColors[][3] = { { 0, 0, 0 }, { 40, 185, 55 }, { 255, 60, 50 }, { 225, 165, 0 }, { 0, 80, 180 } };
+        static const u8 flameColors[][3] = {
+            { 0, 0, 0 }, { 40, 185, 55 }, { 255, 60, 50 }, { 225, 165, 0 }, { 0, 80, 180 }
+        };
         pickup.drawSoulFlame = true;
         pickup.flameRed = flameColors[season][0];
         pickup.flameGreen = flameColors[season][1];
@@ -592,7 +556,8 @@ S2H_MOD_EXPORT void ModInit(void) {
         randomizer.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
         randomizer.logicKey = randomizer.hintKey = pickup.key;
         pickup.randomizer = &randomizer;
-        if (!Z64Items_RegisterPickup(sApi, &pickup)) return;
+        if (!Z64Items_RegisterPickup(sApi, &pickup))
+            return;
     }
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, KeepSeasonRunning);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, SyncSeasonOnSceneInit);

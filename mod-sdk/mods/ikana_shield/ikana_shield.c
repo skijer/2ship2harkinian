@@ -1,8 +1,3 @@
-/**
- * Shield of Ikana: Majora's Mask's Mirror Shield. A guard landed right after raising it drains the attacker's soul
- * into Link, and once per area it refuses to let him die.
- */
-
 #include "z64items.h"
 #include "z64logic.h"
 
@@ -10,6 +5,7 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
+#include "2s2h/ModApi/RandoInfCustom/RandoInfCustom.h"
 
 #define IKANA_SHIELD_KEY "nei.equip.ikana_shield"
 #define GUARD_WINDOW 12
@@ -53,6 +49,15 @@ static void FadeReviveFlash(PlayState* play) {
     }
     play->envCtx.fillScreen = false;
     play->envCtx.screenFillColor[3] = 0;
+}
+
+// The randomizer's logic simulation still needs the vanilla value.
+static void ClaimNativeMirror(u8 item, bool* should) {
+    if (RandoInfCustom_IsLogicSimulation()) {
+        return;
+    }
+    *should = false;
+    CustomEquipRegistry_SetOwned(IKANA_SHIELD_KEY, true);
 }
 
 static void TickShield(Player* player) {
@@ -127,7 +132,7 @@ static void ForgetGuard(const char* key) {
 }
 
 static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnPlayerShieldBlocked", "OnPlayerHealthChange",
-                                              "OnSceneInit" };
+                                              "OnSceneInit", "ShouldItemGive" };
 
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -144,7 +149,6 @@ static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     GetItem_Draw(play, GID_SHIELD_MIRROR);
 }
 
-// Worn, the shield is MM's own mirror value, so it reflects every native light beam.
 static void GrantIkanaShieldLogic(void) {
     static const Z64LogicSource sShield = { IKANA_SHIELD_KEY };
     static const char* const sReflecting[] = { "CanShield", "CanReflectLight", NULL };
@@ -164,8 +168,9 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.namePath = sName;
     definition.pauseText = "%rShield of Ikana&%wBlock with %y\xB4%w right as you raise it to drain the attacker's "
                            "soul. Once per area it holds death off.";
-    definition.getItemText = "You got the %rShield of Ikana%w!&The mirror of a kingdom of ghosts. It drinks the soul of "
-                             "whatever strikes it in time, and once in every place it will not let you fall.";
+    definition.getItemText =
+        "You got the %rShield of Ikana%w!&The mirror of a kingdom of ghosts. It drinks the soul of "
+        "whatever strikes it in time, and once in every place it will not let you fall.";
     definition.slot = S2H_EQUIP_SLOT_SHIELD;
     definition.page = 0;
     definition.row = S2H_EQUIP_SLOT_SHIELD;
@@ -183,4 +188,5 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK(sApi, OnPlayerShieldBlocked, DrainOnGuard);
     S2H_REGISTER_HOOK(sApi, OnPlayerHealthChange, SaveFromDeath);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, RenewDeathSave);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldItemGive, ITEM_SHIELD_MIRROR, ClaimNativeMirror);
 }

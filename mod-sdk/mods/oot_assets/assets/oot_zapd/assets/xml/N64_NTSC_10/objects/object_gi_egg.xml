@@ -1,0 +1,7 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_gi_egg" Segment="6" OutName="oot_object_gi_egg" Game="OOT">
+        <DList Name="gGiEggDL" Offset="0x1008" />
+        <DList Name="gGiEggMaterialDL" Offset="0x0FD0" />
+    </File>
+</Root>

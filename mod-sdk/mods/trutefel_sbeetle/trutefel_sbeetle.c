@@ -1,21 +1,7 @@
 /*
  * File: z_en_sbeetle.c
  * Description: Scissors Beetle comparable to the Scissors Beetles from The Minish Cap.
- * Authors: @syeo501 (Model) @trueffel (Code) — 2ship/MM port by Skijer's NEI.
- * Note: This enemy code was mostly written by @trueffel but contains some AI code, mostly for the
- *       mathematical operations related to the pincer attack.
- *
- * ---- MM port notes ----------------
- *  - The OoT original set naviEnemyId + ACTOR_FLAG_18 for a custom Navi textbox (message 0x065D,
- *    sbeetle_message_data.h). MM's Tatl hints go through actor.hintId / TATL_HINT_ID_* and a
- *    custom entry would need extra message plumbing, so the hint is STUBBED OUT here (enemy is
- *    fully functional without it).
- *  - OoT->MM API mapping: Actor_MoveXZGravity->Actor_MoveWithGravity,
- *    Animation_ChangeByInfo->Actor_ChangeAnimationByInfo, Actor_SetDropFlag loses its 3rd arg,
- *    Audio_StopSfxById->AudioSfx_StopById, EffectSsEnIce_SpawnFlyingVec3f->local ice-chunk helper
- *    on MM's EffectSsEnIce_Spawn, EffectSsDeadDb_Spawn takes Color_RGBA8* prim/env in MM.
- *  - Sfx substitution: NA_SE_EN_GOMA_JR_FREEZE->NA_SE_EN_COMMON_FREEZE. Everything else
- *    (TUBOOCK_FLY, RIZA_JUMP, BUBLEWALK_*, TEKU_WALK, boomerang/sword swings) exists verbatim.
+ * Authors: @syeo501 (Model) @trueffel (Code)
  */
 
 #include "2s2h/ModApi/ModApi.h"
@@ -81,8 +67,6 @@ typedef struct EnSbeetle {
     s16 pincerRSpin;
 } EnSbeetle;
 
-// z-targetable, hostile, update outside cull zone, hookshot pulls the actor
-// (OoT FLAG_0|2|4|9; OoT FLAG_18 = Navi dialogue dropped — see header note)
 #define SBEETLE_FLAGS                                                                         \
     (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE | ACTOR_FLAG_UPDATE_CULLING_DISABLED | \
      ACTOR_FLAG_HOOKSHOT_PULLS_ACTOR)
@@ -147,7 +131,7 @@ static ColliderCylinderInit sSbeetleCylinderInit = {
     {
         ELEM_MATERIAL_UNK1,
         { 0x00000000, 0x00, 0x00 },
-        { 0xF7CFFFFF, 0x00, 0x00 }, // MM accept-all bumper mask (z_en_skb.c), not OoT's 0xFFCFFFFF
+        { 0xF7CFFFFF, 0x00, 0x00 },
         ATELEM_NONE,
         ACELEM_ON | ACELEM_HOOKABLE,
         OCELEM_ON,
@@ -155,8 +139,6 @@ static ColliderCylinderInit sSbeetleCylinderInit = {
     { 40, 45, 0, { 0, 0, 0 } },
 };
 
-// Pincer touchers: OoT used DMG_SLASH / a raw 0x20000000 bit; both are OoT dmg-bit meanings, so
-// the generic enemy-attack mask is used in MM. Damage is set at runtime (0x10 dash / 0x08 throw).
 static ColliderCylinderInit sPincerLCylinderInit = {
     {
         COL_MATERIAL_NONE,
@@ -205,12 +187,6 @@ typedef enum {
     /* 14 */ ENSBEETLE_DMGEFF_FIRE
 } EnSbeetleDamageEffect;
 
-/**
- * MM damage table (MM weapon order — rebuilt from the OoT original preserving intent):
- * stun columns (nut/boomerang/hookshot) -> 0 + STUN; explosives (incl. Powder Keg) 2; sword 1,
- * spins 3, arrows 1; fire arrow 3 + FIRE (burns to death), ice arrow 2 + ICE (freeze), light
- * arrow 4 + LIGHT; Goron punch/pound = OoT hammer 2.
- */
 static DamageTable sSbeetleDamageTable = {
     /* Deku Nut       */ DMG_ENTRY(0, ENSBEETLE_DMGEFF_STUN),
     /* Deku Stick     */ DMG_ENTRY(2, ENSBEETLE_DMGEFF_NONE),
@@ -246,7 +222,6 @@ static DamageTable sSbeetleDamageTable = {
     /* Powder Keg     */ DMG_ENTRY(2, ENSBEETLE_DMGEFF_NONE),
 };
 
-// MM field order: health, cylRadius, cylHeight, cylYShift, mass (differs from OoT).
 static CollisionCheckInfoInit2 sSbeetleColChkInit = {
     /* health    */ 5,
     /* cylRadius */ 25,
@@ -283,9 +258,6 @@ void EnSbeetle_ChangeAnimation(EnSbeetle* self, s32 index) {
     Actor_ChangeAnimationByInfo(&self->skelAnime, sSbeetleAnimationInfo, index);
 }
 
-/**
- * OoT EffectSsEnIce_SpawnFlyingVec3f replacement (MM has no built-in fling — Bg_Icicle idiom).
- */
 static void EnSbeetle_SpawnIceChunk(PlayState* play, Vec3f* pos) {
     static Color_RGBA8 sIcePrimColor = { 150, 150, 150, 250 };
     static Color_RGBA8 sIceEnvColor = { 235, 245, 255, 255 };
@@ -300,9 +272,6 @@ static void EnSbeetle_SpawnIceChunk(PlayState* play, Vec3f* pos) {
                         &sIceEnvColor, 30);
 }
 
-/*
- * Prepares pincer colliders and body collider
- */
 void EnSbeetle_InitAndSetCollision(EnSbeetle* self, PlayState* play) {
     Collider_InitCylinder(play, &self->collider);
     Collider_SetCylinder(play, &self->collider, &self->actor, &sSbeetleCylinderInit);
@@ -320,8 +289,6 @@ void EnSbeetle_Init(Actor* thisx, PlayState* play) {
 
     ActorShape_Init(&self->actor.shape, 0.0f, ActorShadow_DrawCircle, 10.0f);
     Actor_SetScale(&self->actor, 0.1f);
-    // OoT: this->actor.naviEnemyId = NAVI_ENEMY_SCISSORS_BEETLE (custom message 0x065D) — stubbed,
-    // MM Tatl hints would need a custom TATL_HINT_ID + message table entry.
     thisx->gravity = -1.0f;
     self->nextIdleTimer = 0;
     self->attackTimer = 0;
@@ -354,8 +321,7 @@ void EnSbeetle_Update(Actor* thisx, PlayState* play) {
     Collider_UpdateCylinder(thisx, &self->collider);
 
     if ((self->pincerState == ENSBEETLE_PINCER_OUTBOUND) || (self->pincerState == ENSBEETLE_PINCER_RETURN) ||
-        (self->pincerState == ENSBEETLE_PINCER_FAST_RETURN)) { // Update pincer collider positions
-
+        (self->pincerState == ENSBEETLE_PINCER_FAST_RETURN)) {
         Collider_UpdateCylinder(&self->actor, &self->pincerLCollider);
 
         Collider_UpdateCylinder(&self->actor, &self->pincerRCollider);
@@ -374,8 +340,8 @@ void EnSbeetle_Update(Actor* thisx, PlayState* play) {
         }
     }
 
-    if (self->actionFunc != EnSbeetle_Die) {    // Enemy can't take more damage after death
-        if (DECR(self->hurtboxCooldown) == 0) { // Player is not able to spam the sword
+    if (self->actionFunc != EnSbeetle_Die) {
+        if (DECR(self->hurtboxCooldown) == 0) {
             CollisionCheck_SetAC(play, &play->colChkCtx, &self->collider.base);
         }
 
@@ -383,7 +349,6 @@ void EnSbeetle_Update(Actor* thisx, PlayState* play) {
     }
 }
 
-// Relative positions to spawn ice chunks when the beetle is frozen
 static Vec3f sSbeetleIceChunks[12] = {
     { 20.0f, 20.0f, 0.0f },   { 10.0f, 40.0f, 10.0f },   { -10.0f, 40.0f, 10.0f }, { -20.0f, 20.0f, 0.0f },
     { 10.0f, 40.0f, -10.0f }, { -10.0f, 40.0f, -10.0f }, { 0.0f, 20.0f, -20.0f },  { 10.0f, 0.0f, 10.0f },
@@ -402,7 +367,6 @@ void EnSbeetle_Draw(Actor* thisx, PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
 
     if (self->spawnIceTimer != 0) {
-        // Spawn chunks of ice all over the beetle's body
         thisx->colorFilterTimer++;
         self->spawnIceTimer--;
         if ((self->spawnIceTimer & 3) == 0) {
@@ -417,7 +381,6 @@ void EnSbeetle_Draw(Actor* thisx, PlayState* play) {
     }
 
     if (self->fireTimer != 0) {
-        // MM's EffectSsDeadDb_Spawn takes prim/env colors as Color_RGBA8* (OoT passed loose ints)
         static Color_RGBA8 sFirePrimColor = { 200, 135, 50, 255 };
         static Color_RGBA8 sFireEnvColor = { 200, 80, 50, 255 };
 
@@ -444,10 +407,6 @@ void EnSbeetle_Draw(Actor* thisx, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-/*  --- This function was written by AI ---
- *  Converts a world-space position into the local coordinate space of the currently active matrix.
- *  This is needed for bones as their position coordinates are bound to the actor.
- */
 void EnSbeetle_WorldToCurrentMatrixLocal(Vec3f* worldPos, Vec3f* localPos) {
     MtxF mtx;
     Vec3f delta;
@@ -484,9 +443,6 @@ void EnSbeetle_WorldToCurrentMatrixLocal(Vec3f* worldPos, Vec3f* localPos) {
     }
 }
 
-/*  --- This function was written by AI ---
- *  Calculates a curved boomerang-like flight path between a start and end position
- */
 void EnSbeetle_GetPincerPath(Vec3f* start, Vec3f* end, f32 progress, f32 side, Vec3f* result) {
     f32 dx;
     f32 dz;
@@ -520,9 +476,6 @@ void EnSbeetle_GetPincerPath(Vec3f* start, Vec3f* end, f32 progress, f32 side, V
     result->y += curve * ENSBEETLE_PINCER_ARC_HEIGHT;
 }
 
-/*  --- This function was written by AI ---
- *  pincers will start flying back
- */
 void EnSbeetle_StartPincerReturn(EnSbeetle* self) {
     self->pincerLReturnStart = self->pincerLWorldPos;
     self->pincerRReturnStart = self->pincerRWorldPos;
@@ -531,10 +484,6 @@ void EnSbeetle_StartPincerReturn(EnSbeetle* self) {
     self->pincerFlightTimer = 0;
 }
 
-/*  --- This function was written by AI ---
- *  If the scissors beetle takes damage while pincers are flying
- *  they fly back immediately, stopping the attack.
- */
 void EnSbeetle_StartPincerFastReturn(EnSbeetle* self) {
     if ((self->pincerState != ENSBEETLE_PINCER_OUTBOUND) && (self->pincerState != ENSBEETLE_PINCER_RETURN)) {
         return;
@@ -550,9 +499,6 @@ void EnSbeetle_StartPincerFastReturn(EnSbeetle* self) {
     self->pincerRCollider.base.atFlags &= ~AT_HIT;
 }
 
-/*  --- This function was written by AI ---
- *  Commands for the pincers on how to behave depending on state
- */
 void EnSbeetle_UpdatePincers(EnSbeetle* self, PlayState* play) {
     f32 progress;
     s32 pincerHit;
@@ -651,9 +597,6 @@ void EnSbeetle_UpdatePincers(EnSbeetle* self, PlayState* play) {
     }
 }
 
-/*  --- This function was written by AI ---
- *  Visual work of the pincers flying towards link and back
- */
 s32 EnSbeetle_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, Actor* thisx) {
     EnSbeetle* self = (EnSbeetle*)thisx;
     Vec3f originalPos;
@@ -697,9 +640,6 @@ s32 EnSbeetle_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3
     return false;
 }
 
-/*
- *  Sync actor focus position to the body and pincer colliders to the pincer bones
- */
 void EnSbeetle_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, Actor* thisx) {
     static Vec3f sZeroVec = { 0.0f, 0.0f, 0.0f };
     EnSbeetle* self = (EnSbeetle*)thisx;
@@ -730,18 +670,14 @@ void EnSbeetle_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* 
     }
 }
 
-/*
- *  Checks whether the beetle was hit and transitions it into the appropriate hurt, stunned, or death state.
- */
 void EnSbeetle_CheckHurt(EnSbeetle* self, PlayState* play) {
     if (self->collider.base.acFlags & AC_HIT) {
         self->collider.base.acFlags &= ~AC_HIT;
-        Actor_SetDropFlag(&self->actor, &self->collider.elem); // MM: 2-arg (OoT had a 3rd bool)
+        Actor_SetDropFlag(&self->actor, &self->collider.elem);
         self->actor.speed = 0.0f;
 
         switch (self->actor.colChkInfo.damageEffect) {
             case ENSBEETLE_DMGEFF_STUN:
-                // Stunning effect because of e.g. a deku nut
                 Actor_SetColorFilter(&self->actor, COLORFILTER_COLORFLAG_BLUE, 120, COLORFILTER_BUFFLAG_OPA, 60);
                 Actor_ApplyDamage(&self->actor);
                 EnSbeetle_SetupStunned(self, play);
@@ -770,14 +706,10 @@ void EnSbeetle_CheckHurt(EnSbeetle* self, PlayState* play) {
         }
     }
     if ((self->actor.bgCheckFlags & BGCHECKFLAG_WATER) && self->actionFunc != EnSbeetle_Die) {
-        // This enemy is not supposed to be in water so it dies immediately when in deep water
         EnSbeetle_SetupDie(self, play);
     }
 }
 
-/*
- *  Updates the beetle's collision state with the environment (ground, walls, ceilings, water).
- */
 void EnSbeetle_UpdateBgCheck(EnSbeetle* self, PlayState* play) {
     Actor_UpdateBgCheckInfo(
         play, &self->actor, self->actor.colChkInfo.cylHeight, self->actor.colChkInfo.cylRadius,
@@ -789,10 +721,6 @@ void EnSbeetle_UpdateBgCheck(EnSbeetle* self, PlayState* play) {
 #define ENSBEETLE_FORGET_HEIGHT 140.0f
 #define ENSBEETLE_FORGET_TIME 60
 
-/*
- *  Checks whether the player has moved far enough away or changed elevation enough for the beetle
- *  to lose track of them.
- */
 s32 EnSbeetle_HasLostPlayer(EnSbeetle* self, PlayState* play) {
     Player* player = GET_PLAYER(play);
     f32 yDist;
@@ -817,10 +745,6 @@ s32 EnSbeetle_HasLostPlayer(EnSbeetle* self, PlayState* play) {
 #define ENSBEETLE_SIDE_ANGLE 0x5000
 #define ENSBEETLE_DETECT_HEIGHT 80.0f
 
-/*
- * Checks whether the player is close enough and within the beetle's hearing or field-of-view
- * range to be detected.
- */
 s32 EnSbeetle_CheckPlayerNear(EnSbeetle* self, PlayState* play) {
     Player* player = GET_PLAYER(play);
     f32 yDist;
@@ -861,9 +785,6 @@ s32 EnSbeetle_CheckPlayerNear(EnSbeetle* self, PlayState* play) {
     return false;
 }
 
-/*
- * Enemy has nothing to do. Setup for idling around.
- */
 void EnSbeetle_SetupDoNothing(EnSbeetle* self, PlayState* play) {
     self->actor.speed = 0.0f;
     self->nextIdleTimer = 100;
@@ -871,11 +792,6 @@ void EnSbeetle_SetupDoNothing(EnSbeetle* self, PlayState* play) {
     self->actionFunc = EnSbeetle_DoNothing;
 }
 
-/*
- * Enemy has nothing to do.
- * Constantly checking for the player.
- * Random idle animations. Random walking.
- */
 void EnSbeetle_DoNothing(EnSbeetle* self, PlayState* play) {
     if (EnSbeetle_CheckPlayerNear(self, play) == true) {
         self->idleAction = NULL;
@@ -885,39 +801,36 @@ void EnSbeetle_DoNothing(EnSbeetle* self, PlayState* play) {
     if (self->idleAction == NULL) {
         SkelAnime_Update(&self->skelAnime);
         if (DECR(self->nextIdleTimer) == 0) {
-            self->nextIdleTimer = Rand_S16Offset(40, 40); // Between 2 and 4 seconds
-            if (Rand_ZeroOne() > 0.4f) {                  // ~60% chance of a random idle action
+            self->nextIdleTimer = Rand_S16Offset(40, 40);
+            if (Rand_ZeroOne() > 0.4f) {
                 f32 randomIdle = Rand_ZeroOne();
-                if (randomIdle <= 0.3f) { // 30% chance of idle2
+                if (randomIdle <= 0.3f) {
                     self->afterAnimTimer = 10;
                     EnSbeetle_ChangeAnimation(self, SCISSORSBEETLE_ANIMATION_IDLE2);
                     self->idleAction = EnSbeetle_IdleActionIdle2;
-                } else if (randomIdle >= 0.4f && randomIdle <= 0.7f) { // 30% chance of idle3
+                } else if (randomIdle >= 0.4f && randomIdle <= 0.7f) {
                     self->afterAnimTimer = 10;
                     EnSbeetle_ChangeAnimation(self, SCISSORSBEETLE_ANIMATION_IDLE3);
                     self->idleAction = EnSbeetle_IdleActionIdle3;
-                } else { // 30% chance of walking
+                } else {
                     self->actor.speed = 1.0f;
-                    self->randomWalkTimer = Rand_S16Offset(60, 40); // Between 3 and 5 seconds
+                    self->randomWalkTimer = Rand_S16Offset(60, 40);
                     EnSbeetle_ChangeAnimation(self, SCISSORSBEETLE_ANIMATION_WALK);
                     self->idleAction = EnSbeetle_IdleActionWalk;
                 }
             }
         }
     } else {
-        self->idleAction(self, play); // This is like a sub actionFunc
+        self->idleAction(self, play);
     }
 }
 
-/*
- * Enemy starts walking randomly.
- */
 void EnSbeetle_IdleActionWalk(EnSbeetle* self, PlayState* play) {
     f32 distToHome = Math_Vec3f_DistXZ(&self->actor.world.pos, &self->actor.home.pos);
 
     SkelAnime_Update(&self->skelAnime);
 
-    if (distToHome > 300.0f) { // this way, the scissors beetle doesn't move off too much from the spawn position
+    if (distToHome > 300.0f) {
         Math_ApproachS(&self->actor.world.rot.y, Math_Vec3f_Yaw(&self->actor.world.pos, &self->actor.home.pos), 3,
                        4000);
     } else {
@@ -926,66 +839,51 @@ void EnSbeetle_IdleActionWalk(EnSbeetle* self, PlayState* play) {
     Math_ApproachS(&self->actor.shape.rot.y, self->actor.world.rot.y, 2, 6000);
 
     if (Animation_OnFrame(&self->skelAnime, 10.0f) || Animation_OnFrame(&self->skelAnime, 17.0f)) {
-        // foot touches the ground
         Actor_PlaySfx(&self->actor, NA_SE_EN_TEKU_WALK);
     }
 
-    if (DECR(self->randomWalkTimer) == 0) { // Back to doing nothing
+    if (DECR(self->randomWalkTimer) == 0) {
         self->actor.speed = 0.0f;
         EnSbeetle_ChangeAnimation(self, SCISSORSBEETLE_ANIMATION_IDLE1);
         self->idleAction = NULL;
     }
 }
 
-/*
- * Enemy Idle2 Animation. Rattling.
- */
 void EnSbeetle_IdleActionIdle2(EnSbeetle* self, PlayState* play) {
-    if (Animation_OnFrame(&self->skelAnime, 7.0f)) { // Rattling sound
+    if (Animation_OnFrame(&self->skelAnime, 7.0f)) {
         Actor_PlaySfx(&self->actor, NA_SE_EN_TUBOOCK_FLY);
     }
-    if (Animation_OnFrame(&self->skelAnime, 30.0f)) { // this sound effect must be stopped manually
+    if (Animation_OnFrame(&self->skelAnime, 30.0f)) {
         AudioSfx_StopById(NA_SE_EN_TUBOOCK_FLY);
     }
 
     if (SkelAnime_Update(&self->skelAnime)) {
-        if (DECR(self->afterAnimTimer) == 0) { // Back to doing nothing
+        if (DECR(self->afterAnimTimer) == 0) {
             EnSbeetle_ChangeAnimation(self, SCISSORSBEETLE_ANIMATION_IDLE1);
             self->idleAction = NULL;
         }
     }
 }
 
-/*
- * Enemy Idle3 Animation. Looking around.
- */
 void EnSbeetle_IdleActionIdle3(EnSbeetle* self, PlayState* play) {
     if (Animation_OnFrame(&self->skelAnime, 7.0f) || Animation_OnFrame(&self->skelAnime, 39.0f)) {
         Actor_PlaySfx(&self->actor, NA_SE_EN_TEKU_WALK);
     }
 
     if (SkelAnime_Update(&self->skelAnime)) {
-        if (DECR(self->afterAnimTimer) == 0) { // Back to doing nothing
+        if (DECR(self->afterAnimTimer) == 0) {
             EnSbeetle_ChangeAnimation(self, SCISSORSBEETLE_ANIMATION_IDLE1);
             self->idleAction = NULL;
         }
     }
 }
 
-/*
- * Ends up being unused.
- * Setup for a jump - see EnSbeetle_HopWithPlayerRot.
- */
 void EnSbeetle_SetupHopWithPlayerRot(EnSbeetle* self, PlayState* play) {
     self->actor.speed = 0.0f;
     EnSbeetle_ChangeAnimation(self, SCISSORSBEETLE_ANIMATION_HOP);
     self->actionFunc = EnSbeetle_HopWithPlayerRot;
 }
 
-/*
- * Ends up being unused.
- * Jump and rotate towards the player midair.
- */
 void EnSbeetle_HopWithPlayerRot(EnSbeetle* self, PlayState* play) {
     if (self->skelAnime.curFrame >= 7.0f) {
         Math_ApproachS(&self->actor.world.rot.y, self->actor.yawTowardsPlayer, 3, 4000);
@@ -1006,28 +904,27 @@ void EnSbeetle_SetupThreatPlayer(EnSbeetle* self, PlayState* play) {
 void EnSbeetle_ThreatPlayer(EnSbeetle* self, PlayState* play) {
     SkelAnime_Update(&self->skelAnime);
 
-    if (!EnSbeetle_HasLostPlayer(self, play)) { // Always reset the timer if player is in sight
+    if (!EnSbeetle_HasLostPlayer(self, play)) {
         self->playerLostTimer = ENSBEETLE_FORGET_TIME;
-    } else if (DECR(self->playerLostTimer) == 0) { // Player lost
+    } else if (DECR(self->playerLostTimer) == 0) {
         self->actor.speed = 0.0f;
         EnSbeetle_SetupDoNothing(self, play);
         return;
     }
 
-    // Rotate towards player
     Math_ApproachS(&self->actor.world.rot.y, self->actor.yawTowardsPlayer, 3, 3000);
     Math_ApproachS(&self->actor.shape.rot.y, self->actor.world.rot.y, 2, 5000);
 
     if (DECR(self->attackTimer) == 0) {
-        if (Rand_ZeroOne() < 0.6f) {     // ~60% chance
-            if (Rand_ZeroOne() < 0.6f) { // ~60% chance for normal attack
+        if (Rand_ZeroOne() < 0.6f) {
+            if (Rand_ZeroOne() < 0.6f) {
                 EnSbeetle_SetupAttack(self, play);
-            } else { // otherwise swing the pincers
+            } else {
                 EnSbeetle_SetupSwingAttack(self, play);
             }
             return;
         }
-        self->attackTimer = 40; // 2 seconds
+        self->attackTimer = 40;
     }
 }
 
@@ -1042,13 +939,12 @@ void EnSbeetle_SetupAttack(EnSbeetle* self, PlayState* play) {
 void EnSbeetle_Attack(EnSbeetle* self, PlayState* play) {
     CollisionCheck_SetAT(play, &play->colChkCtx, &self->pincerLCollider.base);
 
-    if (self->skelAnime.curFrame < 20.0f) { // Rotate towards player
+    if (self->skelAnime.curFrame < 20.0f) {
         Math_ApproachS(&self->actor.world.rot.y, self->actor.yawTowardsPlayer, 3, 3000);
         Math_ApproachS(&self->actor.shape.rot.y, self->actor.world.rot.y, 2, 5000);
     }
 
     if (Animation_OnFrame(&self->skelAnime, 24.0f) || Animation_OnFrame(&self->skelAnime, 25.0f)) {
-        // Dash towards player
         self->actor.speed = self->actor.xzDistToPlayer / 2;
         if (!self->audioPlayed) {
             Actor_PlaySfx(&self->actor, NA_SE_IT_SWORD_SWING_HARD);
@@ -1058,14 +954,11 @@ void EnSbeetle_Attack(EnSbeetle* self, PlayState* play) {
         self->actor.speed = 0.0f;
     }
 
-    if (SkelAnime_Update(&self->skelAnime)) { // Animation finished
+    if (SkelAnime_Update(&self->skelAnime)) {
         EnSbeetle_SetupHopAwayFromOrTowardsPlayer(self, play);
     }
 }
 
-/* --- This function was written by AI ---
- * Setup for the pincers
- */
 void EnSbeetle_SetupSwingAttack(EnSbeetle* self, PlayState* play) {
     EnSbeetle_ChangeAnimation(self, SCISSORSBEETLE_ANIMATION_SWING);
 
@@ -1084,8 +977,6 @@ void EnSbeetle_SetupSwingAttack(EnSbeetle* self, PlayState* play) {
     self->actionFunc = EnSbeetle_SwingAttack;
 }
 
-/* --- This function was written by AI ---
- */
 void EnSbeetle_ThrowPincers(EnSbeetle* self, PlayState* play) {
     Player* player = GET_PLAYER(play);
 
@@ -1106,15 +997,12 @@ void EnSbeetle_ThrowPincers(EnSbeetle* self, PlayState* play) {
     Actor_PlaySfx(&self->actor, NA_SE_IT_BOOMERANG_THROW);
 }
 
-/* --- This function was written by AI ---
- * Swing attack: wind up, then throw the pincers boomerang-style
- */
 void EnSbeetle_SwingAttack(EnSbeetle* self, PlayState* play) {
     s32 animationFinished;
 
     self->actor.speed = 0.0f;
 
-    if (self->pincerState == ENSBEETLE_PINCER_WINDUP) { // Rotate towards player
+    if (self->pincerState == ENSBEETLE_PINCER_WINDUP) {
         Math_ApproachS(&self->actor.world.rot.y, self->actor.yawTowardsPlayer, 3, 3000);
 
         Math_ApproachS(&self->actor.shape.rot.y, self->actor.world.rot.y, 2, 5000);
@@ -1141,7 +1029,6 @@ void EnSbeetle_SetupHopAwayFromOrTowardsPlayer(EnSbeetle* self, PlayState* play)
 
 void EnSbeetle_HopAwayFromOrTowardsPlayer(EnSbeetle* self, PlayState* play) {
     if (self->skelAnime.curFrame <= 6.0f || self->skelAnime.curFrame >= 15.0f) {
-        // Rotate towards player before jumping
         self->actor.speed = 0.0f;
         Math_ApproachS(&self->actor.world.rot.y, self->actor.yawTowardsPlayer, 3, 4000);
         Math_ApproachS(&self->actor.shape.rot.y, self->actor.world.rot.y, 2, 6000);
@@ -1150,10 +1037,10 @@ void EnSbeetle_HopAwayFromOrTowardsPlayer(EnSbeetle* self, PlayState* play) {
             Actor_PlaySfx(&self->actor, NA_SE_EN_RIZA_JUMP);
             self->audioPlayed = true;
         }
-        if (self->playerDistAtSetup > 300.0f) { // Either jump towards the player
+        if (self->playerDistAtSetup > 300.0f) {
             self->actor.speed = 12.0f;
         } else {
-            self->actor.speed = -12.0f; // Or away from the player
+            self->actor.speed = -12.0f;
         }
     }
 
@@ -1169,7 +1056,7 @@ void EnSbeetle_HopAwayFromOrTowardsPlayer(EnSbeetle* self, PlayState* play) {
 void EnSbeetle_SetupStunned(EnSbeetle* self, PlayState* play) {
     EnSbeetle_StartPincerFastReturn(self);
     self->actor.speed = 0.0f;
-    Actor_PlaySfx(&self->actor, NA_SE_EN_COMMON_FREEZE); // MM's common enemy stun/freeze sfx
+    Actor_PlaySfx(&self->actor, NA_SE_EN_COMMON_FREEZE);
     Animation_PlayOnceSetSpeed(&self->skelAnime, &gScissorsBeetleSkelIdle1Anim, 0.0f);
     Actor_SetColorFilter(&self->actor, COLORFILTER_COLORFLAG_BLUE, 120, COLORFILTER_BUFFLAG_OPA, 60);
     self->actionFunc = EnSbeetle_Stunned;
@@ -1200,7 +1087,7 @@ void EnSbeetle_SetupHurt(EnSbeetle* self, PlayState* play) {
 
 void EnSbeetle_Hurt(EnSbeetle* self, PlayState* play) {
     if (SkelAnime_Update(&self->skelAnime)) {
-        if (DECR(self->damageTimer) == 0) { // timer for seeing the Sbeetle taking damage
+        if (DECR(self->damageTimer) == 0) {
             EnSbeetle_SetupHopAwayFromOrTowardsPlayer(self, play);
         }
     }
@@ -1210,7 +1097,7 @@ void EnSbeetle_SetupDie(EnSbeetle* self, PlayState* play) {
     EnSbeetle_StartPincerFastReturn(self);
     self->deathFreeze = 12;
     self->actor.speed = 0.0f;
-    self->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED; // Sbeetle not targetable anymore
+    self->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED;
     self->actor.shape.shadowAlpha = 0;
     Actor_PlaySfx(&self->actor, NA_SE_EN_BUBLEWALK_DEAD);
     Enemy_StartFinishingBlow(play, &self->actor);
@@ -1227,13 +1114,12 @@ void EnSbeetle_Die(EnSbeetle* self, PlayState* play) {
 
     if (SkelAnime_Update(&self->skelAnime)) {
         if (DECR(self->deathFreeze) == 0) {
-            Math_StepToF(&self->actor.scale.x, 0.0f, 0.0084f); // Sbeetle shrinks in his scale while dying
+            Math_StepToF(&self->actor.scale.x, 0.0f, 0.0084f);
             self->actor.scale.y = self->actor.scale.z = self->actor.scale.x;
-            if (self->actor.scale.x <= 0.001f) { // Enemy not visible anymore
+            if (self->actor.scale.x <= 0.001f) {
                 effectPos.y += 10.0f;
                 EffectSsDeadDb_Spawn(play, &effectPos, &effectVel, &zeroVec, &sDeathPrimColor, &sDeathEnvColor, 90, 0,
                                      9);
-                // The Sbeetle might drop some random collectibles
                 Item_DropCollectibleRandom(play, &self->actor, &self->actor.world.pos, 0xE0);
                 Actor_Kill(&self->actor);
             }
@@ -1245,7 +1131,6 @@ S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
 }
 
-// Limb DLs resolve by OTR path, so GAMEPLAY_KEEP is the only bank needed.
 S2H_MOD_EXPORT void ModInit(void) {
     if (!S2H_MOD_API_HAS(sApi, RegisterActor)) {
         return;

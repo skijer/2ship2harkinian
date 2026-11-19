@@ -1,6 +1,4 @@
-// Auto-generated from "Stasis Rune Sound Effect.wav" — 16000 Hz mono s16 PCM, 13.17 s.
-// Regenerate with scratchpad/wav_to_pcm_header.py. NOT a .h on purpose: mods/*.h is globbed
-// with CONFIGURE_DEPENDS in 2ship, and a new header there forces a CMake regeneration.
+// Not a .h on purpose: a new header under mods/ forces a CMake regeneration in 2ship.
 #define STASIS_SFX_RATE 16000
 #define STASIS_SFX_SAMPLES 210672
 

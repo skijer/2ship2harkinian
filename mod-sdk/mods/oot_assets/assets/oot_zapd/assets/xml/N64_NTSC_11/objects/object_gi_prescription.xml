@@ -1,0 +1,8 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_gi_prescription" Segment="6" OutName="oot_object_gi_prescription" Game="OOT">
+        <DList Name="gGiPrescriptionDL" Offset="0x09C0" />
+        <DList Name="gGiPrescriptionWritingDL" Offset="0x0AF0" />
+        <Texture Name="object_gi_prescriptionTex_000000" Offset="0x0" Format="ia8" Width="32" Height="48" />
+    </File>
+</Root>

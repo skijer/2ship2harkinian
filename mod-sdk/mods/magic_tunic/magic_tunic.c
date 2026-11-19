@@ -1,7 +1,3 @@
-/**
- * Magic Tunic: while the wallet holds rupees every hit is paid in rupees instead of hearts, and heat and water
- * stop counting down. A third of each payment spills out as real rupees. Broke, it is a heavy black shirt.
- */
 
 #include "z64items.h"
 
@@ -16,7 +12,6 @@
 #define ABSORB_INTANGIBILITY 20
 #define SPILL_RADIUS_MIN 8.0f
 #define SPILL_RADIUS_MAX 20.0f
-// Rupees collect within 50 units vertically: spawning above that window keeps them from being swallowed at once.
 #define SPILL_HEIGHT_MARGIN 40.0f
 
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__textures/icon_item_custom/gItemIconMagicTunicTex";
@@ -31,7 +26,6 @@ static bool IsWorn(void) {
     return CustomEquipRegistry_IsWorn(MAGIC_TUNIC_KEY);
 }
 
-// The accumulator holds what the wallet is still paying out, so it counts against the balance.
 static s16 GetSpendableRupees(void) {
     return gSaveContext.save.saveInfo.playerData.rupees + gSaveContext.rupeeAccumulator;
 }
@@ -85,8 +79,6 @@ static void FeelAbsorbedHit(Player* player) {
     Rumble_Request(0.0f, 180, 20, 100);
 }
 
-// Runs before Player_UpdateCommon consumes the hit: paid for, it plays like a block, with no knockback, no hurt
-// animation and no voice.
 static void AbsorbHit(Player* player, Input* input) {
     PlayState* play = gPlayState;
 
@@ -108,15 +100,14 @@ static void AbsorbHit(Player* player, Input* input) {
     }
 }
 
-// Burning floors, falls and voids take health without a collider: the loss is handed back the moment it lands.
 static void RefundOtherDamage(int16_t amount) {
     PlayState* play = gPlayState;
 
     if (amount >= 0 || play == NULL || !HasMoney()) {
         return;
     }
-    gSaveContext.save.saveInfo.playerData.health =
-        MIN(gSaveContext.save.saveInfo.playerData.health - amount, gSaveContext.save.saveInfo.playerData.healthCapacity);
+    gSaveContext.save.saveInfo.playerData.health = MIN(gSaveContext.save.saveInfo.playerData.health - amount,
+                                                       gSaveContext.save.saveInfo.playerData.healthCapacity);
     PayForHit(play, GET_PLAYER(play), -amount);
 }
 
@@ -158,9 +149,18 @@ static void ResetDrain(const char* key) {
 
 static void DyeTunic(bool* should, va_list args) {
     va_arg(args, void*);
-    Color_RGB8* color=va_arg(args, Color_RGB8*);
-    if(!IsWorn() || color==NULL)return;
-    if(GetSpendableRupees()>0){color->r=235;color->g=110;color->b=20;}else{color->r=20;color->g=20;color->b=20;}
+    Color_RGB8* color = va_arg(args, Color_RGB8*);
+    if (!IsWorn() || color == NULL)
+        return;
+    if (GetSpendableRupees() > 0) {
+        color->r = 235;
+        color->g = 110;
+        color->b = 20;
+    } else {
+        color->r = 20;
+        color->g = 20;
+        color->b = 20;
+    }
 }
 
 static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnPlayerFilterInput", "OnPlayerHealthChange",
@@ -177,8 +177,8 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// Pickup renderer from the authoritative OoT mod, including its complete mesh and materials.
-static const ALIGN_ASSET(2) char gGiTunicCollarDL[] = "__OTR__objects/nei_get_item/magic_tunic/object_gi_clothes/gGiTunicCollarDL";
+static const ALIGN_ASSET(2) char gGiTunicCollarDL[] =
+    "__OTR__objects/nei_get_item/magic_tunic/object_gi_clothes/gGiTunicCollarDL";
 static const ALIGN_ASSET(2) char gGiTunicDL[] = "__OTR__objects/nei_get_item/magic_tunic/object_gi_clothes/gGiTunicDL";
 static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(play->state.gfxCtx);
@@ -212,11 +212,19 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.formMask = S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN);
     definition.toggles = 1;
     definition.onUnequip = ResetDrain;
+    static const S2HCustomItemRandomizer randomizer = {
+        .structSize = sizeof(S2HCustomItemRandomizer),
+        .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,
+        .poolCount = 1,
+        .logicKey = MAGIC_TUNIC_KEY,
+        .hintKey = MAGIC_TUNIC_KEY,
+    };
+    definition.randomizer = &randomizer;
     if (!CustomEquipRegistry_Register(&definition)) {
         return;
     }
 
-    sApi->RegisterVB(VB_APPLY_TUNIC_COLOR,DyeTunic);
+    sApi->RegisterVB(VB_APPLY_TUNIC_COLOR, DyeTunic);
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, DrainWallet);
     S2H_REGISTER_HOOK(sApi, OnPlayerFilterInput, AbsorbHit);
     S2H_REGISTER_HOOK(sApi, OnPlayerHealthChange, RefundOtherDamage);

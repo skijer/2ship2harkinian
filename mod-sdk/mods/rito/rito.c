@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64formmasks.h"
 #include "z64logic.h"
 
 #include "align_asset_macro.h"
@@ -19,7 +20,6 @@
 #define ROCS_CAPE_KEY "nei.rocs_cape"
 #define RITO_FORM_KEY "nei.rito"
 #define RITO_MODEL_PATH "objects/forms/rito"
-// Rito shares Bremen's cell in the Majora mask grid.
 #define RITO_MASK_PAGE 1
 #define RITO_MASK_SLOT 7
 #define RITO_MASK_WHEEL_PRIORITY (-1)
@@ -27,7 +27,6 @@
 #define ANIM_VALUES_PER_FRAME 67
 #define JUMP_GRAVITY (-1.2f)
 #define OCARINA_NOTE_NONE OCARINA_PITCH_NONE
-// PlayerAnimation advances R_UPDATE_RATE * 0.5 clip frames per update, and the rate is always 3.
 #define CLIP_FRAMES_PER_UPDATE 1.5f
 
 // The rig is MM's human skeleton, rooted at 2376, so an adult clip drives it a third too high; a child one fits.
@@ -37,17 +36,16 @@
 
 // MM leaves these bits unnamed: dead, talking, loading, getting an item, carrying, swimming, first person, ledge
 // climb, ladder, horse, damage knockback, the textbox freeze and the shield.
-#define BUSY_STATE1                                                                                          \
-    (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_200 | PLAYER_STATE1_400 |                    \
-     PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_8000000 | PLAYER_STATE1_100000 | PLAYER_STATE1_4 |         \
-     PLAYER_STATE1_200000 | PLAYER_STATE1_800000 | PLAYER_STATE1_4000000 | PLAYER_STATE1_20000000 |          \
+#define BUSY_STATE1                                                                                  \
+    (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_200 | PLAYER_STATE1_400 |            \
+     PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_8000000 | PLAYER_STATE1_100000 | PLAYER_STATE1_4 | \
+     PLAYER_STATE1_200000 | PLAYER_STATE1_800000 | PLAYER_STATE1_4000000 | PLAYER_STATE1_20000000 |  \
      PLAYER_STATE1_400000)
 #define STATE1_SHIELDING PLAYER_STATE1_400000
 #define STATE1_SWIMMING PLAYER_STATE1_8000000
 #define STATE1_FIRST_PERSON PLAYER_STATE1_100000
 #define STATE1_DEAD_OR_CUTSCENE (PLAYER_STATE1_DEAD | PLAYER_STATE1_20000000)
 
-// Logic frames at 20 Hz.
 #define A_HOLD_FRAMES 6
 #define CHARGE_MIN 6
 #define CHARGE_FULL 24
@@ -66,7 +64,6 @@
 #define HOP_SIDE_SPEED 8.5f
 #define FLAP_SFX_PERIOD 8
 #define CHARGE_FLAP_PERIOD 4
-// The rocs mod stands down for a form, so a Rito's Roc's is its own: in the air it is unlimited, paid in magic.
 #define ROCS_JUMP_VELOCITY 11.0f
 #define ROCS_AIR_MAGIC_COST 12
 #define ROCS_BOOST_FRAMES 16
@@ -77,8 +74,6 @@
 #define BOW_RELEASE_SPEED 1.5f
 #define BOW_SEED_SPEED 2.0f
 #define THROW_SPEED 3.0f
-// Each clip's root is pinned to its own first frame, so the ones authored lower or higher than the set are
-// brought back to the feet here, in model units.
 #define LAND_LIFT 1500.0f
 #define BOW_SEED_LIFT 1500.0f
 #define BOW_RELEASE_LIFT (-300.0f)
@@ -91,7 +86,6 @@
 #define BOW_CONE 0x1555
 #define BOW_TURN 0x1000
 #define BOW_ARROW_SPEED 150.0f
-// EnArrow travels 150 units a frame, so a tighter arrival sphere is jumped clean over.
 #define BOW_HIT_DIST 170.0f
 #define BOW_SNAP_DIST 400.0f
 #define BOW_MOVE_SPEED 5.0f
@@ -112,11 +106,8 @@
 #define SINK_GRAVITY (-4.0f)
 #define SINK_FRAMES 9
 
-// The shield plate is built at the Deku shield's footprint, so it only needs that DL's centre in each limb.
 static const Vec3f sShieldInHand = { -20.0f, 115.5f, -145.5f };
 static const Vec3f sShieldOnBack = { 608.0f, 10.0f, -142.5f };
-
-// ---- updraft ----
 
 // Tornado_GetAxis: axis.y = -sin(pitch), so straight up is -0x4000.
 #define WIND_PITCH_UP (-0x4000)
@@ -139,14 +130,12 @@ static const Vec3f sShieldOnBack = { 608.0f, 10.0f, -142.5f };
 #define WIND_MOTE_BURST_RADIUS 40.0f
 #define WIND_MOTE_HEIGHT 12.0f
 #define WIND_MOTE_DRIFT 0x0700
-// En_Light's green flame; bit 15 would be the candle variant, drawn orange whatever the index says.
 #define WIND_LIGHT_PARAMS 6
 #define WIND_LIGHT_SCALE 0.0010f
 #define WIND_QUAKE_SPEED 32000
 #define WIND_QUAKE_AMPLITUDE 6
 #define WIND_QUAKE_FRAMES 11
 #define WIND_LOOP_SFX (NA_SE_EV_WIND_TRAP - SFX_FLAG)
-// The mesh is baked tip at the origin, mouth toward +Y, and its texture is intensity only.
 #define TORNADO_MODEL_LENGTH 100.0f
 #define TORNADO_MODEL_RADIUS 47.0f
 #define TORNADO_TEX_WIDTH 32
@@ -156,8 +145,7 @@ static const Vec3f sShieldOnBack = { 608.0f, 10.0f, -142.5f };
 #define GLAIVE(name) ANIM_PATH("gMonsterHunterRise_InsectGlaive_" name)
 #define BOW(name) ANIM_PATH("gPlayerAnim_mhr_bow_" name)
 
-// Host button numbering: B, C-left, C-down, C-right, the unused A slot, then the D-pad as MM lays it out.
-static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,     BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
+static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/gItemIconRitoMaskTex";
@@ -173,6 +161,18 @@ static const ALIGN_ASSET(2) char sOpenLeftHandDL[] = "__OTR__" RITO_MODEL_PATH
                                                      "/object_link_boy/gLinkAdultLeftHandNearDL";
 static const ALIGN_ASSET(2) char sClosedLeftHandDL[] = "__OTR__" RITO_MODEL_PATH
                                                        "/object_link_boy/gLinkAdultLeftHandClosedNearDL";
+static const ALIGN_ASSET(2) char sHeadDL[] = "__OTR__" RITO_MODEL_PATH "/object_link_boy/gLinkAdultSkelLimb_010_DL";
+static const ALIGN_ASSET(2) char sCrestDL[] = "__OTR__" RITO_MODEL_PATH "/object_link_boy/gLinkAdultSkelLimb_011_DL";
+
+// The head's lists index the skeleton's skin matrices on segment 0x0D: the head, its crest and the neck seam.
+#define MASK_MATRIX_COUNT 18
+#define MASK_HEAD_MATRIX 7
+#define MASK_CREST_MATRIX 8
+#define MASK_SCALE 0.03f
+#define MASK_SEAM_SCALE 0.01f
+
+static const Vec3f sMaskCentre = { 300.0f, -430.0f, 0.0f };
+static const Vec3f sCrestJoint = { -365.0f, -670.0f, 0.0f };
 
 typedef enum {
     CLIP_LAUNCH,
@@ -203,8 +203,6 @@ typedef struct {
     bool isRootPinned;
 } ClipSource;
 
-// Hops index by the control stick direction: front, side-left, back, side-right. The side pair reads better
-// mirrored, so a clip's name does not always match its hop.
 static const ClipSource sClipSources[CLIP_COUNT] = {
     { GLAIVE("BackwardRisingDoubleChargedStaffCombo"), CLIP_SPEED, true },
     { ANIM_PATH("gPlayerAnim_mhr_npc_takkuri_fly"), CLIP_SPEED, true },
@@ -280,8 +278,8 @@ typedef struct {
 } Updraft;
 
 static const char* const sRequiredHooks[] = {
-    "OnPlayerActionHandler", "OnPlayerResolveAnim", "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw",
-    "OnOcarinaInput",        "OnSceneInit",
+    "OnPlayerActionHandler", "OnPlayerResolveAnim", "OnPlayerResolveLimbDraw",
+    "OnPlayerPostLimbDraw",  "OnOcarinaInput",      "OnSceneInit",
 };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -291,6 +289,7 @@ void func_8083B1A0(Player* player, PlayState* play);
 bool Player_UpdateUpperBody(Player* player, PlayState* play);
 bool Player_IsZTargeting(Player* player);
 void Player_StopHorizontalMovement(Player* player);
+void Player_AnimSfx_PlayFloorLand(Player* player);
 extern PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeader(const char* animPath);
 extern HOST_DATA u8 sCurOcarinaPitch;
 
@@ -325,7 +324,6 @@ static bool IsRito(void) {
     return sApi != NULL && sApi->IsFormActive(RITO_FORM_KEY);
 }
 
-// A Rito's light frame lifts like a Deku; oot_collectables adds the strength upgrades on top.
 static void ResolveRitoStrength(bool* should, va_list args) {
     s32* strength = va_arg(args, s32*);
 
@@ -366,12 +364,10 @@ static f32 GetRocsVelocity(void) {
     return ROCS_HUMAN_VELOCITY;
 }
 
-// ---- clips ----
-
-// Resampling to fewer frames is what plays an MHR clip at its speed; its root is pinned to its first frame.
 static void LoadClip(RitoClip id) {
     const ClipSource* source = &sClipSources[id];
-    PlayerAnimationHeader* raw = sApi->HasResource(source->path) ? ResourceMgr_LoadPlayerAnimAsHeader(source->path) : NULL;
+    PlayerAnimationHeader* raw =
+        sApi->HasResource(source->path) ? ResourceMgr_LoadPlayerAnimAsHeader(source->path) : NULL;
 
     if (raw == NULL || raw->common.frameCount <= 0) {
         return;
@@ -427,7 +423,6 @@ static void PlayClip(PlayState* play, Player* player, RitoClip id, u8 mode, f32 
     PlayerAnimation_Change(play, &player->skelAnime, clip, 1.0f, 0.0f, Animation_GetLastFrame(clip), mode, morph);
 }
 
-// MM's wings-up wait is the vanilla bow guard, played as it is: a vanilla clip is never resampled.
 static void PlayChargePose(PlayState* play, Player* player) {
     PlayerAnimationHeader* pose = (PlayerAnimationHeader*)gPlayerAnim_link_bow_defense_wait;
 
@@ -435,9 +430,6 @@ static void PlayChargePose(PlayState* play, Player* player) {
                            -4.0f);
 }
 
-// ---- updraft ----
-
-// Its only job is to stay still: En_Light's update is what plays the torch sound and re-lights the floor disc.
 static void HoldMote(Actor* thisx, PlayState* play) {
 }
 
@@ -493,7 +485,6 @@ static void StopRibbons(PlayState* play) {
     sUpdraft.areRibbonsOn = false;
 }
 
-// Each streak is a blure fed along a parabolic spiral: it leaves the tip and flares out as it climbs.
 static void FeedRibbons(PlayState* play) {
     f32 radius = sUpdraft.cone.radius * WIND_RIBBON_SPREAD;
     f32 width = radius * 0.16f + 3.0f;
@@ -530,7 +521,6 @@ static void StopUpdraft(PlayState* play) {
     }
 }
 
-// A scene change already destroyed every mote and effect: forgetting them is all that is left to do.
 static void ForgetUpdraft(void) {
     memset(&sUpdraft, 0, sizeof(sUpdraft));
 }
@@ -572,7 +562,6 @@ static void OrbitMotes(bool isBursting) {
     }
 }
 
-// The column only holds while it is being built; once the Rito rides it off the ground it dies away.
 static void TickUpdraft(PlayState* play, bool isHolding, f32 fill) {
     if (!sUpdraft.isOn) {
         return;
@@ -602,7 +591,6 @@ static void TickUpdraft(PlayState* play, bool isHolding, f32 fill) {
     OrbitMotes(isBursting);
 }
 
-// The column stands on its tip; the matrix is built fresh, so it is pushed to leave the caller's untouched.
 static void DrawUpdraft(PlayState* play) {
     if (!sUpdraft.isOn || !sApi->HasResource(sTornadoMatDL) || !sApi->HasResource(sTornadoTriDL)) {
         return;
@@ -625,8 +613,6 @@ static void DrawUpdraft(PlayState* play) {
     Matrix_Pop();
     CLOSE_DISPS(play->state.gfxCtx);
 }
-
-// ---- moves ----
 
 static void StartMove(PlayState* play, Player* player, u8 move) {
     if (player->actionFunc != RitoAction) {
@@ -696,7 +682,6 @@ static void RunCharge(PlayState* play, Player* player) {
     if (sCharge % CHARGE_FLAP_PERIOD == 0) {
         Actor_PlaySfx(&player->actor, NA_SE_EN_KAICHO_FLUTTER);
     }
-    // A full column lets go by itself: there is no sitting on a charged updraft.
     if (IsHeld(play, BTN_A) && sCharge < CHARGE_FULL) {
         return;
     }
@@ -712,7 +697,6 @@ static void RunCharge(PlayState* play, Player* player) {
     Launch(play, player);
 }
 
-// The upper body is what reads the item buttons: flying keeps it running, as MM's own fall does.
 static void RunLaunch(PlayState* play, Player* player) {
     if (TryAirBow(play, player)) {
         return;
@@ -730,7 +714,6 @@ static void RunLaunch(PlayState* play, Player* player) {
     }
 }
 
-// Steering is a slow bank and nothing else: forward only, level, sinking gently; altitude comes from the launch.
 static void SteerGlide(PlayState* play, Player* player) {
     f32 stickX = play->state.input[0].rel.stick_x;
 
@@ -744,7 +727,6 @@ static void SteerGlide(PlayState* play, Player* player) {
     player->actor.gravity = 0.0f;
 }
 
-// A Roc's used mid-glide climbs on the item's own velocity with the launch clip, then settles back level.
 static void RiseOnBoost(PlayState* play, Player* player) {
     player->actor.velocity.y -= LAUNCH_DECAY;
     if (--sBoostFrames > 0 && player->actor.velocity.y > GLIDE_SINK) {
@@ -756,6 +738,7 @@ static void RiseOnBoost(PlayState* play, Player* player) {
 
 static void RunGlide(PlayState* play, Player* player) {
     if (IsGrounded(player)) {
+        Player_AnimSfx_PlayFloorLand(player);
         EndMove(play, player);
         return;
     }
@@ -779,7 +762,6 @@ static void RunGlide(PlayState* play, Player* player) {
     }
 }
 
-// Roll, side hops and the backflip become Roc's-Feather hops: the roll goes one and a half high, the rest one.
 static void StartHop(PlayState* play, Player* player, s32 direction) {
     bool isRoll = direction == PLAYER_STICK_DIR_FORWARD;
 
@@ -798,7 +780,6 @@ static void StartHop(PlayState* play, Player* player, s32 direction) {
     Actor_PlaySfx(&player->actor, NA_SE_PL_SKIP);
 }
 
-// A starts every hop, so it only turns one into flight after it has been let go of once.
 static void RunHop(PlayState* play, Player* player) {
     bool isAHeld = IsHeld(play, BTN_A);
 
@@ -808,6 +789,7 @@ static void RunHop(PlayState* play, Player* player) {
         return;
     }
     if (IsGrounded(player) && ++sMoveFrames > HOP_LAND_GUARD) {
+        Player_AnimSfx_PlayFloorLand(player);
         EndMove(play, player);
         return;
     }
@@ -862,7 +844,6 @@ static void RocsJump(PlayState* play, Player* player) {
     SpawnRocsSparkles(play, player);
 }
 
-// From the ground it is the item's own jump; in the air every use is another, and each costs magic.
 static void TryRocs(PlayState* play, Player* player) {
     u16 buttons = FindRocsButtons();
 
@@ -890,14 +871,10 @@ static void TryRocs(PlayState* play, Player* player) {
     SpawnRocsSparkles(play, player);
 }
 
-// ---- throws ----
-
 static bool IsThrowable(s32 item) {
     return item == ITEM_BOMB || item == ITEM_BOMBCHU || item == ITEM_DEKU_NUT || item == ITEM_SLINGSHOT;
 }
 
-// MM spawns and throws the item itself; the Rito only puts its swing on the body while that happens. The swing
-// starts from the form's update, not inside the upper body that is still using the item.
 static void NoteAirThrow(bool* should, va_list args) {
     s32 item = va_arg(args, s32);
 
@@ -934,9 +911,6 @@ static void RunThrow(PlayState* play, Player* player) {
     }
 }
 
-// ---- bow ----
-
-// Obj_Switch never fills focus.pos, so its origin plus a lift is the only aim point it has.
 static void GetAimPoint(Actor* actor, Vec3f* out) {
     if (actor->id == ACTOR_OBJ_SWITCH) {
         *out = actor->world.pos;
@@ -969,7 +943,6 @@ static bool IsAlreadyChosen(Actor* actor, Actor** chosen, s32 count) {
     return false;
 }
 
-// Up to `max` distinct actors, nearest first; a switch comes before an enemy because it is why you shoot.
 static s32 FindTargets(PlayState* play, Actor** out, s32 max, s16 faceYaw) {
     static const u8 sPasses[] = { ACTORCAT_SWITCH, ACTORCAT_PROP, ACTORCAT_BG, ACTORCAT_ENEMY };
     s32 found = 0;
@@ -1009,7 +982,6 @@ static bool IsInList(PlayState* play, u8 category, Actor* wanted) {
     return false;
 }
 
-// Obj_Ice_Poly is a child of the switch it freezes: shattering it on arrival thaws the switch the same frame.
 static void ShatterIce(PlayState* play, Vec3f* at) {
     static Color_RGBA8 sIceWhite = { 250, 250, 250, 255 };
     static Color_RGBA8 sIceGray = { 180, 200, 230, 255 };
@@ -1040,7 +1012,6 @@ static void ShatterIce(PlayState* play, Vec3f* at) {
     }
 }
 
-// Rotating an arrow curves nothing: EnArrow rides the velocity laid down at the shot, so it is rebuilt each frame.
 static void SteerArrow(PlayState* play, HomingArrow* slot) {
     Actor* arrow = slot->arrow;
 
@@ -1109,7 +1080,6 @@ static void AimArrow(Actor* arrow, Actor* target) {
     }
 }
 
-// One arrow down Link's line at the first charge, two homing ones at the second; a lock-on always homes.
 static void LooseVolley(PlayState* play, Player* player) {
     Actor* targets[BOW_TWIN_SHOTS];
     Actor* locked = player->focusActor;
@@ -1129,7 +1099,6 @@ static void LooseVolley(PlayState* play, Player* player) {
     }
 }
 
-// Aiming states walk the clip they show: the stick turns the Rito toward it, relative to the camera.
 static bool MoveWhileAiming(PlayState* play, Player* player, bool isAdvancing) {
     Input* input = &play->state.input[0];
     f32 stickMagnitude = sqrtf(SQ((f32)input->rel.stick_x) + SQ((f32)input->rel.stick_y));
@@ -1159,7 +1128,6 @@ static void StartBowAir(PlayState* play, Player* player) {
     PlayClip(play, player, CLIP_BOW_AIR, ANIMMODE_ONCE, -4.0f);
 }
 
-// A tap is a thrown seed, not a draw: the charge is what tells them apart.
 static void StartLoose(PlayState* play, Player* player) {
     bool isTap = sCharge < BOW_TAP_FRAMES && GetClip(CLIP_BOW_SEED) != NULL;
 
@@ -1192,7 +1160,6 @@ static void RunBowAim(PlayState* play, Player* player) {
     }
 }
 
-// The loose doubles as a dodge: it carries the Rito back off the shot with a short grace window.
 static void RunBowRelease(PlayState* play, Player* player) {
     f32 lead =
         GetClip(CLIP_BOW_RELEASE) != NULL ? Animation_GetLastFrame(GetClip(CLIP_BOW_RELEASE)) - BOW_LOOSE_LEAD : 0.0f;
@@ -1233,7 +1200,6 @@ static void RunBowSeed(PlayState* play, Player* player) {
     }
 }
 
-// A tap sends one arrow ahead: at the lock-on, else at the nearest thing in sight, else down Link's line.
 static void LooseAirTap(PlayState* play, Player* player) {
     Actor* target = player->focusActor;
     s16 yaw = player->actor.shape.rot.y;
@@ -1254,15 +1220,12 @@ static void LooseAirTap(PlayState* play, Player* player) {
     }
 }
 
-// A held draw fans three arrows straight down, the fan tipped in pitch so they spread along Link's line.
 static void LooseAirVolley(PlayState* play, Player* player) {
     for (s32 i = 0; i < BOW_VOLLEY; i++) {
         SpawnArrow(play, player, player->actor.shape.rot.y, (s16)(0x4000 + (i - 1) * BOW_FAN_STEP), ARROW_TYPE_NORMAL);
     }
 }
 
-// Pinned in the air for the clip. Whether B let go inside the tap window decides the shot, so nothing leaves
-// before that is known.
 static void RunBowAir(PlayState* play, Player* player) {
     bool isBHeld = IsHeld(play, BTN_B);
 
@@ -1309,9 +1272,6 @@ static bool TryAirBow(PlayState* play, Player* player) {
     return true;
 }
 
-// ---- water ----
-
-// A bird is no better in water than a rolling boulder: it beats its wings all the way down until the void.
 static void RunSink(PlayState* play, Player* player) {
     Player_StopHorizontalMovement(player);
     PlayerAnimation_Update(play, &player->skelAnime);
@@ -1321,9 +1281,9 @@ static void RunSink(PlayState* play, Player* player) {
     }
 }
 
-// MM re-seats its swim on anyone deep in water, so the sink runs in its place through the action VB.
 static void TrySink(PlayState* play, Player* player) {
-    if (sMove == RITO_MOVE_SINK || !(player->stateFlags1 & STATE1_SWIMMING) || player->actor.depthInWater <= SINK_DEPTH ||
+    if (sMove == RITO_MOVE_SINK || !(player->stateFlags1 & STATE1_SWIMMING) ||
+        player->actor.depthInWater <= SINK_DEPTH ||
         (player->stateFlags1 & (STATE1_DEAD_OR_CUTSCENE | PLAYER_STATE1_400))) {
         return;
     }
@@ -1344,8 +1304,6 @@ static void DriveSink(bool* should, va_list args) {
     *should = false;
     RunSink(gPlayState, player);
 }
-
-// ---- action ----
 
 static void RitoAction(Player* player, PlayState* play) {
     switch (sMove) {
@@ -1388,7 +1346,6 @@ static bool CanHoldA(Player* player) {
     return !IsRitoBusy(player) && CanAct(player) && IsGrounded(player) && !Player_IsZTargeting(player);
 }
 
-// A tap is a hop and a hold is the updraft, so the press is kept until the button either lets go or stays down.
 static void HoldA(void) {
     sIsAPending = true;
     sAFrames = 0;
@@ -1439,8 +1396,6 @@ static int32_t HandleB(PlayState* play, Player* player) {
     return S2H_FORM_ACTION_STARTED;
 }
 
-// MM's standing list has no roll to ask and the air runs no list for A or B, so these are asked for here.
-// Anything A opened this frame (a door, a sign, a ledge) has already raised a flag CanAct refuses.
 static void TryFreeMoves(PlayState* play, Player* player) {
     if (IsRitoBusy(player) || !CanAct(player)) {
         return;
@@ -1459,15 +1414,12 @@ static void TryFreeMoves(PlayState* play, Player* player) {
     }
 }
 
-// Damage, a cutscene or the water can take the action without passing through the move's end.
 static void DropInterruptedMove(Player* player) {
     if (sMove == RITO_MOVE_NONE || sMove == RITO_MOVE_SINK || IsRitoBusy(player)) {
         return;
     }
     ClearMove(player);
 }
-
-// ---- landing ----
 
 static void ResolveLanding(s32 group, s32 animType, PlayerAnimationHeader** anim) {
     if (!IsRito() || (group != PLAYER_ANIMGROUP_landing && group != PLAYER_ANIMGROUP_short_landing)) {
@@ -1478,8 +1430,6 @@ static void ResolveLanding(s32 group, s32 animType, PlayerAnimationHeader** anim
         *anim = land;
     }
 }
-
-// ---- ocarina ----
 
 static bool IsHoldingOcarina(Player* player) {
     return player->rightHandType == PLAYER_MODELTYPE_RH_INSTRUMENT;
@@ -1501,8 +1451,6 @@ static void NoteStruck(void) {
     sLastNote = note;
 }
 
-// Vanilla's ocarina action waits for the end of its intro and outro clips; Sheik's draw takes their place,
-// forward and then backward, so that wait is what brings the harp out and puts it away.
 static bool SwapOcarinaClip(PlayState* play, Player* player) {
     PlayerAnimationHeader* raise = GetClip(CLIP_HARP_RAISE);
 
@@ -1520,8 +1468,6 @@ static bool SwapOcarinaClip(PlayState* play, Player* player) {
     return false;
 }
 
-// Each note plucks the playing clip on from where the last one stopped. It loops: that same action reopens
-// the ocarina whenever a clip reports its end, which would wipe the notes of the song being played.
 static void PoseHarp(PlayState* play, Player* player) {
     f32 pluckEnd = Animation_GetLastFrame(GetClip(CLIP_HARP_PLAY)) - CLIP_FRAMES_PER_UPDATE;
 
@@ -1542,7 +1488,6 @@ static void PoseHarp(PlayState* play, Player* player) {
     sWasNoteStruck = false;
 }
 
-// The ocarina stays out across the message session, so the latch only lets go once no message is up.
 static void UpdateHarp(PlayState* play, Player* player) {
     bool isSessionOpen = play->msgCtx.msgMode != MSGMODE_NONE;
 
@@ -1564,17 +1509,12 @@ static void UpdateHarp(PlayState* play, Player* player) {
         return;
     }
     if (isSessionOpen) {
-        // Re-applied every frame: the message system sets the instrument again around opening, and the last
-        // write wins.
         AudioOcarina_SetInstrument(OCARINA_INSTRUMENT_HARP);
     }
-    // A raise that ended hands over to the plucking even before an actor opens the session it was played for.
     if (isSessionOpen || sHarpPhase == HARP_RAISING) {
         PoseHarp(play, player);
     }
 }
-
-// ---- body ----
 
 static bool IsPathNamed(Gfx* dList, const char* part) {
     return dList != NULL && ((uintptr_t)dList & 1) == 0 && strstr((const char*)dList, part) != NULL;
@@ -1584,8 +1524,6 @@ static bool IsHarpOut(void) {
     return sIsOcarinaOut && sHarpPhase != HARP_IDLE;
 }
 
-// The rig is one skeleton for both ages: a hand list is swapped for the Rito's own, and the shield Link would
-// carry is left to the Rito's plate, drawn after the limb.
 static void ResolveRitoBody(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
     if (!IsRito()) {
         return;
@@ -1621,8 +1559,6 @@ static void ResolveRitoBody(Player* player, s32 limbIndex, Gfx** dList, Gfx* lim
     *dList = (Gfx*)hand;
 }
 
-// The mirror shield reflects off shieldMf, so it is taken from the plate itself, in the hand or on the back. The
-// sheath limb comes after the hand, so this capture outlives the one vanilla takes at the hand.
 static void DrawShield(PlayState* play, Player* player, const Vec3f* offset) {
     OPEN_DISPS(play->state.gfxCtx);
     Matrix_Push();
@@ -1634,7 +1570,6 @@ static void DrawShield(PlayState* play, Player* player, const Vec3f* offset) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// The held bow with its fist cut off; MM has no adult bow-string list to hang across the draw.
 static void DrawBow(PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     Matrix_Push();
@@ -1644,7 +1579,6 @@ static void DrawBow(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// The form borrows the Mirror Shield's equipment for its reflections; the plate on screen is the Rito's own.
 static void DrawRitoParts(Player* player, s32 limbIndex) {
     PlayState* play = gPlayState;
 
@@ -1665,8 +1599,6 @@ static void DrawRitoParts(Player* player, s32 limbIndex) {
     }
 }
 
-// The mirror shield only reflects while the right hand is in its shield model, which vanilla sets only with R up.
-// The plate on the back reflects too, so an empty hand is kept in that model; its list is the Rito's closed hand.
 static void RaiseShieldOnBack(Player* player) {
     bool isHandEmpty =
         player->rightHandType == PLAYER_MODELTYPE_RH_OPEN || player->rightHandType == PLAYER_MODELTYPE_RH_CLOSED;
@@ -1680,8 +1612,6 @@ static void RaiseShieldOnBack(Player* player) {
 static void DrawRito(PlayState* play, Player* player) {
     DrawUpdraft(play);
 }
-
-// ---- form ----
 
 static void ResetState(PlayState* play) {
     sMove = RITO_MOVE_NONE;
@@ -1739,7 +1669,6 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
     sHarpPhase = HARP_IDLE;
 }
 
-// No sword to swing and the Mirror Shield's properties for its plate; the stash gives Link his own back.
 static uint16_t ResolveRitoEquipment(int32_t equipType, uint16_t value) {
     if (equipType == EQUIP_TYPE_SWORD) {
         return EQUIP_VALUE_SWORD_NONE;
@@ -1752,8 +1681,8 @@ static uint16_t ResolveRitoEquipment(int32_t equipType, uint16_t value) {
 
 static bool IsAllowedCustomItem(const char* customKey) {
     static const char* const sAllowed[] = {
-        "nei.keaton_form_mask", "nei.mask_kafei",  "nei.garo_form_mask", "nei.gerudo_form_mask",
-        "nei.rocs_feather",     "nei.rocs_cape",   "nei.progressive_rocs",
+        "nei.keaton_form_mask", "nei.mask_kafei", "nei.garo_form_mask",   "nei.gerudo_form_mask",
+        "nei.rocs_feather",     "nei.rocs_cape",  "nei.progressive_rocs",
     };
 
     for (u32 i = 0; i < ARRAY_COUNT(sAllowed); i++) {
@@ -1764,8 +1693,6 @@ static bool IsAllowedCustomItem(const char* customKey) {
     return false;
 }
 
-// What a Rito can throw or play with its wings: NEI's airborne throwables, the ocarina, the transformation masks,
-// bottles and the Lens.
 static bool AllowsRitoItem(uint16_t item, const char* customKey) {
     if (customKey != NULL) {
         return IsAllowedCustomItem(customKey);
@@ -1807,20 +1734,52 @@ static void RegisterForm(void) {
     sApi->RegisterForm(&rito);
 }
 
-// ---- mask ----
-
 static bool CanWearMask(Player* player, PlayState* play) {
-    return IsGrounded(player) && !(player->stateFlags1 & (STATE1_SWIMMING | STATE1_FIRST_PERSON | PLAYER_STATE1_20000000));
+    return IsGrounded(player) &&
+           !(player->stateFlags1 & (STATE1_SWIMMING | STATE1_FIRST_PERSON | PLAYER_STATE1_20000000));
 }
 
 static void WearMask(PlayState* play, Player* player) {
     sApi->ToggleForm(RITO_FORM_KEY);
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, RITO_MASK_KEY, RITO_MASK_KEY, "",
 };
+
+static void AssignMaskFromPause(const char* key) {
+    Z64FormMasks_AssignToPressedButton(sApi, key);
+}
+
+static void DrawMaskPickup(PlayState* play, S2HGetItemEntry* entry) {
+    GraphicsContext* gfxCtx = play->state.gfxCtx;
+    Mtx* matrices = GRAPH_ALLOC(gfxCtx, MASK_MATRIX_COUNT * sizeof(Mtx));
+
+    (void)entry;
+    if (matrices == NULL) {
+        return;
+    }
+    Matrix_Push();
+    Matrix_Scale(MASK_SCALE, MASK_SCALE, MASK_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYS(-0x4000, MTXMODE_APPLY);
+    Matrix_Translate(-sMaskCentre.x, -sMaskCentre.y, -sMaskCentre.z, MTXMODE_APPLY);
+    Matrix_Push();
+    Matrix_Scale(MASK_SEAM_SCALE, MASK_SEAM_SCALE, MASK_SEAM_SCALE, MTXMODE_APPLY);
+    for (s32 i = 0; i < MASK_MATRIX_COUNT; i++) {
+        Matrix_ToMtx(&matrices[i]);
+    }
+    Matrix_Pop();
+    Matrix_ToMtx(&matrices[MASK_HEAD_MATRIX]);
+    Matrix_Translate(sCrestJoint.x, sCrestJoint.y, sCrestJoint.z, MTXMODE_APPLY);
+    Matrix_ToMtx(&matrices[MASK_CREST_MATRIX]);
+    Matrix_Pop();
+    OPEN_DISPS(gfxCtx);
+    Gfx_SetupDL25_Opa(gfxCtx);
+    gSPSegment(POLY_OPA_DISP++, 0x0D, (uintptr_t)matrices);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sHeadDL);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sCrestDL);
+    CLOSE_DISPS(gfxCtx);
+}
 
 static void RegisterMask(void) {
     S2HCustomItemDefinition mask = Z64Items_Define(RITO_MASK_KEY, sIconTex, sNameTex);
@@ -1828,6 +1787,7 @@ static void RegisterMask(void) {
     Z64Items_SetButtons(&mask, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     mask.flags |= S2H_CUSTOM_ITEM_INSTANT | S2H_CUSTOM_ITEM_WEARABLE;
     Z64Items_SetPlacement(&mask, RITO_MASK_PAGE, RITO_MASK_SLOT, RITO_MASK_WHEEL_PRIORITY);
+    mask.getItemEntry.drawFunc = DrawMaskPickup;
     Z64Items_SetTextbox(&mask, "You got the %rRito Mask%w!&The face of a proud bird of the north wind.^Wear it "
                                "with %y\xA1%w to become a %rRito%w: an updraft to ride, wings to glide and a bow "
                                "that never runs dry.");
@@ -1836,7 +1796,9 @@ static void RegisterMask(void) {
     Z64Items_SetCanUse(&mask, CanWearMask);
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);
+    mask.onPauseToggle = AssignMaskFromPause;
     Z64Items_Register(sApi, &mask);
+    Z64FormMasks_PlaceMask(sApi, RITO_MASK_KEY, RITO_MASK_SLOT);
 }
 
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
@@ -1847,7 +1809,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// The Rito fires native arrows of his own, without the Bow or a quiver.
 static void GrantRitoLogic(void) {
     static const Z64LogicSource sMask = { RITO_MASK_KEY };
     static const char* const sShooting[] = { "CanUseProjectile", "CanHitSwitch", "CanAttack", "CanDamage", NULL };

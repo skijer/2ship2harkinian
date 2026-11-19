@@ -1,5 +1,3 @@
-// SW97 Medallion Spells, ported 1:1 from Skijer's NEI: the six Spaceworld '97 spell actors cast from the
-// medallions, the six elemental shots for the bow and the slingshot, Shadow stealth and the Spirit fairy.
 
 #include "z64items.h"
 
@@ -65,7 +63,6 @@ s16 Sw97_GetArrowActorId(Sw97Element element) {
     return (element > SW97_ELEM_NONE && element < SW97_ELEM_COUNT) ? sArrowActorIds[element] : -1;
 }
 
-// The Soul arrow's Cucco transformation lives in its own mod; without it a Cucco hit is just a hit.
 void Sw97_StartCuccoMode(void) {
     void (*startCuccoMode)(void) = (void (*)(void))gSw97Api->FindService(SW97_CUCCO_MODE_SERVICE);
 
@@ -122,8 +119,8 @@ static void ForgetBlinded(void) {
 
 // The Shadow spell drives the Nayru's Love timer for its whole life, so a running timer is the stealth.
 static bool IsHiddenFrom(Actor* actor) {
-    bool isWatcher = actor->category == ACTORCAT_ENEMY || actor->category == ACTORCAT_NPC ||
-                     (actor->flags & ACTOR_FLAG_HOSTILE);
+    bool isWatcher =
+        actor->category == ACTORCAT_ENEMY || actor->category == ACTORCAT_NPC || (actor->flags & ACTOR_FLAG_HOSTILE);
 
     return (gSaveContext.nayrusLoveTimer > 0 && isWatcher) || IsBlinded(actor);
 }
@@ -143,8 +140,7 @@ static s16 RegisterActor(const Sw97ActorInfo* info) {
     definition.key = info->key;
     definition.description = info->description;
     definition.category = ACTORCAT_ITEMACTION;
-    definition.actorFlags =
-        ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
+    definition.actorFlags = ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
     definition.objectId = GAMEPLAY_KEEP;
     definition.instanceSize = (uint32_t)info->instanceSize;
     definition.init = (S2HActorFunc)info->init;

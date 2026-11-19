@@ -3,5 +3,6 @@
     <Texture Name="gPauseQuestStatus00ENGTex" OutName="pause_quest_status_0_0_eng" Format="ia8" Width="80" Height="32" Offset="0xB480" />
     <Texture Name="gPauseQuestStatus10ENGTex" OutName="pause_quest_status_1_0_eng" Format="ia8" Width="80" Height="32" Offset="0xBE80" />
     <Texture Name="gPauseQuestStatus20ENGTex" OutName="pause_quest_status_2_0_eng" Format="ia8" Width="80" Height="32" Offset="0xC880" />
+    <Texture Name="gPauseEquipment10ENGTex" OutName="pause_equipment_1_0_eng" Format="ia8" Width="80" Height="32" Offset="0x8280"/>
   </File>
 </Root>

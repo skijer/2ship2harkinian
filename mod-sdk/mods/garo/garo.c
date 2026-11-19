@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include "z64formmasks.h"
 #include "z64aiming.h"
 
 #include "align_asset_macro.h"
@@ -27,7 +28,6 @@
 #define SPIN_YAW_RATE ((0x10000 * SPIN_TURNS) / SPIN_FRAMES)
 #define SPIN_PLAY_SPEED 1.5f
 #define SPIN_MOVE_SPEED (9.0f * 1.5f)
-// The spin starts on the press and turns into the rod charge if B is still down this many frames later.
 #define B_HOLD_FRAMES 9
 
 #define DASH_SPEED 14.0f
@@ -37,14 +37,12 @@
 #define PARRY_DAMAGE 4
 #define PARRY_STRIKE_FRAME 6
 #define PARRY_FREEZE_FRAMES 60
-// A frozen actor never re-registers its AC collider, so both counters thaw their target before landing.
 #define PARRY_THAW_LEAD 2
 #define BANISH_THAW_LEAD 3
 #define RIPOSTE_OFFSET 45.0f
 #define GUARD_MELEE_RANGE 160.0f
 #define GUARD_HOLD_FRACTION 0.5f
 #define GUARD_RETURN_SPEED 1.5f
-// Shots are caught in the air: most projectiles delete themselves on impact.
 #define GUARD_CATCH_RADIUS 130.0f
 #define GUARD_CATCH_HEIGHT 40.0f
 #define GUARD_CATCH_MIN_SPEED 1.0f
@@ -93,7 +91,6 @@
 #define RETICLE_SPREAD 26.0f
 #define RETICLE_DOT_SCALE 0.55f
 
-// MM has no Ganondorf light-ball models, so every orb is gameplay_keep's light orb at these scales.
 #define ORB_BALL_UNIT 0.01f
 #define ORB_DOT_UNIT 0.05f
 #define ORB_SHADOW_UNIT 0.0125f
@@ -126,8 +123,6 @@
 #define DEATH_FLAMES 9
 #define DEATH_FLAME_RADIUS 20.0f
 
-// The Garo enemy's own 19-bone skeleton: Link's pose drives the body and legs, Garo's idle sways the robe and
-// the blades. The enemy is drawn at 0.035, so the subtree takes 3.5 over Link's 0.01.
 #define HYBRID_LIMBS 19
 #define HYBRID_JOINTS (HYBRID_LIMBS + 1)
 #define HYBRID_SUBTREE_SCALE 3.5f
@@ -144,15 +139,12 @@
 #define TRAIL_BLADE_LENGTH 900.0f
 #define TRAIL_ELEM_DURATION 8
 
-// MM leaves these bits unnamed: dead, talking, loading, getting an item, carrying, swimming, first person, ledge
-// climb, ladder, horse, damage knockback and the textbox freeze.
-#define BUSY_STATE1                                                                                          \
-    (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_200 | PLAYER_STATE1_400 |                    \
-     PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_8000000 | PLAYER_STATE1_100000 | PLAYER_STATE1_4 |         \
+#define BUSY_STATE1                                                                                  \
+    (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_200 | PLAYER_STATE1_400 |            \
+     PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_8000000 | PLAYER_STATE1_100000 | PLAYER_STATE1_4 | \
      PLAYER_STATE1_200000 | PLAYER_STATE1_800000 | PLAYER_STATE1_4000000 | PLAYER_STATE1_20000000)
 #define STATE1_SWIMMING PLAYER_STATE1_8000000
 #define STATE1_FIRST_PERSON PLAYER_STATE1_100000
-// Shape yaw follows `yaw` instead of the lock-on, or stops following anything.
 #define STATE2_NO_Z_TARGET_ROTATION PLAYER_STATE2_20
 #define STATE2_NO_ROTATION PLAYER_STATE2_40
 #define STATE2_DISABLE_DRAW PLAYER_STATE2_20000000
@@ -160,7 +152,6 @@
 #define GARO_ANIM_PATH(name) "__OTR__objects/forms/garo/gPlayerAnim_garo_" name
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__icon_item_static_yar/gItemIconGaroMaskTex";
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__item_name_static/gItemNameGarosMaskENGTex";
-static const ALIGN_ASSET(2) char sGetItemDL[] = "__OTR__objects/object_gi_mask09/gGiGarosMaskFaceDL";
 static const ALIGN_ASSET(2) char sMaskDL[] = "__OTR__objects/object_mask_json/object_mask_json_DL_0004C0";
 static const ALIGN_ASSET(2) char sHybridSkelPath[] = "__OTR__objects/object_jso/gGaroSkel";
 static const ALIGN_ASSET(2) char sHybridIdlePath[] = "__OTR__objects/object_jso/gGaroIdleAnim";
@@ -225,18 +216,14 @@ typedef struct {
     s16 trailIndex;
 } RodOrb;
 
-// Link limb -> hybrid joint. The shoulders also drive the robe's side panels, done apart in PoseHybrid.
 static const s8 sLinkToHybridJoint[PLAYER_LIMB_MAX] = {
     -1, 1, 13, -1, 14, 15, 16, 17, 18, 19, 2, 12, -1, -1, 3, -1, 4, 5, -1, 6, -1, -1,
 };
 
-// Sword and robe bones keep Garo's own sway instead of Link's pose.
 static bool IsGaroOwnedJoint(s8 joint) {
     return joint == HYBRID_JOINT_L_SWORD || joint == HYBRID_JOINT_R_SWORD || joint == 7 || joint == 8 || joint == 11;
 }
 
-// Igos du Ikana's bank (En_Osk): MM gives Garo no player voice, so every Link grunt is paired by tone with one of
-// his.
 static const u16 sGaroVoiceByAction[0x20] = {
     NA_SE_EN_BOSU_ATTACK,     NA_SE_EN_BOSU_ATTACK_K, NA_SE_EN_BOSU_ATTACK_W, NA_SE_EN_BOSU_HAND,
     NA_SE_EN_BOSU_STAND,      NA_SE_EN_BOSU_DAMAGE,   NA_SE_EN_BOSU_SHOCK,    NA_SE_EN_BOSU_DAMAGE,
@@ -248,7 +235,6 @@ static const u16 sGaroVoiceByAction[0x20] = {
     NA_SE_EN_BOSU_ATTACK_K,   NA_SE_EN_BOSU_CYNICAL,  NA_SE_EN_BOSU_ATTACK,   NA_SE_EN_BOSU_LAUGH,
 };
 
-// The six SW97 arrow colours, in SW97's order; only fire, ice and light carry a vanilla arrow flag.
 static const u8 sOrbPrim[ELEMENT_COUNT][3] = {
     { 255, 200, 0 }, { 170, 255, 255 }, { 255, 255, 255 }, { 200, 120, 255 }, { 255, 255, 170 }, { 170, 255, 255 },
 };
@@ -259,9 +245,10 @@ static const f32 sRodLevelScale[ROD_LEVELS] = { 0.35f, 0.7f, 1.0f };
 static const s16 sRodLevelRays[ROD_LEVELS] = { 0, BIG_MAGIC_RAYS_MAX / 2, BIG_MAGIC_RAYS_MAX };
 
 static const char* const sRequiredHooks[] = {
-    "OnPlayerActionHandler",  "OnPlayerResolveLimbDraw", "OnPlayerFilterInput", "OnActorPlaySfx",
-    "OnBgCheckRaycastFloor",  "OnSceneInit",             "ShouldActorDraw",     "OnCollisionResolveDamage",
-    "OnOcarinaInput",          "ShouldItemGive",
+    "OnPlayerActionHandler", "OnPlayerResolveLimbDraw",  "OnPlayerFilterInput",
+    "OnActorPlaySfx",        "OnBgCheckRaycastFloor",    "OnSceneInit",
+    "ShouldActorDraw",       "OnCollisionResolveDamage", "OnOcarinaInput",
+    "ShouldItemGive",
 };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -398,7 +385,6 @@ static s16 GetStickYaw(PlayState* play) {
     return Math_Atan2S(y, -x) + Camera_GetInputDirYaw(GET_ACTIVE_CAM(play));
 }
 
-// Freezing the actor also stops its AC from registering, which is why both counters thaw it early.
 static void MarkStunned(PlayState* play, Actor* target, s16 frames) {
     Vec3f accel = { 0.0f, -0.05f, 0.0f };
     Color_RGBA8 prim = { 140, 80, 220, 255 };
@@ -416,7 +402,6 @@ static void MarkStunned(PlayState* play, Actor* target, s16 frames) {
     Actor_PlaySfx(target, NA_SE_IT_SHIELD_REFLECT_SW);
 }
 
-// A counter holds its target by pointer, and the target may have died since.
 static bool IsActorAlive(PlayState* play, Actor* actor) {
     if (actor == NULL) {
         return false;
@@ -431,7 +416,6 @@ static bool IsActorAlive(PlayState* play, Actor* actor) {
     return false;
 }
 
-// A light-ball sparkle in the orb's element colours, standing in for the Phantom Ganon flash MM lacks.
 static void SpawnOrbWake(PlayState* play, Vec3f* pos, Vec3f* velocity, s16 scale, u8 element) {
     Vec3f accel = { 0.0f, 0.0f, 0.0f };
     u8 e = element % ELEMENT_COUNT;
@@ -440,8 +424,6 @@ static void SpawnOrbWake(PlayState* play, Vec3f* pos, Vec3f* velocity, s16 scale
 
     EffectSsKirakira_SpawnDispersed(play, pos, velocity, &accel, &prim, &env, scale * 4, 14);
 }
-
-// ---- sound ----
 
 static void SpeakWithIgosVoice(Actor* actor, s32 kind, u16* sfxId, bool* handled) {
     u16 action = (u16)(*sfxId - NA_SE_VO_LI_SWORD_N);
@@ -468,15 +450,12 @@ static u16 GetChargeSfx(u8 element) {
     return NA_SE_IT_SWORD_CHARGE;
 }
 
-// ---- animation ----
-
 static void LoadAnims(void) {
     for (s32 slot = 0; slot < ANIM_COUNT; slot++) {
         sAnims[slot] = ResourceMgr_LoadPlayerAnimAsHeader(sAnimPaths[slot]);
     }
 }
 
-// endFrame below zero plays to the last frame; a negative speed runs the clip backwards.
 static void PlayGaroAnim(PlayState* play, Player* player, s32 slot, f32 startFrame, f32 endFrame, f32 speed) {
     PlayerAnimationHeader* anim = sAnims[slot];
 
@@ -497,8 +476,6 @@ static f32 GetAnimLastFrame(s32 slot) {
     return sAnims[slot] != NULL ? Animation_GetLastFrame(sAnims[slot]) : 0.0f;
 }
 
-// ---- strikes ----
-
 // The sword flag is what every sword-vulnerable bumper accepts; the number itself is fixed past the enemy's
 // damage table in FixStrikeDamage.
 static void Strike(PlayState* play, Player* player, Vec3f* corners, u8 damage) {
@@ -517,7 +494,6 @@ static void StopStriking(Player* player) {
     player->meleeWeaponQuads[0].base.atFlags &= ~AT_ON;
 }
 
-// A slab in front of Garo, slanting from its near bottom edge to its far top one.
 static void StrikeAhead(PlayState* play, Player* player, f32 halfWidth, f32 top, u8 damage) {
     f32 sinYaw = Math_SinS(player->actor.shape.rot.y);
     f32 cosYaw = Math_CosS(player->actor.shape.rot.y);
@@ -536,8 +512,6 @@ static void StrikeAhead(PlayState* play, Player* player, f32 halfWidth, f32 top,
     Strike(play, player, corners, damage);
 }
 
-// A full-height wall across his facing that marches outward: the plain slab is one thin line at any given
-// distance and missed the enemy he had just appeared behind.
 static void StrikeWallAhead(PlayState* play, Player* player, s16 liveFrame, u8 damage) {
     f32 distance = 15.0f + (f32)MAX(liveFrame, 0) * 12.0f;
     f32 sinYaw = Math_SinS(player->actor.shape.rot.y);
@@ -570,8 +544,6 @@ static void StrikeAround(PlayState* play, Player* player, s16 liveFrame, u8 dama
 
     Strike(play, player, corners, damage);
 }
-
-// ---- sword trails ----
 
 static void KillTrails(PlayState* play) {
     if (sTrailLeft >= 0) {
@@ -655,8 +627,6 @@ static void FeedTrail(Player* player, s32 effectIndex, s8* axis) {
     EffectBlure_AddVertex(trail, &tip, &base);
 }
 
-// ---- rod orbs ----
-
 static u32 GetOrbDmgFlags(u8 element) {
     if (element == ELEMENT_FIRE) {
         return DMG_FIRE_ARROW;
@@ -687,7 +657,6 @@ static void AddOrb(const RodOrb* orb) {
     }
 }
 
-// Level 1 fires nothing; level 3 flies half as far and breaks into seekers, and costs double for them.
 static void FireRodOrb(PlayState* play, Player* player) {
     u8 level = GetRodLevel(sRodCharge);
     bool bursts = level >= 3;
@@ -736,8 +705,6 @@ static Actor* FindNearestUnclaimed(PlayState* play, Vec3f* origin, Actor** claim
     return best;
 }
 
-// The impact, then fragments fanned out that each claim a different enemy; with fewer enemies than fragments
-// the claims start over, so the spares double up instead of flying at nothing.
 static void BurstOrb(PlayState* play, RodOrb* source) {
     Actor* claimed[ORB_SEEKERS];
     s32 claimedCount = 0;
@@ -776,8 +743,6 @@ static void BurstOrb(PlayState* play, RodOrb* source) {
     }
 }
 
-// A fragment wheels onto the enemy it claimed; a plain shot only bends toward what is ahead of it, so one with
-// nothing in front flies straight.
 static void HomeOrb(PlayState* play, RodOrb* orb) {
     f32 forwardX = Math_SinS(orb->yaw) * Math_CosS(orb->pitch);
     f32 forwardY = -Math_SinS(orb->pitch);
@@ -816,7 +781,6 @@ static void HomeOrb(PlayState* play, RodOrb* orb) {
     Math_ScaledStepToS(&orb->pitch, Math_Vec3f_Pitch(&orb->pos, &aim), turn);
 }
 
-// Quads remember their actor and a new scene brings a new player, so they are rebuilt per scene.
 static void PrepareEscortQuads(PlayState* play, Player* player) {
     if (sAreOrbQuadsReady) {
         return;
@@ -851,7 +815,6 @@ static void RecordOrbTrail(RodOrb* orb) {
     orb->trailPos[orb->trailIndex] = orb->pos;
 }
 
-// A plain shot pierces; the level-3 ball breaks on its first hit, or at the end of its flight regardless.
 static void UpdateOrbs(PlayState* play, Player* player) {
     for (s32 i = 0; i < ORB_POOL_MAX; i++) {
         RodOrb* orb = &sOrbs[i];
@@ -893,9 +856,6 @@ static void UpdateOrbs(PlayState* play, Player* player) {
     }
 }
 
-// ---- reflected shots ----
-
-// There is no "projectile" flag: nearly every shot is something you cannot lock onto.
 static bool IsRangedAttacker(Actor* actor) {
     if (actor == NULL) {
         return false;
@@ -930,7 +890,6 @@ static bool IsShotIncoming(Actor* actor, Vec3f* chest) {
     return SQ(velX) + SQ(velZ) >= SQ(GUARD_CATCH_MIN_SPEED) && (velX * dx + velZ * dz) > 0.0f;
 }
 
-// Every category is swept: a shot can recategorise itself in its own init, as the Octorok's rock does.
 static bool TryReflectIncoming(PlayState* play, Player* player) {
     Vec3f chest = { player->actor.world.pos.x, player->actor.world.pos.y + GUARD_CATCH_HEIGHT,
                     player->actor.world.pos.z };
@@ -952,7 +911,6 @@ static bool TryReflectIncoming(PlayState* play, Player* player) {
     return false;
 }
 
-// The shot keeps its own look and collider; what hurts on the way back is a sword quad escorting it.
 static void EscortReflectedShot(PlayState* play, Player* player) {
     if (sReflectTimer <= 0) {
         return;
@@ -967,8 +925,6 @@ static void EscortReflectedShot(PlayState* play, Player* player) {
     StampEscortQuad(play, &sReflectQuad, &sReflectedShot->world.pos, REFLECT_HALF, DMG_SWORD, REFLECT_DAMAGE);
 }
 
-// ---- moves ----
-
 static void StartMove(PlayState* play, Player* player, u8 move) {
     if (player->actionFunc != GaroAction) {
         Player_SetAction(play, player, GaroAction, 0);
@@ -981,7 +937,6 @@ static void StartMove(PlayState* play, Player* player, u8 move) {
     }
 }
 
-// Ending a free spin keeps the heading he was travelling; one done on the spot hands back the entry facing.
 static void SettleSpinFacing(Player* player) {
     player->actor.shape.rot.y = player->speedXZ > 0.5f ? player->yaw : sSpinEntryYaw;
     player->yaw = player->actor.shape.rot.y;
@@ -1031,8 +986,6 @@ static bool HasLanded(Player* player) {
     sHopAirFrames++;
     return IsGrounded(player) && sHopAirFrames >= HOP_MIN_AIR_FRAMES;
 }
-
-// -- spin and rod --
 
 static void StartSpin(PlayState* play, Player* player) {
     sSpinEntryYaw = player->actor.shape.rot.y;
@@ -1088,7 +1041,6 @@ static void RunSpin(PlayState* play, Player* player) {
     }
 }
 
-// The ball steps a size per damage tier, so what it looks like is what the shot will do.
 static void GrowRodBall(void) {
     u8 level = GetRodLevel(sRodCharge);
     f32 fraction = sRodLevelScale[level - 1];
@@ -1112,7 +1064,6 @@ static void CycleRodElement(PlayState* play, Player* player) {
     }
 }
 
-// A cancels the aim as it does the Deku bubble's; letting go of B fires.
 static void RunRodAim(PlayState* play, Player* player) {
     Z64Aiming_Update(player, play);
     if (IsPressed(play, BTN_A)) {
@@ -1140,8 +1091,6 @@ static void RunRodAim(PlayState* play, Player* player) {
     AdvanceGaroAnim(play, player);
 }
 
-// -- guard and counter --
-
 static void StartGuardReturn(PlayState* play, Player* player) {
     sMove = GARO_MOVE_GUARD_RETURN;
     sMoveTimer = 0;
@@ -1149,7 +1098,6 @@ static void StartGuardReturn(PlayState* play, Player* player) {
                  -GUARD_RETURN_SPEED);
 }
 
-// The attacker freezes, Garo appears behind it from wherever he stood and opens with the jump attack's swing.
 static void StartRiposte(PlayState* play, Player* player, Actor* attacker) {
     if (attacker != NULL) {
         s16 yaw = attacker->shape.rot.y;
@@ -1167,7 +1115,6 @@ static void StartRiposte(PlayState* play, Player* player, Actor* attacker) {
     Player_PlaySfx(player, NA_SE_PL_MAGIC_WIND_WARP);
 }
 
-// A shooter across the room is not what touched him: its shot goes back and the stance ends, with no chase.
 static void AnswerHit(PlayState* play, Player* player, Actor* attacker) {
     f32 distSq = attacker == NULL ? 0.0f
                                   : SQ(attacker->world.pos.x - player->actor.world.pos.x) +
@@ -1234,8 +1181,6 @@ static void RunRiposte(PlayState* play, Player* player) {
     }
 }
 
-// -- dash --
-
 static void RunDash(PlayState* play, Player* player) {
     PlayerAnimationHeader* dash = sAnims[ANIM_DASH];
 
@@ -1256,8 +1201,6 @@ static void RunDash(PlayState* play, Player* player) {
     }
 }
 
-// -- banish --
-
 static void StartBanish(PlayState* play, Player* player, Actor* target) {
     StartMove(play, player, GARO_MOVE_BANISH_VANISH);
     PlayGaroAnim(play, player, ANIM_COLLAPSE, 0.0f, -1.0f, 1.0f);
@@ -1269,7 +1212,6 @@ static void StartBanish(PlayState* play, Player* player, Actor* target) {
     }
 }
 
-// With nothing locked the shadow ball still crosses a short way ahead, and he reappears where he stood.
 static void LaunchShadowBall(PlayState* play, Player* player) {
     Actor* target = sBanishTarget;
 
@@ -1321,7 +1263,6 @@ static void DropShadowWake(PlayState* play) {
     }
 }
 
-// The warp hum is a loop, asked for every frame of the crossing so it ends with it.
 static void RunBanishShadow(PlayState* play, Player* player) {
     f32 t = MIN((f32)sShadowTimer / (f32)BANISH_SHADOW_FRAMES, 1.0f);
 
@@ -1353,7 +1294,6 @@ static void RunBanishShadow(PlayState* play, Player* player) {
     PlayGaroAnim(play, player, ANIM_APPEAR_DRAW_SWORDS, 0.0f, -1.0f, SHADOW_STRIKE_PLAY_SPEED);
 }
 
-// He never leaves before the strike has had its window: the fast arrival clip ends before it otherwise.
 static void RunShadowStrike(PlayState* play, Player* player) {
     Freeze(player);
     player->invincibilityTimer = MAX(player->invincibilityTimer, 5);
@@ -1374,8 +1314,6 @@ static void RunShadowStrike(PlayState* play, Player* player) {
         EndMove(play, player);
     }
 }
-
-// -- leaps --
 
 static void StartLeap(PlayState* play, Player* player, u8 move, s32 anim, s16 yaw, f32 xzSpeed, f32 ySpeed) {
     StartMove(play, player, move);
@@ -1408,7 +1346,6 @@ static void StartAirSlash(PlayState* play, Player* player) {
     Player_PlaySfx(player, NA_SE_IT_SWORD_SWING);
 }
 
-// Hops and the back flip keep facing the lock-on while `yaw` carries them sideways or back.
 static void RunHop(PlayState* play, Player* player) {
     player->stateFlags2 |= STATE2_NO_ROTATION;
     KeepAirborne(player);
@@ -1418,7 +1355,6 @@ static void RunHop(PlayState* play, Player* player) {
     }
 }
 
-// The leap turns into the air slash past its apex, and a short hop lands straight into the strike.
 static void RunJumpAttack(PlayState* play, Player* player) {
     KeepAirborne(player);
     AdvanceGaroAnim(play, player);
@@ -1456,8 +1392,6 @@ static void RunLandStrike(PlayState* play, Player* player) {
         EndMove(play, player);
     }
 }
-
-// -- laugh --
 
 static void RunLaugh(PlayState* play, Player* player) {
     bool isDone = AdvanceGaroAnim(play, player);
@@ -1521,8 +1455,6 @@ static void GaroAction(Player* player, PlayState* play) {
     }
 }
 
-// ---- action overrides ----
-
 static bool CanStartMove(Player* player) {
     return IsGaro() && !IsGaroBusy(player) && CanAct(player) && sRodCooldown == 0;
 }
@@ -1538,7 +1470,6 @@ static int32_t HandleSlash(PlayState* play, Player* player) {
     return S2H_FORM_ACTION_STARTED;
 }
 
-// Z-targeted A falls through to the next handler, which is where the hops live.
 static int32_t HandleDash(PlayState* play, Player* player) {
     if (!IsGaro() || !IsPressed(play, BTN_A) || Player_IsZTargeting(player)) {
         return S2H_FORM_ACTION_VANILLA;
@@ -1565,7 +1496,6 @@ static void StartZTargetMove(PlayState* play, Player* player, s8 direction) {
     }
 }
 
-// Standing still with the stick forward, or neutral while the banish recharges, Z+A does nothing, as in NEI.
 static int32_t HandleZTargetA(PlayState* play, Player* player) {
     s8 direction = player->controlStickDirections[player->controlStickDataIndex];
     bool isStillForward = direction == PLAYER_STICK_DIR_FORWARD && player->speedXZ <= 0.5f;
@@ -1581,7 +1511,6 @@ static int32_t HandleZTargetA(PlayState* play, Player* player) {
     return S2H_FORM_ACTION_STARTED;
 }
 
-// The guard rises halfway through its clip and holds there; the second half plays backwards on release.
 static int32_t HandleGuard(PlayState* play, Player* player) {
     if (!IsGaro() || !IsHeld(play, BTN_R) || IsHeld(play, BTN_B)) {
         return S2H_FORM_ACTION_VANILLA;
@@ -1596,7 +1525,6 @@ static int32_t HandleGuard(PlayState* play, Player* player) {
     return S2H_FORM_ACTION_STARTED;
 }
 
-// Garo cannot lift anything: an offer with no item attached is a carry, and it is refused.
 static int32_t RefuseCarry(PlayState* play, Player* player) {
     if (!IsGaro() || player->interactRangeActor == NULL || player->getItemId != GI_NONE) {
         return S2H_FORM_ACTION_VANILLA;
@@ -1604,10 +1532,6 @@ static int32_t RefuseCarry(PlayState* play, Player* player) {
     return S2H_FORM_ACTION_BLOCKED;
 }
 
-// ---- incoming damage ----
-
-// Runs before the player consumes the hit: Garo takes it doubled, and the guard takes it without the knockback
-// so its counter can answer.
 static void HandleIncomingHit(Player* player, Input* input) {
     u8 damage = player->actor.colChkInfo.damage;
 
@@ -1633,8 +1557,6 @@ static void HandleIncomingHit(Player* player, Input* input) {
     sScaledDamage = 0;
 }
 
-// Strikes hit for exactly their number whatever the enemy's table says; the orbs keep the table, since their
-// element is what finds a weakness.
 static void FixStrikeDamage(Actor* victim, ColliderElement* attack, f32* damage) {
     if (!IsGaro() || gPlayState == NULL) {
         return;
@@ -1648,9 +1570,6 @@ static void FixStrikeDamage(Actor* victim, ColliderElement* attack, f32* damage)
     }
 }
 
-// ---- world ----
-
-// A Garo runs across water: while he is out of it and not rising, the surface is his floor.
 static void WalkOnWater(CollisionContext* colCtx, Vec3f* pos, Actor* actor, CollisionPoly** poly, s32* bgId,
                         f32* floorY) {
     PlayState* play = gPlayState;
@@ -1696,7 +1615,6 @@ static void ConcealRevealed(PlayState* play) {
     sRevealedCount = 0;
 }
 
-// The real Lens still does its own job on top.
 static void HideFakes(Actor* actor, bool* shouldDraw) {
     PlayState* play = gPlayState;
 
@@ -1718,9 +1636,6 @@ static void ReleaseChantVoice(void) {
     }
 }
 
-// Igos du Ikana's chant, the voice MM gives the Elegy. The ocarina stays out across the message session, so the
-// latch only lets go once no message is up; the instrument is re-applied while it is open, since the message
-// system sets it again around opening.
 static void UpdateOcarinaVoice(PlayState* play, Player* player) {
     bool isSessionOpen = play->msgCtx.msgMode != MSGMODE_NONE;
 
@@ -1739,7 +1654,6 @@ static void UpdateOcarinaVoice(PlayState* play, Player* player) {
     }
 }
 
-// Any enemy that vanished since last frame counts as a kill for the taunt: a despawn only costs a dice roll.
 static void WatchForKills(PlayState* play) {
     Actor* current[ENEMY_SNAPSHOT_MAX];
     s32 count = 0;
@@ -1772,7 +1686,6 @@ static void TryLaugh(PlayState* play, Player* player) {
     Player_PlaySfx(player, NA_SE_EN_BOSU_LAUGH);
 }
 
-// Vanilla's jump reads no item buttons, so the air slash reads B here, off any jump or fall.
 static void TryAirSlash(PlayState* play, Player* player) {
     if (IsGaroBusy(player) || IsGrounded(player) || !CanAct(player) || sRodCooldown > 0 || !IsPressed(play, BTN_B)) {
         return;
@@ -1780,7 +1693,6 @@ static void TryAirSlash(PlayState* play, Player* player) {
     StartAirSlash(play, player);
 }
 
-// MM's Garo Master burns away in a ring of flames when he falls.
 static void BurnOnDeath(PlayState* play, Player* player) {
     Vec3f accel = { 0.0f, 0.1f, 0.0f };
 
@@ -1802,8 +1714,6 @@ static void BurnOnDeath(PlayState* play, Player* player) {
     Actor_PlaySfx(&player->actor, NA_SE_EN_STAL_DEAD);
 }
 
-// ---- hybrid body ----
-
 static bool PrepareHybrid(PlayState* play) {
     if (sIsHybridReady) {
         return true;
@@ -1819,7 +1729,6 @@ static bool PrepareHybrid(PlayState* play) {
     return true;
 }
 
-// Garo's idle sways every bone, then Link's pose overwrites the body's; the robe's side panels follow the arms.
 static void PoseHybrid(PlayState* play, Player* player) {
     Vec3s* link = player->skelAnime.jointTable;
 
@@ -1838,7 +1747,6 @@ static void PoseHybrid(PlayState* play, Player* player) {
     sHybridJoints[HYBRID_JOINT_ROBE_RIGHT] = link[PLAYER_LIMB_RIGHT_SHOULDER];
 }
 
-// Link's root is placed at Link's scale, then the whole Garo subtree takes the enemy's.
 static s32 OverrideHybridLimb(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, Actor* actor) {
     if (limbIndex == HYBRID_JOINT_ROOT) {
         Matrix_TranslateRotateZYX(pos, rot);
@@ -1853,7 +1761,6 @@ static s32 OverrideHybridLimb(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f
     return false;
 }
 
-// The blades only exist on this skeleton, so their trails are fed here, at the bones the player sees.
 static void PostHybridLimb(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, Actor* actor) {
     Player* player = (Player*)actor;
 
@@ -1892,8 +1799,6 @@ static void HideLinkBody(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDL
     }
 }
 
-// ---- projectile draws ----
-
 static void DrawBillboardOrb(PlayState* play, Vec3f pos, f32 scale, const u8* prim, const u8* env) {
     OPEN_DISPS(play->state.gfxCtx);
     Matrix_Translate(pos.x, pos.y, pos.z, MTXMODE_NEW);
@@ -1921,7 +1826,6 @@ static void DrawShadowBall(PlayState* play, Vec3f pos, f32 scale) {
     DrawBillboardOrb(play, pos, scale, sShadowPrim, sShadowEnv);
 }
 
-// The ball is the orb at its charge size, wrapped in a ring of small ones, one per damage tier ray.
 static void DrawRodBall(PlayState* play, Vec3f pos, f32 circleScale, f32 ballScale, s32 rays, u8 element) {
     if (circleScale <= 0.001f) {
         return;
@@ -1935,7 +1839,6 @@ static void DrawRodBall(PlayState* play, Vec3f pos, f32 circleScale, f32 ballSca
     }
 }
 
-// A fragment's lit streak: the last path samples, each a smaller orb than the one before.
 static void DrawOrbStreak(PlayState* play, RodOrb* orb) {
     for (s32 i = 0; i < ORB_STREAK_DRAWN; i++) {
         s32 t = ((orb->trailIndex - i) + ORB_TRAIL_LEN) % ORB_TRAIL_LEN;
@@ -1945,8 +1848,6 @@ static void DrawOrbStreak(PlayState* play, RodOrb* orb) {
     }
 }
 
-// The slingshot-style aim draws no crosshair, and Garo's first-person arms are hidden: four dots and a centre
-// spread out as the shot charges.
 static void DrawChargeAndReticle(PlayState* play, Player* player) {
     Vec3f head = player->actor.focus.pos;
     s16 yaw;
@@ -2001,16 +1902,13 @@ static void DrawProjectiles(PlayState* play, Player* player) {
 }
 
 static void DrawGaro(PlayState* play, Player* player) {
-    bool isBodyVisible =
-        !(player->stateFlags2 & STATE2_DISABLE_DRAW) && !(player->stateFlags1 & STATE1_FIRST_PERSON);
+    bool isBodyVisible = !(player->stateFlags2 & STATE2_DISABLE_DRAW) && !(player->stateFlags1 & STATE1_FIRST_PERSON);
 
     if (isBodyVisible) {
         DrawHybrid(play, player);
     }
     DrawProjectiles(play, player);
 }
-
-// ---- lifetime ----
 
 static void ResetState(PlayState* play, Player* player) {
     if (player != NULL && play != NULL && IsGaroBusy(player)) {
@@ -2047,7 +1945,6 @@ static void ExitGaro(PlayState* play, Player* player) {
     }
 }
 
-// Damage, a cutscene or the water can take the player from a move without passing through its end.
 static void DropInterruptedMove(PlayState* play, Player* player) {
     if (sMove == GARO_MOVE_NONE || IsGaroBusy(player)) {
         return;
@@ -2088,8 +1985,6 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
     ResetState(NULL, NULL);
 }
 
-// ---- mask ----
-
 static bool CanWearMask(Player* player, PlayState* play) {
     return IsGrounded(player) &&
            !(player->stateFlags1 & (STATE1_SWIMMING | STATE1_FIRST_PERSON | PLAYER_STATE1_20000000));
@@ -2099,7 +1994,6 @@ static void WearMask(PlayState* play, Player* player) {
     sApi->ToggleForm(GARO_FORM_KEY);
 }
 
-// A light ninja's body lifts like a Human; oot_collectables adds the strength upgrades on top.
 static void ResolveGaroStrength(bool* should, va_list args) {
     s32* strength = va_arg(args, s32*);
 
@@ -2108,7 +2002,6 @@ static void ResolveGaroStrength(bool* should, va_list args) {
     }
 }
 
-// The native mask is already in MM's pool. Keep the custom ID for older seeds.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 0, GARO_MASK_KEY, GARO_MASK_KEY, "",
 };
@@ -2121,10 +2014,18 @@ static void KeepMaskOutOfSaveDuringSimulation(const char* key) {
 
 static void GiveMaskToSimulation(u8 item, bool* should) {
     (void)item;
-    // The ID hook runs after the host's generic replacement hook.
     if (RandoInfCustom_IsLogicSimulation()) {
         *should = true;
     }
+}
+
+static void DrawMaskPickup(PlayState* play, S2HGetItemEntry* entry) {
+    (void)entry;
+    GetItem_Draw(play, GID_MASK_GARO);
+}
+
+static void AssignMaskFromPause(const char* key) {
+    Z64FormMasks_AssignToPressedButton(sApi, key);
 }
 
 static void RegisterMask(void) {
@@ -2135,7 +2036,7 @@ static void RegisterMask(void) {
     Z64Items_SetPlacement(&mask, GARO_MASK_PAGE, GARO_MASK_SLOT, 0);
     Z64Items_SetReplaces(&mask, ITEM_MASK_GARO);
     Z64Items_SetVanillaMode(&mask, S2H_VANILLA_ITEM_REPLACE, RI_MASK_GARO);
-    Z64Items_SetGetItemModel(&mask, sGetItemDL);
+    mask.getItemEntry.drawFunc = DrawMaskPickup;
     Z64Items_SetTextbox(&mask, "You got %rGaro's Mask%w!&The face of the Garo, Ikana's ninja spies.^Wear it with "
                                "%y\xA1%w to become a %rGaro%w: twin blades, a guard that answers every blow, and a "
                                "rod of elemental magic.");
@@ -2145,10 +2046,10 @@ static void RegisterMask(void) {
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);
     mask.onAcquire = KeepMaskOutOfSaveDuringSimulation;
+    mask.onPauseToggle = AssignMaskFromPause;
     Z64Items_Register(sApi, &mask);
+    Z64FormMasks_PlaceMask(sApi, GARO_MASK_KEY, GARO_MASK_SLOT);
 }
-
-// ---- form ----
 
 static uint16_t ResolveGaroEquipment(int32_t equipType, uint16_t value) {
     if (equipType == EQUIP_TYPE_SWORD) {
@@ -2162,7 +2063,7 @@ static uint16_t ResolveGaroEquipment(int32_t equipType, uint16_t value) {
 
 static bool IsAllowedCustomItem(const char* customKey) {
     static const char* const sAllowed[] = {
-        "nei.keaton_form_mask", "nei.mask_kafei", "nei.gerudo_form_mask", "nei.whip",
+        "nei.keaton_form_mask", "nei.mask_kafei",  "nei.gerudo_form_mask", "nei.whip",
         "nei.beetle",           "nei.switch_hook", "nei.somaria",          "nei.rito_form_mask",
     };
 
@@ -2174,7 +2075,6 @@ static bool IsAllowedCustomItem(const char* customKey) {
     return false;
 }
 
-// The ranged tools of a ninja spy, the transformation masks, bottles and trade items.
 static bool AllowsGaroItem(uint16_t item, const char* customKey) {
     if (customKey != NULL) {
         return IsAllowedCustomItem(customKey);

@@ -38,7 +38,6 @@
 #define GUST_JAR_SHRUNK_LIMIT 12
 #define GUST_JAR_SHRINK_FLOOR 0.15f
 #define GUST_JAR_HALF_TURN 3.14159265f
-// Frame 8 of the two-handed carry is the pose that holds a jar at chest height.
 #define GUST_JAR_POSE_FRAME 8
 
 typedef enum {
@@ -77,9 +76,6 @@ static const ALIGN_ASSET(2) char sModeIcons[GUST_MODE_MAX][64] = {
     "__OTR__textures/icon_item_custom/gItemIconGustJarSpiritTex",
 };
 
-// Suction never damages what it swallows by element, so every blow carries 0 damage: the flags alone
-// light torches and fire sun switches, exactly as the matching arrow would. Each breath beyond the first is
-// unlocked by owning the matching medallion item.
 static const GustElement sElements[GUST_MODE_MAX] = {
     { { 110, 190, 255, 255 }, { 40, 90, 200, 255 }, DMG_SWORD, NULL },
     { { 180, 255, 180, 255 }, { 60, 170, 90, 255 }, DMG_UNBLOCKABLE, "nei.medallion.forest" },
@@ -97,12 +93,10 @@ static const Z64WheelEntry sWheelEntries[GUST_MODE_MAX] = {
     { sModeIcons[GUST_MODE_SPIRIT], "Spirit" },
 };
 
-// The small things the bare jar can move. Anything heavier waits for the element that matches it.
 static const s16 sSuckableActors[] = {
-    ACTOR_EN_KUSA,   ACTOR_OBJ_TSUBO, ACTOR_OBJ_KIBAKO, ACTOR_OBJ_KIBAKO2, ACTOR_OBJ_COMB,
-    ACTOR_EN_KANBAN, ACTOR_BG_ICICLE, ACTOR_EN_FIREFLY, ACTOR_EN_TITE,     ACTOR_EN_DEKUNUTS,
-    ACTOR_EN_POH,    ACTOR_EN_OKUTA,  ACTOR_EN_PEEHAT,  ACTOR_EN_SB,       ACTOR_EN_BB,
-    ACTOR_EN_SKB,    ACTOR_EN_CROW,
+    ACTOR_EN_KUSA,   ACTOR_OBJ_TSUBO,  ACTOR_OBJ_KIBAKO, ACTOR_OBJ_KIBAKO2, ACTOR_OBJ_COMB, ACTOR_EN_KANBAN,
+    ACTOR_BG_ICICLE, ACTOR_EN_FIREFLY, ACTOR_EN_TITE,    ACTOR_EN_DEKUNUTS, ACTOR_EN_POH,   ACTOR_EN_OKUTA,
+    ACTOR_EN_PEEHAT, ACTOR_EN_SB,      ACTOR_EN_BB,      ACTOR_EN_SKB,      ACTOR_EN_CROW,
 };
 
 static ColliderCylinderInit sNozzleColliderInit = {
@@ -126,8 +120,8 @@ static ColliderCylinderInit sNozzleColliderInit = {
 };
 
 // Indexed by Player.heldItemButton, which keeps a slot for A between the C buttons and the D-pad.
-static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,     BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
-                                                         BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN,  BTN_DUP };
+static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
+                                                         BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
 static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnActorDrawEnd", "OnSceneInit", "OnInterfaceDrawEnd",
                                               "OnSaveLoad" };
@@ -214,7 +208,6 @@ static bool IsSuckable(Actor* actor, u8 mode) {
     if (actor->update == NULL || (actor->flags & ACTOR_FLAG_TALK) != 0) {
         return false;
     }
-    // The Spirit Medallion's pull takes hold of anything that fights back, not just the small fry.
     if (mode == GUST_MODE_SPIRIT && actor->category == ACTORCAT_ENEMY) {
         return true;
     }
@@ -260,7 +253,6 @@ static void ShrinkTowardsNozzle(Actor* actor, f32 factor) {
     sShrunkCount++;
 }
 
-// Whatever survived the pull gets its own size back; a dead actor's scale is no longer ours to touch.
 static void RestoreShrunkActors(void) {
     for (u8 index = 0; index < sShrunkCount; index++) {
         if (sShrunkActors[index] != NULL && sShrunkActors[index]->update != NULL) {
@@ -318,7 +310,6 @@ static void StopRibbons(PlayState* play) {
     sAreRibbonsLive = false;
 }
 
-// Blure colours are fixed when the effect is added, so a new element needs new ribbons.
 static void StartRibbons(PlayState* play, u8 mode) {
     Color_RGBA8 primary = sElements[mode].primary;
     Color_RGBA8 secondary = sElements[mode].secondary;
@@ -354,7 +345,6 @@ static void StartRibbons(PlayState* play, u8 mode) {
     sRibbonMode = mode;
 }
 
-// Each ribbon rides the funnel's surface: it flares out along the axis while it turns around it.
 static void FeedRibbons(PlayState* play, Vec3f* nozzle, Vec3f* axis, s16 yaw, u8 mode, bool isBlow) {
     f32 reach = isBlow ? GUST_JAR_BLOW_LENGTH : GUST_JAR_SUCK_LENGTH;
     f32 spread = isBlow ? GUST_JAR_BLOW_RADIUS : GUST_JAR_SUCK_RADIUS;
@@ -432,8 +422,7 @@ static void PullActors(Player* player, PlayState* play, Vec3f* nozzle, Vec3f* ax
             f32 distance = 0.0f;
             bool isCollectible = actor->id == ACTOR_EN_ITEM00;
 
-            if (!IsInsideCone(nozzle, axis, &actor->world.pos, GUST_JAR_SUCK_LENGTH, GUST_JAR_SUCK_RADIUS,
-                              &distance) ||
+            if (!IsInsideCone(nozzle, axis, &actor->world.pos, GUST_JAR_SUCK_LENGTH, GUST_JAR_SUCK_RADIUS, &distance) ||
                 (!isCollectible && !IsSuckable(actor, mode))) {
                 continue;
             }
@@ -466,8 +455,6 @@ static void PushActors(PlayState* play, Vec3f* nozzle, Vec3f* axis, u8 mode) {
     }
 }
 
-// Red ice answers to no damage flag at all, so the icy breath melts it itself by setting the switch flag its
-// own native shatter reads, which also opens whatever it was guarding.
 static void MeltRedIceInCone(PlayState* play, Vec3f* nozzle, Vec3f* axis) {
     for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].first; actor != NULL; actor = actor->next) {
         ObjIcePoly* ice = (ObjIcePoly*)actor;
@@ -565,7 +552,6 @@ static void TakeOutJar(PlayState* play, Player* player) {
         Collider_SetCylinder(play, &sNozzleCollider, &player->actor, &sNozzleColliderInit);
         sIsColliderReady = true;
     }
-    // The jar owns C-Up while it is in hand: unclaimed, the press talks to Tatl or beeps over the aim.
     if (S2H_MOD_API_HAS(sApi, BlockPlayerInput)) {
         sApi->BlockPlayerInput(GUST_JAR_KEY, BTN_CUP, false);
     }
@@ -578,7 +564,7 @@ static void TakeOutJar(PlayState* play, Player* player) {
 // The carry frame is queued here and lands in sPoseJoints when the animation queue runs, so the pose applied is
 // the previous frame's. Only the arms are borrowed, so Link keeps walking, running and turning as he was.
 static void HoldJarWithBothHands(Player* player, PlayState* play) {
-    static const u8 armLimbs[] = { PLAYER_LIMB_LEFT_SHOULDER,  PLAYER_LIMB_LEFT_FOREARM, PLAYER_LIMB_LEFT_HAND,
+    static const u8 armLimbs[] = { PLAYER_LIMB_LEFT_SHOULDER,  PLAYER_LIMB_LEFT_FOREARM,  PLAYER_LIMB_LEFT_HAND,
                                    PLAYER_LIMB_RIGHT_SHOULDER, PLAYER_LIMB_RIGHT_FOREARM, PLAYER_LIMB_RIGHT_HAND };
 
     AnimTaskQueue_AddLoadPlayerFrame(play, (PlayerAnimationHeader*)sCarryPoseAnim, GUST_JAR_POSE_FRAME, PLAYER_LIMB_MAX,
@@ -614,8 +600,6 @@ static void PutJarAway(Player* player, PlayState* play) {
     sIsJarOut = false;
 }
 
-// The jar sits between both hands of the carry pose, laid on its side to face where Link faces, and its band
-// takes the colour of the breath: the mouth is the only part of the model that says what the jar is doing.
 static void DrawJarInHand(Player* player, PlayState* play) {
     Vec3f* leftHand = &player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND];
     Vec3f* rightHand = &player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND];
@@ -635,8 +619,6 @@ static void DrawJarInHand(Player* player, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// The cone stands on its own base along +Y, so it is laid down onto the aim before it is stretched. The quarter
-// turn that lays it down grows with the pitch, because a positive pitch aims below the horizon.
 static void DrawTornado(Player* player, PlayState* play) {
     u8 mode = CurrentMode();
     Color_RGBA8 color = sElements[mode].primary;
@@ -691,7 +673,6 @@ static void UpdateUnlocks(Player* player) {
     }
 }
 
-// The scene tears down every actor and effect, so the ribbons and the borrowed scales are gone with it.
 static void DropAimOnSceneChange(s16 sceneId, s8 spawnNum) {
     Z64Aiming_Drop();
     sIsJarOut = false;
@@ -701,7 +682,6 @@ static void DropAimOnSceneChange(s16 sceneId, s8 spawnNum) {
     sFairiesPaidCount = 0;
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, GUST_JAR_KEY, GUST_JAR_KEY, "",
 };

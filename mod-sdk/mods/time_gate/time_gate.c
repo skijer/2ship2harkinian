@@ -62,8 +62,6 @@ static bool IsCasting(Player* player) {
     return player->actionFunc == TimeGateAction;
 }
 
-// Majora's Mask has no ages: adult Link is the form the adult_link mod registers. Called while the prompt
-// still freezes Link, the form swaps at once instead of playing the mask cutscene; the flash covers the swap.
 static void SwitchAge(void) {
     sApi->ToggleForm(S2H_FORM_KEY_ADULT);
 }
@@ -360,7 +358,6 @@ static void DrawGate(Actor* actor, PlayState* play) {
     }
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, TIME_GATE_KEY, TIME_GATE_KEY, "",
 };
@@ -389,6 +386,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetCanUse(&gate, CanOpenGate);
     Z64Items_SetAction(&gate, OpenGate, NULL);
     Z64Items_SetGetItemModel(&gate, sGateDL);
+    gate.getItemScale = 0.3f;
     gate.flags |= S2H_CUSTOM_ITEM_INSTANT;
 
     Z64Items_SetLogic(&gate, &sRandomizerItem);

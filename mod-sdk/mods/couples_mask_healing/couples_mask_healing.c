@@ -12,7 +12,8 @@ static void Update(Player* player) {
         sTimer = 0;
         return;
     }
-    if (--sTimer > 0) return;
+    if (--sTimer > 0)
+        return;
     if (gSaveContext.save.isNight == 0) {
         sTimer = 4;
         if (gSaveContext.save.saveInfo.playerData.health < gSaveContext.save.saveInfo.playerData.healthCapacity)
@@ -24,6 +25,12 @@ static void Update(Player* player) {
     }
 }
 
-S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) { sApi = api; }
-S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) { return &sRequirements; }
-S2H_MOD_EXPORT void ModInit(void) { S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, Update); }
+S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
+    sApi = api;
+}
+S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
+    return &sRequirements;
+}
+S2H_MOD_EXPORT void ModInit(void) {
+    S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, Update);
+}

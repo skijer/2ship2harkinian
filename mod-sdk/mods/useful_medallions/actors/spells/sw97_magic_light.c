@@ -134,7 +134,6 @@ static ColliderCylinderInit sLightCylinderInit = {
         ACELEM_NONE,
         OCELEM_NONE,
     },
-    // Bounded: the original 3250-unit radius covered the whole room and "attacked" doors and loading zones.
     { 700.0f, 900.0f, -450.0f, { 0, 0, 0 } },
 };
 
@@ -211,10 +210,7 @@ void Sw97_MagicLight_GrowCylinder(MagicLight* this, PlayState* play) {
         Sw97_MagicLight_SetupAction(this, Sw97_MagicLight_Wait);
         this->timer = 20;
         if (!this->massStunApplied) {
-            // NEI's Light spell also reaches hostile ReDeads and Gibdos outside the cylinder.
-            // The talking Gibdo has a separate actor ID in MM.
-            for (Actor* enemy = play->actorCtx.actorLists[ACTORCAT_ENEMY].first;
-                 enemy != NULL; enemy = enemy->next) {
+            for (Actor* enemy = play->actorCtx.actorLists[ACTORCAT_ENEMY].first; enemy != NULL; enemy = enemy->next) {
                 if (enemy->update != NULL && (enemy->id == ACTOR_EN_RD || enemy->id == ACTOR_EN_RAILGIBUD)) {
                     enemy->freezeTimer = MAX(enemy->freezeTimer, 600);
                     Actor_SetColorFilter(enemy, -0x8000, 200, 0, 255);
@@ -238,9 +234,8 @@ void Sw97_MagicLight_Update(Actor* thisx, PlayState* play) {
     if (this->unk_174 >= 0.0f) {
         Sw97_PlayLoopSfx(&this->actor, NA_SE_PL_ARROW_CHARGE_LIGHT);
 
-        // MM's damage-table lookup resolves to the single highest set bit, so the bit alternates every frame: the
-        // light-arrow reaction (light switches, undead) and the light-ray one (instant kill on undead) both land.
-        // Each actor's own table decides, so nothing is pushed per actor.
+        // MM's damage-table lookup resolves to the highest set bit, so the bit alternates every frame to land both
+        // reactions.
         this->collider.elem.atDmgInfo.dmgFlags = (play->gameplayFrames & 1) ? DMG_LIGHT_RAY : DMG_LIGHT_ARROW;
         Collider_UpdateCylinder(&this->actor, &this->collider);
         CollisionCheck_SetAT(play, &play->colChkCtx, &this->collider.base);

@@ -19,7 +19,6 @@ typedef struct MagicSoul {
     f32 flashIntensity;
 } MagicSoul; // size = 0x0164
 
-// SOH doesn't have gSaveContext.fairyTimer - use a file-static instead
 static s16 sw97FairyTimer = 0;
 
 #define THIS ((MagicSoul*)thisx)
@@ -64,9 +63,8 @@ void Sw97_MagicSoul_Init(Actor* thisx, PlayState* play) {
 }
 
 void Sw97_MagicSoul_Destroy(Actor* thisx, PlayState* play) {
-    // Fairy mode owns the camera and the magic meter once it has taken over.
     if (!Sw97_IsFairyModeActive()) {
-        Sw97_MagicSoul_DimLighting(play,0.0f);
+        Sw97_MagicSoul_DimLighting(play, 0.0f);
         Camera_ChangeSetting(Play_GetCamera(play, CAM_ID_MAIN), CAM_SET_NORMAL0);
         func_800876C8(play);
         Audio_PlayActorSound2(thisx, NA_SE_EV_TRIFORCE_FLASH);
@@ -100,13 +98,13 @@ void Sw97_MagicSoul_DiamondUpdate(Actor* thisx, PlayState* play) {
     Actor_Kill(thisx);
 }
 
-// OoT's adjusted fog maps to MM's AdjLightSettings.
 void Sw97_MagicSoul_DimLighting(PlayState* play, f32 intensity) {
-    intensity=CLAMP(intensity,0.0f,1.0f);
-    f32 nearFactor=MAX(intensity-0.2f,0.0f);
-    play->envCtx.adjLightSettings.fogNear=(850.0f-play->envCtx.lightSettings.fogNear)*nearFactor;
-    f32 colorFactor=MIN(intensity*5.0f,1.0f);
-    for(u8 i=0;i<3;i++)play->envCtx.adjLightSettings.fogColor[i]=-(s16)(play->envCtx.lightSettings.fogColor[i]*colorFactor);
+    intensity = CLAMP(intensity, 0.0f, 1.0f);
+    f32 nearFactor = MAX(intensity - 0.2f, 0.0f);
+    play->envCtx.adjLightSettings.fogNear = (850.0f - play->envCtx.lightSettings.fogNear) * nearFactor;
+    f32 colorFactor = MIN(intensity * 5.0f, 1.0f);
+    for (u8 i = 0; i < 3; i++)
+        play->envCtx.adjLightSettings.fogColor[i] = -(s16)(play->envCtx.lightSettings.fogColor[i] * colorFactor);
 }
 
 void Sw97_MagicSoul_OrbUpdate(Actor* thisx, PlayState* play) {
@@ -227,6 +225,6 @@ void Sw97_MagicSoul_Draw(Actor* thisx, PlayState* play) {
 }
 
 const Sw97ActorInfo gSw97MagicSoulInfo = {
-    "sw97.magic_soul",   "SW97 Spirit Spell",    sizeof(MagicSoul),   Sw97_MagicSoul_Init,
+    "sw97.magic_soul",      "SW97 Spirit Spell",   sizeof(MagicSoul),   Sw97_MagicSoul_Init,
     Sw97_MagicSoul_Destroy, Sw97_MagicSoul_Update, Sw97_MagicSoul_Draw,
 };

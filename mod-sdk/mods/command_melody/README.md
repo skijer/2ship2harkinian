@@ -4,7 +4,7 @@ Implements the existing `nei.mm_song_command_melody` song. No second song item
 is registered. Its description and pause text explain the controls with native
 button glyphs.
 
-Play **A, A, C-Up, C-Right, C-Left, C-Down** after learning the song. A targeted
+Play **A, C-Left, A, C-Right, A, C-Left, A, C-Right** after learning the song. A targeted
 registered partner is preferred; otherwise the nearest available partner is
 chosen. Uses an independent subcamera, keeps Link standing in his actual
 location and returns control on C-Up, interruption, damage or transitions.

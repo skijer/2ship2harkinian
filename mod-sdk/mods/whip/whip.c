@@ -28,9 +28,6 @@
 #define WHIP_PULL_HEIGHT 30.0f
 #define WHIP_RAGE_FRAMES 90
 #define WHIP_RAGE_EXTRA_STRIDE 0.5f
-// Two adult Links tall: the grab pulls him onto that radius instead of hanging at the distance he happened
-// to lash from, which is what makes every swing arc the same. A lower anchor gets the rope that fits under
-// it rather than planting him in the floor.
 #define WHIP_ROPE_LENGTH 136.0f
 #define WHIP_MIN_ROPE_LENGTH 40.0f
 #define WHIP_HANG_CLEARANCE 20.0f
@@ -45,7 +42,6 @@
 #define WHIP_MIN_LAUNCH_LIFT 1.0f
 #define WHIP_FORWARD_RELEASE_LIFT 0.25f
 #define WHIP_FLOOR_TOLERANCE 5.0f
-// Frame 13 of the swing clip is the vertical pose, the point the swing turns from back to front.
 #define WHIP_SWING_MIDDLE_FRAME 13.0f
 #define WHIP_CAMERA_DISTANCE 200.0f
 #define WHIP_CAMERA_HEIGHT 60.0f
@@ -59,18 +55,13 @@
 #define WHIP_BEAM_ASPECT 1.5f
 #define WHIP_BEAM_NEIGHBOR_DISTANCE 50.0f
 #define WHIP_BEAM_NORMAL_SIMILARITY 0.85f
-// The lash display list is one snake-body piece of this length along +Z, repeated along the cord.
 #define WHIP_LASH_SEGMENT_LENGTH 8.0f
 #define WHIP_LASH_MAX_SEGMENTS 72
 #define WHIP_TIP_SCALE 0.8f
-// Pose off the right hand BONE, so the whip turns with the wrist. The angles are the ones NEI dialled for
-// its Rod of Seasons, a staff modelled along +Y like this grip; the offsets slide it out of the palm and up
-// to the middle of the grip, which is what a fist closes on.
 #define WHIP_HAND_ROT_X 109.655f
 #define WHIP_HAND_ROT_Y 72.414f
 #define WHIP_HAND_OFFSET_Y 5.0f
 #define WHIP_HAND_OFFSET_Z -3.0f
-// The whip model spans about 120 units, so this puts a third of Link's height of coiled whip in his hand.
 #define WHIP_HELD_SCALE 0.2f
 #define WHIP_SWING_ROPE_SAG 15.0f
 #define WHIP_DEGREES_TO_RADIANS 0.0174532925f
@@ -103,10 +94,9 @@ static const ALIGN_ASSET(2) char sItemDL[] = "__OTR__objects/object_nei_whip/whi
 static const ALIGN_ASSET(2) char sGripDL[] = "__OTR__objects/object_nei_whip/whip_grip_opaque_dl";
 static const ALIGN_ASSET(2) char sLashDL[] = "__OTR__objects/object_nei_whip/whip_lash_opaque_dl";
 static const ALIGN_ASSET(2) char sTipDL[] = "__OTR__objects/object_nei_whip/whip_tip_opaque_dl";
-// Retargeted from Mixamo's rope swing, frames 20-60: the whole clip is one back-to-front swing.
 static const ALIGN_ASSET(2) char sSwingAnim[] = "__OTR__objects/object_nei_whip/gPlayerAnim_nei_whip_swing";
 
-static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,   BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
+static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
 static ColliderCylinderInit sLashColliderInit = {
@@ -129,9 +119,13 @@ static ColliderCylinderInit sLashColliderInit = {
     { WHIP_COLLIDER_RADIUS, WHIP_COLLIDER_HEIGHT, 0, { 0, 0, 0 } },
 };
 
-static const char* const sRequiredHooks[] = { "OnGameFrameUpdate", "OnPlayerUpdate",       "OnActorDrawEnd",
-                                              "OnSceneInit",          "OnPlayerFilterInput",
-                                              "OnPlayerPostLimbDraw", "OnPlayerResolveItemActionInit" };
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate",
+                                              "OnPlayerUpdate",
+                                              "OnActorDrawEnd",
+                                              "OnSceneInit",
+                                              "OnPlayerFilterInput",
+                                              "OnPlayerPostLimbDraw",
+                                              "OnPlayerResolveItemActionInit" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
@@ -252,8 +246,6 @@ static void SortAscending(f32* dims) {
     }
 }
 
-// Scene geometry carries no "beam" flag, so the shape of the same-facing patch around the hit decides it.
-// Dyna polys index a shared, relocated vertex list, so their shape can't be read back; only their flag counts.
 static bool IsGraspable(PlayState* play, CollisionPoly* poly, s32 bgId) {
     bool isHookshotSurface = SurfaceType_IsHookshotSurface(&play->colCtx, poly, bgId);
     CollisionHeader* header = BgCheck_GetCollisionHeader(&play->colCtx, bgId);
@@ -290,9 +282,8 @@ static bool IsGraspable(PlayState* play, CollisionPoly* poly, s32 bgId) {
     f32 aspect = dims[1] > 0.1f ? dims[2] / dims[1] : 10.0f;
 
     if (isCeiling) {
-        return isHookshotSurface ||
-               (dims[2] >= WHIP_BEAM_MIN_LENGTH * 0.5f &&
-                (dims[0] <= WHIP_BEAM_MAX_CROSS * 1.5f || aspect >= WHIP_BEAM_ASPECT * 0.75f));
+        return isHookshotSurface || (dims[2] >= WHIP_BEAM_MIN_LENGTH * 0.5f &&
+                                     (dims[0] <= WHIP_BEAM_MAX_CROSS * 1.5f || aspect >= WHIP_BEAM_ASPECT * 0.75f));
     }
     bool isBar = dims[0] >= WHIP_BEAM_MIN_THICKNESS && dims[0] <= WHIP_BEAM_MAX_CROSS &&
                  dims[1] <= WHIP_BEAM_MAX_CROSS && dims[0] + dims[1] <= WHIP_BEAM_MAX_CROSS_SUM;
@@ -321,7 +312,6 @@ static void CreateSwingCamera(PlayState* play) {
     sCameraYaw = sSwingYaw;
 }
 
-// The swing yaw points from the anchor to Link, so an eye further along it frames Link with the anchor beyond.
 static void FollowSwingWithCamera(Player* player, PlayState* play) {
     Vec3f at = { player->actor.world.pos.x, player->actor.world.pos.y + WHIP_CAMERA_AT_HEIGHT,
                  player->actor.world.pos.z };
@@ -350,7 +340,6 @@ static void StartLash(Player* player, PlayState* play, s16 yaw, s16 pitch) {
     sTipPos = player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND];
     sLashTimer = WHIP_LASH_FRAMES;
     sPhase = WHIP_LASHING;
-    // Forget whatever the arm was animating, so the throw plays again on every lash.
     sAnimatedPhase = WHIP_IDLE;
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_IT_SWORD_SWING);
 }
@@ -377,8 +366,6 @@ static void AdvanceTip(Player* player) {
 
 static void AimAction(Player* player, PlayState* play);
 
-// The body keeps the idle loop and the aim pose rides the upper body, as vanilla aims the bow: the upper
-// animation then takes the whole skeleton over while he stands still (Player_UpdateUpperBody).
 static void StartAiming(Player* player, PlayState* play) {
     if (!Z64Aiming_Request(player, play)) {
         return;
@@ -401,8 +388,6 @@ static bool ShouldLeaveAim(Player* player, PlayState* play) {
            Player_IsZTargeting(player) || (player->stateFlags1 & PLAYER_STATE1_8000000);
 }
 
-// The exit is read before the upper body runs, or vanilla would take the same A or B as "roll" or "draw the
-// sword" and drop the whip instead of just lowering it.
 static void AimAction(Player* player, PlayState* play) {
     if (ShouldLeaveAim(player, play)) {
         StopAiming(player, play);
@@ -417,8 +402,6 @@ static void AimAction(Player* player, PlayState* play) {
 
 static void HoldSwingAnimation(Player* player, PlayState* play);
 
-// The angle Link hangs at comes from where he lashed from; the length of the rope does not, so the grab
-// swings him onto that radius. Only an anchor with no room under it at all refuses the swing.
 static bool StartSwing(Player* player, PlayState* play, Vec3f* anchor) {
     f32 dx = player->actor.world.pos.x - anchor->x;
     f32 dz = player->actor.world.pos.z - anchor->z;
@@ -495,8 +478,7 @@ static bool CatchOnGeometry(Player* player, PlayState* play, Vec3f* previousTip)
     s32 bgId = BGCHECK_SCENE;
     Vec3f hitPos;
 
-    if (!BgCheck_EntityLineTest1(&play->colCtx, previousTip, &sTipPos, &hitPos, &poly, true, true, true, true,
-                                 &bgId)) {
+    if (!BgCheck_EntityLineTest1(&play->colCtx, previousTip, &sTipPos, &hitPos, &poly, true, true, true, true, &bgId)) {
         return false;
     }
     sTipPos = hitPos;
@@ -603,7 +585,6 @@ static void UpdateRetracting(Player* player) {
 
 static void AnimateArm(Player* player, PlayState* play) {
     if (sPhase == WHIP_SWINGING) {
-        // The swing clip is already on both skeletons; an arm animation over it would let go of the rope.
         return;
     }
     if (sAnimatedPhase == sPhase) {
@@ -612,7 +593,6 @@ static void AnimateArm(Player* player, PlayState* play) {
     }
     sAnimatedPhase = sPhase;
     if (sPhase == WHIP_AIMING) {
-        // Played once: its last frame is the held aim pose, the way vanilla holds the hookshot up.
         PlayerAnimation_PlayOnce(play, &player->skelAnimeUpper,
                                  (PlayerAnimationHeader*)dgPlayerAnim_link_hook_shot_ready);
     } else if (sPhase == WHIP_LASHING) {
@@ -624,8 +604,6 @@ static void AnimateArm(Player* player, PlayState* play) {
     }
 }
 
-// The return value is Link's "upper body is busy" flag: it is only true while the aim, the lash or the swing
-// owns his arms, or a whip merely coiled in hand would block his rolls and his other item buttons.
 static int32_t UpdateWhipInHand(Player* player, PlayState* play) {
     if (player->invincibilityTimer < 0 && sPhase != WHIP_SWINGING) {
         sPhase = WHIP_COILED;
@@ -647,8 +625,6 @@ static int32_t UpdateWhipInHand(Player* player, PlayState* play) {
             UpdateRetracting(player);
             break;
         case WHIP_SWINGING:
-            // The swing itself runs at the end of the player's update; claiming the upper body here is what
-            // keeps vanilla's rolls, attacks and item buttons off it.
             return 1;
         default:
             sPhase = WHIP_COILED;
@@ -664,7 +640,6 @@ static bool HasSwordOnB(Player* player) {
     return Player_BButtonSwordFromIA(player, action) != PLAYER_B_SWORD_NONE;
 }
 
-// The jump slash needs a blade in hand, so the whip trades places with the B sword without the change animation.
 static void ReleaseIntoJumpSlash(Player* player, PlayState* play, f32 forwardSpeed, f32 lift) {
     ItemId swordItem = CUR_FORM_EQUIP(EQUIP_SLOT_B);
     PlayerItemAction swordAction = Player_ItemToItemAction(player, swordItem);
@@ -684,8 +659,6 @@ static void ReleaseIntoJump(Player* player, PlayState* play, WhipRelease release
         release == WHIP_RELEASE_FORWARD ? lift * WHIP_FORWARD_RELEASE_LIFT : MAX(lift, WHIP_MIN_LAUNCH_LIFT);
 }
 
-// Tangential speed of the pendulum splits into the launch: its horizontal part carries forward, the rest
-// lifts, and Link turns to face the way he is thrown.
 static void ReleaseSwing(Player* player, PlayState* play, WhipRelease release, f32 angularVelocity) {
     f32 tangentialSpeed = angularVelocity * sRopeLength * WHIP_RELEASE_BOOST;
     f32 forwardSpeed = Math_CosF(sSwingAngle) * tangentialSpeed;
@@ -722,10 +695,6 @@ static bool TryReleaseSwing(Player* player, PlayState* play, f32 angularVelocity
     return false;
 }
 
-// Read as the screen reads it. The swing camera sits beyond Link along the anchor-to-Link direction, so
-// stick up is away from it, which is the angle going DOWN: pushing up has to SUBTRACT. And Link's offset along
-// the plane is sin(angle), whose sign flips under the anchor, so the turn has to follow it or right means
-// right on only half of the arc.
 static void PumpAndSteer(PlayState* play, f32* angularAcceleration) {
     f32 stickX = play->state.input[0].cur.stick_x / 127.0f;
     f32 stickY = play->state.input[0].cur.stick_y / 127.0f;
@@ -752,9 +721,6 @@ static void ClampSwingAngle(void) {
     }
 }
 
-// Vanilla keeps its own action func through the swing and only picks an animation when its state changes, so
-// the clip has to be put back whenever it does. Both skeletons carry it: the upper body is copied over the
-// main one every frame the upper action claims the arms, and copying the same pose changes nothing.
 static void HoldSwingAnimation(Player* player, PlayState* play) {
     PlayerAnimationHeader* swing = (PlayerAnimationHeader*)sSwingAnim;
 
@@ -768,8 +734,6 @@ static void HoldSwingAnimation(Player* player, PlayState* play) {
     }
 }
 
-// The pose follows the pendulum instead of running on its own clock. Link keeps facing the anchor the whole
-// swing, so the arc behind him is the clip's back half (frame 0) and the one past the anchor its front half.
 static void PoseForSwingAngle(Player* player, PlayState* play) {
     f32 frame = WHIP_SWING_MIDDLE_FRAME * (1.0f - sSwingAngle / WHIP_MAX_SWING_ANGLE);
 
@@ -781,9 +745,6 @@ static void PoseForSwingAngle(Player* player, PlayState* play) {
     PlayerAnimation_Update(play, &player->skelAnimeUpper);
 }
 
-// The swing yaw points from the anchor to Link, and the swing camera sits beyond him along it, so facing the
-// other way is facing into the screen and towards the anchor. It is held there for the whole swing: turning
-// with the travel direction spun Link around every time the pendulum came back.
 static void HangFromRope(Player* player) {
     f32 reach = Math_SinF(sSwingAngle) * sRopeLength;
 
@@ -793,7 +754,6 @@ static void HangFromRope(Player* player) {
     FaceYaw(player, sSwingYaw + 0x8000);
 }
 
-// The swing drove Link's own skeleton, and vanilla will not put an animation back on its own.
 static void DropFromSwing(Player* player, PlayState* play) {
     player->actor.world.pos.y = player->actor.floorHeight;
     player->actor.gravity = -1.0f;
@@ -822,8 +782,6 @@ static void UpdateSwinging(Player* player, PlayState* play) {
     PumpAndSteer(play, &angularAcceleration);
     sSwingVelocity = (sSwingVelocity + angularAcceleration) * WHIP_SWING_DAMPING;
 
-    // The launch reads the speed from before the clamp: at the top of the arc the bounce has already turned
-    // it around, and releasing there would throw Link the way he came from.
     f32 launchVelocity = sSwingVelocity;
 
     sSwingAngle += sSwingVelocity;
@@ -835,7 +793,6 @@ static void UpdateSwinging(Player* player, PlayState* play) {
     PoseForSwingAngle(player, play);
     HangFromRope(player);
     sTipPos = sAnchorPos;
-    // One whoosh as he passes under the anchor, where the swing is fastest.
     if ((previousAngle > 0.0f) != (sSwingAngle > 0.0f)) {
         Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_IT_SWORD_SWING);
     }
@@ -857,7 +814,6 @@ static void TakeOutWhip(PlayState* play, Player* player) {
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_PL_CHANGE_ARMS);
 }
 
-// Z-targeting already points at the foe, so the button lashes straight away; otherwise it opens the aim first.
 static void AimOrLash(Player* player, PlayState* play) {
     Actor* target = player->focusActor;
 
@@ -904,10 +860,8 @@ static bool IsChangingHeldItem(Player* player) {
            player->upperActionFunc == Player_UpperAction_ChangeHeldItem;
 }
 
-// Every press is answered from the end of the player's update, never inside the item-button pass: the aim
-// takes a player action func, and one set from there is overwritten the same frame by whatever action the
-// rest of the update picks. Taking the whip out also plays the item-change animation over the arm, so a
-// press waits for that to finish.
+// Presses are answered at the end of the player's update: an action func set from the item-button pass is overwritten
+// the same frame.
 static void RunPendingWhipAction(Player* player, PlayState* play) {
     if (!sIsLashPending || IsChangingHeldItem(player)) {
         return;
@@ -932,7 +886,6 @@ static void RecoverFromInterruptedAim(Player* player, PlayState* play) {
     StopAiming(player, play);
 }
 
-// A struck enemy turns on Link once the stun wears off, covering half again the ground it was already covering.
 static void DriveEnragedEnemy(void) {
     if (sEnragedEnemy == NULL) {
         return;
@@ -966,15 +919,10 @@ static void UpdateWhipWorld(Player* player) {
     if (sPhase != WHIP_SWINGING) {
         return;
     }
-    // The swing runs here, after the action func: its position, pose and launch are the last word of the
-    // frame whatever action vanilla picked. The item's upper action does not necessarily run from there, so
-    // the host's held-item watchdog has to be told the whip is still out.
     Z64Items_KeepHeld(sApi);
     UpdateSwinging(player, play);
 }
 
-// A and B are the swing's own release, and vanilla would read the same press as "roll" or "draw the sword".
-// The mod reads the raw input, so taking them off Link's copy for those frames costs it nothing.
 static void KeepSwingButtons(Player* player, Input* input) {
     if (sPhase != WHIP_SWINGING) {
         return;
@@ -983,7 +931,6 @@ static void KeepSwingButtons(Player* player, Input* input) {
     input->press.button &= ~(BTN_A | BTN_B | BTN_R);
 }
 
-// Cameras and actors belong to the scene that is ending; holding their ids past it would touch freed state.
 static void ForgetScene(s16 sceneId, s8 spawnNum) {
     Z64Aiming_Drop();
     sCameraId = CAM_ID_NONE;
@@ -994,8 +941,6 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
     sPhase = WHIP_IDLE;
 }
 
-// Nothing touches the matrix between the hand limb and the end of the post-limb pass while the whip is out
-// (no held actor, no shield), so this is the hand bone's own matrix: position and full orientation.
 static void CaptureHandMatrix(Player* player, s32 limbIndex) {
     if (gPlayState == NULL || player != GET_PLAYER(gPlayState) || limbIndex != PLAYER_LIMB_RIGHT_HAND) {
         return;
@@ -1004,7 +949,6 @@ static void CaptureHandMatrix(Player* player, s32 limbIndex) {
     sHasHandMatrix = true;
 }
 
-// Every piece of the whip is modelled along +Z, so yaw then pitch aim it from its origin at its target.
 static void DrawPart(PlayState* play, WhipPart* part, Gfx* displayList) {
     f32 dx = part->target.x - part->origin.x;
     f32 dy = part->target.y - part->origin.y;
@@ -1020,14 +964,11 @@ static void DrawPart(PlayState* play, WhipPart* part, Gfx* displayList) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// The cord is the snake itself: its body piece stretched span by span down the sagging curve, each piece
-// scaled to the gap it covers so they meet, and the head riding at the tip of the last one.
 static void DrawLash(PlayState* play, Vec3f* from, Vec3f* to, f32 sag) {
     f32 dx = to->x - from->x;
     f32 dy = to->y - from->y;
     f32 dz = to->z - from->z;
-    s32 segments =
-        CLAMP((s32)(sqrtf(SQ(dx) + SQ(dy) + SQ(dz)) / WHIP_LASH_SEGMENT_LENGTH), 1, WHIP_LASH_MAX_SEGMENTS);
+    s32 segments = CLAMP((s32)(sqrtf(SQ(dx) + SQ(dy) + SQ(dz)) / WHIP_LASH_SEGMENT_LENGTH), 1, WHIP_LASH_MAX_SEGMENTS);
     WhipPart part = { *from, *from, 1.0f };
 
     for (s32 i = 1; i <= segments; i++) {
@@ -1057,11 +998,9 @@ static void DrawWhipInHand(PlayState* play, Player* player) {
     }
     OPEN_DISPS(play->state.gfxCtx);
     Matrix_Put(&sHandMatrix);
-    // That matrix carries Link's own 0.01 body scale: dividing it back out leaves the offsets in world units.
     Matrix_Scale(unscale, unscale, unscale, MTXMODE_APPLY);
     Matrix_RotateYF(WHIP_HAND_ROT_Y * WHIP_DEGREES_TO_RADIANS, MTXMODE_APPLY);
     Matrix_RotateXF(WHIP_HAND_ROT_X * WHIP_DEGREES_TO_RADIANS, MTXMODE_APPLY);
-    // The offsets come after the rotations, so each slides the whip along its OWN axis.
     Matrix_Translate(0.0f, WHIP_HAND_OFFSET_Y, WHIP_HAND_OFFSET_Z, MTXMODE_APPLY);
     Matrix_Scale(WHIP_HELD_SCALE, WHIP_HELD_SCALE, WHIP_HELD_SCALE, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
@@ -1071,7 +1010,6 @@ static void DrawWhipInHand(PlayState* play, Player* player) {
 
 static void DrawWhip(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
-    // The swing animation hangs Link from his left hand, so that is the hand the rope leaves from.
     s32 bodyPart = sPhase == WHIP_SWINGING ? PLAYER_BODYPART_LEFT_HAND : PLAYER_BODYPART_RIGHT_HAND;
     Vec3f hand = player->bodyPartsPos[bodyPart];
 
@@ -1080,7 +1018,6 @@ static void DrawWhip(Actor* actor, PlayState* play) {
     }
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
     if (sPhase == WHIP_SWINGING) {
-        // The grip stays inside his fist while he hangs: only the rope and the biting head show.
         DrawLash(play, &hand, &sAnchorPos, WHIP_SWING_ROPE_SAG);
         return;
     }
@@ -1095,7 +1032,6 @@ static void DrawWhip(Actor* actor, PlayState* play) {
     }
 }
 
-// Shuffled once by the randomizer; no vanilla logic needs it.
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, WHIP_KEY, WHIP_KEY, "",
 };
@@ -1161,8 +1097,6 @@ static void PublishRemoteVisual(void) {
     }
 }
 
-
-
 static void InitRemoteVisuals(void) {
     if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
         !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
@@ -1175,8 +1109,6 @@ static void InitRemoteVisuals(void) {
         S2H_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, DrawRemoteLimb);
     }
 }
-
-
 
 static void DrawRemoteLimb(Player* player, int32_t limb) {
     PlayState* play = gPlayState;
@@ -1248,7 +1180,6 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
-// The lash hits with the Zora boomerang's damage at arm's reach; its swing is too short to stand in for a hookshot.
 static void GrantWhipLogic(void) {
     static const Z64LogicSource sWhip = { WHIP_KEY };
     static const char* const sLashing[] = { "CanHitSwitch", "CanAttack", "CanDamage", NULL };
@@ -1276,12 +1207,13 @@ S2H_MOD_EXPORT void ModInit(void) {
                                "it straight at a foe.^"
                                "It bites into %ybeams%w, %ybars%w and&%ytorch stands%w so you can swing&"
                                "where you cannot jump,^"
-                               "and it drags %cKeese%w and %cBubbles%w&to your feet.");
+                               "and it drags %bKeese%w and %bBubbles%w&to your feet.");
     Z64Items_SetPauseText(&whip, "%rWhip&%wAim with %y\xB2%w, press again to lash.&"
                                  "Tilt the stick to swing, let go&with %y\xB0%w or %y\xB1%w.");
     Z64Items_SetAction(&whip, TakeOutWhip, UpdateWhipInHand);
     Z64Items_SetHeldCallbacks(&whip, RequestWhipAction, PutWhipAway, NULL);
     Z64Items_SetGetItemModel(&whip, sItemDL);
+    whip.getItemScale = 0.5f;
     whip.modelGroup = PLAYER_MODELGROUP_DEFAULT;
     Z64Items_SetLogic(&whip, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &whip)) {

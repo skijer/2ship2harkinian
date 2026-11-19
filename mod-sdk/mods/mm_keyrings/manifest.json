@@ -1,0 +1,8 @@
+{
+  "name": "mm_keyrings",
+  "author": "Skijer",
+  "version": "1.0",
+  "display_name": "Majora's Mask: Key Rings",
+  "description": "Key rings for the four temples: each one holds every small key of its temple and replaces them in the randomizer pool. Off, Random, Count or a per-temple Selection.",
+  "game": "mm"
+}

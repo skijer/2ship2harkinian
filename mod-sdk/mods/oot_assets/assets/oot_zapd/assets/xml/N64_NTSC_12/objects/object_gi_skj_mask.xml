@@ -1,0 +1,6 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_gi_skj_mask" Segment="6" OutName="oot_object_gi_skj_mask" Game="OOT">
+        <DList Name="gGiSkullMaskDL" Offset="0x09D0" />
+    </File>
+</Root>
