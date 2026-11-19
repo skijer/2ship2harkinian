@@ -304,9 +304,19 @@ jobs:
         key: ${{ steps.restore-cache-deps.outputs.cache-primary-key }}
         path: deps
 
+  # The unsafe edition asks before loading each unsigned mod. It builds in its own job:
+  # reconfiguring the signed build in place loses the vcpkg toolchain on current runners.
   build-windows:
     needs: generate-2ship-otr
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - policy: signed
+            package: 2ship-windows
+          - policy: ask
+            package: 2ship-unbound-unsafe-windows
     steps:
     - name: Install dependencies
       run: |
@@ -324,9 +334,9 @@ jobs:
         max-size: "2G"
         evict-old-files: job
         save: ${{ github.ref_name == github.event.repository.default_branch }}
-        key: ${{ runner.os }}-ccache-${{ github.ref }}-${{ github.sha }}
+        key: ${{ runner.os }}-ccache-${{ matrix.policy }}-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
-          ${{ runner.os }}-ccache-${{ github.ref }}
+          ${{ runner.os }}-ccache-${{ matrix.policy }}-${{ github.ref }}
           ${{ runner.os }}-ccache
     - name: Restore Cached VCPKG folder
       id: restore-cache-vcpkg
@@ -349,12 +359,12 @@ jobs:
         VCPKG_ROOT: ${{github.workspace}}/vcpkg
       run: |
         set $env:PATH="$env:USERPROFILE/.cargo/bin;$env:PATH"
-        cmake -S . -B build-windows -G Ninja -DCMAKE_MAKE_PROGRAM=ninja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DS2H_MOD_POLICY=signed
+        cmake -S . -B build-windows -G Ninja -DCMAKE_MAKE_PROGRAM=ninja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DS2H_MOD_POLICY=${{ matrix.policy }}
         cmake --build build-windows --config Release --parallel 10
 
         (cd build-windows && cpack)
         cd ..
-        mv _packages/*.zip _packages/2ship-windows.zip
+        mv _packages/*.zip _packages/${{ matrix.package }}.zip
     # Mods link against 2ship.lib, the import library of 2ship.dll; it ships next to the game and as its own artifact.
     - name: Find the mod import library
       run: |
@@ -363,6 +373,7 @@ jobs:
         New-Item -ItemType Directory -Force -Path mod-sdk-lib | Out-Null
         Copy-Item -Path $lib.FullName -Destination mod-sdk-lib/2ship.lib
     - name: Upload mod SDK import library
+      if: matrix.policy == 'signed'
       uses: actions/upload-artifact@v7
       with:
         name: unbound-mod-sdk-windows
@@ -370,33 +381,15 @@ jobs:
         path: mod-sdk-lib/2ship.lib
     - name: Unzip package
       run: |
-        Expand-Archive -Path _packages/2ship-windows.zip -DestinationPath 2ship-windows
-        Copy-Item -Path mod-sdk-lib/2ship.lib -Destination 2ship-windows/2ship.lib
+        Expand-Archive -Path _packages/${{ matrix.package }}.zip -DestinationPath ${{ matrix.package }}
+        Copy-Item -Path mod-sdk-lib/2ship.lib -Destination ${{ matrix.package }}/2ship.lib
     - name: Upload build
       uses: actions/upload-artifact@v7
       with:
-        name: 2ship-windows
-        path: 2ship-windows
-    # The mod developers' edition asks before loading each unsigned mod; only ModLoader.cpp and the link rebuild.
-    - name: Build the unsafe mods edition
-      env:
-        VCPKG_ROOT: ${{github.workspace}}/vcpkg
-      run: |
-        Remove-Item -Path _packages/*.zip -Force
-        cmake -S . -B build-windows -DS2H_MOD_POLICY=ask
-        cmake --build build-windows --config Release --parallel 10
-        (cd build-windows && cpack)
-        cd ..
-        mv _packages/*.zip _packages/2ship-unbound-unsafe-windows.zip
-        Expand-Archive -Path _packages/2ship-unbound-unsafe-windows.zip -DestinationPath 2ship-unbound-unsafe-windows
-        Copy-Item -Path mod-sdk-lib/2ship.lib -Destination 2ship-unbound-unsafe-windows/2ship.lib
-    - name: Upload the unsafe mods edition
-      uses: actions/upload-artifact@v7
-      with:
-        name: 2ship-unbound-unsafe-windows
-        path: 2ship-unbound-unsafe-windows
+        name: ${{ matrix.package }}
+        path: ${{ matrix.package }}
     - name: Save Cache VCPKG folder
-      if: ${{ github.ref_name == github.event.repository.default_branch }}
+      if: github.ref_name == github.event.repository.default_branch && matrix.policy == 'signed'
       uses: actions/cache/save@v5
       with:
         key: ${{ steps.restore-cache-vcpkg.outputs.cache-primary-key }}
