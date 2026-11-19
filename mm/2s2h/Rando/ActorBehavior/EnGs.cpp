@@ -114,8 +114,8 @@ RandoCheckId GetRandomCheck(bool repeatableOnlyObtained = false) {
             continue;
         }
 
-        const u32 baseWeight =
-            rcToWeight.contains(randoCheckId) ? rcToWeight[randoCheckId] : Rando::GetItemHintWeight(saveCheck.randoItemId);
+        const u32 baseWeight = rcToWeight.contains(randoCheckId) ? rcToWeight[randoCheckId]
+                                                                 : Rando::GetItemHintWeight(saveCheck.randoItemId);
 
         u32 effectiveWeight = 100 + (baseWeight - 1) * strength;
         totalWeight += effectiveWeight;

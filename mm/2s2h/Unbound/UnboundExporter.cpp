@@ -59,7 +59,6 @@ namespace {
 namespace K = Schema;
 using SOH::SceneCommandID;
 
-// Bump whenever the converter's output changes: every existing base is then converted again.
 constexpr int kConverterRevision = 2;
 constexpr const char* kOtrPrefix = "__OTR__";
 
@@ -294,10 +293,17 @@ Json MeshEntriesJson(const SOH::SetMesh& mesh) {
 }
 
 Json BgImageJson(const SOH::BgImage& image) {
-    return { { K::kUnk00, image.unk_00 }, { K::kId, image.id },         { K::kSource, StripOtrPrefix(image.source) },
-             { K::kUnk0C, image.unk_0C }, { K::kTlut, image.tlut },     { K::kWidth, image.width },
-             { K::kHeight, image.height }, { K::kFmt, image.fmt },      { K::kSiz, image.siz },
-             { K::kMode0, image.mode0 },  { K::kTlutCount, image.tlutCount } };
+    return { { K::kUnk00, image.unk_00 },
+             { K::kId, image.id },
+             { K::kSource, StripOtrPrefix(image.source) },
+             { K::kUnk0C, image.unk_0C },
+             { K::kTlut, image.tlut },
+             { K::kWidth, image.width },
+             { K::kHeight, image.height },
+             { K::kFmt, image.fmt },
+             { K::kSiz, image.siz },
+             { K::kMode0, image.mode0 },
+             { K::kTlutCount, image.tlutCount } };
 }
 
 Json PrerenderedMeshJson(const SOH::SetMesh& mesh) {
@@ -414,8 +420,11 @@ Json MinimapJson(const SOH::SetMinimapList& command) {
     Json entries = Json::object();
     for (size_t i = 0; i < command.entries.size(); i++) {
         const SOH::MinimapEntryData& entry = command.entries[i];
-        entries[std::to_string(i)] = { { K::kMapId, entry.mapId }, { K::kUnk2, entry.unk2 }, { K::kUnk4, entry.unk4 },
-                                       { K::kUnk6, entry.unk6 },   { K::kUnk8, entry.unk8 } };
+        entries[std::to_string(i)] = { { K::kMapId, entry.mapId },
+                                       { K::kUnk2, entry.unk2 },
+                                       { K::kUnk4, entry.unk4 },
+                                       { K::kUnk6, entry.unk6 },
+                                       { K::kUnk8, entry.unk8 } };
     }
     return { { K::kScale, command.list.scale }, { K::kEntries, entries } };
 }
@@ -424,8 +433,11 @@ Json MinimapChestsJson(const SOH::SetMinimapChests& command) {
     Json list = Json::object();
     for (size_t i = 0; i < command.chests.size(); i++) {
         const SOH::MinimapChestData& chest = command.chests[i];
-        list[std::to_string(i)] = { { K::kUnk0, chest.unk_0 }, { K::kUnk2, chest.unk_2 }, { K::kUnk4, chest.unk_4 },
-                                    { K::kUnk6, chest.unk_6 }, { K::kUnk8, chest.unk_8 } };
+        list[std::to_string(i)] = { { K::kUnk0, chest.unk_0 },
+                                    { K::kUnk2, chest.unk_2 },
+                                    { K::kUnk4, chest.unk_4 },
+                                    { K::kUnk6, chest.unk_6 },
+                                    { K::kUnk8, chest.unk_8 } };
     }
     return list;
 }
@@ -434,36 +446,57 @@ bool ConvertRoom(ExportContext& ctx, const std::string& roomPath, std::string& d
 
 std::string ConvertCollision(ExportContext& ctx, const std::string& source) {
     const std::string key = "collision:" + source;
-    if (ctx.resourceDocuments.contains(key)) { return ctx.resourceDocuments[key]; }
+    if (ctx.resourceDocuments.contains(key)) {
+        return ctx.resourceDocuments[key];
+    }
     const auto resource = std::dynamic_pointer_cast<SOH::CollisionHeader>(
         Ship::Context::GetRawInstance()->GetResourceManager()->LoadResourceProcess(source));
-    if (!resource) { ctx.report.failures++; return source; }
+    if (!resource) {
+        ctx.report.failures++;
+        return source;
+    }
     const std::string path = ctx.sceneDir + "/collision-" + std::to_string(ctx.resourceDocuments.size());
     std::string bulk;
     auto word = [&](uint32_t value, size_t size) {
-        for (size_t i = 0; i < size; i++) { bulk.push_back((value >> (8 * i)) & 255); }
+        for (size_t i = 0; i < size; i++) {
+            bulk.push_back((value >> (8 * i)) & 255);
+        }
     };
-    for (const auto& vertex : resource->vertices) { word(vertex.x, 4); word(vertex.y, 4); word(vertex.z, 4); }
+    for (const auto& vertex : resource->vertices) {
+        word(vertex.x, 4);
+        word(vertex.y, 4);
+        word(vertex.z, 4);
+    }
     for (const auto& polygon : resource->polygons) {
-        word(polygon.type, 2); word(0, 2);
-        word(polygon.flags_vIA, 4); word(polygon.flags_vIB, 4); word(polygon.vIC, 4);
-        word(polygon.normal.x, 2); word(polygon.normal.y, 2); word(polygon.normal.z, 2); word(0, 2);
+        word(polygon.type, 2);
+        word(0, 2);
+        word(polygon.flags_vIA, 4);
+        word(polygon.flags_vIB, 4);
+        word(polygon.vIC, 4);
+        word(polygon.normal.x, 2);
+        word(polygon.normal.y, 2);
+        word(polygon.normal.z, 2);
+        word(0, 2);
         word(polygon.dist, 4);
     }
     Json document = { { "$schema", "2ship-unbound/collision/1" },
-        { "bulk", { { "file", path + ".bin" }, { "vertices", resource->vertices.size() }, { "polys", resource->polygons.size() } } },
-        { "surfaceTypes", Json::object() }, { "cameraPositions", Json::object() },
-        { "cameras", Json::object() }, { "waterBoxes", Json::object() } };
+                      { "bulk",
+                        { { "file", path + ".bin" },
+                          { "vertices", resource->vertices.size() },
+                          { "polys", resource->polygons.size() } } },
+                      { "surfaceTypes", Json::object() },
+                      { "cameraPositions", Json::object() },
+                      { "cameras", Json::object() },
+                      { "waterBoxes", Json::object() } };
     const auto& bounds = resource->collisionHeaderData;
-    document["bounds"] = {
-        { "min", Json::array({ bounds.minBounds.x, bounds.minBounds.y, bounds.minBounds.z }) },
-        { "max", Json::array({ bounds.maxBounds.x, bounds.maxBounds.y, bounds.maxBounds.z }) }
-    };
+    document["bounds"] = { { "min", Json::array({ bounds.minBounds.x, bounds.minBounds.y, bounds.minBounds.z }) },
+                           { "max", Json::array({ bounds.maxBounds.x, bounds.maxBounds.y, bounds.maxBounds.z }) } };
     for (size_t i = 0; i < resource->surfaceTypes.size(); i++) {
         const auto& surface = resource->surfaceTypes[i];
         document["surfaceTypes"][std::to_string(i)] = { { "raw", Json::array({ surface.data[0], surface.data[1] }) } };
         for (const PackedField& field : kSurfaceFields) {
-            document["surfaceTypes"][std::to_string(i)][field.key] = (surface.data[field.word] >> field.shift) & field.mask;
+            document["surfaceTypes"][std::to_string(i)][field.key] =
+                (surface.data[field.word] >> field.shift) & field.mask;
         }
     }
     for (size_t i = 0; i < resource->camPosData.size(); i++) {
@@ -474,39 +507,60 @@ std::string ConvertCollision(ExportContext& ctx, const std::string& source) {
         const auto& camera = resource->camData[i];
         const uintptr_t pointer = (uintptr_t)camera.camPosData;
         const uintptr_t start = (uintptr_t)resource->camPosData.data();
-        const int64_t index = pointer >= start && pointer < start + resource->camPosData.size() * sizeof(Vec3s) ?
-            (pointer - start) / sizeof(Vec3s) : -1;
-        document["cameras"][std::to_string(i)] = { { "setting", camera.cameraSType }, { "count", camera.numCameras }, { "positionIndex", index } };
+        const int64_t index = pointer >= start && pointer < start + resource->camPosData.size() * sizeof(Vec3s)
+                                  ? (pointer - start) / sizeof(Vec3s)
+                                  : -1;
+        document["cameras"][std::to_string(i)] = { { "setting", camera.cameraSType },
+                                                   { "count", camera.numCameras },
+                                                   { "positionIndex", index } };
     }
     for (size_t i = 0; i < resource->waterBoxes.size(); i++) {
         const auto& water = resource->waterBoxes[i];
-        document["waterBoxes"][std::to_string(i)] = {
-            { "xMin", water.xMin }, { "ySurface", water.ySurface }, { "zMin", water.zMin },
-            { "xLength", water.xLength }, { "zLength", water.zLength }, { "room", water.room },
-            { "camera", water.properties & 255 }, { "lightSetting", (water.properties >> 8) & 31 },
-            { "notSwimmable", (water.properties >> 19) & 1 }
-        };
+        document["waterBoxes"][std::to_string(i)] = { { "xMin", water.xMin },
+                                                      { "ySurface", water.ySurface },
+                                                      { "zMin", water.zMin },
+                                                      { "xLength", water.xLength },
+                                                      { "zLength", water.zLength },
+                                                      { "room", water.room },
+                                                      { "camera", water.properties & 255 },
+                                                      { "lightSetting", (water.properties >> 8) & 31 },
+                                                      { "notSwimmable", (water.properties >> 19) & 1 } };
     }
-    if (!ctx.zip.Add(path + ".bin", bulk) || !ctx.zip.Add(path + ".json", document.dump(2))) { ctx.report.failures++; }
+    if (!ctx.zip.Add(path + ".bin", bulk) || !ctx.zip.Add(path + ".json", document.dump(2))) {
+        ctx.report.failures++;
+    }
     return ctx.resourceDocuments[key] = path + ".json";
 }
 Json ConvertPaths(ExportContext& ctx, const std::vector<std::string>& sources) {
     Json paths = Json::array();
     for (const auto& source : sources) {
         const std::string key = "path:" + source;
-        if (ctx.resourceDocuments.contains(key)) { paths.push_back(ctx.resourceDocuments[key]); continue; }
+        if (ctx.resourceDocuments.contains(key)) {
+            paths.push_back(ctx.resourceDocuments[key]);
+            continue;
+        }
         const auto resource = std::dynamic_pointer_cast<SOH::PathMM>(
             Ship::Context::GetRawInstance()->GetResourceManager()->LoadResourceProcess(source));
-        if (!resource) { ctx.report.failures++; paths.push_back(source); continue; }
+        if (!resource) {
+            ctx.report.failures++;
+            paths.push_back(source);
+            continue;
+        }
         Json document = { { "$schema", "2ship-unbound/path/1" }, { "paths", Json::object() } };
         for (size_t i = 0; i < resource->pathData.size(); i++) {
             const auto& path = resource->pathData[i];
             Json points = Json::array();
-            for (size_t j = 0; j < path.count; j++) { points.push_back(Json::array({ path.points[j].x, path.points[j].y, path.points[j].z })); }
-            document["paths"][std::to_string(i)] = { { "points", points }, { "additionalPathIndex", path.additionalPathIndex }, { "customValue", path.customValue } };
+            for (size_t j = 0; j < path.count; j++) {
+                points.push_back(Json::array({ path.points[j].x, path.points[j].y, path.points[j].z }));
+            }
+            document["paths"][std::to_string(i)] = { { "points", points },
+                                                     { "additionalPathIndex", path.additionalPathIndex },
+                                                     { "customValue", path.customValue } };
         }
         const std::string path = ctx.sceneDir + "/paths-" + std::to_string(ctx.resourceDocuments.size()) + ".json";
-        if (!ctx.zip.Add(path, document.dump(2))) { ctx.report.failures++; }
+        if (!ctx.zip.Add(path, document.dump(2))) {
+            ctx.report.failures++;
+        }
         paths.push_back(path);
         ctx.resourceDocuments[key] = path;
     }
@@ -593,7 +647,9 @@ void AddCommand(ExportContext& ctx, Json& setup, const std::shared_ptr<SOH::ISce
             break;
         case SceneCommandID::SetTimeSettings: {
             const auto& time = As<SOH::SetTimeSettings>(command)->settings;
-            setup[K::kTime] = { { K::kHour, time.hour }, { K::kMinute, time.minute }, { K::kIncrement, time.timeIncrement } };
+            setup[K::kTime] = { { K::kHour, time.hour },
+                                { K::kMinute, time.minute },
+                                { K::kIncrement, time.timeIncrement } };
             break;
         }
         case SceneCommandID::SetSkyboxSettings: {
@@ -651,7 +707,6 @@ void AddCommand(ExportContext& ctx, Json& setup, const std::shared_ptr<SOH::ISce
     }
 }
 
-// Each command adds at most one key; the keys in the order they appear keep the engine's command order.
 Json SetupJson(ExportContext& ctx, const SOH::Scene& scene) {
     Json setup = Json::object();
     Json order = Json::array();
@@ -800,23 +855,33 @@ ExportReport ExportArchive(const std::string& outPath) {
     }
     ConvertAllScenes(ctx);
     for (const auto& language : { std::pair{ "eng", "text/message_data_static/message_data_static" },
-                                 std::pair{ "staff", "text/staff_message_data_static/staff_message_data_static" } }) {
+                                  std::pair{ "staff", "text/staff_message_data_static/staff_message_data_static" } }) {
         const auto resource = std::dynamic_pointer_cast<SOH::TextMM>(
             Ship::Context::GetRawInstance()->GetResourceManager()->LoadResourceProcess(language.second));
-        if (!resource) { continue; }
+        if (!resource) {
+            continue;
+        }
         Json document = { { "$schema", "2ship-unbound/text/1" }, { "messages", Json::object() } };
         for (const auto& message : resource->messages) {
-            if (message.id == 0xFFFF) { continue; }
+            if (message.id == 0xFFFF) {
+                continue;
+            }
             std::string text;
             for (uint8_t byte : message.msg) {
-                if (byte < 128) { text.push_back(byte); }
-                else { text.push_back(0xC0 | (byte >> 6)); text.push_back(0x80 | (byte & 63)); }
+                if (byte < 128) {
+                    text.push_back(byte);
+                } else {
+                    text.push_back(0xC0 | (byte >> 6));
+                    text.push_back(0x80 | (byte & 63));
+                }
             }
-            document["messages"][std::to_string(message.id)] = {
-                { "box", message.textboxType }, { "ypos", message.textboxYPos }, { "icon", message.icon },
-                { "nextMessage", message.nextMessageID }, { "firstItemCost", message.firstItemCost },
-                { "secondItemCost", message.secondItemCost }, { "text", text }
-            };
+            document["messages"][std::to_string(message.id)] = { { "box", message.textboxType },
+                                                                 { "ypos", message.textboxYPos },
+                                                                 { "icon", message.icon },
+                                                                 { "nextMessage", message.nextMessageID },
+                                                                 { "firstItemCost", message.firstItemCost },
+                                                                 { "secondItemCost", message.secondItemCost },
+                                                                 { "text", text } };
         }
         if (!ctx.zip.Add(std::string("text/") + language.first + "/messages.json", document.dump(2))) {
             ctx.report.failures++;
@@ -827,12 +892,19 @@ ExportReport ExportArchive(const std::string& outPath) {
     const auto base = Archives()->GetArchiveFromFile(basePath);
     if (base) {
         std::vector<std::string> names;
-        for (const auto& [hash, name] : *base->ListFiles()) { if (name != K::kManifestPath) { names.push_back(name); } }
+        for (const auto& [hash, name] : *base->ListFiles()) {
+            if (name != K::kManifestPath) {
+                names.push_back(name);
+            }
+        }
         std::sort(names.begin(), names.end());
         for (const auto& name : names) {
             const auto file = base->LoadFile(name);
-            const std::string bytes = file && file->Buffer ? std::string(file->Buffer->begin(), file->Buffer->end()) : "";
-            if (!ctx.zip.Add(name, bytes)) { ctx.report.failures++; }
+            const std::string bytes =
+                file && file->Buffer ? std::string(file->Buffer->begin(), file->Buffer->end()) : "";
+            if (!ctx.zip.Add(name, bytes)) {
+                ctx.report.failures++;
+            }
             ctx.report.copied++;
         }
     }

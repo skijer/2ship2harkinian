@@ -11,16 +11,6 @@ extern "C" {
 extern PlayState* gPlayState;
 }
 
-/**
- * PLAYER_UPDATE
- *
- * Contains real-time data necessary to update other clients in the same scene as the player
- *
- * Sent every frame to other clients within the same scene
- *
- * Note: This packet is sent _a lot_, so please do not include any unnecessary data in it
- */
-
 void Anchor::SendPacket_PlayerUpdate() {
     if (!IsSaveLoaded()) {
         return;
@@ -92,17 +82,22 @@ void Anchor::HandlePacket_PlayerUpdate(nlohmann::json payload) {
         client.formKey = payload.value("formKey", std::string());
         client.heldCustomItemKey = payload.value("heldCustomItemKey", std::string());
         client.wornCustomItemKeys = payload.value("wornCustomItemKeys", std::vector<std::string>());
-        if (client.formKey.size() > 128) client.formKey.clear();
-        if (client.heldCustomItemKey.size() > 128) client.heldCustomItemKey.clear();
-        if (client.wornCustomItemKeys.size() > 64) client.wornCustomItemKeys.clear();
+        if (client.formKey.size() > 128)
+            client.formKey.clear();
+        if (client.heldCustomItemKey.size() > 128)
+            client.heldCustomItemKey.clear();
+        if (client.wornCustomItemKeys.size() > 64)
+            client.wornCustomItemKeys.clear();
         client.wornCustomItemKeyPointers.clear();
         for (const auto& key : client.wornCustomItemKeys) {
-            if (key.size() <= 128) client.wornCustomItemKeyPointers.push_back(key.c_str());
+            if (key.size() <= 128)
+                client.wornCustomItemKeyPointers.push_back(key.c_str());
         }
         client.sceneId = payload.value("sceneId", (s16)SCENE_MAX);
         client.entrance = payload.value("entrance", (s32)0);
         client.transformation = payload.value("transformation", (uint8_t)PLAYER_FORM_HUMAN);
-        if (client.transformation >= PLAYER_FORM_MAX) client.transformation = PLAYER_FORM_HUMAN;
+        if (client.transformation >= PLAYER_FORM_MAX)
+            client.transformation = PLAYER_FORM_HUMAN;
         client.posRot = payload.value("posRot", PosRot{});
         std::vector<u8> jointTableVec = payload.value("jointTable", std::vector<u8>{});
         std::vector<u8> upperJointTableVec = payload.value("upperJointTable", std::vector<u8>{});

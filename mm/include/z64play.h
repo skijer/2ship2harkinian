@@ -93,7 +93,7 @@ typedef struct PlayState {
     /* 0x18854 */ ActorEntry* setupActorList;
     /* 0x18858 */ ActorCsCamInfo* actorCsCamList;
     /* 0x1885C */ EntranceEntry* setupEntranceList;
-    /* 0x18860 */ u32* setupExitList; // 2S2H [Unbound] entrances are 32-bit (see Entrance_GetTableEntry)
+    /* 0x18860 */ u32* setupExitList;
     /* 0x18864 */ Path* setupPathList;
     /* 0x18868 */ void* naviQuestHints; // leftover from OoT, system which processes this is removed
     /* 0x1886C */ AnimatedMaterial* sceneMaterialAnims;

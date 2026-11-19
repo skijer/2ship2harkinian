@@ -66,6 +66,7 @@ struct RegisteredCustomItem {
     std::vector<int32_t> poolSources;
     FormKeyList allowedForms;
     S2HCustomItemRandomizer randomizer = {};
+    S2HKeyRing keyRing = {};
     S2HCustomItemDefinition definition = {};
     uint16_t runtimeId = 0;
 };
@@ -115,7 +116,6 @@ bool IsValidButton(uint8_t button) {
            IsDpadButton(button);
 }
 
-// Only B differs per form; C and D-pad buttons are shared by every form.
 std::string& EquippedKey(uint8_t button) {
     return sEquippedKeys[button == S2H_ITEM_BUTTON_B ? CUR_FORM : 0][button];
 }
@@ -228,7 +228,6 @@ void ReadSection(const nlohmann::json& section) {
             RANDO_SAVE_CHECKS[check].randoItemId = (RandoItemId)item;
         }
     }
-    // Migrate former separately equipable wand rewards into their parent slot.
     for (auto& form : sEquippedKeys) {
         for (auto& key : form) {
             const auto* variant = CustomItemRegistry_GetPickupVariant(key.c_str());
@@ -307,7 +306,6 @@ void PutAwayHeldItem(PlayState* play, Player* player) {
     Player_InitItemActionWithAnim(play, player, PLAYER_IA_NONE);
 }
 
-// A held item whose upper action stopped running (cutscene, damage) is put away rather than left stuck in the hand.
 void PutAwayStalledHeldItem(Player* player) {
     if (sHeldItem.empty() || gPlayState == nullptr) {
         return;
@@ -419,10 +417,13 @@ void CustomItemRegistry_DrawAcquisition(const char* key, PlayState* play) {
         const float scale = definition->getItemScale > 0.0f ? definition->getItemScale : 0.13333333f;
         Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
         Gfx_SetupDL25_Opa(play->state.gfxCtx);
+        // No actor binds segments for a pickup: one the model calls would run the last actor's leftover as opcodes.
+        for (u8 segment = 0x08; segment <= 0x0C; segment++) {
+            gSPSegment(POLY_OPA_DISP++, segment, (uintptr_t)gEmptyDL);
+        }
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
         gSPDisplayList(POLY_OPA_DISP++, (Gfx*)definition->getItemModelPath);
     } else if (definition->iconPath != nullptr && ResourceMgr_FileExists(definition->iconPath)) {
-        // Icon-only mods remain visible without pretending they have a get-item model.
         static Vtx vertices[] = {
             { { { -24, -24, 0 }, 0, { 0, 1024 }, { 255, 255, 255, 255 } } },
             { { { 24, -24, 0 }, 0, { 1024, 1024 }, { 255, 255, 255, 255 } } },
@@ -432,7 +433,7 @@ void CustomItemRegistry_DrawAcquisition(const char* key, PlayState* play) {
         Matrix_ReplaceRotation(&play->billboardMtxF);
         Gfx_SetupDL25_Xlu(play->state.gfxCtx);
         gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_CULL_BACK);
-        gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+        gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_PASS2);
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
         gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
         gDPLoadTextureBlock(POLY_XLU_DISP++, definition->iconPath, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0, G_TX_CLAMP,
@@ -579,6 +580,23 @@ bool IsValidDefinition(const S2HCustomItemDefinition* definition) {
     return true;
 }
 
+bool StoreKeyRing(RegisteredCustomItem& item) {
+    const S2HKeyRing* keyRing = item.randomizer.keyRing;
+    if (keyRing == nullptr) {
+        return true;
+    }
+    const bool isValid = keyRing->structSize >= S2H_KEY_RING_MIN_SIZE &&
+                         keyRing->dungeon <= DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE && keyRing->count > 0;
+    if (!isValid) {
+        SPDLOG_ERROR("[CustomItemRegistry] Custom item '{}' supplied an invalid key ring", item.key);
+        return false;
+    }
+    std::memcpy(&item.keyRing, keyRing, std::min<size_t>(keyRing->structSize, sizeof(item.keyRing)));
+    item.keyRing.structSize = sizeof(item.keyRing);
+    item.randomizer.keyRing = &item.keyRing;
+    return true;
+}
+
 // Copies the caller's randomizer data so the pointer in the stored definition outlives the mod's stack.
 bool StoreRandomizer(RegisteredCustomItem& item, const S2HCustomItemRandomizer* randomizer) {
     item.definition.randomizer = nullptr;
@@ -607,11 +625,13 @@ bool StoreRandomizer(RegisteredCustomItem& item, const S2HCustomItemRandomizer* 
     SetString(item.randomizer.progressionGroup, item.progressionGroup, item.randomizer.progressionGroup);
     SetString(item.randomizer.poolCountOption, item.poolCountOption, item.randomizer.poolCountOption);
     SetString(item.randomizer.poolModeOption, item.poolModeOption, item.randomizer.poolModeOption);
+    if (!StoreKeyRing(item)) {
+        return false;
+    }
     item.definition.randomizer = &item.randomizer;
     return true;
 }
 
-// Reads the host's copy, where a definition older than these fields left them zeroed.
 bool StoreUseRestrictions(RegisteredCustomItem& item) {
     S2HCustomItemDefinition& definition = item.definition;
     const bool isAgeKnown = definition.ageRequirement <= S2H_CUSTOM_ITEM_AGE_ADULT;
@@ -668,6 +688,22 @@ const char* CustomItemRegistry_FindPickupKey(const char* itemKey, const char* va
         }
     }
     return nullptr;
+}
+
+std::vector<const S2HCustomPickupVariant*> CustomItemRegistry_ListPickupVariants(const char* itemKey) {
+    std::vector<const S2HCustomPickupVariant*> variants;
+    if (itemKey == nullptr) {
+        return variants;
+    }
+    for (const auto& [key, pickup] : sPickupVariants) {
+        if (pickup->itemKey == itemKey) {
+            variants.push_back(&pickup->definition);
+        }
+    }
+    std::sort(variants.begin(), variants.end(), [](const auto* left, const auto* right) {
+        return CustomItemRegistry_GetRuntimeId(left->key) < CustomItemRegistry_GetRuntimeId(right->key);
+    });
+    return variants;
 }
 
 static void ReceivePickupVariant(const char* key) {
@@ -777,6 +813,34 @@ bool CustomItemRegistry_Register(const S2HCustomItemDefinition* definition) {
 
 const S2HCustomItemDefinition* CustomItemRegistry_Find(const char* key) {
     return key == nullptr ? nullptr : FindDefinition(key);
+}
+
+static std::string ReadHighlightedName(const char* getItemText) {
+    if (getItemText == nullptr) {
+        return {};
+    }
+    const std::string text = getItemText;
+    const size_t colour = text.find('%');
+    const size_t end = colour == std::string::npos ? colour : text.find('%', colour + 2);
+    if (end == std::string::npos) {
+        return {};
+    }
+    std::string name = text.substr(colour + 2, end - colour - 2);
+    std::replace(name.begin(), name.end(), '&', ' ');
+    // A button glyph or an accent is a raw text byte, which neither an item list's JSON nor a menu can carry.
+    const bool isPlain = std::all_of(name.begin(), name.end(), [](unsigned char c) { return c >= ' ' && c <= '~'; });
+    return isPlain ? name : std::string{};
+}
+
+std::string CustomItemRegistry_GetDisplayName(const char* key) {
+    const S2HCustomItemDefinition* definition = CustomItemRegistry_Find(key);
+    if (definition == nullptr) {
+        return {};
+    }
+    if (definition->displayName != nullptr && definition->displayName[0] != '\0') {
+        return definition->displayName;
+    }
+    return ReadHighlightedName(definition->getItemText);
 }
 
 std::string CustomItemRegistry_GetOwner(const char* key) {
@@ -1128,7 +1192,6 @@ uint8_t CustomItemRegistry_GetHeldMeleeWeapon(void) {
     return definition == nullptr ? 0 : definition->meleeWeapon;
 }
 
-// A definition that never sets a model group is zero-initialised and keeps the vanilla default.
 uint8_t CustomItemRegistry_GetActiveModelGroup(void) {
     const S2HCustomItemDefinition* definition = FindDefinition(sActiveItem);
     if (definition == nullptr || definition->modelGroup == PLAYER_MODELGROUP_0 ||
@@ -1173,7 +1236,6 @@ void CustomItemRegistry_DrawHeld(Player* player, PlayState* play) {
     if (definition == nullptr) {
         return;
     }
-    // Another player's item with an appearance is drawn at its own limb (DrawOtherPlayerAppearance).
     if (isOtherPlayer && definition->appearance.modelPath != nullptr) {
         return;
     }
@@ -1269,7 +1331,6 @@ const char* CustomItemRegistry_GetActorItem(Actor* actor) {
     return item == sActorItems.end() ? nullptr : item->second.c_str();
 }
 
-// MM has no get-item table for these: the fanfare and the textbox are the whole acquisition.
 bool CustomItemRegistry_Give(PlayState* play, const char* key) {
     if (const char* next = ProgressiveItems_ResolvePickup(key, UINT16_MAX)) {
         key = next;

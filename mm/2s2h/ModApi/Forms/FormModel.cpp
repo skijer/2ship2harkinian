@@ -65,7 +65,6 @@ FlexSkeletonHeader* LoadSkeleton(const char* rigDirectory, const char* skeleton)
     return reinterpret_cast<FlexSkeletonHeader*>(header);
 }
 
-// MM has no ages: Human Link is the child, so a form's child rig is the natural fit and the adult one the fallback.
 FlexSkeletonHeader* ActiveSkeleton() {
     if (!sTriedRigs) {
         sTriedRigs = true;
@@ -122,7 +121,6 @@ std::string FaceTexturePath(const char* rigDirectory, const std::string& texture
     return sModelPath + rigDirectory + textureName;
 }
 
-// A mirror is authored either with MM's texture names or with OoT's gLink{Adult,Child}Eyes*/Mouth* ones.
 const char* FindFaceTexture(const char* vanillaPath, const std::string& ootName) {
     const char* leaf = VanillaPlayerLeaf(vanillaPath);
     const std::string mirrored = leaf != nullptr ? sModelPath + "/" + leaf : std::string();

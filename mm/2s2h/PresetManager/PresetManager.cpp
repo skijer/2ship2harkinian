@@ -657,7 +657,6 @@ nlohmann::json voyage3PresetJ = R"(
 )"_json;
 
 std::unordered_map<std::string, std::pair<nlohmann::json, std::set<std::string>>> presets = {};
-// Resolved on use: inside Fleet the app directory becomes 2ship's install only once it joins the host.
 static std::filesystem::path PresetsFolderPath() {
     return Ship::Context::GetPathRelativeToAppDirectory("presets", appShortName);
 }

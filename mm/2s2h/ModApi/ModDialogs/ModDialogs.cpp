@@ -21,7 +21,6 @@ enum class DialogChoice : int {
     Yes,
 };
 
-// Every dialog is titled with the mod's name, so a mod cannot pass its questions off as the game's.
 bool AskFor(const ModIdentity* mod, const char* title, const std::string& message, const char* yes, const char* no) {
     if (mod == nullptr) {
         return false;
@@ -58,7 +57,6 @@ std::wstring GetOriginalArguments() {
     return line == nullptr ? L"" : line;
 }
 
-// The new process starts once this one has had time to close, so it finds the mods folder free.
 bool ScheduleRelaunch() {
     wchar_t executable[MAX_PATH];
     if (GetModuleFileNameW(nullptr, executable, MAX_PATH) == 0) {

@@ -1,8 +1,6 @@
 #ifndef S2H_Z64AIMING_H
 #define S2H_Z64AIMING_H
 
-// Shipwright's z64aiming API on Majora's Mask: the first-person camera and the native aiming rotation stand in for
-// OoT's Player_Action first-person handlers. The host keeps Link still while a custom item is aimed.
 #include "2s2h/ModApi/ModApi.h"
 #include "align_asset_macro.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -80,7 +78,6 @@ static inline bool Z64Aiming_Request(Player* player, PlayState* play) {
     return true;
 }
 
-// Same inversion, sensitivity, gyro and limits as the native bow; once per frame however often it is called.
 static inline void Z64Aiming_Update(Player* player, PlayState* play) {
     if (!sZ64Aiming || player == NULL || play == NULL) {
         return;
@@ -138,7 +135,6 @@ static inline void Z64Aiming_GetDirection(Player* player, s16* yaw, s16* pitch) 
     }
 }
 
-// The hookshot's reticle has no toggle; MM has a single Bow Reticle option, which the boomerang style follows too.
 static inline bool Z64Aiming_IsReticleEnabled(Z64AimingReticleToggle toggle) {
     switch (toggle) {
         case Z64AIMING_TOGGLE_BOW:
@@ -182,7 +178,6 @@ static inline Gfx* Z64AimingImpl_GetUntintedReticleDL(void) {
     return NULL;
 }
 
-// Shown only on a surface within range, scaled like Player_DrawHookshotReticle.
 static inline void Z64Aiming_DrawReticle(PlayState* play, Player* player, f32 range, Z64AimingReticleStyle style) {
     if (play == NULL || player == NULL || !Z64Aiming_IsReticleEnabled(style.toggle)) {
         return;

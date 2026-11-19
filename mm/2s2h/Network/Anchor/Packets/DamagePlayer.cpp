@@ -11,10 +11,6 @@ void func_80833B18(PlayState* play, Player* player, s32 arg2, f32 speed, f32 vel
                    s32 invincibilityTimer);
 }
 
-/**
- * DAMAGE_PLAYER
- */
-
 void Anchor::SendPacket_DamagePlayer(u32 clientId, u8 damageEffect, u8 damage) {
     if (!IsSaveLoaded()) {
         return;
@@ -43,7 +39,6 @@ void Anchor::HandlePacket_DamagePlayer(nlohmann::json payload) {
     Player* otherPlayer = anchorClient.player;
     Player* self = GET_PLAYER(gPlayState);
 
-    // Prevent incoming damage during cutscenes or item get sequences
     if (Player_InBlockingCsMode(gPlayState, self) || self->stateFlags1 & PLAYER_STATE1_400 ||
         self->stateFlags1 & PLAYER_STATE1_10000000) {
         return;

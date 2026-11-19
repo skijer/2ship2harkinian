@@ -17,11 +17,9 @@ extern "C" {
 
 namespace {
 
-// Above every vanilla text id and below 0x4E20, where Message_OpenText switches to the credits font.
 constexpr uint16_t FirstModMessageId = 0x4000;
 constexpr uint16_t LastModMessageId = 0x4DFF;
 
-// Vanilla Tatl hints stop at TATL_HINT_ID_MUSHROOM (0x64); mods take the top of the range, below TATL_HINT_ID_NONE.
 constexpr uint16_t TatlHintTextBase = 0x1900;
 constexpr uint8_t FirstModTatlHintId = 0xA0;
 constexpr uint8_t LastModTatlHintId = 0xFE;

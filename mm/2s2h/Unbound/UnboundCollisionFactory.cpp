@@ -13,7 +13,6 @@ namespace S2H::Unbound {
 
 namespace {
 
-// Bulk layout shared with SoH: Unbound's collision.bin v3, little-endian, vertices then polygons.
 constexpr size_t kBulkVertexSize = 12;
 constexpr size_t kBulkPolySize = 28;
 constexpr u32 kBulkIndexMask = 0x1FFFFFFF;
@@ -91,10 +90,14 @@ void ReadSurfaceTypes(SOH::CollisionHeader& header, const Json& list, const std:
     for (const auto& key : PositionalKeys(list, where + "." + Schema::kSurfaceTypes)) {
         SOH::SurfaceType surface = {};
         const Json& raw = SubArray(list[key], "raw");
-        if (raw.size() == 2) { surface.data[0] = ToInt(raw[0]); surface.data[1] = ToInt(raw[1]); }
+        if (raw.size() == 2) {
+            surface.data[0] = ToInt(raw[0]);
+            surface.data[1] = ToInt(raw[1]);
+        }
         for (const PackedField& field : kSurfaceFields) {
             if (list[key].contains(field.key)) {
-                surface.data[field.word] = (surface.data[field.word] & ~(field.mask << field.shift)) | PackField(list[key], field);
+                surface.data[field.word] =
+                    (surface.data[field.word] & ~(field.mask << field.shift)) | PackField(list[key], field);
             }
         }
         header.surfaceTypes.push_back(surface);
@@ -140,7 +143,8 @@ void ReadWaterBoxes(SOH::CollisionHeader& header, const Json& list, const std::s
         }
         header.waterBoxes.push_back({ IntegralField(entry, Schema::kXMin), IntegralField(entry, Schema::kYSurface),
                                       IntegralField(entry, Schema::kZMin), IntegralField(entry, Schema::kXLength),
-                                      IntegralField(entry, Schema::kZLength), WaterBoxProperties(entry), (s32)Field(entry, Schema::kRoom, -1) });
+                                      IntegralField(entry, Schema::kZLength), WaterBoxProperties(entry),
+                                      (s32)Field(entry, Schema::kRoom, -1) });
     }
 }
 

@@ -27,7 +27,6 @@ constexpr const char* VanillaPageKey = "vanilla";
 constexpr uint8_t MaxItemRows = 4;
 constexpr uint8_t MaxItemColumns = 6;
 constexpr uint8_t QuestPointCount = QUEST_HEART_PIECE + 1;
-// Below S2H_ITEM_PAGE_QUEST_VANILLA, clear of the small page numbers mods give their items directly.
 constexpr uint16_t FirstItemPageId = 0x80;
 constexpr uint16_t ItemPageLimit = S2H_ITEM_PAGE_QUEST_VANILLA - FirstItemPageId;
 constexpr uint16_t QuestPageLimit = S2H_ITEM_PAGE_VANILLA - S2H_ITEM_PAGE_QUEST_VANILLA - 1;
@@ -44,9 +43,28 @@ struct Page {
     uint16_t flags = 0;
     std::array<std::string, 4> cursorCorners;
     std::array<const char*, 4> cursorPointers{};
+    std::string ownerForm;
 };
 
 std::map<std::string, Page> sPages;
+
+const char* GetDeclaredOwnerForm(const S2HLayoutPage* definition) {
+    const size_t requiredSize = offsetof(S2HLayoutPage, ownerForm) + sizeof(definition->ownerForm);
+    return definition->structSize >= requiredSize ? definition->ownerForm : nullptr;
+}
+
+bool IsFormPageOwned(const char* formKey) {
+    return std::any_of(sPages.begin(), sPages.end(),
+                       [formKey](const auto& entry) { return entry.second.ownerForm == formKey; });
+}
+
+bool IsValidOwnerForm(const S2HLayoutPage* definition) {
+    const char* ownerForm = GetDeclaredOwnerForm(definition);
+    if (ownerForm == nullptr) {
+        return true;
+    }
+    return ownerForm[0] != '\0' && definition->kind == S2H_LAYOUT_ITEMS && !IsFormPageOwned(ownerForm);
+}
 
 bool HasReservedPrefix(const std::string& key) {
     return key == VanillaPageKey || key.rfind("vanilla.", 0) == 0 || key.rfind("user.", 0) == 0 ||
@@ -64,7 +82,7 @@ uint16_t CountPagesOfKind(uint8_t kind) {
 bool IsValidPage(const S2HLayoutPage* definition) {
     if (definition == nullptr || definition->structSize < offsetof(S2HLayoutPage, backgroundSections) ||
         definition->key == nullptr || definition->key[0] == '\0' || HasReservedPrefix(definition->key) ||
-        sPages.contains(definition->key)) {
+        sPages.contains(definition->key) || !IsValidOwnerForm(definition)) {
         return false;
     }
     if (definition->kind == S2H_LAYOUT_EQUIPMENT) {
@@ -83,7 +101,6 @@ uint16_t GetCellCount(const Page& page) {
     return page.kind == S2H_LAYOUT_COLLECTABLES ? 25 : page.rows * page.columns;
 }
 
-// Item pages lay their cells out in the pause grid's 6 columns; quest pages address the quest points directly.
 uint8_t GetSlot(const Page& page, uint8_t cell) {
     if (page.kind == S2H_LAYOUT_EQUIPMENT) {
         return (cell / page.columns) * 6 + cell % page.columns;
@@ -95,7 +112,6 @@ uint8_t GetSlot(const Page& page, uint8_t cell) {
 }
 
 bool PlaceOnPage(const S2HCustomItemDefinition& definition, uint16_t pageId, uint8_t slot) {
-    // A mod's defaults live only for this session; saved user placements still win in GetPlacement.
     const S2HCustomItemPlacement placement = { pageId, slot };
     return KaleidoItemManager_SetDefaultPlacement(definition.key, &placement);
 }
@@ -161,14 +177,40 @@ bool ModLayout_RegisterPage(const S2HLayoutPage* definition) {
             }
         }
     }
-    if (definition->structSize >= sizeof(S2HLayoutPage) && definition->cursorCorners != nullptr) {
+    const bool hasCursorCorners =
+        definition->structSize >= offsetof(S2HLayoutPage, cursorCorners) + sizeof(definition->cursorCorners);
+    if (hasCursorCorners && definition->cursorCorners != nullptr) {
         for (int i = 0; i < 4; ++i) {
             if (definition->cursorCorners[i]) {
                 registered.cursorCorners[i] = definition->cursorCorners[i];
             }
         }
     }
+    const char* ownerForm = GetDeclaredOwnerForm(definition);
+    registered.ownerForm = ownerForm != nullptr ? ownerForm : "";
     return true;
+}
+
+const char* ModLayout_GetPageOwnerForm(uint16_t id) {
+    for (const auto& [key, page] : sPages) {
+        if (page.pageId == id) {
+            return page.ownerForm.empty() ? nullptr : page.ownerForm.c_str();
+        }
+    }
+    return nullptr;
+}
+
+bool ModLayout_FindFormPage(const char* formKey, uint16_t* id) {
+    if (formKey == nullptr || formKey[0] == '\0' || id == nullptr) {
+        return false;
+    }
+    for (const auto& [key, page] : sPages) {
+        if (page.ownerForm == formKey) {
+            *id = page.pageId;
+            return true;
+        }
+    }
+    return false;
 }
 
 const char* const* ModLayout_GetCursorCorners(uint16_t id) {

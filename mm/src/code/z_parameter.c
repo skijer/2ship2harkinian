@@ -4611,7 +4611,8 @@ u8 Item_Give(PlayState* play, u8 item) {
     if (GameInteractor_ExecuteOnResolveItemGive(play, &item)) {
         return ITEM_NONE;
     }
-    if (ProgressiveItems_GiveVanilla(item)) return ITEM_NONE;
+    if (ProgressiveItems_GiveVanilla(item))
+        return ITEM_NONE;
     if (!GameInteractor_ShouldItemGive(item) || item == ITEM_SHIP) {
         return ITEM_NONE;
     }
@@ -6254,8 +6255,8 @@ void Interface_DrawItemIconTexture(PlayState* play, TexturePtr texture, s16 butt
         24, // EQUIP_SLOT_C_RIGHT
     };
 
-    texture = (TexturePtr)GameInteractor_ExecuteOnInterfaceResolveButtonIcon(play, button, GET_CUR_FORM_BTN_ITEM(button),
-                                                                             (const char*)texture);
+    texture = (TexturePtr)GameInteractor_ExecuteOnInterfaceResolveButtonIcon(
+        play, button, GET_CUR_FORM_BTN_ITEM(button), (const char*)texture);
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -9732,7 +9733,6 @@ void Interface_Update(PlayState* play) {
             sEnvHazard = PLAYER_ENV_HAZARD_NONE;
         }
     }
-    // 2S2H [Mods] Mods can claim the hazard the HUD reacts to
     sEnvHazard = Timers_ResolveHazard(sEnvHazard);
     GameInteractor_ExecuteOnResolveEnvHazard(play, &sEnvHazard);
 

@@ -29,6 +29,7 @@ extern "C" {
 #include "variables.h"
 extern PlayerAnimationHeader* D_8085BE84[PLAYER_ANIMGROUP_MAX][PLAYER_ANIMTYPE_MAX];
 extern PlayerAgeProperties sPlayerAgeProperties[PLAYER_FORM_MAX];
+void Player_ResetMeleeWeaponColliders(PlayState* play, Player* player);
 }
 
 namespace {
@@ -65,7 +66,6 @@ struct StashedLoadout {
 
 std::deque<RegisteredForm> sForms;
 std::unordered_map<std::string, RegisteredForm*> sFormsByKey;
-// The form the save says Link wears, versus the one whose effects are live: only a Human Link shows a form.
 RegisteredForm* sActiveForm = nullptr;
 RegisteredForm* sAppliedForm = nullptr;
 std::string sPendingForm;
@@ -130,7 +130,6 @@ bool IsStashableButton(uint8_t button) {
     return (button >= S2H_ITEM_BUTTON_C_FIRST && button <= S2H_ITEM_BUTTON_C_LAST) || IsDpadButton(button);
 }
 
-// C and D-pad buttons are shared by every form, so the Human row is the one they live in.
 uint8_t GetButtonItem(uint8_t button) {
     return IsDpadButton(button) ? DPAD_GET_CUR_FORM_BTN_ITEM(HELD_ITEM_TO_DPAD(button)) : BUTTON_ITEM_EQUIP(0, button);
 }
@@ -185,6 +184,13 @@ bool EnforceEquipment(const S2HFormDefinition& form) {
     return changed;
 }
 
+bool IsFormItem(uint8_t item, const char* key) {
+    if (key == nullptr) {
+        return item >= ITEM_MASK_DEKU && item <= ITEM_MASK_FIERCE_DEITY;
+    }
+    return std::any_of(sForms.begin(), sForms.end(), [key](const RegisteredForm& form) { return form.item == key; });
+}
+
 bool EnforceButtons(const RegisteredForm& form) {
     if (form.definition.allowsButtonItem == nullptr) {
         return false;
@@ -197,8 +203,7 @@ bool EnforceButtons(const RegisteredForm& form) {
         }
         const uint8_t item = GetButtonItem(button);
         const char* key = CustomItemRegistry_GetEquippedKey(button);
-        const bool isOwnMask = key != nullptr && form.item == key;
-        if (item == ITEM_NONE || isOwnMask || form.definition.allowsButtonItem(item, key)) {
+        if (item == ITEM_NONE || IsFormItem(item, key) || form.definition.allowsButtonItem(item, key)) {
             continue;
         }
         sStash.hasButton[button] = true;
@@ -339,6 +344,9 @@ void RevokeEffects(Player* player) {
     if (player != nullptr && leaving->definition.onExit != nullptr) {
         leaving->definition.onExit(gPlayState, player);
     }
+    if (player != nullptr) {
+        Player_ResetMeleeWeaponColliders(gPlayState, player);
+    }
     UnpatchAnims();
     UnpatchBody();
     RestoreLoadout(player);
@@ -370,7 +378,6 @@ void ExitActiveForm() {
     SelectForm(nullptr);
 }
 
-// The world a form was applied to is gone when a save loads, so nothing may call back into it.
 void DropActiveForm() {
     FormModel_SetActive(nullptr);
     if (sAppliedForm != nullptr) {
@@ -625,10 +632,15 @@ bool FormRegistry_SetActive(const char* key) {
         return false;
     }
     if (key == nullptr || key[0] == '\0') {
-        if (sActiveForm != nullptr && FormTransform_Begin(ActiveDefinition(), nullptr)) {
+        if (sActiveForm == nullptr) {
+            ExitActiveForm();
+            return true;
+        }
+        if (FormTransform_Begin(ActiveDefinition(), nullptr)) {
             return true;
         }
         ExitActiveForm();
+        FormTransform_PlayInstantFlash();
         return true;
     }
     RegisteredForm* form = FindForm(key);
@@ -646,6 +658,7 @@ bool FormRegistry_SetActive(const char* key) {
         return true;
     }
     SelectForm(form);
+    FormTransform_PlayInstantFlash();
     return true;
 }
 
@@ -665,7 +678,8 @@ bool FormRegistry_ApplyActive(const char* key) {
 }
 
 bool FormRegistry_Toggle(const char* key) {
-    return FormRegistry_IsActive(key) ? FormRegistry_SetActive(nullptr) : FormRegistry_SetActive(key);
+    const bool isWorn = key != nullptr && sActiveForm != nullptr && sActiveForm->key == key;
+    return isWorn ? FormRegistry_SetActive(nullptr) : FormRegistry_SetActive(key);
 }
 
 const char* FormRegistry_GetActiveKey(void) {
@@ -674,7 +688,7 @@ const char* FormRegistry_GetActiveKey(void) {
         GameInteractor::Instance->ExecuteHooks<GameInteractor::OnPlayerResolveForm>(player, &key);
         return key;
     }
-    return sActiveForm == nullptr ? nullptr : sActiveForm->key.c_str();
+    return sAppliedForm == nullptr ? nullptr : sAppliedForm->key.c_str();
 }
 
 bool FormRegistry_IsActive(const char* key) {
@@ -697,7 +711,6 @@ const char* FormRegistry_GetNativeKey(uint8_t playerForm) {
     }
 }
 
-// A registered form only shows on Human Link, so a native transformation outranks the one the save remembers.
 static const RegisteredForm* GetWornForm() {
     return gSaveContext.save.playerForm == PLAYER_FORM_HUMAN ? sActiveForm : nullptr;
 }

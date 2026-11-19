@@ -124,6 +124,12 @@ extern "C" const char* FleetGame_GetSaveDirectory(void) {
     return getDirectory != nullptr ? getDirectory(GameName) : nullptr;
 }
 
+extern "C" const char* FleetGame_GetModsDirectory(void) {
+    using GetDirectory = const char* (*)(const char*);
+    const auto getDirectory = reinterpret_cast<GetDirectory>(FleetGame_GetHostFunction("GetModsDirectory"));
+    return getDirectory != nullptr ? getDirectory(GameName) : nullptr;
+}
+
 extern "C" bool FleetGame_FileSelect(void) {
     const auto show = reinterpret_cast<bool (*)()>(FleetGame_GetHostFunction("FileSelect"));
     return show != nullptr && show();

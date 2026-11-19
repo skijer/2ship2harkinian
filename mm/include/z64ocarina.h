@@ -28,7 +28,6 @@ typedef enum OcarinaSongId {
     /* 21 */ OCARINA_SONG_ZELDAS_LULLABY,
     /* 22 */ OCARINA_SONG_SCARECROW_SPAWN,
     /* 23 */ OCARINA_SONG_TERMINA_WALL,
-    // 2S2H [Mods] Slots songs registered by mods are given; they have no bit in the song flags
     /* 24 */ OCARINA_SONG_CUSTOM_FIRST,
     /* 31 */ OCARINA_SONG_CUSTOM_LAST = OCARINA_SONG_CUSTOM_FIRST + 7,
     /* 32 */ OCARINA_SONG_MAX,

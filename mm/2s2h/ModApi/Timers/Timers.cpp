@@ -14,7 +14,6 @@ extern "C" {
 
 namespace {
 
-// The generic minigame timer: the only HUD timer MM leaves free outside its own minigames.
 constexpr int CountdownTimerId = TIMER_ID_MINIGAME_2;
 
 struct HazardClaim {

@@ -69,7 +69,6 @@ typedef union {
     PolygonType2 polygon2;
 } MeshHeader; // "Ground Shape"
 
-// 2S2H [Unbound] mirrors RoomShapeCullableEntry: position is f32 (world extent)
 typedef struct {
     /* 0x00 */ Vec3f pos;
     /* 0x0C */ s16 unk_06;

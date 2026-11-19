@@ -18,7 +18,6 @@ typedef struct {
 
 #define S2H_USER_FILE_MIN_SIZE (offsetof(S2HUserFile, name) + sizeof(((S2HUserFile*)0)->name))
 
-// The paths inside the request are relative to zapdAssetRoot, the folder its archive files are exported into.
 typedef struct {
     uint32_t structSize;
     const uint8_t* rom;
@@ -38,6 +37,9 @@ bool UserFiles_Pick(const char* title, const char* filterName, const char* filte
 void UserFiles_Free(S2HUserFile* file);
 bool UserFiles_MountArchive(const char* title);
 bool UserFiles_SaveToMods(const char* fileName, const void* data, uint64_t size);
+uint32_t UserFiles_ReadMods(const char* extensions,
+                            bool (*visit)(const char* path, const uint8_t* data, uint64_t size, void* userData),
+                            void* userData);
 bool UserFiles_ExtractRomToMods(const S2HRomExtractRequest* request);
 bool UserFiles_HasModArchiveFile(const char* fileName);
 

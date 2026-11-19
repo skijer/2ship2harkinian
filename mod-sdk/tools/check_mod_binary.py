@@ -6,7 +6,6 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-# Mirrors mm/2s2h/ModApi/ModTrust/ModTrust.cpp, which shows the same findings when asking about an unsigned mod.
 HOST_MODULES = {"2ship.dll", "libultraship.dll"}
 WINDOWS_RUNTIME_PREFIXES = ("vcruntime140", "msvcp140", "ucrtbase", "api-ms-win-crt-")
 WINDOWS_STARTUP_KERNEL_IMPORTS = {
@@ -14,6 +13,10 @@ WINDOWS_STARTUP_KERNEL_IMPORTS = {
     "GetSystemTimeAsFileTime", "InitializeSListHead", "IsDebuggerPresent", "IsProcessorFeaturePresent",
     "QueryPerformanceCounter", "RtlCaptureContext", "RtlLookupFunctionEntry", "RtlVirtualUnwind",
     "SetUnhandledExceptionFilter", "TerminateProcess", "UnhandledExceptionFilter",
+}
+# MSVC links these into any C++ module with a function-local static (thread-safe static initialisation).
+WINDOWS_STATIC_INIT_KERNEL_IMPORTS = {
+    "AcquireSRWLockExclusive", "ReleaseSRWLockExclusive", "SleepConditionVariableSRW", "WakeAllConditionVariable",
 }
 WINDOWS_DANGEROUS_RUNTIME_IMPORTS = {
     "system", "_wsystem", "_popen", "_wpopen", "fopen", "fopen_s", "_wfopen", "_wfopen_s", "_fsopen", "_wfsopen",
@@ -60,7 +63,7 @@ def is_allowed_windows_import(library, function):
     if library in HOST_MODULES:
         return not HOST_TRUST_INTERNALS.search(function)
     if library == "kernel32.dll":
-        return function in WINDOWS_STARTUP_KERNEL_IMPORTS
+        return function in WINDOWS_STARTUP_KERNEL_IMPORTS or function in WINDOWS_STATIC_INIT_KERNEL_IMPORTS
     if not library.startswith(WINDOWS_RUNTIME_PREFIXES):
         return False
     return function not in WINDOWS_DANGEROUS_RUNTIME_IMPORTS and not function.startswith(

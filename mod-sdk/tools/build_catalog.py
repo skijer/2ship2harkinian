@@ -9,8 +9,6 @@ from pathlib import Path
 
 import mod_signature
 
-# The store catalog is one JSON payload, signed like a mod, that the game reads from the "mods" release.
-# Each signature request only rewrites the entries of its own issue; everything else is carried over.
 CATALOG_FORMAT = 2
 MOD_ID = re.compile(r"^[a-z0-9_-]{1,64}$")
 PACK_ID = re.compile(r"^[a-z0-9-]{1,40}$")
@@ -93,7 +91,6 @@ def file_hash(path):
 def plan(catalog, packages, hashes, issue, trusted, approved, held_permissions, game="mm", author=None):
     """Which built mods to sign and publish, which are already published, and which wait or are refused."""
     source = catalog["sources"].get(f"{game}:{issue}", catalog["sources"].get(str(issue)) if game == "oot" else None)
-    # Until an issue has a mod in the store, everything it asks for is part of the approval it got first.
     published = any(mod.get("variants", {}).get(game, mod if game == "oot" and "variants" not in mod else {}).get("issue") == issue
                     for mod in catalog["mods"].values())
     allowed = set(source["permissions"]) if source and published else None
@@ -146,6 +143,7 @@ def apply(catalog, plan_result, request, signed, hashes, packs, links, release_b
             "repository": request["repository"], "commit": request["commit"], "issue": issue,
             "owner": request["author"], "permissions": manifest.get("permissions", []),
             "dependencies": manifest.get("dependencies", []), "listed": existing.get("listed", True),
+            "dependency_only": manifest.get("dependency_only") is True,
             "builds": builds,
         }
         variants = dict(existing.get("variants", {}))
@@ -155,7 +153,6 @@ def apply(catalog, plan_result, request, signed, hashes, packs, links, release_b
                                            "permissions", "dependencies", "issue", "owner", "commit", "listed")}
         variants[game] = {key: metadata[key] for key in ("name", "author", "description", "version", "repository",
                                                        "permissions", "dependencies", "issue", "owner", "commit", "listed")}
-        # Legacy top-level presentation remains the OoT variant when one exists.
         catalog["mods"][mod_id] = {**metadata, **variants.get("oot", {}), "variants": variants, "builds": builds}
         permissions |= set(manifest.get("permissions", []))
 

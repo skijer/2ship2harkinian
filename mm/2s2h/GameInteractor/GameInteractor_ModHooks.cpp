@@ -225,8 +225,7 @@ bool GameInteractor_ExecuteOnKaleidoDebugEditor(PlayState* play) {
 
 const char* GameInteractor_ExecuteOnInterfaceResolveButtonIcon(PlayState* play, u8 button, u16 item,
                                                                const char* iconPath) {
-    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnInterfaceResolveButtonIcon>(play, button, item,
-                                                                                         &iconPath);
+    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnInterfaceResolveButtonIcon>(play, button, item, &iconPath);
     return iconPath;
 }
 
@@ -279,8 +278,7 @@ bool GameInteractor_ExecuteOnBgCheckLineTest(CollisionContext* colCtx, Vec3f* po
 void GameInteractor_ExecuteOnActorTalk(Actor* actor, PlayState* play) {
     bool continueVanilla = true;
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnActorTalk>(actor, play, &continueVanilla);
-    GameInteractor::Instance->ExecuteHooksForID<GameInteractor::OnActorTalk>(actor->id, actor, play,
-                                                                             &continueVanilla);
+    GameInteractor::Instance->ExecuteHooksForID<GameInteractor::OnActorTalk>(actor->id, actor, play, &continueVanilla);
     GameInteractor::Instance->ExecuteHooksForPtr<GameInteractor::OnActorTalk>((uintptr_t)actor, actor, play,
                                                                               &continueVanilla);
 }

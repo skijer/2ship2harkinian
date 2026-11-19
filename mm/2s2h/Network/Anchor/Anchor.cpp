@@ -18,8 +18,6 @@ extern "C" {
 extern PlayState* gPlayState;
 }
 
-// MARK: - Rooms
-
 static const std::string sOcarinaGlobalRoomId = "soh-global";
 
 bool Anchor::IsGlobalRoom() {
@@ -36,8 +34,6 @@ std::string Anchor::RoomToJoin() {
     }
     return FleetGame_NetworkRoom(CVarGetString("gNetwork.Anchor.RoomId", ""));
 }
-
-// MARK: - Overrides
 
 void Anchor::Enable() {
     if (isEnabled) {
@@ -60,8 +56,6 @@ void Anchor::OnConnected() {
     connectedAt = std::chrono::steady_clock::now();
     SendPacket_Handshake();
     connectionChanged = true;
-
-
 }
 
 void Anchor::OnDisconnected() {
@@ -87,7 +81,13 @@ void Anchor::QueueOutgoingPacket(nlohmann::json payload) {
 void Anchor::ProcessIncomingPacket(nlohmann::json payload) {
     const bool previous = isProcessingIncomingPacket;
     isProcessingIncomingPacket = true;
-    struct Guard { bool& value; bool previous; ~Guard() { value = previous; } } guard{isProcessingIncomingPacket, previous};
+    struct Guard {
+        bool& value;
+        bool previous;
+        ~Guard() {
+            value = previous;
+        }
+    } guard{ isProcessingIncomingPacket, previous };
     if (payload.value("type", std::string()) == CUSTOM_PROGRESS) {
         HandlePacket_CustomProgress(std::move(payload));
         return;
@@ -100,14 +100,12 @@ void Anchor::ProcessIncomingPacket(nlohmann::json payload) {
         }
         return;
     }
-    // If it doesn't contain a type, it's not a valid payload
     if (!payload.contains("type")) {
         return;
     }
 
     std::string packetType = payload["type"].get<std::string>();
 
-    // Ignore packets from mismatched clients, except for ALL_CLIENT_STATE, UPDATE_CLIENT_STATE, and PLAYER_UPDATE
     if (packetType != ALL_CLIENT_STATE && packetType != UPDATE_CLIENT_STATE && packetType != PLAYER_UPDATE) {
         if (payload.contains("clientId")) {
             uint32_t clientId = payload["clientId"].get<uint32_t>();
@@ -117,7 +115,6 @@ void Anchor::ProcessIncomingPacket(nlohmann::json payload) {
         }
     }
 
-    // packetType here is a string so we can't use a switch statement
     if (packetType == ALL_CLIENT_STATE)
         HandlePacket_AllClientState(payload);
     else if (packetType == DAMAGE_PLAYER)
@@ -217,7 +214,6 @@ void Anchor::RegisterHooks() {
         Anchor::Instance->SwapIncomingPacketQueue(packetQueue);
 
         if (!queuedPacketsFromTeamState.empty() && IsSaveLoaded()) {
-            // Put them in the main queue to be processed
             while (!queuedPacketsFromTeamState.empty()) {
                 packetQueue.push(std::move(queuedPacketsFromTeamState.front()));
                 queuedPacketsFromTeamState.pop();
@@ -237,9 +233,6 @@ void Anchor::RegisterHooks() {
     });
 }
 
-// MARK: - Misc/Helpers
-
-// Kills all existing anchor actors and respawns them with the new client data
 void Anchor::RefreshClientActors() {
     if (!IsSaveLoaded()) {
         return;
@@ -263,9 +256,6 @@ void Anchor::RefreshClientActors() {
         }
 
         actorIndexToClientId.push_back(clientId);
-        // We are using a hook `ShouldActorInit` to override the init/update/draw/destroy functions of the Player we
-        // spawn We quickly store a mapping of "index" to clientId, then within the init function we use this to get the
-        // clientId and store it on player->zTargetActiveTimer (unused s32 for the dummy) for convenience
         auto dummy = Actor_Spawn(&gPlayState->actorCtx, gPlayState, ACTOR_PLAYER, client.posRot.pos.x,
                                  client.posRot.pos.y, client.posRot.pos.z, client.posRot.rot.x, client.posRot.rot.y,
                                  client.posRot.rot.z, actorIndexToClientId.size() - 1);
@@ -296,67 +286,73 @@ bool Anchor::IsSaveLoaded() {
 
 void Anchor::Init() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnItemGive>([this](u8 item) {
-        if (item >= ITEM_KEY_BOSS && item <= ITEM_KEY_SMALL) SendPacket_UpdateDungeonItems();
+        if (item >= ITEM_KEY_BOSS && item <= ITEM_KEY_SMALL)
+            SendPacket_UpdateDungeonItems();
     });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnFlagSet>([this](FlagType type, u32 flag) {
-        SendPacket_SetFlag(SCENE_MAX, type, flag);
-    });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnFlagUnset>([this](FlagType type, u32 flag) {
-        SendPacket_UnsetFlag(SCENE_MAX, type, flag);
-    });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneFlagSet>([this](s16 scene, FlagType type, u32 flag) {
-        SendPacket_SetFlag(scene, type, flag);
-    });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneFlagUnset>([this](s16 scene, FlagType type, u32 flag) {
-        SendPacket_UnsetFlag(scene, type, flag);
-    });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnFlagSet>(
+        [this](FlagType type, u32 flag) { SendPacket_SetFlag(SCENE_MAX, type, flag); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnFlagUnset>(
+        [this](FlagType type, u32 flag) { SendPacket_UnsetFlag(SCENE_MAX, type, flag); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneFlagSet>(
+        [this](s16 scene, FlagType type, u32 flag) { SendPacket_SetFlag(scene, type, flag); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneFlagUnset>(
+        [this](s16 scene, FlagType type, u32 flag) { SendPacket_UnsetFlag(scene, type, flag); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameCompletion>([this] { SendPacket_GameComplete(); });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnCustomItemOwnedChange>([this](const char* key, bool owned) {
-        SendPacket_CustomProgress("item", key, owned);
-    });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnCustomItemReceive>([this](const char* key) {
-        SendPacket_CustomProgress("receive", key, true);
-    });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnCustomEquipOwnedChange>([this](const char* key, bool owned) {
-        SendPacket_CustomProgress("equipment", key, owned);
-    });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnRandoInfCustomChange>([this](const char* key, bool state) {
-        SendPacket_CustomProgress("flag", key, state);
-    });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerResolveForm>([this](Player* player, const char** key) {
-        const auto client = clients.find(GetDummyPlayerClientId(&player->actor));
-        if (client != clients.end()) *key = client->second.formKey.empty() ? nullptr : client->second.formKey.c_str();
-    });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerResolveHeldCustomItem>([this](Player* player, const char** key) {
-        const auto client = clients.find(GetDummyPlayerClientId(&player->actor));
-        if (client != clients.end()) *key = client->second.heldCustomItemKey.empty() ? nullptr : client->second.heldCustomItemKey.c_str();
-    });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnCustomItemOwnedChange>(
+        [this](const char* key, bool owned) { SendPacket_CustomProgress("item", key, owned); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnCustomItemReceive>(
+        [this](const char* key) { SendPacket_CustomProgress("receive", key, true); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnCustomEquipOwnedChange>(
+        [this](const char* key, bool owned) { SendPacket_CustomProgress("equipment", key, owned); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnRandoInfCustomChange>(
+        [this](const char* key, bool state) { SendPacket_CustomProgress("flag", key, state); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerResolveForm>(
+        [this](Player* player, const char** key) {
+            const auto client = clients.find(GetDummyPlayerClientId(&player->actor));
+            if (client != clients.end())
+                *key = client->second.formKey.empty() ? nullptr : client->second.formKey.c_str();
+        });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerResolveHeldCustomItem>(
+        [this](Player* player, const char** key) {
+            const auto client = clients.find(GetDummyPlayerClientId(&player->actor));
+            if (client != clients.end())
+                *key = client->second.heldCustomItemKey.empty() ? nullptr : client->second.heldCustomItemKey.c_str();
+        });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerResolveWornCustomItems>(
         [this](Player* player, const char* const** keys, uint32_t* count) {
             const auto client = clients.find(GetDummyPlayerClientId(&player->actor));
-            if (client == clients.end()) return;
+            if (client == clients.end())
+                return;
             *keys = client->second.wornCustomItemKeyPointers.data();
             *count = static_cast<uint32_t>(client->second.wornCustomItemKeyPointers.size());
         });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>([this] {
         static std::set<uint32_t> online;
         std::set<uint32_t> current;
-        if (isConnected) for (const auto& [id, client] : clients) {
-            if (!client.self && client.online) current.insert(id);
-        }
-        for (uint32_t id : current) if (!online.contains(id)) ModNetwork_OnPeerOnlineChange(id, true);
-        for (uint32_t id : online) if (!current.contains(id)) ModNetwork_OnPeerOnlineChange(id, false);
+        if (isConnected)
+            for (const auto& [id, client] : clients) {
+                if (!client.self && client.online)
+                    current.insert(id);
+            }
+        for (uint32_t id : current)
+            if (!online.contains(id))
+                ModNetwork_OnPeerOnlineChange(id, true);
+        for (uint32_t id : online)
+            if (!current.contains(id))
+                ModNetwork_OnPeerOnlineChange(id, false);
         online = std::move(current);
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>([this] {
         if (connectionChanged.exchange(false)) {
             RegisterHooks();
-            if (isConnected && IsSaveLoaded()) SendPacket_RequestTeamState();
+            if (isConnected && IsSaveLoaded())
+                SendPacket_RequestTeamState();
         }
     });
 }
 
 uint32_t Anchor::GetDummyPlayerClientId(const Actor* actor) {
-    if (actor == nullptr || actor->update != DummyPlayer_Update) return 0;
+    if (actor == nullptr || actor->update != DummyPlayer_Update)
+        return 0;
     return static_cast<const Player*>(static_cast<const void*>(actor))->zTargetActiveTimer;
 }

@@ -15,6 +15,12 @@ void TransitionFade_SetColor(void* thisx, u32 color);
 #define CVAR_NAME "gEnhancements.Masks.FastTransformation"
 #define CVAR CVarGetInteger(CVAR_NAME, 0)
 
+void FastTransformation_PlayFlash(Player* player) {
+    TransitionFade_SetColor(&gPlayState->unk_18E48, 0x000000);
+    R_TRANS_FADE_FLASH_ALPHA_STEP = -1;
+    Player_PlaySfx(player, NA_SE_SY_TRANSFORM_MASK_FLASH);
+}
+
 void RegisterFastTransformation() {
     COND_VB_SHOULD(VB_PREVENT_MASK_TRANSFORMATION_CS, CVAR, {
         *should = true;
@@ -35,9 +41,7 @@ void RegisterFastTransformation() {
         player->actor.draw = PlayerCall_Draw;
         gSaveContext.save.equippedMask = PLAYER_MASK_NONE;
 
-        TransitionFade_SetColor(&gPlayState->unk_18E48, 0x000000);
-        R_TRANS_FADE_FLASH_ALPHA_STEP = -1;
-        Player_PlaySfx(GET_PLAYER(gPlayState), NA_SE_SY_TRANSFORM_MASK_FLASH);
+        FastTransformation_PlayFlash(player);
 
         // Clear previous mask to prevent crashing with masks being drawn while we switch transformations
         if (player->transformation == PLAYER_FORM_HUMAN) {

@@ -238,7 +238,9 @@ bool BenMenu::MoveModWidget(const WidgetPath& path, const std::string& label, co
         return false;
     }
     auto& widgets = sidebars.at(path.sidebarName).columnWidgets.at(path.column);
-    auto isNamed = [](const std::string& name) { return [&name](const WidgetInfo& widget) { return widget.name == name; }; };
+    auto isNamed = [](const std::string& name) {
+        return [&name](const WidgetInfo& widget) { return widget.name == name; };
+    };
     auto source = std::find_if(widgets.begin(), widgets.end(), isNamed(label));
     auto target = std::find_if(widgets.begin(), widgets.end(), isNamed(anchor));
     if (source == widgets.end() || target == widgets.end() || source == target) {
@@ -2421,9 +2423,12 @@ std::string BenMenu::FleetMenuModel() {
                     if (widget.type == WIDGET_SEARCH) {
                         continue;
                     }
-                    widgets.push_back({ { "name", widget.name }, { "cvar", widget.cVar ? widget.cVar : "" },
-                        { "tooltip", widget.options ? std::string(widget.options->tooltip) : "" },
-                        { "search", !widget.hideInSearch }, { "column", column }, { "index", index } });
+                    widgets.push_back({ { "name", widget.name },
+                                        { "cvar", widget.cVar ? widget.cVar : "" },
+                                        { "tooltip", widget.options ? std::string(widget.options->tooltip) : "" },
+                                        { "search", !widget.hideInSearch },
+                                        { "column", column },
+                                        { "index", index } });
                 }
             }
             sidebars.push_back({ { "name", label }, { "columns", sidebar.columnCount }, { "widgets", widgets } });
@@ -2442,7 +2447,6 @@ SidebarEntry* BenMenu::FindFleetPage(const std::string& section, const std::stri
     return side != entry->second.sidebars.end() ? &side->second : nullptr;
 }
 
-// Fleet draws a page outside DrawElement: run what DrawElement runs first, once per page and frame.
 void BenMenu::PrepareFleetPage(const std::string& section, const std::string& sidebar) {
     ImGui::SetCurrentContext(Ship::Context::GetRawInstance()->GetWindow()->GetGui()->GetImGuiContext());
     static std::map<std::pair<std::string, std::string>, int> updatedPages;
@@ -2484,7 +2488,6 @@ void BenMenu::FleetDrawWidget(const std::string& section, const std::string& sid
     MenuDrawItem(widgets[index], 90 / std::max(1u, page->columnCount), GetMenuThemeColor());
 }
 
-// The column block of DrawElement, so a page Fleet shows looks exactly as it does in 2Ship's own menu.
 void BenMenu::FleetDrawPage(const std::string& section, const std::string& sidebar) {
     SidebarEntry* page = FindFleetPage(section, sidebar);
     if (page == nullptr) {

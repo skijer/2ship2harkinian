@@ -105,7 +105,6 @@ void ApplyOptions(WidgetInfo& widget, const RegisteredWidget& registered) {
     }
 }
 
-// BenMenu callbacks are plain function pointers, so the widget's name finds the mod callback it belongs to.
 void RunModCallback(WidgetInfo& info) {
     for (const RegisteredWidget& registered : sWidgets) {
         if (registered.label == info.name && registered.definition.onChange != nullptr) {

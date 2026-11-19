@@ -683,9 +683,11 @@ const std::map<RandoItemId, std::vector<std::string>> fakeItemNames = {
 std::string GetItemName(RandoItemId randoItemId, bool includeArticle, RandoCheckId randoCheckId) {
     const auto row = Items.find(randoItemId);
     if (row != Items.end()) {
-        if (const char* label = ModLabels_Get(S2H_LABEL_ITEM, gSaveContext.options.language, row->second.itemId)) return label;
+        if (const char* label = ModLabels_Get(S2H_LABEL_ITEM, gSaveContext.options.language, row->second.itemId))
+            return label;
     }
-    if (const char* key = ProgressiveItems_ResolveRando(randoItemId, RandoInfCustom_GetActiveBank())) return key;
+    if (const char* key = ProgressiveItems_ResolveRando(randoItemId, RandoInfCustom_GetActiveBank()))
+        return key;
     std::string result;
 
     if (includeArticle && !Ship_IsCStringEmpty(Rando::StaticData::Items[randoItemId].article)) {
@@ -738,9 +740,6 @@ std::vector<std::string> GetTrickNames(RandoItemId randoItemId) {
     return fakeNames == fakeItemNames.end() ? std::vector<std::string>{} : fakeNames->second;
 }
 
-// A readable name two items share would be ambiguous, so those items keep their spoiler token.
-// RI_TRIFORCE_PIECE_PREVIOUS only draws and shares its name with the real piece.
-// Rebuilt whenever mods add rows: a first call before mod registration must not hide their items.
 static const std::unordered_map<RandoItemId, std::string>& UniqueItemNames() {
     static std::unordered_map<RandoItemId, std::string> names;
     static size_t namedRows = 0;

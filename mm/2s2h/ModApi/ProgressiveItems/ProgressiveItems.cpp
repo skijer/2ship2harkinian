@@ -41,7 +41,6 @@ struct ApplyingScope {
     }
 };
 constexpr const char* section = "progressiveItems";
-// MM's generator operates on a temporary gSaveContext; counters still live in separate banks.
 SaveContext* BankSave(S2HRandoInfBank) {
     return &gSaveContext;
 }

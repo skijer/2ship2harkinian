@@ -6,7 +6,6 @@
 #include <libultraship/libultra/types.h>
 
 std::vector<std::string> Rando::Spoiler::spoilerOptions;
-// Resolved on use: inside Fleet the app directory becomes 2ship's install only once it joins the host.
 static std::filesystem::path RandomizerFolderPath() {
     return Ship::Context::GetPathRelativeToAppDirectory("randomizer", appShortName);
 }

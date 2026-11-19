@@ -4,12 +4,6 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/BenPort.h"
 
-/**
- * UNSET_FLAG
- *
- * Fired when a flag is unset in the save context
- */
-
 void Anchor::SendPacket_UnsetFlag(s16 sceneId, s16 flagType, uint32_t flag) {
     if (!IsSaveLoaded() || !roomState.syncItemsAndFlags || isProcessingIncomingPacket) {
         return;

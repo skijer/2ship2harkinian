@@ -179,7 +179,6 @@ u16 sMusicStaffExpectedLength[OCARINA_SONG_MAX];
 u8 sMusicStaffExpectedPitch[OCARINA_SONG_MAX]; // Next required pitch in song playback
 u8 D_801FD518[OCARINA_SONG_MAX];
 u32 D_801FD530[OCARINA_SONG_MAX];
-// Bit n is custom slot OCARINA_SONG_CUSTOM_FIRST + n; the game thread writes the unlocked set
 static u8 sCustomOcarinaSongsUnlocked;
 static u8 sCustomOcarinaSongFlags;
 OcarinaNote sScarecrowsLongSongSecondNote;
@@ -2103,7 +2102,6 @@ void AudioOcarina_ReadControllerInput(void) {
     GameInteractor_ExecuteOnOcarinaInput();
 }
 
-// Marks a song as just played, as AudioOcarina_CheckSongsWithMusicStaff does on a match
 void AudioOcarina_ForceSongPlayed(u8 songIndex) {
     sPlayedOcarinaSongIndexPlusOne = songIndex + 1;
     sIsOcarinaInputEnabled = false;
@@ -2213,7 +2211,6 @@ static bool AudioOcarina_IsSongCandidate(u8 songIndex) {
     return sOcarinaAvailableSongFlags & (1 << songIndex);
 }
 
-// A toggle, as MM's own `^=`: two misses in one check put the song back
 static void AudioOcarina_ToggleSongCandidate(u8 songIndex) {
     if (AudioOcarina_IsCustomSong(songIndex)) {
         sCustomOcarinaSongFlags ^= AudioOcarina_GetCustomSongBit(songIndex);
@@ -2397,7 +2394,6 @@ void AudioOcarina_StartDefault(u32 ocarinaFlags) {
     AudioOcarina_Start(ocarinaFlags);
 }
 
-// Checks the player's notes against one song, as the quest page's prompt does
 void AudioOcarina_StartSongCheck(u8 songIndex) {
     if (!AudioOcarina_IsCustomSong(songIndex)) {
         AudioOcarina_StartDefault((1 << songIndex) | 0x80000000);
@@ -2412,8 +2408,8 @@ u8 func_8019B568(void) {
     u32 temp_v0 = D_801D8534;
     u8 songIndex;
 
-    for (songIndex = OCARINA_SONG_SONATA;
-         !((temp_v0 >> songIndex) & 1) && (songIndex < OCARINA_SONG_CUSTOM_FIRST); songIndex++) {}
+    for (songIndex = OCARINA_SONG_SONATA; !((temp_v0 >> songIndex) & 1) && (songIndex < OCARINA_SONG_CUSTOM_FIRST);
+         songIndex++) {}
 
     return songIndex;
 }

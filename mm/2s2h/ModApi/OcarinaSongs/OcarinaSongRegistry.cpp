@@ -116,7 +116,6 @@ bool OcarinaSongRegistry_IsOwned(uint8_t songIndex) {
     return (song != nullptr) && CustomItemRegistry_IsOwned((*song)->itemKey.c_str());
 }
 
-// Runs when the ocarina staff opens, so free play recognises only the songs Link has learned
 void OcarinaSongRegistry_UnlockOwnedSongs(void) {
     uint8_t unlocked = 0;
     for (uint8_t slot = 0; slot < CustomSongCount; slot++) {

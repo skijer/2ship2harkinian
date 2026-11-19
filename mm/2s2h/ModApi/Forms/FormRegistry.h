@@ -25,7 +25,6 @@ typedef enum {
 typedef int32_t (*S2HFormActionFunc)(PlayState* play, Player* player);
 typedef void (*S2HFormPlayerFunc)(PlayState* play, Player* player);
 
-// action is an SOHPlayerAction (2s2h/ModApi/Player/PlayerHookTypes.h), the index of a Player_ActionHandler_*.
 typedef struct {
     int32_t action;
     S2HFormActionFunc run;
@@ -44,7 +43,6 @@ typedef struct {
     const char* key;
     const char* label;
     S2HFormKind kind;
-    // Replaces the Human row of sPlayerAgeProperties while the form is in effect.
     const PlayerAgeProperties* body;
     const S2HFormActionOverride* actions;
     uint32_t actionCount;
@@ -57,30 +55,25 @@ typedef struct {
     S2HFormPlayerFunc update;
     S2HFormPlayerFunc draw;
     const char* item;
-    // Kept for the shared definition layout: the transformation pose is MM's own cl_setmask.
     PlayerAnimationHeader* transformAnim;
     const char* transformMask;
     const char* transformMaskClimax;
     uint16_t transformVoiceSfx;
-    // Mirror root of a Link-rig model: <modelPath>/object_link_child/gLinkChildSkel or object_link_boy/gLinkAdultSkel.
     const char* modelPath;
     float rootScaleAdult;
     float rootScaleChild;
     float rootDrop;
     float height;
-    // equipType is EQUIP_TYPE_SWORD or EQUIP_TYPE_SHIELD; return value to wear instead of value.
     uint16_t (*resolveEquipment)(int32_t equipType, uint16_t value);
     bool (*allowsButtonItem)(uint16_t item, const char* customKey);
     PlayerAnimationHeader* transformOffAnim;
     Vec3f transformGlowOffset;
     float transformGlowScale;
-    // Majora's Mask has no ages of its own: Link is an adult while the form he wears says so.
     bool isAdult;
 } S2HFormDefinition;
 
 #define S2H_FORM_DEFINITION_MIN_SIZE (offsetof(S2HFormDefinition, draw) + sizeof(((S2HFormDefinition*)0)->draw))
 
-// Form keys both games share. Link without a form is HUMAN; the others are the game's own forms, mods in Ship.
 #define S2H_FORM_KEY_HUMAN "nei.human"
 #define S2H_FORM_KEY_DEKU "nei.deku"
 #define S2H_FORM_KEY_GORON "nei.goron"
@@ -97,14 +90,11 @@ bool FormRegistry_Toggle(const char* key);
 bool FormRegistry_ApplyActive(const char* key);
 const char* FormRegistry_GetActiveKey(void);
 bool FormRegistry_IsActive(const char* key);
-// The local player's form, never NULL: a native form's S2H_FORM_KEY_*, else the registered form Human Link wears.
 const char* FormRegistry_GetCurrentKey(void);
 const char* FormRegistry_GetNativeKey(uint8_t playerForm);
-// An empty list names no restriction.
 bool FormRegistry_IsCurrentFormIn(const char* const* formKeys, uint32_t formKeyCount);
 bool FormRegistry_IsCurrentFormAdult(void);
 
-// Player_GetHeight (z_actor.c), Human case: the form's own height, or height itself when none applies.
 float FormRegistry_ResolveHeight(Player* player, float height);
 
 #ifdef __cplusplus
@@ -112,8 +102,6 @@ float FormRegistry_ResolveHeight(Player* player, float height);
 
 void FormRegistry_Init();
 
-// Same arguments as the Ship hooks OnPlayerActionHandler and OnPlayerResolveMotionScale (ID
-// SOH_PLAYER_MOTION_STICK_SPEED).
 void FormRegistry_RunActionOverride(PlayState* play, Player* player, int32_t action, bool* consumed,
                                     bool* startedAction);
 void FormRegistry_ResolveMotionScale(Player* player, int32_t kind, float* scale);

@@ -1,6 +1,4 @@
 #pragma once
-// Resource factory for the JSON scene and room documents (unbound-docs/SPEC.md §4). It builds the same SOH::Scene
-// command list the binary factory builds, so nothing downstream of the resource changes.
 #include <ship/resource/ResourceFactoryJson.h>
 #include <ship/resource/ResourceLoader.h>
 

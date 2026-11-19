@@ -195,8 +195,9 @@ s16 sMaskMagicArrowEffectsG[] = { 0, 100, 255 };
 s16 sMaskMagicArrowEffectsB[] = { 0, 255, 100 };
 
 void KaleidoScope_DrawMaskSelect(PlayState* play) {
-    if (KaleidoMaskEquipment_Draw(play)) return;
-    ModLayout_ApplyCells(play,UINT16_MAX,play->pauseCtx.maskVtx,MASK_NUM_SLOTS);
+    if (KaleidoMaskEquipment_Draw(play))
+        return;
+    ModLayout_ApplyCells(play, UINT16_MAX, play->pauseCtx.maskVtx, MASK_NUM_SLOTS);
     PauseContext* pauseCtx = &play->pauseCtx;
     u16 i;
     u16 j;
@@ -281,11 +282,10 @@ void KaleidoScope_DrawMaskSelect(PlayState* play) {
 
                 u8 maskItem = gSaveContext.save.saveInfo.inventory.items[i + ITEM_NUM_SLOTS];
                 gSPVertex(POLY_OPA_DISP++, &pauseCtx->maskVtx[j + 0], 4, 0);
-                KaleidoScope_DrawTexQuadRGBA32(
-                    play->state.gfxCtx,
-                    (TexturePtr)GameInteractor_ExecuteOnKaleidoResolveItemIcon(play, maskItem,
-                                                                               (const char*)gItemIcons[maskItem]),
-                    32, 32, 0);
+                KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx,
+                                               (TexturePtr)GameInteractor_ExecuteOnKaleidoResolveItemIcon(
+                                                   play, maskItem, (const char*)gItemIcons[maskItem]),
+                                               32, 32, 0);
             }
         }
         GameInteractor_ExecuteOnKaleidoItemDraw(play, i + ITEM_NUM_SLOTS,
@@ -318,7 +318,8 @@ void KaleidoScope_UpdateMaskCursor(PlayState* play) {
     s16 moveCursorResult;
     s16 pad2;
 
-    if (KaleidoMaskEquipment_Update(play)) return;
+    if (KaleidoMaskEquipment_Update(play))
+        return;
 
     pauseCtx->cursorColorSet = PAUSE_CURSOR_COLOR_SET_WHITE;
     pauseCtx->nameColorSet = PAUSE_NAME_COLOR_SET_WHITE;

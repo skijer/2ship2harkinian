@@ -93,7 +93,6 @@ void ResolveItemGive(u8 item, bool* should) {
     }
 }
 
-// Item_Give is not the only way in (old saves, cheats), so claimed items are swept instead of checked every frame.
 void SweepInventory() {
     for (size_t slot = 0; slot < ARRAY_COUNT(gSaveContext.save.saveInfo.inventory.items); slot++) {
         const uint16_t item = gSaveContext.save.saveInfo.inventory.items[slot];
@@ -153,7 +152,6 @@ bool VanillaItems_Give(PlayState* play, uint16_t vanillaItem) {
     return true;
 }
 
-// MM has no custom drop actor: En_Item00 would need a custom collectible type first.
 bool VanillaItems_Drop(PlayState* play, uint16_t vanillaItem) {
     return false;
 }

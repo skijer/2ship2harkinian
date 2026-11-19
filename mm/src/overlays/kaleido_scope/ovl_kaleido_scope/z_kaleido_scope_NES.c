@@ -753,7 +753,8 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
 
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
 
-            POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->itemPageVtx, KaleidoItemManager_GetBackground(sItemPageBgTextures));
+            POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->itemPageVtx,
+                                                          KaleidoItemManager_GetBackground(sItemPageBgTextures));
 
             GameInteractor_ExecuteBeforeKaleidoDrawPage(pauseCtx, PAUSE_ITEM);
             KaleidoScope_DrawItemSelect(play);
@@ -806,7 +807,8 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
 
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
 
-            POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->questPageVtx, KaleidoQuestManager_GetBackground(sQuestPageBgTextures));
+            POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->questPageVtx,
+                                                          KaleidoQuestManager_GetBackground(sQuestPageBgTextures));
 
             GameInteractor_ExecuteBeforeKaleidoDrawPage(pauseCtx, PAUSE_QUEST);
             KaleidoScope_DrawQuestStatus(play);
@@ -830,7 +832,8 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
 
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
 
-            POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->maskPageVtx, KaleidoMaskEquipment_GetBackground(sMaskPageBgTextures));
+            POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->maskPageVtx,
+                                                          KaleidoMaskEquipment_GetBackground(sMaskPageBgTextures));
 
             GameInteractor_ExecuteBeforeKaleidoDrawPage(pauseCtx, PAUSE_MASK);
             KaleidoScope_DrawMaskSelect(play);
@@ -854,8 +857,8 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
 
                     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
 
-                    POLY_OPA_DISP =
-                        KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->itemPageVtx, KaleidoItemManager_GetBackground(sItemPageBgTextures));
+                    POLY_OPA_DISP = KaleidoScope_DrawPageSections(
+                        POLY_OPA_DISP, pauseCtx->itemPageVtx, KaleidoItemManager_GetBackground(sItemPageBgTextures));
 
                     GameInteractor_ExecuteBeforeKaleidoDrawPage(pauseCtx, pauseCtx->pageIndex);
                     KaleidoScope_DrawItemSelect(play);
@@ -930,8 +933,8 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
 
                 MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
 
-                POLY_OPA_DISP =
-                    KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->questPageVtx, KaleidoQuestManager_GetBackground(sQuestPageBgTextures));
+                POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->questPageVtx,
+                                                              KaleidoQuestManager_GetBackground(sQuestPageBgTextures));
 
                 GameInteractor_ExecuteBeforeKaleidoDrawPage(pauseCtx, pauseCtx->pageIndex);
                 KaleidoScope_DrawQuestStatus(play);
@@ -953,8 +956,8 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
 
                 MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
 
-                POLY_OPA_DISP =
-                    KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->maskPageVtx, KaleidoMaskEquipment_GetBackground(sMaskPageBgTextures));
+                POLY_OPA_DISP = KaleidoScope_DrawPageSections(POLY_OPA_DISP, pauseCtx->maskPageVtx,
+                                                              KaleidoMaskEquipment_GetBackground(sMaskPageBgTextures));
 
                 GameInteractor_ExecuteBeforeKaleidoDrawPage(pauseCtx, pauseCtx->pageIndex);
                 KaleidoScope_DrawMaskSelect(play);
@@ -3070,14 +3073,16 @@ void KaleidoScope_DrawCursor(PlayState* play) {
                                   !KaleidoQuestManager_IsVanillaPageShown();
 
     const uint16_t equipmentPage = KaleidoMaskEquipment_GetShownPage();
-    const bool equipmentCursor = pauseCtx->pageIndex == PAUSE_MASK && pauseCtx->cursorSpecialPos == 0 &&
-                                 equipmentPage != UINT16_MAX;
+    const bool equipmentCursor =
+        pauseCtx->pageIndex == PAUSE_MASK && pauseCtx->cursorSpecialPos == 0 && equipmentPage != UINT16_MAX;
     const bool pageCursor = extraQuestCursor || equipmentCursor;
     const char* const* corners = equipmentCursor ? ModLayout_GetCursorCorners(equipmentPage) : NULL;
     S2HLayoutCell cursorCell;
-    if (equipmentCursor && !ModLayout_GetCell(equipmentPage, pauseCtx->cursorSlot[PAUSE_MASK], &cursorCell)) return;
+    if (equipmentCursor && !ModLayout_GetCell(equipmentPage, pauseCtx->cursorSlot[PAUSE_MASK], &cursorCell))
+        return;
     if ((extraQuestCursor && pauseCtx->cursorItem[PAUSE_QUEST] == PAUSE_ITEM_NONE) ||
-        (equipmentCursor && pauseCtx->cursorItem[PAUSE_MASK] == PAUSE_ITEM_NONE)) return;
+        (equipmentCursor && pauseCtx->cursorItem[PAUSE_MASK] == PAUSE_ITEM_NONE))
+        return;
 
     // #region 2S2H [Port] Track cursor position so we can skip interpolation for one frame whenever it moves
     static f32 prevX = 0;
@@ -3105,20 +3110,20 @@ void KaleidoScope_DrawCursor(PlayState* play) {
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, sCursorPrimR, sCursorPrimG, sCursorPrimB, 255);
         gDPSetEnvColor(POLY_OPA_DISP++, sCursorEnvR, sCursorEnvG, sCursorEnvB, 255);
 
-        if(pageCursor) {
-            KaleidoScope_SetView(pauseCtx,pauseCtx->eye.x,pauseCtx->eye.y,pauseCtx->eye.z);
+        if (pageCursor) {
+            KaleidoScope_SetView(pauseCtx, pauseCtx->eye.x, pauseCtx->eye.y, pauseCtx->eye.z);
             Matrix_RotateYF(equipmentCursor ? 1.57f : -3.14f, MTXMODE_NEW);
             Matrix_Translate(0.0f, sPauseMenuVerticalOffset / 100.0f, -93.0f, MTXMODE_APPLY);
-            Matrix_Scale(0.78f,0.78f,0.78f,MTXMODE_APPLY);
+            Matrix_Scale(0.78f, 0.78f, 0.78f, MTXMODE_APPLY);
             Matrix_RotateXFApply(-(equipmentCursor ? pauseCtx->maskPageRoll : pauseCtx->questPageRoll) / 100.0f);
-            Matrix_Translate(pauseCtx->cursorX,pauseCtx->cursorY,0.0f,MTXMODE_APPLY);
-        } else Matrix_Translate(pauseCtx->cursorX, pauseCtx->cursorY, -50.0f, MTXMODE_NEW);
+            Matrix_Translate(pauseCtx->cursorX, pauseCtx->cursorY, 0.0f, MTXMODE_APPLY);
+        } else
+            Matrix_Translate(pauseCtx->cursorX, pauseCtx->cursorY, -50.0f, MTXMODE_NEW);
         Matrix_Scale(1.0f, 1.0f, 1.0f, MTXMODE_APPLY);
 
         for (i = 0; i < 4; i++) {
             Matrix_Push();
             if (corners != NULL) {
-                // OoT's 16px corner quads overlap by 2px around a 28px item (UpdateCursorSize: -1,+1,14,14).
                 f32 x = cursorCell.width * 0.5f - 7.0f;
                 f32 y = cursorCell.height * 0.5f - 7.0f;
                 Matrix_Translate((i & 1) ? x : -x, (i & 2) ? -y : y, 0.0f, MTXMODE_APPLY);
@@ -3129,12 +3134,12 @@ void KaleidoScope_DrawCursor(PlayState* play) {
             gDPPipeSync(POLY_OPA_DISP++);
             if (corners != NULL) {
                 gDPLoadTextureBlock_4b(POLY_OPA_DISP++, (TexturePtr)corners[i], G_IM_FMT_IA, 16, 16, 0,
-                    G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
-                    G_TX_NOLOD, G_TX_NOLOD);
+                                       G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
+                                       G_TX_NOLOD, G_TX_NOLOD);
             } else {
-            gDPLoadTextureBlock(POLY_OPA_DISP++, gPauseMenuCursorTex, G_IM_FMT_IA, G_IM_SIZ_8b, 16, 16, 0,
-                                G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
-                                G_TX_NOLOD, G_TX_NOLOD);
+                gDPLoadTextureBlock(POLY_OPA_DISP++, gPauseMenuCursorTex, G_IM_FMT_IA, G_IM_SIZ_8b, 16, 16, 0,
+                                    G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
+                                    G_TX_NOLOD, G_TX_NOLOD);
             }
             gSPVertex(POLY_OPA_DISP++, &pauseCtx->cursorVtx[0], 4, 0);
             gSP1Quadrangle(POLY_OPA_DISP++, 0, 2, 3, 1, 0);
@@ -3146,7 +3151,8 @@ void KaleidoScope_DrawCursor(PlayState* play) {
         FrameInterpolation_RecordCloseChild();
     }
 
-    if(extraQuestCursor) KaleidoScope_SetView(pauseCtx,0.0f,0.0f,64.0f);
+    if (extraQuestCursor)
+        KaleidoScope_SetView(pauseCtx, 0.0f, 0.0f, 64.0f);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 

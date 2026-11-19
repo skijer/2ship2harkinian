@@ -62,7 +62,6 @@ nlohmann::json DescribeItems() {
     return items;
 }
 
-// Actor ids depend on the mounted mod set, so tools address types by key only.
 nlohmann::json DescribeActors() {
     nlohmann::json actors = nlohmann::json::array();
     for (const S2HRegisteredActor& actor : ActorRegistry_List()) {
@@ -421,6 +420,7 @@ S2HModApi BuildTable() {
     api.PickUserFile = UserFiles_Pick;
     api.FreeUserFile = UserFiles_Free;
     api.SaveToModsFolder = UserFiles_SaveToMods;
+    api.ReadModsFolderFiles = UserFiles_ReadMods;
     api.ExtractRomToModsFolder = UserFiles_ExtractRomToMods;
     api.AskPlayer = ModDialogs_Ask;
     api.TellPlayer = ModDialogs_Tell;
@@ -516,7 +516,6 @@ void ModApi_Init() {
     ModApi_WriteRegistry(Ship::Context::GetPathRelativeToAppDirectory(RegistryFileName, appShortName));
 }
 
-// Items and actor types exist only inside mod binaries; tools such as Nocturne read them from this file.
 bool ModApi_WriteRegistry(const std::filesystem::path& path) {
     std::ofstream file(path);
     if (!file) {
@@ -555,6 +554,10 @@ void ModApi_ClearCurrentMod() {
 
 bool ModApi_HasHook(const char* name) {
     return HasHook(name);
+}
+
+bool ModApi_PublishHostService(const char* name, void* function) {
+    return PublishService(name, function);
 }
 
 std::string ModApi_GetCatalogFingerprint() {

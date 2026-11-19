@@ -46,7 +46,6 @@ struct CustomScene {
     PersistentFlags persistent;
 };
 
-// One Majora's Mask entrance slot (the bits above 9) per registry entry that declares entrances.
 struct EntranceSlot {
     std::string sceneKey;
     std::vector<std::string> names;
@@ -240,7 +239,6 @@ Json WriteFlagsSection() {
     return section;
 }
 
-// The save keeps what the cycle reached, as vanilla saves copy the cycle flags into the permanent ones.
 void ReadFlagsSection(const Json& section) {
     for (CustomScene& scene : sCustomScenes) {
         const Json& flags = Sub(section, scene.key.c_str());
@@ -394,11 +392,16 @@ extern "C" void SceneFlags_SetRoomVisited(s16 sceneId, s32 room) {
 }
 
 extern "C" void SceneFlags_ClearRoomVisited(s16 sceneId, s32 room) {
-    if (room < 0 || room > INT16_MAX) return;
-    if (room < 32) { SceneFlags_GetPermanent(sceneId)->rooms &= ~(1u << room); return; }
+    if (room < 0 || room > INT16_MAX)
+        return;
+    if (room < 32) {
+        SceneFlags_GetPermanent(sceneId)->rooms &= ~(1u << room);
+        return;
+    }
     const std::string key = SceneDB_GetSceneKey(sceneId);
     auto found = sRoomFlags.find(key);
-    if (found != sRoomFlags.end()) found->second.visited.erase(room);
+    if (found != sRoomFlags.end())
+        found->second.visited.erase(room);
 }
 
 extern "C" s32 SceneFlags_GetRoomClear(s16 sceneId, s32 room, s32 temporary) {

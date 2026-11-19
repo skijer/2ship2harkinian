@@ -133,7 +133,6 @@ u16 StutterFrames() {
     return static_cast<u16>(std::max(1, static_cast<int>(1.0f / WinningSpeed()) - 1));
 }
 
-// A timer below the stutter length means the actor skipped its update this frame and registered no hurtbox.
 void KeepSlowedActorHittable(PlayState* play, Actor* actor) {
     const bool skippedUpdate = actor->freezeTimer != 0 && actor->freezeTimer < StutterFrames();
     if (skippedUpdate && ReregisterHurtboxesWasHit(play, actor)) {

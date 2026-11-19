@@ -1,14 +1,10 @@
 #ifndef UNBOUND_Z64LOGIC_H
 #define UNBOUND_Z64LOGIC_H
 
-// A mod item inherits Majora's Mask randomizer logic: while the seed's simulated inventory holds it, it counts
-// as a native capability or item. Conditions ask the logic bank, never the save.
 #include "2s2h/ModApi/ModApi.h"
 
 typedef struct {
-    // The item, or any stage of its progressive chain: a stage also answers for every later one.
     const char* key;
-    // Zero, or a native RandoItemId the item needs too, such as the Bow for arrows.
     int32_t requiredItem;
     bool needsMagic;
 } Z64LogicSource;
@@ -72,7 +68,6 @@ static inline void Z64Logic_GrantScoped(const Z64LogicSource* source, const S2HL
     sZ64LogicApi->GrantLogic(&grant);
 }
 
-// Carrying fire from a lit torch to another is where MM's logic asks for a Deku Stick.
 static inline void Z64Logic_GrantTorchLighting(const Z64LogicSource* source) {
     S2HLogicSelector torches = Z64Logic_SelectAny();
     torches.capability = "HasFireSourceWithTorch";
@@ -84,8 +79,6 @@ static inline void Z64Logic_GrantTorchLighting(const Z64LogicSource* source) {
     Z64Logic_GrantScoped(source, &scope);
 }
 
-// Boulders and snowballs break on Goron punch or pound damage (ObjBombiwa 0x500, ObjSnowball 0x400|0x100);
-// MM's logic spells exactly those obstacles as explosives or Goron.
 static inline void Z64Logic_GrantBoulderSmashing(const Z64LogicSource* source) {
     S2HLogicSelector obstacles[2] = { Z64Logic_SelectAny(), Z64Logic_SelectAny() };
     obstacles[0].conditionText = "CAN_USE_EXPLOSIVE || CAN_BE_GORON";

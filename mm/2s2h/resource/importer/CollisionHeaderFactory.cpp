@@ -39,8 +39,14 @@ ResourceFactoryBinaryCollisionHeaderV0::ReadResource(std::shared_ptr<Ship::File>
 
         polygon.type = reader->ReadUInt16();
 
-        { const u32 word = reader->ReadUInt16(); polygon.flags_vIA = (word & 0x1FFFu) | ((word & 0xE000u) << 16); }
-        { const u32 word = reader->ReadUInt16(); polygon.flags_vIB = (word & 0x1FFFu) | ((word & 0xE000u) << 16); }
+        {
+            const u32 word = reader->ReadUInt16();
+            polygon.flags_vIA = (word & 0x1FFFu) | ((word & 0xE000u) << 16);
+        }
+        {
+            const u32 word = reader->ReadUInt16();
+            polygon.flags_vIB = (word & 0x1FFFu) | ((word & 0xE000u) << 16);
+        }
         polygon.vIC = reader->ReadUInt16();
 
         polygon.normal.x = reader->ReadUInt16();
@@ -117,7 +123,9 @@ ResourceFactoryBinaryCollisionHeaderV0::ReadResource(std::shared_ptr<Ship::File>
         waterBox.zLength = reader->ReadInt16();
         waterBox.properties = reader->ReadInt32();
         waterBox.room = (waterBox.properties >> 13) & 0x3F;
-        if (waterBox.room == 0x3F) { waterBox.room = -1; }
+        if (waterBox.room == 0x3F) {
+            waterBox.room = -1;
+        }
 
         collisionHeader->waterBoxes.push_back(waterBox);
     }
@@ -165,8 +173,14 @@ ResourceFactoryXMLCollisionHeaderV0::ReadResource(std::shared_ptr<Ship::File> fi
 
             polygon.type = child->UnsignedAttribute("Type");
 
-            { const u32 word = child->UnsignedAttribute("VertexA"); polygon.flags_vIA = (word & 0x1FFFu) | ((word & 0xE000u) << 16); }
-            { const u32 word = child->UnsignedAttribute("VertexB"); polygon.flags_vIB = (word & 0x1FFFu) | ((word & 0xE000u) << 16); }
+            {
+                const u32 word = child->UnsignedAttribute("VertexA");
+                polygon.flags_vIA = (word & 0x1FFFu) | ((word & 0xE000u) << 16);
+            }
+            {
+                const u32 word = child->UnsignedAttribute("VertexB");
+                polygon.flags_vIB = (word & 0x1FFFu) | ((word & 0xE000u) << 16);
+            }
             polygon.vIC = child->UnsignedAttribute("VertexC");
 
             polygon.normal.x = child->IntAttribute("NormalX");
@@ -216,8 +230,10 @@ ResourceFactoryXMLCollisionHeaderV0::ReadResource(std::shared_ptr<Ship::File> fi
             waterBox.xLength = child->IntAttribute("XLength");
             waterBox.zLength = child->IntAttribute("ZLength");
             waterBox.properties = child->IntAttribute("Properties");
-        waterBox.room = (waterBox.properties >> 13) & 0x3F;
-        if (waterBox.room == 0x3F) { waterBox.room = -1; }
+            waterBox.room = (waterBox.properties >> 13) & 0x3F;
+            if (waterBox.room == 0x3F) {
+                waterBox.room = -1;
+            }
 
             collisionHeader->waterBoxes.push_back(waterBox);
         }

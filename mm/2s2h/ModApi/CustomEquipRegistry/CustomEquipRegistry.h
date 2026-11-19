@@ -44,18 +44,15 @@ typedef struct {
     S2HGetItemEntry getItemEntry;
     const char* getItemModelPath;
     const S2HCustomItemRandomizer* randomizer;
-    // A PlayerMeleeWeapon for a sword piece that goes on Link's B button; zero keeps the vanilla sword on B.
     uint8_t meleeWeapon;
     // Optional tail field: presentation-only equipment cannot be worn or assigned to buttons.
     uint64_t presentationFlags;
     uint8_t ageRequirement;
-    // Optional form keys that may wear the piece, as in S2HCustomItemDefinition; none means every form.
     const char* const* allowedForms;
     uint32_t allowedFormCount;
 } S2HCustomEquipDefinition;
 
 #define S2H_EQUIP_OWNERSHIP_ONLY UINT64_C(1)
-// The piece is the vanilla one itself: wearing it hands the slot back its own value instead of vanillaBase.
 #define S2H_EQUIP_VANILLA_STAND_IN UINT64_C(2)
 
 bool CustomEquipRegistry_Register(const S2HCustomEquipDefinition* definition);
@@ -80,7 +77,6 @@ bool KaleidoEquipManager_IsCellEquipped(uint8_t row, uint8_t column);
 bool KaleidoEquipManager_EquipCell(struct PlayState* play, uint8_t row, uint8_t column);
 void KaleidoEquipManager_Init(void);
 
-// Engine glue of the quest status page, where MM shows the sword and the shield.
 void KaleidoEquipManager_Update(struct PlayState* play);
 void KaleidoEquipManager_DrawPoints(struct PlayState* play);
 

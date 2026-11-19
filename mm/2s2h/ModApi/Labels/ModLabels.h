@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// The names SoH's own windows (save editor, gameplay stats, time splits) show
 typedef enum {
     S2H_LABEL_ITEM,       // an item id; per language
     S2H_LABEL_QUEST_ITEM, // a quest item; per language
@@ -13,8 +12,6 @@ typedef enum {
 } S2HLabelKind;
 
 typedef struct {
-    // TimeSplits' SplitTypes: SPLIT_TYPE_ITEM (id: an ITEM_*), SPLIT_TYPE_SCENE (a SCENE_*),
-    // SPLIT_TYPE_BOSS (the boss's ACTOR_*)
     uint32_t type;
     uint32_t id;      // what the split waits for
     const char* name; // the label (the time splits draw the image for the type and id themselves)

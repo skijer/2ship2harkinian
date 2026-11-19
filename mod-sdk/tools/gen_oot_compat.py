@@ -48,7 +48,6 @@ def to_mm_name(prefix, rest):
 
 SAVE_FIELDS_OUTPUT = SDK_DIRECTORY / "tools" / "oot_save_fields.json"
 STRUCT_FIELD = re.compile(r"^\s*(?:/\*[^*]*\*/)?\s*[A-Za-z_][\w ]*?[\s\*]+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])*\s*;", re.M)
-# OoT SaveContext fields whose MM counterpart has another name.
 RENAMED_SAVE_FIELDS = {
     "isDoubleDefenseAcquired": "doubleDefense",
     "naviTimer": "tatlTimer",
@@ -65,7 +64,6 @@ RENAMED_SAVE_FIELDS = {
     "childEquips": "equips",
     "adultEquips": "equips",
 }
-# Under SaveOptions in MM.
 OPTION_SAVE_FIELDS = {"language", "audioSetting", "zTargetSetting"}
 
 
@@ -84,7 +82,6 @@ def struct_body(text, struct_name):
     return ""
 
 
-# Top-level fields only: members of nested struct/union bodies are dropped with their braces.
 def read_struct_fields(header, struct_name):
     body = struct_body(strip_comments(header.read_text(encoding="utf-8", errors="ignore")), struct_name)
     while "{" in body:
@@ -92,7 +89,6 @@ def read_struct_fields(header, struct_name):
     return STRUCT_FIELD.findall(body)
 
 
-# SaveContext is flat in OoT and nested in MM: each OoT field maps to the MM path where a field of that name lives.
 def write_save_field_map(ship_root):
     ship_fields = read_struct_fields(ship_root / "soh" / "include" / "z64save.h", "SaveContext")
     mm_header = REPOSITORY_ROOT / "mm" / "include" / "z64save.h"
@@ -168,7 +164,6 @@ RANDO_HEADERS = ["randomizerTypes.h", "randomizerEnums.h"]
 RANDO_TOKEN = re.compile(r"RANDO_ENUM_BEGIN\((\w+)\)|RANDO_ENUM_ITEM\((\w+)\s*(?:,\s*([^)]*))?\)")
 
 
-# Values as Ship's compiler numbers them: an explicit value it can evaluate, else the previous one plus one.
 def read_rando_enums(enum_directory):
     types = []
     values = {}
@@ -189,7 +184,6 @@ def read_rando_enums(enum_directory):
     return types, values
 
 
-# OoT randomizer enums as plain ints, without Ship's headers, whose RC_ names collide with MM's randomizer.
 def write_rando_shim(ship_root):
     enums = ship_root / "soh" / "soh" / "Enhancements" / "randomizer" / "randomizerEnums"
     mm_identifiers = collect_identifiers([REPOSITORY_ROOT / "mm" / "include", REPOSITORY_ROOT / "mm" / "2s2h"])

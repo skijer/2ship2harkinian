@@ -2724,7 +2724,6 @@ void PopulateCheckNames() {
     }
 }
 
-// The readable name, unless two checks read the same: those keep their RC_ token so the name stays unique.
 static const std::unordered_map<RandoCheckId, std::string>& UniqueCheckNames() {
     static const std::unordered_map<RandoCheckId, std::string> names = [] {
         std::unordered_map<RandoCheckId, std::string> readable;

@@ -252,8 +252,7 @@ s32 EnElfgrp_GetFountainFairiesCount(PlayState* play, s32 type) {
         }
     }
 
-    numberInFountain =
-        (SceneFlags_GetPermanent(play->sceneId)->unk_14 >> (((type - 1) * 5) + 1)) & 0x1F;
+    numberInFountain = (SceneFlags_GetPermanent(play->sceneId)->unk_14 >> (((type - 1) * 5) + 1)) & 0x1F;
     if (numberInFountain < STRAY_FAIRY_TOTAL - STRAY_FAIRY_SCATTERED_TOTAL) {
         numberInFountain = STRAY_FAIRY_TOTAL - STRAY_FAIRY_SCATTERED_TOTAL;
     } else if (numberInFountain > STRAY_FAIRY_TOTAL) {

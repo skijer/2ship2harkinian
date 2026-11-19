@@ -15,19 +15,6 @@ extern "C" {
 extern PlayState* gPlayState;
 }
 
-/**
- * UPDATE_TEAM_STATE
- *
- * Pushes the current save state to the server for other teammates to use.
- *
- * Fires when the server passes on a REQUEST_TEAM_STATE packet, or when this client saves the game
- *
- * When sending this packet we will assume that the team queue has been emptied for this client, so the queue
- * stored in the server will be cleared.
- *
- * When receiving this packet, if there is items in the team queue, we will play them back in order.
- */
-
 void Anchor::SendPacket_UpdateTeamState(std::string targetTeamId) {
     if (!roomState.syncItemsAndFlags) {
         return;
@@ -37,17 +24,17 @@ void Anchor::SendPacket_UpdateTeamState(std::string targetTeamId) {
     payload["type"] = UPDATE_TEAM_STATE;
     payload["targetTeamId"] = targetTeamId;
 
-    // Assume the team queue has been emptied, so clear it
     payload["queue"] = json::array();
 
     payload["state"] = gSaveContext.save;
     payload["customProgress"] = PrepCustomProgressState();
     payload["customCheckItems"] = json::object();
-    if (IS_RANDO) for (int i = 0; i < RC_MAX; ++i) {
-        if (const char* key = RandoItems_GetKey(RANDO_SAVE_CHECKS[i].randoItemId)) payload["customCheckItems"][std::to_string(i)] = key;
-    }
+    if (IS_RANDO)
+        for (int i = 0; i < RC_MAX; ++i) {
+            if (const char* key = RandoItems_GetKey(RANDO_SAVE_CHECKS[i].randoItemId))
+                payload["customCheckItems"][std::to_string(i)] = key;
+        }
 
-    // Hack to reduce the amount of bytes for this data
     if (IS_RANDO) {
         payload["state"]["shipSaveInfo"]["rando"].erase("randoSaveChecks");
         payload["state"]["shipSaveInfo"]["rando"]["randoSaveChecksCopy"] = json::array();
@@ -83,19 +70,22 @@ void Anchor::HandlePacket_UpdateTeamState(nlohmann::json payload) {
 
     if (payload.contains("state")) {
         const auto customChecks = payload.value("customCheckItems", json::object());
-        if (!customChecks.is_object()) return;
+        if (!customChecks.is_object())
+            return;
         for (const auto& [check, value] : customChecks.items()) {
             if (!value.is_string() || RandoItems_GetRandoGet(value.get<std::string>().c_str()) == 0) {
-                Notification::Emit({.message = "Team seed requires a missing custom item mod"});
+                Notification::Emit({ .message = "Team seed requires a missing custom item mod" });
                 return;
             }
         }
-        // Hack to reduce the amount of bytes for this data
         if (IS_RANDO && payload["state"]["shipSaveInfo"].contains("rando")) {
             auto stuff =
                 payload["state"]["shipSaveInfo"]["rando"]["randoSaveChecksCopy"].get<std::vector<std::vector<s32>>>();
-            if (stuff.size() != RC_MAX) return;
-            for (const auto& row : stuff) if (row.size() < 7) return;
+            if (stuff.size() != RC_MAX)
+                return;
+            for (const auto& row : stuff)
+                if (row.size() < 7)
+                    return;
             for (int i = 0; i < RC_MAX; i++) {
                 payload["state"]["shipSaveInfo"]["rando"]["randoSaveChecks"][i] = RandoSaveCheck{
                     (RandoItemId)stuff[i][0], (bool)stuff[i][1], (bool)stuff[i][2], (bool)stuff[i][3],
@@ -107,11 +97,11 @@ void Anchor::HandlePacket_UpdateTeamState(nlohmann::json payload) {
         Save loadedData = payload["state"].get<Save>();
         for (int i = 0; i < RC_MAX; ++i) {
             const auto key = customChecks.find(std::to_string(i));
-            if (key != customChecks.end()) loadedData.shipSaveInfo.rando.randoSaveChecks[i].randoItemId =
-                static_cast<RandoItemId>(RandoItems_GetRandoGet(key->get<std::string>().c_str()));
+            if (key != customChecks.end())
+                loadedData.shipSaveInfo.rando.randoSaveChecks[i].randoItemId =
+                    static_cast<RandoItemId>(RandoItems_GetRandoGet(key->get<std::string>().c_str()));
         }
 
-        // Restore bottle contents (unless it's the Deku Princess)
         for (int i = 0; i < 6; i++) {
             if (gSaveContext.save.saveInfo.inventory.items[SLOT_BOTTLE_1 + i] != ITEM_NONE &&
                 gSaveContext.save.saveInfo.inventory.items[SLOT_BOTTLE_1 + i] != ITEM_DEKU_PRINCESS) {
@@ -120,14 +110,12 @@ void Anchor::HandlePacket_UpdateTeamState(nlohmann::json payload) {
             }
         }
 
-        // Restore ammo if it's non-zero, unless it's beans
         for (int i = 0; i < ARRAY_COUNT(gSaveContext.save.saveInfo.inventory.ammo); i++) {
             if (gSaveContext.save.saveInfo.inventory.ammo[i] != 0 && i != SLOT(ITEM_MAGIC_BEANS)) {
                 loadedData.saveInfo.inventory.ammo[i] = gSaveContext.save.saveInfo.inventory.ammo[i];
             }
         }
 
-        // Restore stuff that shouldn't be synced
         loadedData.saveInfo.checksum = gSaveContext.save.saveInfo.checksum;
         loadedData.shipSaveInfo.fileCreatedAt = gSaveContext.save.shipSaveInfo.fileCreatedAt;
         memcpy(loadedData.saveInfo.playerData.newf, gSaveContext.save.saveInfo.playerData.newf,

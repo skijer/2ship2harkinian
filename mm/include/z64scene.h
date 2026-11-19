@@ -9,8 +9,8 @@
 struct GameState;
 struct PlayState;
 
-#define ROOM_MAX 32 // native minimap room capacity
-#define ROOM_TRANSITION_MAX 1024 // maximum number of transition actors in a scene (2S2H [Unbound] vanilla 48)
+#define ROOM_MAX 32
+#define ROOM_TRANSITION_MAX 1024
 
 #define SPAWN_ROT_FLAGS(rotation, flags) (((rotation) << 7) | (flags))
 
@@ -292,7 +292,6 @@ typedef struct {
     /* 0xC */ RoomShapeImageMultiBgEntry* backgrounds;
 } RoomShapeImageMulti; // size = 0x10
 
-// 2S2H [Unbound] positions in this file are f32 (world extent); each struct is mirrored in 2s2h/resource/type
 typedef struct {
     /* 0x00 */ Vec3f boundsSphereCenter;
     /* 0x0C */ s16 boundsSphereRadius;
@@ -401,7 +400,6 @@ typedef struct {
     /* 0x1 */ s16 room;
 } EntranceEntry; // size = 0x2
 
-// 2S2H [Unbound] sceneId is s16: custom scenes are numbered past SCENE_MAX, and the sign still means "no title card"
 typedef struct {
     /* 0x0 */ s16 sceneId;
     /* 0x2 */ s8 spawnNum;
@@ -479,7 +477,6 @@ typedef RoomShapeCullableEntry PolygonDlist2;
 typedef RoomShapeCullable PolygonType2;
 
 #define OBJECT_SLOT_NONE -1
-// 2S2H [Unbound] object slots and their users are 16-bit.
 #define OBJECT_SLOT_CAPACITY 1024
 
 typedef struct {

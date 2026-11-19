@@ -1,7 +1,6 @@
 #ifndef S2H_Z64BOSS_H
 #define S2H_Z64BOSS_H
 
-// Shipwright's z64boss API on Majora's Mask: a registered boss ends its fight as the vanilla boss of its slot.
 #include <string.h>
 
 #include "2s2h/ModApi/ModApi.h"
@@ -18,7 +17,6 @@ extern "C" {
 }
 #endif
 
-// True while `key` holds the slot of the loaded scene: spawn the fight from OnSceneInit when this holds.
 static inline bool Z64Boss_IsFightHere(const S2HModApi* api, const char* key, PlayState* play) {
     if (!S2H_MOD_API_HAS(api, GetSceneBoss) || play == NULL || key == NULL) {
         return false;
@@ -36,7 +34,6 @@ static inline int32_t Z64Boss_GetSceneSlot(const S2HModApi* api, PlayState* play
     return -1;
 }
 
-// Majora's own ending: the moon falls away and the credits start from Termina Field.
 static inline void Z64Boss_RollCredits(PlayState* play) {
     play->nextEntrance = ENTRANCE(TERMINA_FIELD, 0);
     gSaveContext.nextCutsceneIndex = 0xFFF7;
@@ -44,7 +41,6 @@ static inline void Z64Boss_RollCredits(PlayState* play) {
     play->transitionType = TRANS_TYPE_FADE_WHITE;
 }
 
-// The dungeon warp leads to the Giant's cutscene of the lair it stands in, as after the vanilla boss.
 static inline void Z64Boss_SpawnRewards(PlayState* play, Actor* boss, Vec3f warpPos, Vec3f heartPos) {
     Actor_SpawnAsChild(&play->actorCtx, boss, play, ACTOR_DOOR_WARP1, warpPos.x, warpPos.y, warpPos.z, 0, 0, 0,
                        ENDOORWARP1_FF_1);
@@ -52,8 +48,6 @@ static inline void Z64Boss_SpawnRewards(PlayState* play, Actor* boss, Vec3f warp
                 BHEART_PARAM_NORMAL);
 }
 
-// Ends the fight as the replaced boss would: room clear, defeat hooks, then the blue warp and heart container of a
-// lair, or Majora's credits.
 static inline void Z64Boss_Finish(const S2HModApi* api, PlayState* play, Actor* boss, Vec3f warpPos,
                                   Vec3f heartPos) {
     if (!S2H_MOD_API_HAS(api, ReportBossDefeated) || play == NULL || boss == NULL) {

@@ -228,7 +228,7 @@ typedef struct {
 
 typedef struct {
     /* 0x00 */ Vec3f quad[4];
-    /* 0x30 */ Vec3f dcMid; // midpoint of vectors d, c. 2S2H [Unbound] f32 (world extent)
+    /* 0x30 */ Vec3f dcMid; // midpoint of vectors d, c
     /* 0x3C */ Vec3f baMid; // midpoint of vectors b, a
     /* 0x48 */ f32 acDist; // distance to nearest AC collision this frame.
 } ColliderQuadDim; // size = 0x4C

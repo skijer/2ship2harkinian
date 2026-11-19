@@ -11,14 +11,56 @@ extern "C" {
 #include "functions.h"
 }
 
+namespace {
+
+// MM keeps a dungeon's key count at -1 until its first key.
+void GiveSmallKeys(s32 dungeon, s8 count) {
+    if (DUNGEON_KEY_COUNT(dungeon) < 0) {
+        DUNGEON_KEY_COUNT(dungeon) = 0;
+        gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[dungeon] = 0;
+    }
+    DUNGEON_KEY_COUNT(dungeon) += count;
+    gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[dungeon] += count;
+}
+
+void CompleteTriforceHunt() {
+    // Blocks the ability to beat the game through killing Majora until all Triforce Pieces are found.
+    if (!Flags_GetRandoInf(RANDO_INF_OBTAINED_SOUL_OF_BOSS_MAJORA)) {
+        Rando::GiveItem(RI_SOUL_BOSS_MAJORA);
+    }
+    if (RandoInfCustom_GetActiveBank() != S2H_RANDO_INF_SAVE) {
+        return;
+    }
+    GameInteractor_ExecuteOnGameCompletion();
+    const bool playsCredits = GameInteractor_Should(VB_PLAY_ENDING_CREDITS, true);
+    GameInteractor::Instance->events.emplace_back(
+        GIEventTransition{ .entrance = ENTRANCE(TERMINA_FIELD, 0),
+                           .cutsceneIndex = static_cast<u16>(playsCredits ? 0xFFF7 : 0),
+                           .transitionTrigger = TRANS_TRIGGER_START,
+                           .transitionType = TRANS_TYPE_FADE_BLACK });
+}
+
+} // namespace
+
+void Rando::GiveKeyRingKeys(RandoItemId randoItemId) {
+    const S2HKeyRing* keyRing = RandoItems_GetKeyRing(randoItemId);
+    if (keyRing != nullptr) {
+        GiveSmallKeys(keyRing->dungeon, static_cast<s8>(keyRing->count));
+    }
+}
+
 void Rando::GiveItem(RandoItemId randoItemId) {
     if (Anchor::Instance != nullptr && RandoInfCustom_GetActiveBank() == S2H_RANDO_INF_SAVE &&
         !RandoItems_IsModItem(randoItemId) && !ProgressiveItems_IsSource(randoItemId)) {
         Anchor::Instance->SendPacket_GiveItem(0, randoItemId);
     }
-    if (ProgressiveItems_ChangeRando(randoItemId, true)) return;
-    if (DungeonRegistry_GrantItem(randoItemId)) { return; }
+    if (ProgressiveItems_ChangeRando(randoItemId, true))
+        return;
+    if (DungeonRegistry_GrantItem(randoItemId)) {
+        return;
+    }
     if (RandoItems_IsModItem(randoItemId)) {
+        GiveKeyRingKeys(randoItemId);
         RandoItems_Give(randoItemId);
         return;
     }
@@ -67,13 +109,7 @@ void Rando::GiveItem(RandoItemId randoItemId) {
                              DUNGEON_SCENE_INDEX_WOODFALL_TEMPLE);
             break;
         case RI_WOODFALL_SMALL_KEY:
-            if (DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_WOODFALL_TEMPLE) < 0) {
-                DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_WOODFALL_TEMPLE) = 1;
-                gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[DUNGEON_SCENE_INDEX_WOODFALL_TEMPLE] = 1;
-            } else {
-                DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_WOODFALL_TEMPLE)++;
-                gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[DUNGEON_SCENE_INDEX_WOODFALL_TEMPLE]++;
-            }
+            GiveSmallKeys(DUNGEON_SCENE_INDEX_WOODFALL_TEMPLE, 1);
             break;
         case RI_SNOWHEAD_BOSS_KEY:
         case RI_SNOWHEAD_MAP:
@@ -82,13 +118,7 @@ void Rando::GiveItem(RandoItemId randoItemId) {
                              DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE);
             break;
         case RI_SNOWHEAD_SMALL_KEY:
-            if (DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE) < 0) {
-                DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE) = 1;
-                gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE] = 1;
-            } else {
-                DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE)++;
-                gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE]++;
-            }
+            GiveSmallKeys(DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE, 1);
             break;
         case RI_GREAT_BAY_BOSS_KEY:
         case RI_GREAT_BAY_MAP:
@@ -97,13 +127,7 @@ void Rando::GiveItem(RandoItemId randoItemId) {
                              DUNGEON_SCENE_INDEX_GREAT_BAY_TEMPLE);
             break;
         case RI_GREAT_BAY_SMALL_KEY:
-            if (DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_GREAT_BAY_TEMPLE) < 0) {
-                DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_GREAT_BAY_TEMPLE) = 1;
-                gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[DUNGEON_SCENE_INDEX_GREAT_BAY_TEMPLE] = 1;
-            } else {
-                DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_GREAT_BAY_TEMPLE)++;
-                gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[DUNGEON_SCENE_INDEX_GREAT_BAY_TEMPLE]++;
-            }
+            GiveSmallKeys(DUNGEON_SCENE_INDEX_GREAT_BAY_TEMPLE, 1);
             break;
         case RI_STONE_TOWER_BOSS_KEY:
         case RI_STONE_TOWER_MAP:
@@ -112,13 +136,7 @@ void Rando::GiveItem(RandoItemId randoItemId) {
                              DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE);
             break;
         case RI_STONE_TOWER_SMALL_KEY:
-            if (DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE) < 0) {
-                DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE) = 1;
-                gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE] = 1;
-            } else {
-                DUNGEON_KEY_COUNT(DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE)++;
-                gSaveContext.save.shipSaveInfo.rando.foundDungeonKeys[DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE]++;
-            }
+            GiveSmallKeys(DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE, 1);
             break;
         // Grants the max small keys for every dungeon at once (Woodfall 1, Snowhead 3, Great Bay 1, Stone Tower 4)
         case RI_SKELETON_KEY:
@@ -142,18 +160,10 @@ void Rando::GiveItem(RandoItemId randoItemId) {
         case RI_TRIFORCE_PIECE:
         case RI_TRIFORCE_PIECE_PREVIOUS:
             gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces++;
-            if (gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces ==
-                RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED]) {
-                // Blocks the ability to beat the game through killing Majora until all Triforce Pieces are found.
-                if (!Flags_GetRandoInf(RANDO_INF_OBTAINED_SOUL_OF_BOSS_MAJORA)) {
-                    Rando::GiveItem(RI_SOUL_BOSS_MAJORA);
-                }
-                GameInteractor_ExecuteOnGameCompletion();
-                GameInteractor::Instance->events.emplace_back(
-                    GIEventTransition{ .entrance = ENTRANCE(TERMINA_FIELD, 0),
-                                       .cutsceneIndex = 0xFFF7,
-                                       .transitionTrigger = TRANS_TRIGGER_START,
-                                       .transitionType = TRANS_TYPE_FADE_BLACK });
+            if (Rando::IsTriforceHuntOn(gSaveContext.save.shipSaveInfo.rando) &&
+                gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces ==
+                    RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED]) {
+                CompleteTriforceHunt();
             }
             break;
         // Technically these should never be used, but leaving them here just in case

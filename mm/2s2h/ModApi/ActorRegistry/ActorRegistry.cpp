@@ -79,7 +79,6 @@ void AddEnemy(const S2HActorDefinition* definition, int16_t actorId) {
     sEnemies.insert(position, enemy);
 }
 
-// An actor that set its own hintId in init keeps it.
 void AttachTatlHint(const S2HActorDefinition* definition, int16_t actorId) {
     if (definition->structSize < S2H_ACTOR_DEFINITION_HINT_SIZE || definition->naviHint == nullptr) {
         return;

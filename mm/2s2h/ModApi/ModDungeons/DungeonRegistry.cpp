@@ -452,12 +452,25 @@ int32_t DungeonRegistry_FindItem(int32_t item) {
     return found == itemOwners.end() ? -1 : found->second.first;
 }
 namespace {
+int32_t ToRegistryPlacement(uint32_t nativePlacement) {
+    switch (nativePlacement) {
+        case RO_DUNGEON_ITEM_VANILLA:
+            return -2;
+        case RO_DUNGEON_ITEM_ANY_DUNGEON:
+            return 3;
+        case RO_DUNGEON_ITEM_OVERWORLD:
+            return 4;
+        default:
+            return static_cast<int32_t>(nativePlacement);
+    }
+}
+
 int32_t Placement(int32_t index, int32_t kind) {
     if (dungeons[index].placement[kind] != -1) {
         return dungeons[index].placement[kind];
     }
-    return kind == 0   ? RANDO_SAVE_OPTIONS[RO_PLACEMENT_SMALL_KEYS]
-           : kind == 1 ? RANDO_SAVE_OPTIONS[RO_PLACEMENT_BOSS_KEYS]
+    return kind == 0   ? ToRegistryPlacement(RANDO_SAVE_OPTIONS[RO_PLACEMENT_SMALL_KEYS])
+           : kind == 1 ? ToRegistryPlacement(RANDO_SAVE_OPTIONS[RO_PLACEMENT_BOSS_KEYS])
                        : dungeons[index].placement[kind];
 }
 } // namespace

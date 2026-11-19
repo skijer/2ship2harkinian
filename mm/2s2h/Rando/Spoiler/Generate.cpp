@@ -47,10 +47,12 @@ nlohmann::json GenerateFromSaveContext() {
         const char* key = RandoItems_GetKey(RANDO_SAVE_CHECKS[randoCheckId].randoItemId);
         if (const auto* pickup = CustomItemRegistry_GetPickupVariant(key)) {
             auto& location = spoiler["checks"][randoStaticCheck.name];
-            if (location.is_string()) location = {{"randoItemId", location.get<std::string>()}};
-            location["pickup"] = {{"itemKey", pickup->itemKey}, {"variantKey", pickup->variantKey}, {"key", pickup->key}};
+            if (location.is_string())
+                location = { { "randoItemId", location.get<std::string>() } };
+            location["pickup"] = { { "itemKey", pickup->itemKey },
+                                   { "variantKey", pickup->variantKey },
+                                   { "key", pickup->key } };
         }
-
     }
 
     BossRegistry_WriteSpoiler(spoiler);

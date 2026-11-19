@@ -35,8 +35,6 @@ struct GrottoDescriptor {
 };
 
 inline const std::array<GrottoDescriptor, 26>& Grottos() {
-    // Native content, yaw, XYZ and separate void data: DeveloperTools/BetterMapSelect.c:76–165.
-    // Region and native portal pairing: Rando/Logic/Regions; reused identities: Logic.cpp:18–106.
     static const std::array<GrottoDescriptor, 26> grottos = { {
         { 0,
           0,
@@ -332,11 +330,6 @@ struct PortalDescriptor {
     InteriorKind kind = InteriorKind::Passage;
 };
 inline const std::array<PortalDescriptor, 42>& Interiors() {
-    // Explicit native reversible ingress set; source conditions stay in the native graph.
-    // Clock Tower Interior remains owned by the original cross-game link.
-    // Kinds describe the physical ingress: native En_Door transitions and their
-    // retail use. Open tunnels/caves remain Passage, including Observatory spawn 0.
-    // Zora Hall rooms and Observatory spawn 1 have actual opening doors.
     static const std::array<PortalDescriptor, 42> interiors = { {
         { "mm:interior:fishermans_hut:0", ENTRANCE(FISHERMANS_HUT, 0), ENTRANCE(GREAT_BAY_COAST, 4), RR_FISHERMANS_HUT,
           RR_GREAT_BAY_COAST, InteriorKind::Passage },

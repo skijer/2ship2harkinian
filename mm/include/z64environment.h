@@ -191,7 +191,7 @@ typedef struct {
     /* 0x0F */ u8 fogColor[3];
     /* 0x12 */ s16 fogNear; // ranges from 0-1000 (0: starts immediately, 1000: no fog), but is clamped to ENV_FOGNEAR_MAX
     /* 0x14 */ s16 zFar; // Max depth (render distance) of the view as a whole. fogFar will always match zFar
-    /* 0x16 */ u8 hasWorldFog; // 2S2H [Unbound]
+    /* 0x16 */ u8 hasWorldFog;
     /* 0x18 */ WorldFog worldFog;
 } CurrentEnvLightSettings; // size = 0x28
 
@@ -213,7 +213,6 @@ typedef struct {
     /* 0x0F */ u8 fogColor[3];
     /* 0x12 */ s16 blendRateAndFogNear;
     /* 0x14 */ s16 zFar;
-    // 2S2H [Unbound] world-unit fog (SPEC §4.2 lighting); mirrored in SetLightingSettings.h
     /* 0x16 */ u8 hasWorldFog;
     /* 0x18 */ WorldFog worldFog;
 } EnvLightSettings; // size = 0x28

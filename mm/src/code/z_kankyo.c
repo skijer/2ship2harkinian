@@ -1308,7 +1308,7 @@ s32 Environment_IsSceneUpsideDown(PlayState* play) {
     return ret;
 }
 
-// 2S2H [Unbound] Vanilla fogNear is a point on the N64 fog scale, u = 1000 * (1 - zNear / distance) with zNear 10
+// Vanilla fogNear is a point on the N64 fog scale, u = 1000 * (1 - zNear / distance) with zNear 10
 f32 Environment_GetLegacyFogStart(s16 fogNear, s16 zFar) {
     if (fogNear >= 1000) {
         return zFar;
@@ -1350,8 +1350,6 @@ static void Environment_BlendWorldFog(CurrentEnvLightSettings* dest, EnvLightSet
     dest->worldFog = Environment_LerpWorldFog(Environment_GetWorldFog(from), Environment_GetWorldFog(to), weight);
 }
 
-// Effects that pull the fog in (Nayru's Love, fairies, game over) speak the 0-1000 scale through adjLightSettings,
-// and the skybox and weather keep reading lightCtx->fogNear/zFar, so both get the vanilla equivalent.
 static void Environment_ApplyWorldFog(EnvironmentContext* envCtx, LightContext* lightCtx) {
     WorldFog* fog = &lightCtx->worldFog;
     s16 adjustedNear;

@@ -17,6 +17,7 @@ bool FormTransform_IsActive(void);
 void FormTransform_Init();
 void FormTransform_DrawMask(Player* player, s32 limbIndex);
 bool FormTransform_Begin(const S2HFormDefinition* from, const S2HFormDefinition* to);
+void FormTransform_PlayInstantFlash(void);
 #endif
 
 #endif

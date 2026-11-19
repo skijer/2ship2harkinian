@@ -267,9 +267,7 @@ bool ParseNumberString(const std::string& text, double& out) {
         size_t consumed = 0;
         out = std::stod(text, &consumed);
         return consumed == text.size();
-    } catch (...) {
-        return false;
-    }
+    } catch (...) { return false; }
 }
 
 int64_t ToInt(const Json& value, int64_t fallback) {

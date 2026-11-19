@@ -24,6 +24,7 @@
 #include <ship/resource/archive/ArchiveManager.h>
 
 #include "2s2h/BenPort.h"
+#include "2s2h/Fleet/FleetGame.h"
 #include "ModPermissions/ModPermissions.h"
 #include "ModTrust/ModTrust.h"
 
@@ -88,7 +89,6 @@ std::string Hex(uint64_t value) {
     return result;
 }
 
-// The binary lives inside the .o2r; it is written out once so the OS loader can map it.
 class ModLibrary {
   public:
     ModLibrary() = default;
@@ -372,6 +372,9 @@ std::optional<NativeModPackage> ReadNativeModPackage(const std::shared_ptr<Ship:
     if (!ReadManifest(archive, manifest) || !manifest.contains("binaries") || !manifest["binaries"].is_object()) {
         return std::nullopt;
     }
+    if (manifest.value("fleet_only", false) && !FleetGame_IsHosted()) {
+        return std::nullopt;
+    }
     std::string protocolError;
     if (!ModPackage_IsCompatible(manifest, "mm", protocolError)) {
         const std::string message = archive->GetPath() + ": " + protocolError;
@@ -552,7 +555,25 @@ void InitMod(LoadedMod& mod) {
     }
 }
 
+void MountFleetMods() {
+    const char* folder = FleetGame_GetModsDirectory();
+    std::error_code error;
+    if (folder == nullptr || !std::filesystem::is_directory(folder, error)) {
+        return;
+    }
+    auto archives = Ship::Context::GetRawInstance()->GetResourceManager()->GetArchiveManager();
+    for (const auto& entry : std::filesystem::directory_iterator(folder, error)) {
+        if (entry.path().extension() == ".o2r") {
+            archives->AddArchive(entry.path().string());
+        }
+    }
+}
+
 std::vector<NativeModPackage> FindNativeModPackages(const char* platform) {
+    if (FleetGame_IsHosted()) {
+        ModApi_PublishHostService("fleet.hosted", reinterpret_cast<void*>(FleetGame_IsHosted));
+        MountFleetMods();
+    }
     std::vector<NativeModPackage> packages;
     auto archives = Ship::Context::GetRawInstance()->GetResourceManager()->GetArchiveManager()->GetArchives();
     for (const auto& archive : *archives) {
@@ -568,7 +589,6 @@ std::vector<NativeModPackage> FindNativeModPackages(const char* platform) {
     return packages;
 }
 
-// A mod initialises after the mods named in its manifest "dependencies"; otherwise archive order is kept.
 class DependencyOrder {
   public:
     explicit DependencyOrder(std::vector<NativeModPackage>& packages) : mPackages(packages) {
@@ -664,7 +684,6 @@ void ModLoader_LoadMods() {
                                       { "compatible", mod->compatible },
                                       { "hooks", mod->requiredHooks },
                                       { "behaviors", mod->requiredBehaviors } };
-        // `requires` is never cached, so a package added between two boots is picked up.
         if (mod->compatible && HasRequiredResources(*mod)) {
             InitMod(*mod);
         }

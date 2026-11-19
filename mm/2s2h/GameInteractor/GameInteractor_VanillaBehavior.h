@@ -2548,9 +2548,6 @@ typedef enum {
     // - `*f32` (speed)
     VB_ZTARGET_SPEED_CHECK,
 
-    // Appended on purpose: compiled mods bake these values in, so never insert above this line.
-    // Names and argument order match Shipwright's behaviors of the same name.
-
     // #### `result`
     // ```c
     // !(this->stateFlags3 & PLAYER_STATE3_4)
@@ -2596,7 +2593,8 @@ typedef enum {
     // #### `result`
     // ```c
     // (this->stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR) && (this->heldActor != NULL) &&
-    //     CHECK_BTN_ANY(sPlayerControlInput->press.button, BTN_CRIGHT | BTN_CLEFT | BTN_CDOWN | BTN_B | BTN_A | BTN_DPAD_EQUIP)
+    //     CHECK_BTN_ANY(sPlayerControlInput->press.button, BTN_CRIGHT | BTN_CLEFT | BTN_CDOWN | BTN_B | BTN_A |
+    //     BTN_DPAD_EQUIP)
     // ```
     // #### `args`
     // - `*Input`
@@ -2636,7 +2634,6 @@ typedef enum {
     // - `s32` (item)
     VB_UPDATE_BOTTLE_ITEM,
 
-    // The slot starts as the form's vanilla strength; a mod may overwrite it. The result is ignored.
     // #### `args`
     // - `*s32` (strength)
     VB_USE_STRENGTH_UPGRADE,
@@ -2683,7 +2680,6 @@ typedef enum {
     // - `*ObjLightswitch`
     VB_LIGHTSWITCH_OFF,
 
-    // args: Player*, Color_RGB8*. Mods may replace the human tunic tint.
     VB_APPLY_TUNIC_COLOR,
 
     // #### `result`
@@ -2711,7 +2707,6 @@ typedef enum {
     // ```
     // #### `args`
     // - `*Player`
-    // True keeps Link in his walk past a ledge, held level, instead of falling or auto-jumping (OoT's hover boots).
     VB_PLAYER_WALK_ON_AIR,
     VB_PIRATE_DETECT_PLAYER,
 
@@ -2722,6 +2717,22 @@ typedef enum {
     // #### `args`
     // - None
     VB_RANDO_MATCH_CONTAINER_STYLE,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - None
+    VB_PLAY_ENDING_CREDITS,
+
+    // #### `result`
+    // ```c
+    // CVarGetInteger("gCheats.NoClip", 0) != 0
+    // ```
+    // #### `args`
+    // - `*Actor` (the player)
+    VB_PLAYER_NOCLIP,
 } GIVanillaBehavior;
 
 #endif

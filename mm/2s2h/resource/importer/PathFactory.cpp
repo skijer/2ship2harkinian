@@ -47,7 +47,7 @@ ResourceFactoryBinaryPathMMV0::ReadResource(std::shared_ptr<Ship::File> file,
 }
 std::shared_ptr<Ship::IResource>
 ResourceFactoryJsonPathMMV1::ReadResource(std::shared_ptr<Ship::File> file,
-                                         std::shared_ptr<Ship::ResourceInitData> initData) {
+                                          std::shared_ptr<Ship::ResourceInitData> initData) {
     using namespace S2H::Unbound;
     if (!FileHasValidFormatAndReader(file, initData)) {
         return nullptr;
@@ -78,12 +78,11 @@ ResourceFactoryJsonPathMMV1::ReadResource(std::shared_ptr<Ship::File> file,
                 positions.push_back(ReadVec3f(point));
             }
             const int64_t additional = Field(definition, "additionalPathIndex", 255);
-            if (additional < 0 || additional > 255 ||
-                (additional != 255 && additional >= keys.size())) {
+            if (additional < 0 || additional > 255 || (additional != 255 && additional >= keys.size())) {
                 throw DocumentError("additionalPathIndex is outside the path list");
             }
             resource->pathData.push_back({ static_cast<u8>(positions.size()), static_cast<u8>(additional),
-                                          static_cast<s16>(Field(definition, "customValue")), positions.data() });
+                                           static_cast<s16>(Field(definition, "customValue")), positions.data() });
         }
         return resource;
     } catch (const std::exception& error) {

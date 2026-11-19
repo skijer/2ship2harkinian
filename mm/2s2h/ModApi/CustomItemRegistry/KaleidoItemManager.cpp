@@ -16,6 +16,7 @@
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ModApi/CustomEquipRegistry/CustomEquipRegistry.h"
+#include "2s2h/ModApi/Forms/FormRegistry.h"
 
 extern "C" {
 #include "z64.h"
@@ -138,6 +139,11 @@ void BuildVisiblePages() {
         }
         pages[placement.page][placement.slot].push_back(definition);
     }
+    const char* currentForm = FormRegistry_GetCurrentKey();
+    std::erase_if(pages, [currentForm](const auto& entry) {
+        const char* ownerForm = ModLayout_GetPageOwnerForm(entry.first);
+        return ownerForm != nullptr && std::strcmp(ownerForm, currentForm) != 0;
+    });
 
     for (auto& items : sVanillaClaims.slots) {
         items.clear();
@@ -333,7 +339,25 @@ void ResetShownPage() {
     sCyclingSlot = -1;
 }
 
+void OpenOnFormPage(PlayState* play) {
+    uint16_t formPage;
+    if (play == nullptr || !ModLayout_FindFormPage(FormRegistry_GetCurrentKey(), &formPage)) {
+        return;
+    }
+    sLayoutFrame.reset();
+    RefreshVisiblePages();
+    if (FindVisiblePage(formPage) != nullptr) {
+        sShownPage = formPage;
+        MoveCursorToFirstItem(play);
+    }
+}
+
 void RegisterHooks() {
+    REGISTER_VB_SHOULD(VB_OPEN_PAUSE_MENU, {
+        if (*should) {
+            OpenOnFormPage(gPlayState);
+        }
+    });
     REGISTER_VB_SHOULD(VB_KALEIDO_EQUIP_ITEM_TO_BUTTON, { EquipCursorItem(should, args); });
     REGISTER_VB_SHOULD(VB_KALEIDO_DISPLAY_ITEM_TEXT, { DisplayCursorItemText(should, args); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveLoad>([](s16) { ResetShownPage(); });
@@ -454,8 +478,6 @@ bool KaleidoItemManager_SetDefaultPlacement(const char* key, const S2HCustomItem
     if (key == nullptr || placement == nullptr || CustomItemRegistry_Find(key) == nullptr) {
         return false;
     }
-    // Older disposition migrations persisted the registry's built-in default as an override.
-    // Adopt the mod default once for those unchanged cells; preserve actual user placements.
     if (!CVarGetInteger(PlacementCvar(key, "ModDefaultAdopted").c_str(), 0)) {
         const auto* equip = CustomEquipRegistry_Find(key);
         if (equip != nullptr) {
@@ -547,7 +569,6 @@ uint16_t KaleidoItemManager_GetSlotItem(uint8_t slot) {
     return KaleidoItemManager_ResolveSlotItem(slot, gSaveContext.save.saveInfo.inventory.items[vanillaSlot]);
 }
 
-// MM draws and indexes its item grid by slot, so there is no cell permutation to undo yet.
 uint8_t KaleidoItemManager_GetVanillaSlot(uint8_t cell) {
     return cell;
 }
@@ -571,10 +592,14 @@ const char* KaleidoItemManager_GetPauseNameTexture(void) {
 
 bool KaleidoItemManager_OpenPauseDescription(PlayState* play, const S2HCustomItemDefinition* definition,
                                              int16_t cursorRow) {
-    if (play == nullptr || definition == nullptr || definition->pauseText == nullptr) {
+    const char* text = nullptr;
+    if (definition != nullptr) {
+        text = definition->pauseText != nullptr ? definition->pauseText : definition->getItemText;
+    }
+    if (play == nullptr || text == nullptr) {
         return false;
     }
-    CustomMessage::SetActiveCustomMessage(definition->pauseText);
+    CustomMessage::SetActiveCustomMessage(text);
     play->pauseCtx.itemDescriptionOn = true;
     func_801514B0(play, CUSTOM_MESSAGE_ID, cursorRow < 2 ? 3 : 1);
     return true;
@@ -622,9 +647,11 @@ bool KaleidoItemManager_CycleItemPage(PlayState* play) {
     if (play == nullptr || sVisiblePages.empty() || sCyclingSlot != -1) {
         return false;
     }
+    uint16_t formPage;
+    const bool hasFormPage = ModLayout_FindFormPage(FormRegistry_GetCurrentKey(), &formPage);
     std::vector<ItemPage> itemPages;
     for (const auto& page : sVisiblePages) {
-        if (page.page < S2H_ITEM_PAGE_EQUIPMENT_FIRST) {
+        if (page.page < S2H_ITEM_PAGE_EQUIPMENT_FIRST && (!hasFormPage || page.page == formPage)) {
             itemPages.push_back(page);
         }
     }
@@ -649,7 +676,6 @@ bool KaleidoItemManager_CycleItemPage(PlayState* play) {
     return true;
 }
 
-// A on a cell with several items starts or stops turning its wheel; the stick turns it and the cursor stays put.
 void KaleidoItemManager_HandleWheel(PlayState* play) {
     const ItemPage* page = GetShownOrVanillaPage();
     int slot = play->pauseCtx.cursorPoint[PAUSE_ITEM];
@@ -691,7 +717,6 @@ void KaleidoItemManager_HandleWheel(PlayState* play) {
     }
 }
 
-// Follow edited positions rather than assuming that cell numbers remain in a rectangular grid.
 static int SpatialCell(uint16_t page, int slot, int dx, int dy) {
     S2HLayoutCell current;
     ModLayout_GetCell(page, slot, &current);
@@ -716,7 +741,6 @@ static int SpatialCell(uint16_t page, int slot, int dx, int dy) {
     return result;
 }
 
-// L turns to the next extra item page; it is free on the item page (R and Z already turn the pause pages).
 void KaleidoItemManager_Update(PlayState* play) {
     sWasAPressConsumed = false;
     RefreshVisiblePages();
@@ -823,7 +847,6 @@ void** KaleidoMaskEquipment_GetBackground(void** vanilla) {
     return page == nullptr ? vanilla : ModLayout_GetBackground(page->page, vanilla);
 }
 
-// SoH's Assignable Tunics and Boots: a shield, tunic or boots pressed onto C rides that button; A still wears it.
 static int8_t GetAssignableEquipButton(const S2HCustomItemDefinition* item, uint32_t pressed) {
     const S2HCustomEquipDefinition* equip = CustomEquipRegistry_Find(item->key);
     if (equip == nullptr || equip->slot == S2H_EQUIP_SLOT_SWORD || equip->slot >= S2H_EQUIP_SLOT_UPGRADE ||
@@ -963,7 +986,6 @@ bool KaleidoMaskEquipment_Update(PlayState* play) {
     }
     if ((ModLayout_GetFlags(page->page) & S2H_LAYOUT_EQUIP_CONTROLS) &&
         (page->slots[slot].size() <= 1 || (input->press.button & (BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT)))) {
-        // Equipment uses the source menu's direct equip buttons, not the item-page wheel gesture.
         uint32_t equipButtons = BTN_A | BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT;
         if (CVarGetInteger("gEnhancements.Dpad.DpadEquips", 0)) {
             equipButtons |= BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT;
@@ -1012,13 +1034,11 @@ bool KaleidoMaskEquipment_Update(PlayState* play) {
     return true;
 }
 
-// Upgrades (cape, companions, bracelets) show on/off by transparency instead, as OoT's own upgrade column does.
 static bool IsWornInEquipSlot(const S2HCustomItemDefinition* item) {
     const S2HCustomEquipDefinition* equip = CustomEquipRegistry_Find(item->key);
     return equip != nullptr && equip->slot < S2H_EQUIP_SLOT_UPGRADE && CustomEquipRegistry_IsWorn(item->key);
 }
 
-// OoT's KaleidoScope_DrawEquipment: a white box behind each worn piece, drawn before the icons.
 static void DrawEquippedBoxes(PlayState* play, const ItemPage& page) {
     PauseContext* pause = &play->pauseCtx;
     OPEN_DISPS(play->state.gfxCtx);
@@ -1039,7 +1059,6 @@ static void DrawEquippedBoxes(PlayState* play, const ItemPage& page) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// OoT's pause Link image is 64x112; it is rendered at 3x into its own framebuffer.
 constexpr int32_t DollWidth = 64;
 constexpr int32_t DollHeight = 112;
 constexpr int32_t DollSupersample = 3;
@@ -1052,7 +1071,6 @@ struct DollPose {
     f32 y;
 };
 
-// NEI's per-form fit for the 64x112 viewport: Goron and Zora stand taller, Deku shorter.
 static DollPose GetDollPose(const Player* player) {
     switch (player->transformation) {
         case PLAYER_FORM_GORON:
@@ -1089,7 +1107,6 @@ static void RenderPlayerDoll(PlayState* play) {
     Gfx* opaBranch;
     Gfx* xluBranch;
 
-    // Both streams: shields and other held pieces draw translucent parts on POLY_XLU.
     OPEN_DISPS(play->state.gfxCtx);
     opaBranch = POLY_OPA_DISP;
     POLY_OPA_DISP++;
@@ -1147,7 +1164,6 @@ static void RenderPlayerDoll(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Composited the way framebuffer_effects.c samples framebuffers; screen-space, so it does not tilt with the page.
 static void DrawPlayerDoll(PlayState* play, const S2HPlayerPreview& preview) {
     if (sDollFrameBuffer == -1) {
         return;
@@ -1185,7 +1201,6 @@ bool KaleidoItemManager_DrawPlayerPreview(PlayState* play, const S2HPlayerPrevie
         return false;
     }
     const PauseContext* pause = &play->pauseCtx;
-    // Composited in screen space, so it only shows while the page faces the camera, still.
     if (pause->state != PAUSE_STATE_MAIN || pause->mainState == PAUSE_MAIN_STATE_SWITCHING_PAGE ||
         sDrawnFrame == play->state.frames) {
         return false;

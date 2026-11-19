@@ -3,7 +3,6 @@
 
 // OoT equipment behaviour for one mod's custom equipment pieces, built on MM's own systems. Include it in one
 // translation unit, give pieces a role with Z64Equipment_SetRole and call Z64Equipment_Install from ModInit.
-// Swords and shields need no role: their vanillaBase already makes MM treat them as its own.
 
 #include <stdarg.h>
 #include <stdbool.h>
@@ -26,11 +25,9 @@ typedef enum {
 } Z64EquipmentRole;
 
 #define Z64EQUIPMENT_MAX_PIECES 16
-// OoT's iron boots on land: a walking cap, heavy gravity and slow turns (NEI's tuning of MM's boot registers).
 #define Z64EQUIPMENT_IRON_RUN_LIMIT 300
 #define Z64EQUIPMENT_IRON_GRAVITY -160
 #define Z64EQUIPMENT_IRON_TURN 500
-// OoT's hoverBootsTimer: frames Link keeps his height after walking off a ledge.
 #define Z64EQUIPMENT_HOVER_FRAMES 19
 #define Z64EQUIPMENT_HOVER_RING_DL "__OTR__objects/oot_gameplay_keep/gHoverBootsCircleDL"
 // MM numbers hit effects without names; 1 is fire (what func_8083456C sets Link burning on).
@@ -58,7 +55,6 @@ static inline bool Z64Equipment_SetRole(const char* key, Z64EquipmentRole role) 
     return true;
 }
 
-// OoT equipment is human Link's: other forms keep their own bodies.
 static inline bool Z64Equipment_IsRoleWorn(Player* player, Z64EquipmentRole role) {
     if (player == NULL || player->transformation != PLAYER_FORM_HUMAN) {
         return false;
@@ -100,7 +96,6 @@ static inline Z64EquipmentRole Z64Equipment_GetAbilityRole(SOHPlayerAbility abil
     }
 }
 
-// Only ever grants: another mod's piece or the form itself may already have said yes.
 static void Z64Equipment_LendFormAbility(bool* should, va_list args) {
     Player* player = va_arg(args, Player*);
     SOHPlayerAbility ability = (SOHPlayerAbility)va_arg(args, int);
@@ -142,7 +137,6 @@ static void Z64Equipment_UpdateIronBoots(PlayState* play, Player* player) {
     }
 }
 
-// Asked while Link walks past a ledge, before MM starts the fall or the ledge hop.
 static void Z64Equipment_WalkOnAir(bool* should, va_list args) {
     Player* player = va_arg(args, Player*);
 
@@ -154,7 +148,6 @@ static void Z64Equipment_WalkOnAir(bool* should, va_list args) {
     sZ64EquipmentIsWalkingOnAir = true;
 }
 
-// OoT's hoverBootsTimer: refilled on the ground and spent in the air, jumps included.
 static void Z64Equipment_UpdateHoverBoots(Player* player) {
     sZ64EquipmentIsHovering = sZ64EquipmentIsWalkingOnAir;
     sZ64EquipmentIsWalkingOnAir = false;
@@ -183,7 +176,6 @@ static void Z64Equipment_OnPlayerUpdate(Player* player) {
     Z64Equipment_UpdateHoverBoots(player);
 }
 
-// OoT's Goron Tunic shrugs fire off entirely: no damage, no burning, no knockback.
 static void Z64Equipment_OnResolveDamage(Actor* victim, ColliderElement* attack, f32* damage) {
     if (gPlayState == NULL || attack == NULL || victim != &GET_PLAYER(gPlayState)->actor) {
         return;

@@ -39,7 +39,6 @@ typedef struct AnchorClient {
     s16 sceneId;
     s32 entrance;
 
-    // Only available in PLAYER_UPDATE packets
     uint8_t transformation = PLAYER_FORM_HUMAN;
     PosRot posRot;
     u8 jointTable[159]{};
@@ -66,7 +65,6 @@ typedef struct AnchorClient {
     std::vector<std::string> wornCustomItemKeys;
     std::vector<const char*> wornCustomItemKeyPointers;
 
-    // Ptr to the dummy player
     Player* player = nullptr;
 } AnchorClient;
 
@@ -81,7 +79,7 @@ typedef struct {
 class Anchor : public Network {
   private:
     std::chrono::steady_clock::time_point connectedAt;
-    std::atomic<bool> connectionChanged{false};
+    std::atomic<bool> connectionChanged{ false };
     bool isProcessingIncomingPacket = false;
     bool refreshingActors = false;
     bool shouldRefreshActors = false;
@@ -119,7 +117,6 @@ class Anchor : public Network {
     inline static const std::string clientVersion =
         std::string((char*)gBuildVersion) + " | " + (char*)gGitBranch + " | " + (char*)gGitCommitHash;
 
-    // Packet types //
     inline static const std::string CUSTOM_PROGRESS = "CUSTOM_PROGRESS";
     inline static const std::string MOD_PACKET = "MOD_PACKET";
     inline static const std::string ALL_CLIENT_STATE = "ALL_CLIENT_STATE";
@@ -148,9 +145,7 @@ class Anchor : public Network {
     RoomState roomState{};
 
     inline static const std::string GLOBAL_ROOM_ID = "2ship-global";
-    // Inside Fleet both games share one Room ID setting, so the other game's public id also means this one's.
     static bool IsGlobalRoom();
-    // The room the handshake asks for: the public room as it is, any other kept per game inside Fleet.
     static std::string RoomToJoin();
 
     void Init();

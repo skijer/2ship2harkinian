@@ -19,7 +19,6 @@ typedef enum {
 } S2HAudioGroup;
 
 bool AudioMix_Register(S2HAudioMixFunc callback);
-// volumeCvar is an optional float CVar (0..1) the mod exposes for its own volume.
 bool AudioMix_RegisterInGroup(S2HAudioMixFunc callback, uint8_t group, const char* volumeCvar);
 // Runs on the audio thread.
 void AudioMix_Run(int16_t* samples, uint32_t frameCount);

@@ -20,9 +20,11 @@ void FrameInterpolation_RecordOpenChild(const void* a, int b);
 void FrameInterpolation_RecordCloseChild(void);
 }
 
+void FastTransformation_PlayFlash(Player* player);
+
 namespace {
 
-constexpr const char* InstantTransformCvar = "gEnhancements.Forms.InstantTransform";
+constexpr const char* InstantTransformCvar = "gEnhancements.Masks.FastTransformation";
 constexpr float MaskFaceFrame = 12.0f;
 constexpr float MaskClimaxFrame = 51.0f;
 constexpr uint32_t StateLoading = PLAYER_STATE1_200;
@@ -39,9 +41,14 @@ constexpr uint32_t BlockingStateFlags1 = PLAYER_STATE1_DEAD | PLAYER_STATE1_TALK
                                          StateClimbingLedge | StateHanging | StateGettingItem | StateDamaged |
                                          StateFirstPerson;
 
+// Player_Action_86 indexes its week-event table past the end for Human Link and sets these two unrelated flags.
+constexpr s32 HumanSeenWeekEvent = 16;
+constexpr u8 HumanSeenWeekEventBits = 0x0A;
+
 bool sActive = false;
 bool sPendingStart = false;
 bool sFormApplied = false;
+u8 sHumanSeenBitsBefore = 0;
 std::string sTargetKey;
 const char* sMaskDl = nullptr;
 const char* sMaskClimaxDl = nullptr;
@@ -55,11 +62,13 @@ bool IsRunningMaskCutscene(const Player* player) {
     return player->actionFunc == Player_Action_86 || player->actionFunc == Player_Action_87;
 }
 
-// The cutscene re-inits the actor and swallows a worn mask, and it needs solid ground and free hands.
 bool CanPlayMaskCutscene(const Player* player) {
-    return player->transformation == PLAYER_FORM_HUMAN && player->currentMask == PLAYER_MASK_NONE &&
-           player->csAction == PLAYER_CSACTION_NONE && (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) &&
-           !(player->stateFlags1 & BlockingStateFlags1);
+    return player->transformation == PLAYER_FORM_HUMAN && player->csAction == PLAYER_CSACTION_NONE &&
+           (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && !(player->stateFlags1 & BlockingStateFlags1);
+}
+
+u8* GetHumanSeenWeekEvent() {
+    return &gSaveContext.save.saveInfo.weekEventReg[HumanSeenWeekEvent];
 }
 
 void Stop() {
@@ -72,6 +81,9 @@ void Stop() {
 }
 
 void ApplyTargetForm() {
+    u8* seen = GetHumanSeenWeekEvent();
+
+    *seen = (*seen & ~HumanSeenWeekEventBits) | sHumanSeenBitsBefore;
     sFormApplied = true;
     sMaskDl = nullptr;
     FormRegistry_ApplyActive(sTargetKey.empty() ? nullptr : sTargetKey.c_str());
@@ -138,6 +150,12 @@ bool FormTransform_IsActive(void) {
     return sActive;
 }
 
+void FormTransform_PlayInstantFlash(void) {
+    if (Player* player = GetPlayer()) {
+        FastTransformation_PlayFlash(player);
+    }
+}
+
 bool FormTransform_Begin(const S2HFormDefinition* from, const S2HFormDefinition* to) {
     Player* player = GetPlayer();
     const bool isStarted =
@@ -150,6 +168,7 @@ bool FormTransform_Begin(const S2HFormDefinition* from, const S2HFormDefinition*
     sActive = true;
     sPendingStart = true;
     sFormApplied = false;
+    sHumanSeenBitsBefore = *GetHumanSeenWeekEvent() & HumanSeenWeekEventBits;
     sTargetKey = to == nullptr ? "" : to->key;
     sMaskDl = wearer->transformMask;
     sMaskClimaxDl = wearer->transformMaskClimax;

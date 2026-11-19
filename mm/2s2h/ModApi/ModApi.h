@@ -202,7 +202,6 @@ typedef struct {
     bool (*HasModArchiveFile)(const char* fileName);
     bool (*RegisterPickupVariant)(const S2HCustomPickupVariant* variant);
     const S2HCustomPickupVariant* (*GetPickupVariant)(const char* key);
-    // Frame-global renderer tuning; selection and actor scoping belong to the mod.
     void (*SetCelShadingRamp)(float center, float softness, float highlight, float shadow, bool debugBands);
     uint32_t (*ReadArchiveFiles)(const char* searchMask, S2HArchiveFileFunc visit, void* userData);
     uint32_t (*ListArchiveFiles)(const char* searchMask, S2HArchivePathFunc visit, void* userData);
@@ -248,6 +247,7 @@ typedef struct {
     bool (*SetCustomItemNamePath)(const char* key, const char* path);
     const char* (*GetShownLayoutPage)(void);
     bool (*DrawPlayerPreview)(struct PlayState* play, const S2HPlayerPreview* preview);
+    uint32_t (*ReadModsFolderFiles)(const char* extensions, S2HArchiveFileFunc visit, void* userData);
 } S2HModApi;
 
 #define S2H_REGISTER_HOOK(api, name, callback) ((api)->RegisterHookByName(#name, (void*)S2H_CheckHook_##name(callback)))
@@ -283,6 +283,7 @@ void ModApi_ClearCurrentMod();
 std::string ModApi_GetCurrentMod();
 bool ModApi_WriteRegistry(const std::filesystem::path& path);
 std::string ModApi_GetCatalogFingerprint();
+bool ModApi_PublishHostService(const char* name, void* function);
 #endif
 
 #endif

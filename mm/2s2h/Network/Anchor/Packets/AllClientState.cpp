@@ -5,19 +5,10 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/BenGui/Notification.h"
 
-/**
- * ALL_CLIENT_STATE
- *
- * Contains a list of all clients and their CLIENT_STATE currently connected to the server
- *
- * The server itself sends this packet to all clients when a client connects or disconnects
- */
-
 void Anchor::HandlePacket_AllClientState(nlohmann::json payload) {
     std::vector<AnchorClient> newClients = payload["state"].get<std::vector<AnchorClient>>();
     const bool isGlobalRoom = IsGlobalRoom();
 
-    // add new clients
     for (auto& client : newClients) {
         if (client.self) {
             ownClientId = client.clientId;
@@ -54,7 +45,6 @@ void Anchor::HandlePacket_AllClientState(nlohmann::json payload) {
         clients[client.clientId].entrance = client.entrance;
     }
 
-    // remove clients that are no longer in the list
     std::vector<uint32_t> clientsToRemove;
     for (auto& [clientId, client] : clients) {
         if (std::find_if(newClients.begin(), newClients.end(),
@@ -62,7 +52,6 @@ void Anchor::HandlePacket_AllClientState(nlohmann::json payload) {
             clientsToRemove.push_back(clientId);
         }
     }
-    // (seperate loop to avoid iterator invalidation)
     for (auto& clientId : clientsToRemove) {
         clients.erase(clientId);
     }

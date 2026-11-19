@@ -12,7 +12,6 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
-// 2S2H [Unbound] collision storage is owned by the scene, outside the N64 arena.
 static void* BgCheck_Resize(void* data, size_t count, size_t size) {
     void* result;
     if (count > SIZE_MAX / size) {
@@ -29,12 +28,14 @@ static void* BgCheck_Resize(void* data, size_t count, size_t size) {
 
 static u32 BgCheck_GrowCapacity(u32 current, u32 required) {
     u64 capacity = current ? (u64)current * 2 : 64;
-    if (capacity < required) { capacity = required; }
+    if (capacity < required) {
+        capacity = required;
+    }
     return capacity > UINT32_MAX ? UINT32_MAX : (u32)capacity;
 }
 
 static CollisionPoly* BgCheck_MovePolyPointer(CollisionPoly* poly, uintptr_t previous, u32 count,
-                                               CollisionPoly* replacement) {
+                                              CollisionPoly* replacement) {
     uintptr_t pointer = (uintptr_t)poly;
     if (previous != 0 && pointer >= previous && pointer - previous < (size_t)count * sizeof(CollisionPoly)) {
         return replacement + (pointer - previous) / sizeof(CollisionPoly);
@@ -42,8 +43,7 @@ static CollisionPoly* BgCheck_MovePolyPointer(CollisionPoly* poly, uintptr_t pre
     return poly;
 }
 
-static void BgCheck_MoveActorPolyPointers(PlayState* play, uintptr_t previous, u32 count,
-                                         CollisionPoly* replacement) {
+static void BgCheck_MoveActorPolyPointers(PlayState* play, uintptr_t previous, u32 count, CollisionPoly* replacement) {
     s32 category;
     for (category = 0; category < ACTORCAT_MAX; category++) {
         Actor* actor = play->actorCtx.actorLists[category].first;
@@ -1969,7 +1969,8 @@ s32 BgCheck_CheckWallImpl(CollisionContext* colCtx, u16 xpFlags, Vec3f* posResul
     dy = posNext->y - posPrev->y;
     dz = posNext->z - posPrev->z;
 
-    if (CVarGetInteger("gCheats.NoClip", 0) && actor != NULL && actor->id == ACTOR_PLAYER) {
+    if (actor != NULL && actor->id == ACTOR_PLAYER &&
+        GameInteractor_Should(VB_PLAYER_NOCLIP, CVarGetInteger("gCheats.NoClip", 0) != 0, actor)) {
         return false;
     }
 
@@ -2313,8 +2314,8 @@ s32 BgCheck_CheckLineImpl(CollisionContext* colCtx, u16 xpFlags1, u16 xpFlags2, 
             sectorMax.z += colCtx->subdivLength.z;
         }
     } else if (BgCheck_PosInStaticBoundingBox(colCtx, posA) == false) {
-        return GameInteractor_ExecuteOnBgCheckLineTest(colCtx, posA, posB, posResult, outPoly, outBgId, actor,
-                                                       bccFlags, false);
+        return GameInteractor_ExecuteOnBgCheckLineTest(colCtx, posA, posB, posResult, outPoly, outBgId, actor, bccFlags,
+                                                       false);
     } else {
         checkLine.lookup = BgCheck_GetNearestStaticLookup(colCtx, lookupTbl, posA);
         result = BgCheck_CheckLineInSubdivision(&checkLine);
@@ -3208,7 +3209,8 @@ void DynaPoly_UpdateContext(PlayState* play, DynaCollisionContext* dyna) {
         }
         if (waterBoxes > dyna->waterBoxList.max) {
             dyna->waterBoxList.max = MIN(BgCheck_GrowCapacity(dyna->waterBoxList.max, waterBoxes), INT_MAX);
-            dyna->waterBoxList.boxes = BgCheck_Resize(dyna->waterBoxList.boxes, dyna->waterBoxList.max, sizeof(WaterBox));
+            dyna->waterBoxList.boxes =
+                BgCheck_Resize(dyna->waterBoxList.boxes, dyna->waterBoxList.max, sizeof(WaterBox));
             dyna->bitFlag |= DYNAPOLY_INVALIDATE_LOOKUP;
         }
     }

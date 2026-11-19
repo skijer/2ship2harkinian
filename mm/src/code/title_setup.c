@@ -50,7 +50,8 @@ void Setup_InitRegs(void) {
 }
 
 void Setup_InitImpl(SetupState* this) {
-    if (FleetPortal_LoadPending()) return;
+    if (FleetPortal_LoadPending())
+        return;
     SysFlashrom_InitFlash();
     SaveContext_Init();
     Sram_LoadGlobalOptions();

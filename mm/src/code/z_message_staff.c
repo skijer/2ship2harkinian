@@ -354,7 +354,9 @@ void Message_DecodeCredits(PlayState* play) {
         curChar = msgCtx->msgBufPos < msgCtx->msgLength ? font->msgBuf.schar[msgCtx->msgBufPos] : MESSAGE_END;
         if (decodedBufPos >= MESSAGE_DECODED_BUF_SIZE - 64 ||
             charTexIdx >= FONT_CHAR_TEX_SIZE * (MESSAGE_DECODED_BUF_SIZE - 64) ||
-            msgCtx->msgBufPos + 8 >= MESSAGE_BUF_SIZE) { curChar = MESSAGE_END; }
+            msgCtx->msgBufPos + 8 >= MESSAGE_BUF_SIZE) {
+            curChar = MESSAGE_END;
+        }
         msgCtx->decodedBuffer.schar[decodedBufPos] = curChar;
 
         if ((curChar == MESSAGE_BOX_BREAK) || (curChar == MESSAGE_TEXTID) || (curChar == MESSAGE_BOX_BREAK_DELAYED) ||

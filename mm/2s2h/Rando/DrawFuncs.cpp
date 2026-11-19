@@ -955,7 +955,8 @@ extern void DrawRedead() {
     }
 
     if (gPlayState != NULL && lastUpdate != gPlayState->state.frames) {
-        if (EnRd_ShouldNotDance(gPlayState)) {
+        const bool hasPlayer = GET_PLAYER(gPlayState) != NULL;
+        if (!hasPlayer || EnRd_ShouldNotDance(gPlayState)) {
             currentAnim = (AnimationHeader*)gGibdoRedeadIdleAnim;
             Animation_MorphToLoop(&skelAnime, currentAnim, -6.0f);
         } else if (animUpdate != gPlayState->state.frames && animUpdate <= gPlayState->state.frames - 35) {

@@ -1959,7 +1959,8 @@ void Boss07_Wrath_DeathCutscene(Boss07* this, PlayState* play) {
                     }
                     if (this->cutsceneTimer == (u32)(KREG(94) + 440)) {
                         play->nextEntrance = ENTRANCE(TERMINA_FIELD, 0);
-                        gSaveContext.nextCutsceneIndex = 0xFFF7;
+                        gSaveContext.nextCutsceneIndex =
+                            GameInteractor_Should(VB_PLAY_ENDING_CREDITS, true) ? 0xFFF7 : 0;
                         play->transitionTrigger = TRANS_TRIGGER_START;
                     }
                 }

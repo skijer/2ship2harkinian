@@ -57,7 +57,6 @@ void SaveSections_Register(const std::string& name, SaveSectionWrite write, Save
 }
 
 void SaveSections_Write(nlohmann::json& saveFile, bool isOwlSave) {
-    // File select copies and erases files through the same writer; only gameplay owns the live sections.
     if (gFileSelectState != NULL || sSections.empty()) {
         return;
     }

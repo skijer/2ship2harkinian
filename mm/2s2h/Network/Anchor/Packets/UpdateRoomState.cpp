@@ -9,10 +9,6 @@ extern "C" {
 extern PlayState* gPlayState;
 }
 
-/**
- * UPDATE_ROOM_STATE
- */
-
 nlohmann::json Anchor::PrepRoomState() {
     nlohmann::json payload;
     payload["ownerClientId"] = ownClientId;

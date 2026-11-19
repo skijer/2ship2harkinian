@@ -24,7 +24,9 @@ void ApplyNoLogicToSaveContext(std::vector<RandoCheckId>& checkPool, std::vector
 
         RANDO_SAVE_CHECKS[randoCheckId].shuffled = true;
         const size_t pick = SelectItemForCheck(itemPool, checkPool, randoCheckId);
-        if (pick >= itemPool.size()) { throw std::runtime_error("No item satisfies the check's placement restrictions"); }
+        if (pick >= itemPool.size()) {
+            throw std::runtime_error("No item satisfies the check's placement restrictions");
+        }
         RANDO_SAVE_CHECKS[randoCheckId].randoItemId = itemPool[pick];
         itemPool.erase(itemPool.begin() + pick);
     }

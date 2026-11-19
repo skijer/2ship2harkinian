@@ -8,7 +8,6 @@
 #include "interface/parameter_static/parameter_static.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 
-// A mod that draws its own editor also owns its input; set by the draw, read by the next update.
 static bool sIsInventoryEditorTakenOver = false;
 
 s16 sCurSection = 0;

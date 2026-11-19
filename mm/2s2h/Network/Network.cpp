@@ -4,8 +4,6 @@
 #include <ship/GameRegistry.h>
 #include <chrono>
 
-// MARK: - Public
-
 bool Network::Enable(const char* host, uint16_t port) {
     if (isEnabled) {
         return true;
@@ -18,12 +16,10 @@ bool Network::Enable(const char* host, uint16_t port) {
 
     isEnabled = true;
 
-    // First check if there is a thread running, if so, join it
     if (receiveThread.joinable()) {
         receiveThread.join();
     }
 
-    // Inside Fleet a new thread has no game: the handshake must read this game's settings, not the active game's.
     receiveThread = std::thread([this, game = Ship::GameRegistry::GetCurrent()] {
         Ship::GameScope scope(game);
         ReceiveFromServer();
@@ -41,8 +37,14 @@ void Network::Disable() {
         receiveThread.join();
     }
     isConnected = false;
-    { std::lock_guard<std::mutex> lock(incomingPacketQueueMutex); incomingPacketQueue = {}; }
-    { std::lock_guard<std::mutex> lock(outgoingPacketQueueMutex); outgoingPacketQueue = {}; }
+    {
+        std::lock_guard<std::mutex> lock(incomingPacketQueueMutex);
+        incomingPacketQueue = {};
+    }
+    {
+        std::lock_guard<std::mutex> lock(outgoingPacketQueueMutex);
+        outgoingPacketQueue = {};
+    }
 }
 
 void Network::OnConnected() {
@@ -64,8 +66,6 @@ void Network::QueueOutgoingPacket(nlohmann::json packet) {
     std::lock_guard<std::mutex> lock(outgoingPacketQueueMutex);
     outgoingPacketQueue.push(std::move(packet));
 }
-
-// MARK: - Private
 
 void Network::ReceiveFromServer() {
     while (isEnabled) {
@@ -92,10 +92,8 @@ void Network::ReceiveFromServer() {
             SDLNet_TCP_AddSocket(socketSet, networkSocket);
         }
 
-        // Listen to socket messages
         while (isConnected && networkSocket && isEnabled) {
-            // we check first if socket has data, to not block in the TCP_Recv
-            int socketsReady = SDLNet_CheckSockets(socketSet, 10); // 10ms timeout
+            int socketsReady = SDLNet_CheckSockets(socketSet, 10);
 
             if (socketsReady == -1) {
                 SPDLOG_ERROR("[Network] SDLNet_CheckSockets: {}", SDLNet_GetError());
@@ -117,20 +115,15 @@ void Network::ReceiveFromServer() {
                     break;
                 }
 
-                // Process all complete packets
                 size_t delimiterPos = receivedData.find('\0');
                 while (delimiterPos != std::string::npos) {
-                    // Extract the complete packet until the delimiter
                     std::string packet = receivedData.substr(0, delimiterPos);
-                    // Remove the packet (including the delimiter) from the received data
                     receivedData.erase(0, delimiterPos + 1);
                     HandleCompletePacket(packet);
-                    // Find the next delimiter
                     delimiterPos = receivedData.find('\0');
                 }
             }
 
-            // Always send outgoing packets, not just when receiving data
             ProcessOutgoingPackets();
         }
 
@@ -173,7 +166,6 @@ void Network::ProcessOutgoingPackets() {
         return;
     }
 
-    // Copy all queued packets while holding the lock, then send them after releasing
     std::queue<nlohmann::json> packetsToSend;
     {
         std::lock_guard<std::mutex> lock(outgoingPacketQueueMutex);
@@ -192,7 +184,8 @@ void Network::ProcessOutgoingPackets() {
         const size_t length = rawPayload.size() + 1;
         size_t offset = 0;
         while (offset < length && isEnabled) {
-            const int sent = SDLNet_TCP_Send(networkSocket, rawPayload.c_str() + offset, static_cast<int>(length - offset));
+            const int sent =
+                SDLNet_TCP_Send(networkSocket, rawPayload.c_str() + offset, static_cast<int>(length - offset));
             if (sent <= 0) {
                 SPDLOG_ERROR("[Network] SDLNet_TCP_Send: {}", SDLNet_GetError());
                 isConnected = false;

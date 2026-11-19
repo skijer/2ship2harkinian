@@ -50,7 +50,6 @@ nlohmann::json Anchor::PrepCustomProgressState() {
     };
 }
 
-// Merged like the vanilla flags: a team save only ever adds progress.
 void Anchor::ApplyCustomProgressState(const nlohmann::json& state) {
     ProgressiveItems_MergeNetworkState(state.value("progressive", nlohmann::json::array()));
     for (const std::string& key : state.value("item", std::vector<std::string>{})) {

@@ -30,10 +30,8 @@ typedef enum {
     S2H_CUSTOM_ITEM_WEARABLE = 1 << 6,
 } S2HCustomItemFlags;
 
-// Legacy formMask: one bit per PlayerTransformation; zero means every form may use the item.
 #define S2H_CUSTOM_ITEM_FORM_BIT(form) (1u << (form))
 
-// Ages belong to Human Link: a child unless the form he wears is an adult one (S2HFormDefinition.isAdult).
 typedef enum {
     S2H_CUSTOM_ITEM_AGE_ANY = 0,
     S2H_CUSTOM_ITEM_AGE_CHILD = 1,
@@ -60,7 +58,6 @@ typedef enum {
     S2H_ITEM_TEXT_PAUSE = 1,
 } S2HItemTextKind;
 
-// Held buttons as Player.heldItemButton numbers them: B, C-Left, C-Down, C-Right, then the D-pad after EQUIP_SLOT_MAX.
 #define S2H_ITEM_BUTTON_B 0
 #define S2H_ITEM_BUTTON_C_FIRST 1
 #define S2H_ITEM_BUTTON_C_LAST 3
@@ -106,6 +103,15 @@ struct S2HGetItemEntry {
 
 typedef struct {
     uint32_t structSize;
+    uint8_t dungeon;
+    uint8_t count;
+    bool (*isShuffled)(const char* key, uint32_t seed);
+} S2HKeyRing;
+
+#define S2H_KEY_RING_MIN_SIZE (offsetof(S2HKeyRing, count) + sizeof(((S2HKeyRing*)0)->count))
+
+typedef struct {
+    uint32_t structSize;
     uint32_t flags;
     uint32_t type;
     uint16_t price;
@@ -114,14 +120,12 @@ typedef struct {
     const char* hintKey;
     const char* progressionGroup;
     const char* poolCountOption;
-    // Optional seed pool selector; absent means this reward is always eligible.
     const char* poolModeOption;
     int32_t poolModeValue;
     bool poolModeInvert;
-    // Optional native pool contributions (RandoItemId). Each copy chooses one source with the seed RNG.
-    // An empty list preserves the custom item's own randomizer identity.
     const int32_t* poolSources;
     uint16_t poolSourceCount;
+    const S2HKeyRing* keyRing;
 } S2HCustomItemRandomizer;
 
 typedef void (*S2HPickupVariantReceiveFunc)(const char* itemKey, const char* variantKey);
@@ -136,7 +140,6 @@ typedef struct {
     float getItemScale;
     S2HPickupVariantReceiveFunc onReceive;
     const S2HCustomItemRandomizer* randomizer;
-    // Optional tail: render an enemy-soul flame instead of the item model.
     bool drawSoulFlame;
     uint8_t flameRed;
     uint8_t flameGreen;
@@ -145,7 +148,6 @@ typedef struct {
 
 #define S2H_CUSTOM_PICKUP_VARIANT_MIN_SIZE offsetof(S2HCustomPickupVariant, drawSoulFlame)
 
-// How other players see this item on you, drawn while you hold it or wear it (SetCustomItemWorn).
 typedef struct {
     const char* modelPath;
     uint8_t limb;      // PLAYER_LIMB_*; 0 = left hand when held, head when worn
@@ -194,16 +196,12 @@ typedef struct {
     S2HCustomItemStateFunc onReceive;
     uint8_t meleeWeapon;
     S2HCustomItemAmmoFunc getAmmo;
-    // Optional pause action/state for passive effects; ownership and button use are independent.
     S2HCustomItemStateFunc onPauseToggle;
     bool (*isPauseActive)(const char* key);
-    // Multiplier for the world and overhead acquisition model; zero preserves the default scale.
     float getItemScale;
     S2HCustomItemAppearance appearance;
-    // Optional UTF-8 label for messages; omitted labels fall back to the registered key.
     const char* displayName;
     uint8_t ageRequirement;
-    // Optional form keys (S2H_FORM_KEY_* or a registered form's key) that may use the item; none means every form.
     const char* const* allowedForms;
     uint32_t allowedFormCount;
 } S2HCustomItemDefinition;
@@ -222,12 +220,10 @@ static inline bool CustomItemRegistry_IsVanillaUpgrade(const S2HCustomItemDefini
 
 bool CustomItemRegistry_Register(const S2HCustomItemDefinition* definition);
 const S2HCustomItemDefinition* CustomItemRegistry_FindReplacement(uint16_t vanillaItem);
-// The two tests items and equipment share, against the local player as he is now.
 bool CustomItemRegistry_IsAgeMet(uint8_t ageRequirement);
 bool CustomItemRegistry_IsFormInMask(uint8_t formMask);
 bool CustomItemRegistry_IsAgeAllowed(const char* key);
 bool CustomItemRegistry_IsFormAllowed(const char* key);
-// The one gate for showing, equipping and using an item: its age and its form both allow the player.
 bool CustomItemRegistry_IsUsableNow(const char* key);
 bool CustomItemRegistry_IsPauseItemFormAllowed(void);
 const char* CustomItemRegistry_ResolveTexture(const char* key, S2HItemIconSurface surface);
@@ -293,7 +289,6 @@ void CustomItemRegistry_Unequip(uint8_t button);
 void CustomItemRegistry_CopyEquippedKey(uint8_t fromButton, uint8_t toButton);
 const char* CustomItemRegistry_GetEquippedKey(uint8_t button);
 uint16_t CustomItemRegistry_GetEquippedRuntimeId(uint8_t button);
-// Ship also takes the pressed vanilla item for replacements; MM's Player_UseItem only routes ITEM_CUSTOM here.
 bool CustomItemRegistry_PressButtonItem(struct PlayState* play, struct Player* player, uint8_t button);
 bool CustomItemRegistry_SelectPauseItem(const char* key);
 const S2HCustomItemDefinition* CustomItemRegistry_GetPauseItem(void);
@@ -330,6 +325,8 @@ void CustomItemRegistry_RegisterAppearanceDrawing();
 std::string CustomItemRegistry_GetOwner(const char* key);
 std::vector<std::string> CustomItemRegistry_ListWorn();
 std::vector<std::string> CustomItemRegistry_ListOwned();
+std::string CustomItemRegistry_GetDisplayName(const char* key);
+std::vector<const S2HCustomPickupVariant*> CustomItemRegistry_ListPickupVariants(const char* itemKey);
 void CustomItemRegistry_SetDrawingPlayer(Player* player);
 Player* CustomItemRegistry_GetDrawingPlayer();
 void KaleidoItemManager_Init();

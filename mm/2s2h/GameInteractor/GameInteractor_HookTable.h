@@ -22,7 +22,6 @@ DEFINE_HOOK(OnRoomInit, (s16 sceneId, s16 roomNum))
 DEFINE_HOOK(AfterRoomSceneCommands, (s16 sceneId, s16 roomNum))
 DEFINE_HOOK(OnPlayDrawWorldEnd, ())
 DEFINE_HOOK(OnPlayDestroy, ())
-// Ship's: gameplay ends for the title or file select, not for another scene.
 DEFINE_HOOK(OnExitGame, (s32 fileNum))
 
 DEFINE_HOOK(ShouldActorInit, (Actor * actor, bool* should))
@@ -59,21 +58,18 @@ DEFINE_HOOK(OnBottleContentsUpdate, (u8 item))
 DEFINE_HOOK(ShouldVanillaBehavior, (GIVanillaBehavior flag, bool* should, va_list originalArgs))
 DEFINE_HOOK(OnModVanillaBehavior, (GIVanillaBehavior flag, bool* should, va_list originalArgs))
 
-// Mods
 DEFINE_HOOK(OnPlayerUpdate, (Player * player))
 DEFINE_HOOK(OnInterfaceDrawEnd, (PlayState * play))
 DEFINE_HOOK(OnActorResolveMotionScale, (Actor * actor, f32* scale))
 DEFINE_HOOK(OnCollisionRegisterAC, (Collider * collider))
 DEFINE_HOOK(OnOcarinaInput, ())
 
-// Player and world hooks shared with Shipwright mods, same names and argument order
 DEFINE_HOOK(OnPlayerFilterInput, (Player * player, Input* input))
 DEFINE_HOOK(OnPlayerResolveItemAction, (s32 item, s8* itemAction))
 DEFINE_HOOK(OnPlayerResolveItemActionInit, (s8 itemAction, PlayerItemActionInitFunc* init))
 DEFINE_HOOK(OnPlayerResolveItemActionUpdate, (s8 itemAction, PlayerUpperActionFunc* update))
 DEFINE_HOOK(OnPlayerResolveModelGroup, (Player * player, s32 itemAction, s32* modelGroup))
-DEFINE_HOOK(OnPlayerActionHandler,
-            (PlayState * play, Player* player, s32 action, bool* consumed, bool* startedAction))
+DEFINE_HOOK(OnPlayerActionHandler, (PlayState * play, Player* player, s32 action, bool* consumed, bool* startedAction))
 DEFINE_HOOK(OnPlayerResolveAnim, (s32 group, s32 animType, PlayerAnimationHeader** anim))
 DEFINE_HOOK(OnPlayerResolveAgeProperties, (Player * player, PlayerAgeProperties** properties))
 DEFINE_HOOK(OnPlayerResolveMotionScale, (Player * player, s32 kind, f32* scale))
@@ -93,8 +89,8 @@ DEFINE_HOOK(OnActorResolveGrayscale, (Actor * actor, PlayState* play, Color_RGBA
 DEFINE_HOOK(OnRoomResolveGrayscale, (PlayState * play, Room* room, Color_RGBA8* grayscale))
 DEFINE_HOOK(OnActorResolveBgCheckFlags, (Actor * actor, s32* flags))
 DEFINE_HOOK(OnActorResolvePlayerRelation, (Actor * actor, f32* xzDist, f32* yDist, s16* yawTowards))
-DEFINE_HOOK(OnBgCheckRaycastFloor, (CollisionContext * colCtx, Vec3f* pos, Actor* actor, CollisionPoly** poly,
-                                    s32* bgId, f32* floorY))
+DEFINE_HOOK(OnBgCheckRaycastFloor,
+            (CollisionContext * colCtx, Vec3f* pos, Actor* actor, CollisionPoly** poly, s32* bgId, f32* floorY))
 DEFINE_HOOK(OnBgCheckResolveWallFlags, (CollisionContext * colCtx, CollisionPoly* poly, s32 bgId, u32* flags))
 DEFINE_HOOK(OnCameraResolveView, (Camera * camera, Vec3f* eye, Vec3f* at, Vec3f* up))
 DEFINE_HOOK(OnSceneSpawnActors, ())
@@ -106,16 +102,16 @@ DEFINE_HOOK(OnSeqPlayerInit, (s32 playerIdx, s32 seqId));
 
 // Rando
 DEFINE_HOOK(OnRandoSeedGeneration, ());
+DEFINE_HOOK(OnTrapRoll, (uint32_t * candidateCount, void (**effect)(void)));
 
 DEFINE_HOOK(OnNetConnectionChanged, (bool connected))
 DEFINE_HOOK(OnNetPeerChanged, (uint32_t clientId, bool online))
-DEFINE_HOOK(OnPlayerResolveForm, (Player* player, const char** key))
-DEFINE_HOOK(OnPlayerResolveHeldCustomItem, (Player* player, const char** key))
-DEFINE_HOOK(OnPlayerResolveWornCustomItems, (Player* player, const char* const** keys, uint32_t* count))
+DEFINE_HOOK(OnPlayerResolveForm, (Player * player, const char** key))
+DEFINE_HOOK(OnPlayerResolveHeldCustomItem, (Player * player, const char** key))
+DEFINE_HOOK(OnPlayerResolveWornCustomItems, (Player * player, const char* const** keys, uint32_t* count))
 DEFINE_HOOK(AfterOwlSave, ())
 DEFINE_HOOK(OnPlayerSfx, (u16 sfxId))
 
-// Shipwright ModApi hooks; MM types replace OoT ones (PlayerAnimationHeader, S2HGetItemEntry, GID draw ids)
 DEFINE_HOOK(OnKaleidoInput, (PlayState * play, Input* input, bool* handled))
 DEFINE_HOOK(OnKaleidoItemCursor, (PlayState * play, u16* item, u16* slot))
 DEFINE_HOOK(OnKaleidoItemDraw, (PlayState * play, s32 slot, s32 item, Vtx* vertices))
@@ -125,8 +121,7 @@ DEFINE_HOOK(OnKaleidoResolveName, (PlayState * play, u16 item, const char** name
 DEFINE_HOOK(OnKaleidoDebugEditor, (PlayState * play, bool* handled))
 DEFINE_HOOK(OnInterfaceResolveButtonIcon, (PlayState * play, u8 button, u16 item, const char** iconPath))
 DEFINE_HOOK(OnMessageResolveItemIcon, (u16 itemId, const char** iconPath))
-DEFINE_HOOK(OnResolveCustomGetItem,
-            (Actor * actor, PlayState* play, struct S2HGetItemEntry* entry, const char** key))
+DEFINE_HOOK(OnResolveCustomGetItem, (Actor * actor, PlayState* play, struct S2HGetItemEntry* entry, const char** key))
 DEFINE_HOOK(OnResolveItemGive, (PlayState * play, u8* item, bool* handled))
 DEFINE_HOOK(OnGetItemDraw, (PlayState * play, s16* drawId, bool* handled))
 DEFINE_HOOK(OnGetItemDrawPost, (PlayState * play, s16 drawId))

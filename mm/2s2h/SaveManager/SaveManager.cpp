@@ -35,7 +35,6 @@ extern FileSelectState* gFileSelectState;
     ((GET_NEWF(save, 0) == 'Z') && (GET_NEWF(save, 1) == 'E') && (GET_NEWF(save, 2) == 'L') && \
      (GET_NEWF(save, 3) == 'D') && (GET_NEWF(save, 4) == 'A') && (GET_NEWF(save, 5) == '3'))
 
-// Resolved on use: inside Fleet the app directory becomes 2ship's install only once it joins the host.
 static std::filesystem::path SavesFolderPath() {
     const char* fleetDirectory = FleetGame_GetSaveDirectory();
     if (fleetDirectory != nullptr) {

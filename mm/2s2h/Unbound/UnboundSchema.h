@@ -1,6 +1,4 @@
 #pragma once
-// Key names and "$schema" ids of the 2Ship Unbound format, spelled once for the factories and the converter.
-// The contract is unbound-docs/SPEC.md; a key not listed here is not part of the format.
 
 namespace S2H::Unbound::Schema {
 
@@ -17,7 +15,6 @@ inline constexpr const char* kReplace = "$replace";
 inline constexpr const char* kSetups = "setups";
 inline constexpr const char* kCommandOrder = "order";
 
-// Setup keys, one per scene command (SPEC §4.2)
 inline constexpr const char* kSpawns = "spawns";
 inline constexpr const char* kActors = "actors";
 inline constexpr const char* kActorCsCameras = "actorCsCameras";
@@ -46,7 +43,6 @@ inline constexpr const char* kActorCutscenes = "actorCutscenes";
 inline constexpr const char* kMinimap = "minimap";
 inline constexpr const char* kMinimapChests = "minimapChests";
 
-// Entity fields
 inline constexpr const char* kId = "id";
 inline constexpr const char* kPos = "pos";
 inline constexpr const char* kRot = "rot";
@@ -91,7 +87,6 @@ inline constexpr const char* kExit = "exit";
 inline constexpr const char* kEntrance = "entrance";
 inline constexpr const char* kFlag = "flag";
 
-// Lighting entry
 inline constexpr const char* kAmbient = "ambient";
 inline constexpr const char* kLight1Dir = "light1Dir";
 inline constexpr const char* kLight1Color = "light1Color";
@@ -105,7 +100,6 @@ inline constexpr const char* kFogEnd = "fogEnd";
 inline constexpr const char* kDrawDistance = "drawDistance";
 inline constexpr const char* kNearPlane = "nearPlane";
 
-// Actor cutscene entry
 inline constexpr const char* kPriority = "priority";
 inline constexpr const char* kLength = "length";
 inline constexpr const char* kCsCamId = "csCamId";
@@ -117,7 +111,6 @@ inline constexpr const char* kHudVisibility = "hudVisibility";
 inline constexpr const char* kEndCam = "endCam";
 inline constexpr const char* kLetterboxSize = "letterboxSize";
 
-// Minimap
 inline constexpr const char* kScale = "scale";
 inline constexpr const char* kMapId = "mapId";
 inline constexpr const char* kUnk0 = "unk0";
@@ -126,7 +119,6 @@ inline constexpr const char* kUnk4 = "unk4";
 inline constexpr const char* kUnk6 = "unk6";
 inline constexpr const char* kUnk8 = "unk8";
 
-// Room shape (SPEC §4.3)
 inline constexpr const char* kEntries = "entries";
 inline constexpr const char* kOpa = "opa";
 inline constexpr const char* kXlu = "xlu";
@@ -143,7 +135,6 @@ inline constexpr const char* kSiz = "siz";
 inline constexpr const char* kMode0 = "mode0";
 inline constexpr const char* kTlutCount = "tlutCount";
 
-// Collision document (SPEC §4.5)
 inline constexpr const char* kCollisionType = "2ship-unbound/collision";
 inline constexpr int kCollisionVersion = 1;
 inline constexpr const char* kBounds = "bounds";
@@ -180,7 +171,6 @@ inline constexpr const char* kXLength = "xLength";
 inline constexpr const char* kZLength = "zLength";
 inline constexpr const char* kNotSwimmable = "notSwimmable";
 
-// Scene registry (SPEC §7)
 inline constexpr const char* kRegistryPath = "unbound/scenes.json";
 inline constexpr const char* kName = "name";
 inline constexpr const char* kScene = "scene";
@@ -196,7 +186,6 @@ inline constexpr const char* kSwitch0 = "switch0";
 inline constexpr const char* kSwitch1 = "switch1";
 inline constexpr const char* kCollectible = "collectible";
 
-// Manifest (SPEC §6)
 inline constexpr const char* kManifestPath = "unbound.json";
 inline constexpr const char* kFormatName = "format";
 inline constexpr const char* kFormatValue = "2ship-unbound";

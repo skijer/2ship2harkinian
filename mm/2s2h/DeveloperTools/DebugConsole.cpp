@@ -37,7 +37,6 @@ static bool IsCustomActorMarker(const std::string& argument) {
     return argument == "custom_actor" || argument == "custom_enemy";
 }
 
-// Ship's form, `spawn custom_actor|custom_enemy "<key>" <data> ...`, becomes `spawn <id> <data> ...`.
 static bool ResolveCustomActorArgs(std::vector<std::string>& args) {
     if (args.size() < 2 || !IsCustomActorMarker(args[1])) {
         return true;
@@ -50,8 +49,7 @@ static bool ResolveCustomActorArgs(std::vector<std::string>& args) {
     const std::string key = ModApi_UnquoteConsoleArgument(args[2]);
     const int16_t actorId = ActorRegistry_FindCustomId(key.c_str());
     if (actorId < 0 || (wantsEnemy && ActorRegistry_FindEnemyById(actorId) == nullptr)) {
-        ERROR_MESSAGE("No installed mod registers %s named \"%s\"", wantsEnemy ? "an enemy" : "an actor",
-                      key.c_str());
+        ERROR_MESSAGE("No installed mod registers %s named \"%s\"", wantsEnemy ? "an enemy" : "an actor", key.c_str());
         return false;
     }
     args.erase(args.begin() + 1);
@@ -83,9 +81,7 @@ static bool ActorSpawnHandler(std::shared_ptr<Ship::Console> Console, const std:
     s16 actorId = 0;
     try {
         actorId = std::stoi(args[1]);
-    } catch (std::invalid_argument const& ex) {
-        actorId = ActorRegistry_GetId(args[1].c_str());
-    }
+    } catch (std::invalid_argument const& ex) { actorId = ActorRegistry_GetId(args[1].c_str()); }
     if (actorId < 0) {
         ERROR_MESSAGE("Invalid actor ID");
         return 1;
@@ -169,7 +165,6 @@ extern "C" void S2H_ResetToTitle(void) {
     SET_NEXT_GAMESTATE(gGameState, ConsoleLogo_Init, sizeof(ConsoleLogoState));
 }
 
-// Inside Fleet both games share one console, so the command resets whichever game is being played.
 static bool ResetHandler(std::shared_ptr<Ship::Console> Console, std::vector<std::string> args, std::string* output) {
     if (FleetGame_ResetActiveGame()) {
         return 0;

@@ -33,7 +33,7 @@ KNOWN_PERMISSIONS = {"microphone", "files", "network"}
 SERVICE_PERMISSIONS = {
     "OpenMicrophone": "microphone", "ReadMicrophone": "microphone", "CloseMicrophone": "microphone",
     "Microphone_Open": "microphone", "Microphone_Read": "microphone", "Microphone_Close": "microphone",
-    "PickUserFile": "files", "SaveToModsFolder": "files", "ExtractRomToModsFolder": "files",
+    "PickUserFile": "files", "SaveToModsFolder": "files", "ReadModsFolderFiles": "files", "UserFiles_ReadMods": "files", "ExtractRomToModsFolder": "files",
     "UserFiles_Pick": "files", "UserFiles_SaveToMods": "files", "UserFiles_ExtractRomToMods": "files",
     "ExportArchiveFiles": "files", "ExtractRom": "files", "O2rExtractor_ExportFiles": "files",
     "O2rExtractor_Run": "files",

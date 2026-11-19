@@ -67,7 +67,6 @@ typedef struct RoomShapeCullableEntryLinked {
     /* 0xC */ struct RoomShapeCullableEntryLinked* next;
 } RoomShapeCullableEntryLinked; // size = 0x10
 
-
 void Room_DrawCullable(PlayState* play, Room* room, u32 flags) {
     RoomShapeCullable* roomShape;
     RoomShapeCullableEntry* roomShapeCullableEntry;

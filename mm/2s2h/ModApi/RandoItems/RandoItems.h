@@ -25,16 +25,17 @@ void RandoItems_SetOwned(int32_t randoItem, S2HRandoInfBank bank, bool state);
 #ifndef S2H_MOD
 #include <vector>
 
+#include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
 #include "2s2h/Rando/Types.h"
 
 int32_t RandoItems_Register(const char* key);
 void RandoItems_BuildItemTable();
 void RandoItems_AddToPool(std::vector<RandoItemId>& itemPool);
 
-// Rando::GiveItem and RemoveItem route here: the active bank decides between the real save and a logic simulation.
 void RandoItems_Give(RandoItemId randoItemId);
 void RandoItems_Remove(RandoItemId randoItemId);
 void RandoItems_SeedLogicBank();
+const S2HKeyRing* RandoItems_GetKeyRing(RandoItemId randoItemId);
 const char* RandoItems_GetIconPath(RandoItemId randoItemId);
 void RandoItems_Draw(RandoItemId randoItemId);
 #endif

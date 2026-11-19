@@ -7,18 +7,15 @@
 
 #include "2s2h/Rando/Logic/Logic.h"
 
-// Cross-game entrance routing for a combined seed: the entrances 2Ship offers to the shared pools, and the
-// routes Fleet installs back. Every call throws std::exception on a malformed request.
 nlohmann::json FleetCrossDungeon_DumpCatalogue(const nlohmann::json& options);
 nlohmann::json FleetCrossDungeon_DumpCatalogueForSeed(const nlohmann::json& spoiler);
 void FleetCrossDungeon_SetSeed(const nlohmann::json& seed);
 void FleetCrossDungeon_SetAccess(const nlohmann::json& access);
+void FleetCrossDungeon_Reset();
 nlohmann::json FleetCrossDungeon_GetExits();
 bool FleetCrossDungeon_CanEnterArrival(int32_t entrance);
 uint16_t FleetCrossDungeon_GetBossDefeated();
 
-// While alive, logic follows the installed routes. Roots() gives where a search starts, and Remember() keeps
-// what it reached for GetExits.
 class FleetCrossDungeonSearch {
   public:
     FleetCrossDungeonSearch();

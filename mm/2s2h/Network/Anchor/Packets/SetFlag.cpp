@@ -4,12 +4,6 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/BenPort.h"
 
-/**
- * SET_FLAG
- *
- * Fired when a flag is set in the save context
- */
-
 void Anchor::SendPacket_SetFlag(s16 sceneId, s16 flagType, uint32_t flag) {
     if (!IsSaveLoaded() || !roomState.syncItemsAndFlags || isProcessingIncomingPacket) {
         return;

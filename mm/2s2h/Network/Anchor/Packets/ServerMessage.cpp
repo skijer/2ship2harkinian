@@ -4,10 +4,6 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/BenGui/Notification.h"
 
-/**
- * SERVER_MESSAGE
- */
-
 void Anchor::HandlePacket_ServerMessage(nlohmann::json payload) {
     Notification::Emit({
         .prefix = "Server:",

@@ -11,6 +11,7 @@
 
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <libultraship/classes.h>
+#include <fast/resource/type/Texture.h>
 
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ModApi/OcarinaSongs/OcarinaSongRegistry.h"
@@ -21,6 +22,7 @@ extern "C" {
 #include "macros.h"
 #include "variables.h"
 #include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"
+#include "archives/icon_item_static/icon_item_static_yar.h"
 // OPEN_DISPS redeclares these inside its body, which would give them C++ linkage here.
 void FrameInterpolation_RecordOpenChild(const void* a, int b);
 void FrameInterpolation_RecordCloseChild(void);
@@ -181,6 +183,49 @@ bool KaleidoQuestManager_EquipPoint(PlayState* play) {
     return false;
 }
 
+static bool IsSongPoint(uint8_t point) {
+    return point >= QUEST_SONG_SONATA && point <= QUEST_SONG_SUN;
+}
+
+static Color_RGB8 SongNoteTint(const char* icon) {
+    static std::map<std::string, Color_RGB8> sTints;
+    if (const auto known = sTints.find(icon); known != sTints.end()) {
+        return known->second;
+    }
+    constexpr size_t otrPrefixLength = 7;
+    constexpr uint8_t opaqueAlpha = 200;
+    Color_RGB8 tint = { 255, 255, 255 };
+    const char* path = std::strncmp(icon, "__OTR__", otrPrefixLength) == 0 ? icon + otrPrefixLength : icon;
+    const auto texture = std::dynamic_pointer_cast<Fast::Texture>(
+        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path, true));
+    if (texture != nullptr && texture->Type == Fast::TextureType::RGBA32bpp && texture->ImageData != nullptr) {
+        int brightest = -1;
+        for (uint32_t offset = 0; offset + 3 < texture->ImageDataSize; offset += 4) {
+            const uint8_t* texel = &texture->ImageData[offset];
+            const int brightness = texel[0] + texel[1] + texel[2];
+            if (texel[3] >= opaqueAlpha && brightness > brightest) {
+                brightest = brightness;
+                tint = { texel[0], texel[1], texel[2] };
+            }
+        }
+    }
+    sTints[icon] = tint;
+    return tint;
+}
+
+// Assumes the point's four vertices are loaded and the page's IA combine mode is set.
+static void DrawSongNote(GraphicsContext* gfxCtx, const char* icon, uint8_t alpha) {
+    const Color_RGB8 tint = SongNoteTint(icon);
+    OPEN_DISPS(gfxCtx);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, tint.r, tint.g, tint.b, alpha);
+    gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 0, 255);
+    gDPLoadTextureBlock(POLY_OPA_DISP++, gItemIconSongNoteTex, G_IM_FMT_IA, G_IM_SIZ_8b, 16, 24, 0,
+                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
+                        G_TX_NOLOD);
+    gSP1Quadrangle(POLY_OPA_DISP++, 0, 2, 3, 1, 0);
+    CLOSE_DISPS(gfxCtx);
+}
+
 static const char* NativeUpgradeIcon(uint8_t point) {
     int value = 0;
     if (point == QUEST_SWORD) {
@@ -233,9 +278,13 @@ void KaleidoQuestManager_DrawPoints(PlayState* play) {
         if (icon == nullptr) {
             continue;
         }
-        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255,
-                        KaleidoItemManager_IsPauseEffectActive(claim) ? pauseCtx->alpha : pauseCtx->alpha / 2);
+        const uint8_t alpha = KaleidoItemManager_IsPauseEffectActive(claim) ? pauseCtx->alpha : pauseCtx->alpha / 2;
         gSPVertex(POLY_OPA_DISP++, reinterpret_cast<uintptr_t>(&pauseCtx->questVtx[point * 4]), 4, 0);
+        if (claim != nullptr && IsSongPoint(point)) {
+            DrawSongNote(gfxCtx, icon, static_cast<uint8_t>(pauseCtx->alpha));
+            continue;
+        }
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, alpha);
         KaleidoScope_DrawTexQuadRGBA32(gfxCtx, const_cast<char*>(icon), QuestIconSize, QuestIconSize, 0);
     }
 
@@ -255,7 +304,6 @@ uint16_t KaleidoQuestManager_ResolveCursorItem(uint8_t point, uint16_t vanillaIt
     return ITEM_CUSTOM;
 }
 
-// L turns to the next extra quest page, and a C or D-pad button equips the claim under the cursor.
 void KaleidoQuestManager_Update(PlayState* play) {
     if (CHECK_BTN_ALL(CONTROLLER1(&play->state)->press.button, BTN_L) &&
         !CVarGetInteger("gDeveloperTools.DebugEnabled", 0) && play->pauseCtx.cursorSpecialPos == 0) {
@@ -350,7 +398,6 @@ static void LeaveSongPoint(PauseContext* pause) {
     pause->mainState = PAUSE_MAIN_STATE_IDLE;
 }
 
-// MM's quest page song flow: resting on a learned song shows its notes, A plays it, then the player repeats it
 static void UpdateSongPoint(PlayState* play, int8_t songIndex) {
     PauseContext* pause = &play->pauseCtx;
     const bool isTextboxOpen = play->msgCtx.msgLength != 0;
@@ -476,7 +523,6 @@ bool KaleidoQuestManager_UpdateExtra(PlayState* play) {
     if (slot != previousSlot) {
         LeaveSongPoint(pause);
     }
-    // While a song is up the C buttons are its notes, so they neither equip nor open the description
     const int8_t songIndex = FindSongOnPoint(slot);
     UpdateSongPoint(play, songIndex);
     if (songIndex >= 0) {
@@ -489,7 +535,6 @@ bool KaleidoQuestManager_UpdateExtra(PlayState* play) {
     return true;
 }
 
-// MM's quest vertices hold the 16 staff quads after its 23 points; extra pages keep them after their 25.
 constexpr int VanillaStaffFirstVtx = 23 * 4;
 constexpr int ExtraStaffFirstVtx = QuestPointCount * 4;
 constexpr int StaffVtxCount = 16 * 4;
@@ -502,6 +547,21 @@ static void KeepStaffVertices(Vtx* extraVtx, const Vtx* vanillaVtx) {
     }
     std::copy(sStaff.begin(), sStaff.end(), extraVtx + ExtraStaffFirstVtx);
     sLastExtraVtx = extraVtx;
+}
+
+static void FitNoteQuad(Vtx* quad) {
+    constexpr s16 halfWidth = 8;
+    constexpr s16 halfHeight = 12;
+    const s16 centreX = (quad[0].v.ob[0] + quad[1].v.ob[0]) / 2;
+    const s16 centreY = (quad[0].v.ob[1] + quad[2].v.ob[1]) / 2;
+    for (int corner = 0; corner < 4; ++corner) {
+        const bool isRight = (corner & 1) != 0;
+        const bool isBottom = (corner & 2) != 0;
+        quad[corner].v.ob[0] = centreX + (isRight ? halfWidth : -halfWidth);
+        quad[corner].v.ob[1] = centreY + (isBottom ? -halfHeight : halfHeight);
+        quad[corner].v.tc[0] = isRight ? 16 << 5 : 0;
+        quad[corner].v.tc[1] = isBottom ? 24 << 5 : 0;
+    }
 }
 
 bool KaleidoQuestManager_DrawExtra(PlayState* play) {
@@ -531,6 +591,12 @@ bool KaleidoQuestManager_DrawExtra(PlayState* play) {
         }
         const char* icon = CustomItemRegistry_ResolveTexture(item->key, S2H_ITEM_ICON_INVENTORY);
         if (!icon) {
+            continue;
+        }
+        if (OcarinaSongRegistry_FindByItem(item->key) >= 0) {
+            FitNoteQuad(&pause->questVtx[slot * 4]);
+            gSPVertex(POLY_OPA_DISP++, reinterpret_cast<uintptr_t>(&pause->questVtx[slot * 4]), 4, 0);
+            DrawSongNote(play->state.gfxCtx, icon, static_cast<uint8_t>(pause->alpha));
             continue;
         }
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255,

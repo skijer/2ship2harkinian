@@ -43,7 +43,6 @@
 #include "global.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 
-// 2S2H [Unbound] every Mtx writer assumes float matrices; an s16.16 build would wrap world positions >= 32768
 #ifndef GBI_FLOAT_MTX
 #error "2S2H: Unbound requires libultraship built with GBI_FLOAT_MTX"
 #endif

@@ -3,6 +3,7 @@
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "2s2h/ShipUtils.h"
 #include "2s2h/ShipInit.hpp"
+#include "2s2h/ModApi/CustomEquipRegistry/CustomEquipRegistry.h"
 #include <cassert>
 
 // Copied from z_player.c, we could instead move this to a header file, idk
@@ -390,12 +391,12 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
             }
             break;
         case RI_SHIELD_HERO:
-            if (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) != EQUIP_VALUE_SHIELD_NONE) {
+            if (CustomEquipRegistry_GetVanillaBase(S2H_EQUIP_SLOT_SHIELD) != EQUIP_VALUE_SHIELD_NONE) {
                 return false;
             }
             break;
         case RI_SHIELD_MIRROR:
-            if (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) == EQUIP_VALUE_SHIELD_MIRROR) {
+            if (CustomEquipRegistry_GetVanillaBase(S2H_EQUIP_SLOT_SHIELD) == EQUIP_VALUE_SHIELD_MIRROR) {
                 return false;
             }
             break;

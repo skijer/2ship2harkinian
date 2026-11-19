@@ -1,8 +1,6 @@
 #ifndef SOH_MOD_API_PLAYER_HOOK_TYPES_H
 #define SOH_MOD_API_PLAYER_HOOK_TYPES_H
 
-// Shipwright names, kept so a mod reads the same on both ports. Each action is the index of the matching
-// Player_ActionHandler_* in z_player.c; the order is checked there with static asserts.
 typedef enum {
     SOH_PLAYER_ACTION_FIRST_PERSON,
     SOH_PLAYER_ACTION_DOOR,
@@ -28,7 +26,6 @@ typedef enum {
     SOH_PLAYER_MOTION_WATER_SPEED,
 } SOHPlayerMotionKind;
 
-// What VB_PLAYER_USE_FORM_ABILITY asks: a form's trait another form or a piece of equipment may borrow.
 typedef enum {
     SOH_PLAYER_ABILITY_HEAT_PROOF,      // Goron: burning floors and lava do not hurt or send back
     SOH_PLAYER_ABILITY_ZORA_SWIM,       // Zora: A boosts instead of diving, R raises the barrier

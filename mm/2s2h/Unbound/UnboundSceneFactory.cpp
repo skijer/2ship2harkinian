@@ -89,7 +89,6 @@ template <typename T> std::shared_ptr<T> LoadBulkResource(const std::string& pat
         Ship::Context::GetRawInstance()->GetResourceManager()->LoadResourceProcess(path.c_str()));
 }
 
-// Display list and texture paths are kept as "__OTR__" strings, resolved when drawn so mods can swap them.
 const char* KeepOtrPath(std::vector<std::string>& storage, const std::string& path) {
     if (path.empty()) {
         return nullptr;
@@ -100,11 +99,14 @@ const char* KeepOtrPath(std::vector<std::string>& storage, const std::string& pa
 
 s16 ReadActorId(const Json& value, const std::string& where) {
     auto numericId = [&](int64_t id) -> s16 {
-        if (id < INT16_MIN || id > UINT16_MAX) { return -1; }
+        if (id < INT16_MIN || id > UINT16_MAX) {
+            return -1;
+        }
         const uint16_t packedId = (uint16_t)id;
         // MM packs spawn flags into the upper three bits of scene actor IDs.
         if ((packedId & 0x1FFF) >= ACTOR_ID_MAX) {
-            SPDLOG_ERROR("[Unbound] {}: actor id {} is outside the vanilla table; use registered actor names", where, id);
+            SPDLOG_ERROR("[Unbound] {}: actor id {} is outside the vanilla table; use registered actor names", where,
+                         id);
             return -1;
         }
         return (s16)packedId;
@@ -187,7 +189,9 @@ std::shared_ptr<SOH::ISceneCommand> BuildCollision(CommandBuilder& builder, cons
 std::shared_ptr<SOH::ISceneCommand> BuildRooms(CommandBuilder& builder, const Json& list, const std::string& where) {
     auto command = builder.Make<SOH::SetRoomList>(SOH::SceneCommandID::SetRoomList);
     const auto keys = PositionalKeys(list, where + "." + Schema::kRooms);
-    if (keys.size() > 32768) { throw DocumentError(where + ": at most 32768 rooms"); }
+    if (keys.size() > 32768) {
+        throw DocumentError(where + ": at most 32768 rooms");
+    }
     command->fileNames.reserve(keys.size());
     for (const auto& key : keys) {
         command->fileNames.push_back(list[key].is_string() ? list[key].get<std::string>() : "");
@@ -282,9 +286,9 @@ void ReadPrerenderedMesh(SOH::SetMesh& mesh, const Json& shape, const std::strin
     }
     if (polygon.format == 1 && !mesh.images.empty()) {
         const SOH::BgImage& image = mesh.images.front();
-        polygon.single = { image.source, image.unk_0C, (void*)(uintptr_t)image.tlut, image.width,
-                           image.height, image.fmt,    image.siz,                    image.mode0,
-                           image.tlutCount };
+        polygon.single = { image.source, image.unk_0C, (void*)(uintptr_t)image.tlut,
+                           image.width,  image.height, image.fmt,
+                           image.siz,    image.mode0,  image.tlutCount };
         mesh.images.clear();
     } else {
         polygon.multi.count = (u8)mesh.images.size();
@@ -385,7 +389,6 @@ std::shared_ptr<SOH::ISceneCommand> BuildTransitionActors(CommandBuilder& builde
     return command;
 }
 
-// World fog is on when any of its keys is present; an absent one takes the entry's vanilla equivalent.
 void ReadWorldFog(SOH::EnvLightSettings& light, const Json& entry) {
     const bool hasWorldFog = entry.contains(Schema::kFogStart) || entry.contains(Schema::kFogEnd) ||
                              entry.contains(Schema::kDrawDistance) || entry.contains(Schema::kNearPlane);
@@ -415,8 +418,7 @@ SOH::EnvLightSettings ReadLightSetting(const Json& entry) {
     return light;
 }
 
-std::shared_ptr<SOH::ISceneCommand> BuildLighting(CommandBuilder& builder, const Json& list,
-                                                  const std::string& where) {
+std::shared_ptr<SOH::ISceneCommand> BuildLighting(CommandBuilder& builder, const Json& list, const std::string& where) {
     auto command = builder.Make<SOH::SetLightingSettings>(SOH::SceneCommandID::SetLightingSettings);
     for (const auto& key : PositionalKeys(list, where + "." + Schema::kLighting)) {
         command->settings.push_back(ReadLightSetting(list[key]));
@@ -575,35 +577,75 @@ struct SetupCommand {
     SetupCommandBuilder build;
 };
 
-// The canonical order a setup without "order" runs in: entrances before spawns, which index them.
 const SetupCommand kSetupCommands[] = {
-    { Schema::kSound, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildSound(b, Sub(s, Schema::kSound)); } },
-    { Schema::kEntrances, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildEntrances(b, Sub(s, Schema::kEntrances), w); } },
-    { Schema::kSpawns, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildSpawns(b, Sub(s, Schema::kSpawns), w); } },
-    { Schema::kSpecialObjects, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildSpecialObjects(b, Sub(s, Schema::kSpecialObjects)); } },
-    { Schema::kCollision, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildCollision(b, PathField(s, Schema::kCollision)); } },
-    { Schema::kRooms, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildRooms(b, Sub(s, Schema::kRooms), w); } },
-    { Schema::kSkybox, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildSkybox(b, Sub(s, Schema::kSkybox)); } },
-    { Schema::kExits, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildExits(b, SubArray(s, Schema::kExits), w); } },
-    { Schema::kLighting, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildLighting(b, Sub(s, Schema::kLighting), w); } },
-    { Schema::kPaths, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildPaths(b, SubArray(s, Schema::kPaths)); } },
-    { Schema::kTransitionActors, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildTransitionActors(b, Sub(s, Schema::kTransitionActors), w); } },
-    { Schema::kCutscenes, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildCutscenes(b, Sub(s, Schema::kCutscenes), w); } },
-    { Schema::kActorCutscenes, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildActorCutscenes(b, Sub(s, Schema::kActorCutscenes), w); } },
-    { Schema::kActorCsCameras, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildActorCsCameras(b, Sub(s, Schema::kActorCsCameras), w); } },
-    { Schema::kMinimap, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildMinimap(b, Sub(s, Schema::kMinimap), w); } },
-    { Schema::kMinimapChests, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildMinimapChests(b, Sub(s, Schema::kMinimapChests), w); } },
-    { Schema::kRegionVisited, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildRegionVisited(b); } },
-    { Schema::kAnimatedMaterials, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildAnimatedMaterials(b, PathField(s, Schema::kAnimatedMaterials)); } },
-    { Schema::kWind, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildWind(b, Sub(s, Schema::kWind)); } },
-    { Schema::kBehavior, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildBehavior(b, Sub(s, Schema::kBehavior)); } },
-    { Schema::kMesh, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildMesh(b, Sub(s, Schema::kMesh), w); } },
-    { Schema::kObjects, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildObjects(b, SubArray(s, Schema::kObjects)); } },
-    { Schema::kActors, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildActors(b, Sub(s, Schema::kActors), w); } },
-    { Schema::kLights, [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildLights(b, Sub(s, Schema::kLights), w); } },
-    { Schema::kTime, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildTime(b, Sub(s, Schema::kTime)); } },
-    { Schema::kSkyboxModifier, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildSkyboxModifier(b, Sub(s, Schema::kSkyboxModifier)); } },
-    { Schema::kEcho, [](CommandBuilder& b, const Json& s, const std::string&) { return BuildEcho(b, s[Schema::kEcho]); } },
+    { Schema::kSound,
+      [](CommandBuilder& b, const Json& s, const std::string&) { return BuildSound(b, Sub(s, Schema::kSound)); } },
+    { Schema::kEntrances, [](CommandBuilder& b, const Json& s,
+                             const std::string& w) { return BuildEntrances(b, Sub(s, Schema::kEntrances), w); } },
+    { Schema::kSpawns, [](CommandBuilder& b, const Json& s,
+                          const std::string& w) { return BuildSpawns(b, Sub(s, Schema::kSpawns), w); } },
+    { Schema::kSpecialObjects,
+      [](CommandBuilder& b, const Json& s, const std::string&) {
+          return BuildSpecialObjects(b, Sub(s, Schema::kSpecialObjects));
+      } },
+    { Schema::kCollision, [](CommandBuilder& b, const Json& s,
+                             const std::string&) { return BuildCollision(b, PathField(s, Schema::kCollision)); } },
+    { Schema::kRooms,
+      [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildRooms(b, Sub(s, Schema::kRooms), w); } },
+    { Schema::kSkybox,
+      [](CommandBuilder& b, const Json& s, const std::string&) { return BuildSkybox(b, Sub(s, Schema::kSkybox)); } },
+    { Schema::kExits, [](CommandBuilder& b, const Json& s,
+                         const std::string& w) { return BuildExits(b, SubArray(s, Schema::kExits), w); } },
+    { Schema::kLighting, [](CommandBuilder& b, const Json& s,
+                            const std::string& w) { return BuildLighting(b, Sub(s, Schema::kLighting), w); } },
+    { Schema::kPaths,
+      [](CommandBuilder& b, const Json& s, const std::string&) { return BuildPaths(b, SubArray(s, Schema::kPaths)); } },
+    { Schema::kTransitionActors,
+      [](CommandBuilder& b, const Json& s, const std::string& w) {
+          return BuildTransitionActors(b, Sub(s, Schema::kTransitionActors), w);
+      } },
+    { Schema::kCutscenes, [](CommandBuilder& b, const Json& s,
+                             const std::string& w) { return BuildCutscenes(b, Sub(s, Schema::kCutscenes), w); } },
+    { Schema::kActorCutscenes,
+      [](CommandBuilder& b, const Json& s, const std::string& w) {
+          return BuildActorCutscenes(b, Sub(s, Schema::kActorCutscenes), w);
+      } },
+    { Schema::kActorCsCameras,
+      [](CommandBuilder& b, const Json& s, const std::string& w) {
+          return BuildActorCsCameras(b, Sub(s, Schema::kActorCsCameras), w);
+      } },
+    { Schema::kMinimap, [](CommandBuilder& b, const Json& s,
+                           const std::string& w) { return BuildMinimap(b, Sub(s, Schema::kMinimap), w); } },
+    { Schema::kMinimapChests,
+      [](CommandBuilder& b, const Json& s, const std::string& w) {
+          return BuildMinimapChests(b, Sub(s, Schema::kMinimapChests), w);
+      } },
+    { Schema::kRegionVisited,
+      [](CommandBuilder& b, const Json& s, const std::string&) { return BuildRegionVisited(b); } },
+    { Schema::kAnimatedMaterials,
+      [](CommandBuilder& b, const Json& s, const std::string&) {
+          return BuildAnimatedMaterials(b, PathField(s, Schema::kAnimatedMaterials));
+      } },
+    { Schema::kWind,
+      [](CommandBuilder& b, const Json& s, const std::string&) { return BuildWind(b, Sub(s, Schema::kWind)); } },
+    { Schema::kBehavior, [](CommandBuilder& b, const Json& s,
+                            const std::string&) { return BuildBehavior(b, Sub(s, Schema::kBehavior)); } },
+    { Schema::kMesh,
+      [](CommandBuilder& b, const Json& s, const std::string& w) { return BuildMesh(b, Sub(s, Schema::kMesh), w); } },
+    { Schema::kObjects, [](CommandBuilder& b, const Json& s,
+                           const std::string&) { return BuildObjects(b, SubArray(s, Schema::kObjects)); } },
+    { Schema::kActors, [](CommandBuilder& b, const Json& s,
+                          const std::string& w) { return BuildActors(b, Sub(s, Schema::kActors), w); } },
+    { Schema::kLights, [](CommandBuilder& b, const Json& s,
+                          const std::string& w) { return BuildLights(b, Sub(s, Schema::kLights), w); } },
+    { Schema::kTime,
+      [](CommandBuilder& b, const Json& s, const std::string&) { return BuildTime(b, Sub(s, Schema::kTime)); } },
+    { Schema::kSkyboxModifier,
+      [](CommandBuilder& b, const Json& s, const std::string&) {
+          return BuildSkyboxModifier(b, Sub(s, Schema::kSkyboxModifier));
+      } },
+    { Schema::kEcho,
+      [](CommandBuilder& b, const Json& s, const std::string&) { return BuildEcho(b, s[Schema::kEcho]); } },
 };
 
 const SetupCommand* FindSetupCommand(const std::string& key) {
@@ -655,7 +697,6 @@ std::shared_ptr<SOH::Scene> BuildSetup(CommandBuilder& builder, std::shared_ptr<
     return scene;
 }
 
-// Layers past "0" run as vanilla alternate headers: the list comes first and a missing layer falls back to "0".
 std::shared_ptr<SOH::ISceneCommand> BuildAlternateHeaders(CommandBuilder& builder, const Json& setups,
                                                           int64_t highestLayer, const std::string& where) {
     auto command = builder.Make<SOH::SetAlternateHeaders>(SOH::SceneCommandID::SetAlternateHeaders);
@@ -666,8 +707,8 @@ std::shared_ptr<SOH::ISceneCommand> BuildAlternateHeaders(CommandBuilder& builde
             continue;
         }
         CommandBuilder layerBuilder(builder.ChildInitData("/Setup" + key));
-        command->headers.push_back(BuildSetup(layerBuilder, builder.ChildInitData("/Setup" + key), setups[key],
-                                              where + ".setups." + key));
+        command->headers.push_back(
+            BuildSetup(layerBuilder, builder.ChildInitData("/Setup" + key), setups[key], where + ".setups." + key));
     }
     command->numHeaders = (uint32_t)command->headers.size();
     return command;
@@ -687,8 +728,7 @@ int64_t HighestLayer(const Json& setups) {
 void CheckSchema(const Json& doc, const std::string& path) {
     std::string type;
     int version = 0;
-    if (!ParseSchema(SchemaOf(doc), type, version) ||
-        (type != Schema::kSceneType && type != Schema::kRoomType)) {
+    if (!ParseSchema(SchemaOf(doc), type, version) || (type != Schema::kSceneType && type != Schema::kRoomType)) {
         throw DocumentError(path + ": '" + SchemaOf(doc) + "' is not a 2Ship Unbound scene or room schema");
     }
     if (version != Schema::kSceneVersion) {
@@ -715,8 +755,9 @@ std::shared_ptr<SOH::Scene> BuildScene(std::shared_ptr<Ship::ResourceInitData> i
 
 } // namespace
 
-std::shared_ptr<Ship::IResource> ResourceFactoryJsonSceneV1::ReadResource(
-    std::shared_ptr<Ship::File> file, std::shared_ptr<Ship::ResourceInitData> initData) {
+std::shared_ptr<Ship::IResource>
+ResourceFactoryJsonSceneV1::ReadResource(std::shared_ptr<Ship::File> file,
+                                         std::shared_ptr<Ship::ResourceInitData> initData) {
     if (!FileHasValidFormatAndReader(file, initData)) {
         return nullptr;
     }
@@ -736,10 +777,9 @@ void RegisterResourceFactories(const std::shared_ptr<Ship::ResourceLoader>& load
                                     Schema::kSceneType, roomType, Schema::kSceneVersion);
     loader->RegisterResourceFactory(std::make_shared<ResourceFactoryJsonSceneV1>(), RESOURCE_FORMAT_JSON,
                                     Schema::kRoomType, roomType, Schema::kSceneVersion);
-    loader->RegisterResourceFactory(std::make_shared<ResourceFactoryJsonCollisionV1>(), RESOURCE_FORMAT_JSON,
-                                    Schema::kCollisionType,
-                                    static_cast<uint32_t>(SOH::ResourceType::SOH_CollisionHeader),
-                                    Schema::kCollisionVersion);
+    loader->RegisterResourceFactory(
+        std::make_shared<ResourceFactoryJsonCollisionV1>(), RESOURCE_FORMAT_JSON, Schema::kCollisionType,
+        static_cast<uint32_t>(SOH::ResourceType::SOH_CollisionHeader), Schema::kCollisionVersion);
 }
 
 } // namespace S2H::Unbound

@@ -28,8 +28,8 @@ void AnchorFormMenu(WidgetInfo& info) {
     std::string anchorTeamId = CVarGetString("gNetwork.Anchor.TeamId", "default");
     std::string anchorRoomId = CVarGetString("gNetwork.Anchor.RoomId", "");
     std::string anchorName = CVarGetString("gNetwork.Anchor.Name", "");
-    bool isFormValid = !Ship_IsCStringEmpty(host.c_str()) && port > 1024 && port < 65535 && !Ship_IsCStringEmpty(anchorRoomId.c_str()) &&
-                       !Ship_IsCStringEmpty(anchorName.c_str());
+    bool isFormValid = !Ship_IsCStringEmpty(host.c_str()) && port > 1024 && port < 65535 &&
+                       !Ship_IsCStringEmpty(anchorRoomId.c_str()) && !Ship_IsCStringEmpty(anchorName.c_str());
 
     ImGui::SeparatorText("Connection Settings");
 
@@ -126,7 +126,6 @@ void AnchorRoomMenu(WidgetInfo& info) {
     auto anchor = Anchor::Instance;
 
     if (!anchor->isEnabled) {
-        // Fleet draws this room under its own heading, away from the Enable button.
         if (FleetGame_IsHosted()) {
             ImGui::TextDisabled("Off");
         }
@@ -239,13 +238,13 @@ void AnchorInstructionsMenu(WidgetInfo& info) {
 }
 
 void RegisterAnchorMenu() {
-    // Add Network Menu
     BenGui::mBenMenu->AddMenuEntry("Network", "gSettings.Menu.NetworkSidebarSection");
 
     WidgetPath storePath = { "Network", "NEI-Store", SECTION_COLUMN_1 };
     BenGui::mBenMenu->AddSidebarEntry("Network", "NEI-Store", 1);
-    BenGui::mBenMenu->AddWidget(storePath, "NEI-Store", WIDGET_CUSTOM)
-        .CustomFunction([](WidgetInfo& info) { ModStore_DrawMenu(); });
+    BenGui::mBenMenu->AddWidget(storePath, "NEI-Store", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
+        ModStore_DrawMenu();
+    });
 
     BenGui::mBenMenu->AddSidebarEntry("Network", "Anchor", 2);
     WidgetPath path = { "Network", "Anchor", SECTION_COLUMN_1 };

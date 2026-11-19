@@ -403,7 +403,6 @@ void Play_ClearTransition(PlayState* this) {
     this->transitionCtx.transitionType = -1;
 }
 
-// 2S2H [Unbound] N64 fog coordinate of an eye distance under the projection: u = 1000 * f / (f - n) * (1 - n / d)
 static f32 Play_GetFogCoordinate(f32 distance, f32 zNear, f32 zFar) {
     return 1000.0f * (zFar / (zFar - zNear)) * (1.0f - zNear / CLAMP_MIN(distance, zNear));
 }

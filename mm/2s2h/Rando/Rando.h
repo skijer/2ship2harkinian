@@ -10,15 +10,20 @@
 
 #define IS_RANDO (gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO)
 #include "2s2h/ModApi/ModDungeons/DungeonRegistry.h"
-#define RANDO_SAVE_CHECKS RandoSaveChecksView{}
+#define RANDO_SAVE_CHECKS \
+    RandoSaveChecksView { \
+    }
 #define RANDO_SAVE_OPTIONS gSaveContext.save.shipSaveInfo.rando.randoSaveOptions
-#define RANDO_EVENTS RandoEventsView{}
+#define RANDO_EVENTS  \
+    RandoEventsView { \
+    }
 
 namespace Rando {
 
 void Init();
 void DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN, Actor* actor = nullptr);
 void GiveItem(RandoItemId randoItemId);
+void GiveKeyRingKeys(RandoItemId randoItemId);
 void RemoveItem(RandoItemId randoItemId);
 RandoItemId CurrentJunkItem(RandoCheckId randoCheckId = RC_UNKNOWN);
 const std::vector<RandoItemId>& JunkRotation();
@@ -37,7 +42,6 @@ std::vector<RandoItemId> GetStartingItemsFromSave(RandoSaveInfo& randoSaveInfo);
 void SetStartingItemsInSave(RandoSaveInfo& randoSaveInfo, std::vector<RandoItemId>& startingItems);
 std::vector<RandoItemId> GetStartingItemsFromConfig();
 void SetStartingItemsInConfig(std::vector<RandoItemId>& startingItems);
-// While set, the config getters return a seed's own list instead of the player's; it is never saved.
 void OverrideStartingItems(std::optional<std::vector<RandoItemId>> startingItems);
 
 std::vector<RandoItemId> GetDefaultSariaPriorityItems();
@@ -54,6 +58,11 @@ void SetExcludedChecksInConfig(std::vector<RandoCheckId>& excludedChecks);
 void OverrideExcludedChecks(std::optional<std::vector<RandoCheckId>> excludedChecks);
 
 std::vector<RandoCheckId> FindMultiItemPlacement(RandoItemId randoItemId);
+
+inline bool IsTriforceHuntOn(const RandoSaveInfo& saveInfo) {
+    return saveInfo.randoSaveOptions[RO_SHUFFLE_TRIFORCE_PIECES] == RO_GENERIC_YES &&
+           saveInfo.randoSaveOptions[RO_TRIFORCE_PIECES_REQUIRED] > 0;
+}
 
 } // namespace Rando
 

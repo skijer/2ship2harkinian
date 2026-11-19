@@ -22,7 +22,6 @@ bool sSearching = false;
 std::set<RandoRegionId> sLastReachable;
 std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState> sLastTimeStates;
 
-// Grotto portals use logical identities the native entrance table does not know.
 RandoRegionId RegionForEntrance(int32_t entrance) {
     // Goht's warp lands in spring Mountain Village, which the native graph only enters by its winter doors.
     if (entrance == ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7)) {
@@ -37,13 +36,11 @@ RandoRegionId RegionForEntrance(int32_t entrance) {
     return Rando::Logic::GetRegionIdFromEntrance(entrance);
 }
 
-// A grotto's exit is keyed by its logical identity, whichever native entrance it physically uses.
 const Route* RouteForExit(s32 exitId, RandoRegionId fromRegion) {
     const int32_t grottoExit = ComboCrossMmCatalogue::GrottoExitForRegion(fromRegion);
     return sState.Lookup(grottoExit >= 0 ? grottoExit : exitId, exitId);
 }
 
-// A route into the other game leaves 2Ship's graph.
 std::optional<RandoRegionId> RerouteDuringSearch(s32 exitId, RandoRegionId fromRegion) {
     if (!sSearching) {
         return std::nullopt;
@@ -64,7 +61,6 @@ struct BossLair {
     ActorId boss;
 };
 
-// Boss ids 8-11 are MM's in Fleet's shared numbering; Odolwa must stay first (id 8).
 const std::array<BossLair, 4>& BossLairs() {
     static const std::array<BossLair, 4> lairs = { {
         { "mm:woodfall", ENTRANCE(ODOLWAS_LAIR, 0), ENTRANCE(WOODFALL_TEMPLE, 0), ENTRANCE(WOODFALL_TEMPLE, 1),
@@ -81,8 +77,6 @@ const std::array<BossLair, 4>& BossLairs() {
 
 constexpr int kFirstMmBoss = 8;
 
-// Lairs are one-way: a fall in, a warp out. The temple's front door is the safe checkpoint, and Odolwa's
-// warp into the Deku Princess's prison stays inside the temple, so it is its own recovery point.
 void AppendBossLairs(std::vector<Dungeon>& catalogue) {
     for (size_t index = 0; index < BossLairs().size(); index++) {
         const BossLair& lair = BossLairs()[index];
@@ -126,7 +120,6 @@ std::vector<Dungeon> Catalogue(const PoolOptions& options) {
                        { kMm, ENTRANCE(STONE_TOWER_TEMPLE_INVERTED, 0) },
                        { kMm, ENTRANCE(STONE_TOWER_INVERTED, 1) },
                        { kMm, ENTRANCE(STONE_TOWER_INVERTED, 1) } } };
-        // The boss warps that leave each temple without its front door.
         dungeons[0].escapeExits = { { kMm, ENTRANCE(WOODFALL, 3) } };
         dungeons[1].escapeExits = { { kMm, ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7) } };
         dungeons[2].escapeExits = { { kMm, ENTRANCE(ZORA_CAPE, 9) } };
@@ -183,7 +176,13 @@ void FleetCrossDungeon_SetAccess(const nlohmann::json& access) {
     sState.SetAccess(access);
 }
 
-// Which routes into the other game the last search can take, judged on their native exits.
+void FleetCrossDungeon_Reset() {
+    sState = HostState(kMm);
+    sLastReachable.clear();
+    sLastTimeStates.clear();
+    Rando::Logic::SetExitRedirect(nullptr);
+}
+
 nlohmann::json FleetCrossDungeon_GetExits() {
     const bool previousSearching = sSearching;
     sSearching = true;
@@ -206,7 +205,6 @@ nlohmann::json FleetCrossDungeon_GetExits() {
     return exits;
 }
 
-// Physical kills in 2Ship's lairs, judged on the last search; Fleet maps them to the doors that led there.
 uint16_t FleetCrossDungeon_GetBossDefeated() {
     uint16_t defeated = 0;
     for (size_t index = 0; index < BossLairs().size(); index++) {
@@ -244,8 +242,6 @@ FleetCrossDungeonSearch::~FleetCrossDungeonSearch() {
     sSearching = mPreviousSearching;
 }
 
-// Without routes, or with the overworld open, the search starts from the game's own start. A cross arrival
-// keeps its native region's waiting restrictions, unlike that synthetic start.
 void FleetCrossDungeonSearch::Roots(
     std::set<RandoRegionId>& reachable,
     std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState>& timeStates) const {

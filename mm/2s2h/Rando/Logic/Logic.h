@@ -5,12 +5,14 @@
 #include "Rando/ActorBehavior/Souls.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ModApi/RandoLogic/RandoLogic.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "2s2h/ShipUtils.h"
 
 #include <set>
 #include <cassert>
 #include <functional>
 #include <optional>
+#include <span>
 
 extern "C" {
 #include "functions.h"
@@ -21,7 +23,6 @@ namespace Rando {
 
 namespace Logic {
 
-// 2S2H [Fleet] Tags the region graph so ShipInit::Init(RegionGraphPath) builds it without the rest of the game.
 inline const std::string RegionGraphPath = "RANDO_LOGIC";
 inline const std::set<std::string> RegionGraphInitPaths = { RegionGraphPath };
 
@@ -131,8 +132,6 @@ inline void SetCurrentRegionTime(const std::unordered_map<RandoRegionId, RegionT
 void FindReachableRegions(RandoRegionId currentRegion, std::set<RandoRegionId>& reachableRegions,
                           std::unordered_map<RandoRegionId, RegionTimeState>& regionTimeStates);
 RandoRegionId GetRegionIdFromEntrance(s32 entrance);
-// While set, the search follows an exit to the region this returns: nullopt keeps the native destination and
-// RR_MAX leaves the graph. A combined seed reroutes exits across games.
 using ExitRedirect = std::function<std::optional<RandoRegionId>(s32 exitId, RandoRegionId fromRegion)>;
 void SetExitRedirect(ExitRedirect redirect);
 void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool);
@@ -143,6 +142,8 @@ bool IsItemAllowedAtCheck(RandoItemId itemId, RandoCheckId checkId);
 size_t SelectItemForCheck(const std::vector<RandoItemId>& itemPool, const std::vector<RandoCheckId>& checkPool,
                           RandoCheckId checkId);
 void PreplaceConfinedItems(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool);
+void PlaceVanillaDungeonItems(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool,
+                              std::vector<RandoItemId>& itemPool);
 
 struct RandoRegionExit {
     s32 returnEntrance;
@@ -194,16 +195,16 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
 #define CAN_BE_ZORA (LOGIC_GRANTED(CanBeZora) || IS_ZORA || HAS_ITEM(ITEM_MASK_ZORA))
 #define CAN_BE_DEITY (LOGIC_GRANTED(CanBeFierceDeity) || IS_DEITY || HAS_ITEM(ITEM_MASK_FIERCE_DEITY))
 #define CAN_BE_GORON (LOGIC_GRANTED(CanBeGoron) || IS_GORON || HAS_ITEM(ITEM_MASK_GORON))
-#define CAN_BE_HUMAN                                                                                           \
-    (LOGIC_GRANTED(CanBeHuman) || IS_HUMAN || (IS_DEITY && HAS_ITEM(ITEM_MASK_FIERCE_DEITY)) ||                \
-     (IS_ZORA && HAS_ITEM(ITEM_MASK_ZORA)) || (IS_DEKU && HAS_ITEM(ITEM_MASK_DEKU)) ||                         \
+#define CAN_BE_HUMAN                                                                            \
+    (LOGIC_GRANTED(CanBeHuman) || IS_HUMAN || (IS_DEITY && HAS_ITEM(ITEM_MASK_FIERCE_DEITY)) || \
+     (IS_ZORA && HAS_ITEM(ITEM_MASK_ZORA)) || (IS_DEKU && HAS_ITEM(ITEM_MASK_DEKU)) ||          \
      (IS_GORON && HAS_ITEM(ITEM_MASK_GORON)))
 #define CHECK_MAX_HP(TARGET_HP) ((TARGET_HP * 16) <= gSaveContext.save.saveInfo.playerData.healthCapacity)
 #define HAS_MAGIC (LOGIC_GRANTED(HasMagic) || gSaveContext.save.saveInfo.playerData.isMagicAcquired)
 #define CAN_HOOK_SCARECROW \
     (HAS_ITEM(ITEM_OCARINA_OF_TIME) && HAS_ITEM(ITEM_HOOKSHOT) && canPlaySong(OCARINA_SONG_SCARECROW_SPAWN))
-#define CAN_USE_EXPLOSIVE                                                                             \
-    (LOGIC_GRANTED(HasExplosives) || HAS_ITEM(ITEM_BOMB) || HAS_ITEM(ITEM_BOMBCHU) ||                 \
+#define CAN_USE_EXPLOSIVE                                                             \
+    (LOGIC_GRANTED(HasExplosives) || HAS_ITEM(ITEM_BOMB) || HAS_ITEM(ITEM_BOMBCHU) || \
      (HAS_ITEM(ITEM_MASK_BLAST) && GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) > EQUIP_VALUE_SHIELD_NONE))
 #define CAN_USE_HUMAN_SWORD \
     (LOGIC_GRANTED(CanUseHumanSword) || GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) >= EQUIP_VALUE_SWORD_KOKIRI)
@@ -232,9 +233,9 @@ void ValidateRegionTimeOwnership(RandoRegionId regionId, RandoCheckId checkId, u
 #define HAS_BOTTLE_ITEM(item) (Inventory_HasItemInBottle(item))
 // TODO: Maybe not reliable because of theif bird stealing bottle
 #define HAS_BOTTLE (INV_CONTENT(ITEM_BOTTLE) != ITEM_NONE)
-#define CAN_USE_PROJECTILE                                                                                  \
-    (LOGIC_GRANTED(CanUseProjectile) || HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_HOOKSHOT) ||                   \
-     (CAN_BE_DEKU && HAS_MAGIC) || CAN_BE_ZORA)
+#define CAN_USE_PROJECTILE                                                                                             \
+    (LOGIC_GRANTED(CanUseProjectile) || HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_HOOKSHOT) || (CAN_BE_DEKU && HAS_MAGIC) || \
+     CAN_BE_ZORA)
 #define CAN_ACCESS(access) (RANDO_EVENTS[RE_ACCESS_##access])
 #define CAN_GROW_BEAN_PLANT        \
     (HAS_ITEM(ITEM_MAGIC_BEANS) && \
@@ -440,9 +441,114 @@ inline uint32_t RemainsCount() {
     return count;
 }
 
+inline bool HasMoonTriforcePieces() {
+    return RANDO_SAVE_OPTIONS[RO_SHUFFLE_TRIFORCE_PIECES] == RO_GENERIC_NO ||
+           gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces >=
+               RANDO_SAVE_OPTIONS[RO_ACCESS_MOON_TRIFORCE_COUNT];
+}
+
 inline bool MeetsMoonRequirements() {
     return RemainsCount() >= RANDO_SAVE_OPTIONS[RO_ACCESS_MOON_REMAINS_COUNT] &&
-           MoonMaskCount() >= RANDO_SAVE_OPTIONS[RO_ACCESS_MOON_MASKS_COUNT];
+           MoonMaskCount() >= RANDO_SAVE_OPTIONS[RO_ACCESS_MOON_MASKS_COUNT] && HasMoonTriforcePieces();
+}
+
+inline constexpr const char* SPIRITUAL_STONE_KEYS[] = {
+    "nei.spiritual_stone.kokiri",
+    "nei.spiritual_stone.goron",
+    "nei.spiritual_stone.zora",
+};
+inline constexpr const char* MEDALLION_KEYS[] = {
+    "nei.medallion.forest", "nei.medallion.fire",   "nei.medallion.water",
+    "nei.medallion.spirit", "nei.medallion.shadow", "nei.medallion.light",
+};
+
+inline uint32_t OwnedModItemCount(std::span<const char* const> keys) {
+    uint32_t count = 0;
+    for (const char* key : keys) {
+        const int32_t randoItem = RandoItems_GetRandoGet(key);
+        if (randoItem != 0 && RandoLogic_HasLogicItem(randoItem)) {
+            count++;
+        }
+    }
+    return count;
+}
+
+inline uint32_t GoldSkulltulaTokenCount() {
+    return Inventory_GetSkullTokenCount(SCENE_KINSTA1) + Inventory_GetSkullTokenCount(SCENE_KINDAN2);
+}
+
+struct TempleClear {
+    RandoEvent logicEvent;
+    RandoCheckId bossWarp;
+};
+
+inline constexpr TempleClear TEMPLE_CLEARS[] = {
+    { RE_CLEARED_WOODFALL_TEMPLE, RC_WOODFALL_TEMPLE_BOSS_WARP },
+    { RE_CLEARED_SNOWHEAD_TEMPLE, RC_SNOWHEAD_TEMPLE_BOSS_WARP },
+    { RE_CLEARED_GREAT_BAY_TEMPLE, RC_GREAT_BAY_TEMPLE_BOSS_WARP },
+    { RE_CLEARED_STONE_TOWER_TEMPLE, RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP },
+};
+
+enum class TempleClearSource { Logic, Save };
+
+inline uint32_t ClearedTempleCount(TempleClearSource source) {
+    uint32_t count = 0;
+    for (const TempleClear& temple : TEMPLE_CLEARS) {
+        const bool isCleared = source == TempleClearSource::Logic ? RANDO_EVENTS[temple.logicEvent] != 0
+                                                                  : RANDO_SAVE_CHECKS[temple.bossWarp].obtained;
+        if (isCleared) {
+            count++;
+        }
+    }
+    return count;
+}
+
+inline bool IsMajoraSoulTriggered(const RandoSaveInfo& saveInfo) {
+    return saveInfo.randoSaveOptions[RO_SHUFFLE_MAJORA_SOUL] >= RO_MAJORA_SOUL_STONES;
+}
+
+inline bool IsMajoraSoulShuffled(const RandoSaveInfo& saveInfo) {
+    switch (saveInfo.randoSaveOptions[RO_SHUFFLE_MAJORA_SOUL]) {
+        case RO_MAJORA_SOUL_ANY_DUNGEON:
+        case RO_MAJORA_SOUL_OVERWORLD:
+        case RO_MAJORA_SOUL_ANYWHERE:
+            return true;
+        case RO_MAJORA_SOUL_START_WITH:
+            return saveInfo.randoSaveOptions[RO_SHUFFLE_BOSS_SOULS] == RO_GENERIC_YES && !IsTriforceHuntOn(saveInfo);
+        default:
+            return false;
+    }
+}
+
+inline bool IsMajoraSoulRequired(const RandoSaveInfo& saveInfo) {
+    return IsMajoraSoulShuffled(saveInfo) || IsMajoraSoulTriggered(saveInfo);
+}
+
+inline bool MeetsMajoraSoulTrigger(TempleClearSource templeClears) {
+    switch (RANDO_SAVE_OPTIONS[RO_SHUFFLE_MAJORA_SOUL]) {
+        case RO_MAJORA_SOUL_STONES:
+            return OwnedModItemCount(SPIRITUAL_STONE_KEYS) >= RANDO_SAVE_OPTIONS[RO_MAJORA_SOUL_STONE_COUNT];
+        case RO_MAJORA_SOUL_MEDALLIONS:
+            return OwnedModItemCount(MEDALLION_KEYS) >= RANDO_SAVE_OPTIONS[RO_MAJORA_SOUL_MEDALLION_COUNT];
+        case RO_MAJORA_SOUL_REWARDS:
+            return OwnedModItemCount(SPIRITUAL_STONE_KEYS) + OwnedModItemCount(MEDALLION_KEYS) + RemainsCount() >=
+                   RANDO_SAVE_OPTIONS[RO_MAJORA_SOUL_REWARD_COUNT];
+        case RO_MAJORA_SOUL_DUNGEONS:
+            return ClearedTempleCount(templeClears) >= RANDO_SAVE_OPTIONS[RO_MAJORA_SOUL_DUNGEON_COUNT];
+        case RO_MAJORA_SOUL_TOKENS:
+            return GoldSkulltulaTokenCount() >= RANDO_SAVE_OPTIONS[RO_MAJORA_SOUL_TOKEN_COUNT];
+        case RO_MAJORA_SOUL_TRIFORCE_PIECES:
+            return gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces >=
+                   RANDO_SAVE_OPTIONS[RO_MAJORA_SOUL_TRIFORCE_COUNT];
+        default:
+            return false;
+    }
+}
+
+inline bool CanFightMajora() {
+    return !IsMajoraSoulRequired(gSaveContext.save.shipSaveInfo.rando) ||
+           Flags_GetRandoInf(RANDO_INF_OBTAINED_SOUL_OF_BOSS_MAJORA) ||
+           MeetsMajoraSoulTrigger(TempleClearSource::Logic);
 }
 
 // ============================================================================
@@ -635,7 +741,8 @@ inline bool ClockFilter() {
      AFTER(TIME_NIGHT3_AM_12_00))
 
 inline bool CanKillEnemy(ActorId EnemyId) {
-    if (RandoLogic_IsEnemyGranted(EnemyId)) return true;
+    if (RandoLogic_IsEnemyGranted(EnemyId))
+        return true;
     // If enemy souls are shuffled, and the relevant soul is not obtained, we cannot kill that enemy.
     if (RANDO_SAVE_OPTIONS[RO_SHUFFLE_ENEMY_SOULS] && !HaveEnemySoul(EnemyId)) {
         return false;
@@ -661,8 +768,7 @@ inline bool CanKillEnemy(ActorId EnemyId) {
             return (CAN_USE_MAGIC_ARROW(FIRE)) && (Flags_GetRandoInf(RANDO_INF_OBTAINED_SOUL_OF_BOSS_GOHT) ||
                                                    RANDO_SAVE_OPTIONS[RO_SHUFFLE_BOSS_SOULS] == RO_GENERIC_NO);
         case ACTOR_EN_KNIGHT: // Igos du Ikana/IdI Lackey
-            return (CAN_USE_MAGIC_ARROW(FIRE) &&
-                    HAS_MIRROR_SHIELD &&
+            return (CAN_USE_MAGIC_ARROW(FIRE) && HAS_MIRROR_SHIELD &&
                     (CAN_USE_SWORD || CAN_BE_DEKU || CAN_BE_GORON || CAN_BE_ZORA));
         case ACTOR_EN_KAIZOKU: // Fighter Pirate
             return (CAN_USE_SWORD || CAN_BE_ZORA);

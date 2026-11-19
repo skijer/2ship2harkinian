@@ -22,4 +22,4 @@ inline constexpr const char* kLimb = "limb";
 inline constexpr const char* kPivot = "pivot";
 inline constexpr const char* kTurnAxis = "turnAxis";
 inline constexpr const char* kNodAxis = "nodAxis";
-}
+} // namespace S2H::Unbound::Schema

@@ -8,9 +8,6 @@ extern "C" {
 #include "z64scene.h"
 #include "z64save.h"
 
-// Scenes and entrances beyond the vanilla tables (unbound-docs/SPEC.md §7). Custom scene ids follow SCENE_MAX; custom
-// entrances keep Majora's Mask's bit layout with a scene slot from ENTR_SCENE_MAX up, so `entrance >> 9`,
-// `entrance + layer` and Entrance_Create keep working on them.
 SceneTableEntry* SceneDB_GetSceneEntry(s16 sceneId);
 const char* SceneDB_GetScenePath(s16 sceneId);
 EntranceTableEntry* SceneDB_GetCustomEntrance(u32 entrance);

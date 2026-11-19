@@ -10,6 +10,7 @@
 #include "Traps.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
+#include "2s2h/ModApi/ProgressiveItems/ProgressiveItems.h"
 
 extern "C" {
 #include "variables.h"
@@ -19,6 +20,7 @@ extern s16 D_801CFF94[250];
 }
 
 static bool queued = false;
+static const char* givenChainStage = nullptr;
 
 // This function handles queuing up item gives that the player has been marked as eligible for. If you are looking for
 // the behavior of the actual giving itself, the heavy lifting is done by the GameInteractor queue. This function is
@@ -57,8 +59,9 @@ void Rando::MiscBehavior::CheckQueue() {
                             randoItemId = Rando::CurrentJunkItem((RandoCheckId)CUSTOM_ITEM_PARAM);
                         }
                         if (randoItemId == RI_TRIFORCE_PIECE) {
-                            if (gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces + 1 >=
-                                RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED]) {
+                            if (Rando::IsTriforceHuntOn(gSaveContext.save.shipSaveInfo.rando) &&
+                                gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces + 1 >=
+                                    RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED]) {
                                 prefix = "You";
                                 message = "completed the Triforce";
                             }
@@ -84,11 +87,21 @@ void Rando::MiscBehavior::CheckQueue() {
                         const char* customKey = RandoItems_GetKey(randoItemId);
                         if (const auto* item = CustomItemRegistry_Find(customKey)) {
                             CustomItemRegistry_PrepareAcquisitionMessage(customKey);
-                            if (item->getItemText != nullptr) entry.msg = item->getItemText;
+                            if (item->getItemText != nullptr)
+                                entry.msg = item->getItemText;
                             if (item->iconPath != nullptr) {
                                 entry.icon = ITEM_OCARINA_OF_TIME;
                                 entry.iconPath = item->iconPath;
                             }
+                        }
+
+                        const char* stageKey =
+                            ProgressiveItems_ResolveRando(randoItemId, RandoInfCustom_GetActiveBank());
+                        const char* shownKey = stageKey != nullptr ? stageKey : customKey;
+                        const std::string displayName =
+                            shownKey != nullptr ? CustomItemRegistry_GetDisplayName(shownKey) : std::string{};
+                        if (!displayName.empty()) {
+                            message = displayName;
                         }
 
                         if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
@@ -104,10 +117,12 @@ void Rando::MiscBehavior::CheckQueue() {
                                 });
                             }
                         }
+                        givenChainStage = ProgressiveItems_ResolveRando(randoItemId, RandoInfCustom_GetActiveBank());
                         Rando::GiveItem(randoItemId);
                         randoSaveCheck.cycleObtained = true;
                         randoSaveCheck.obtained = true;
-                        if (Anchor::Instance) Anchor::Instance->SendPacket_SetCheckStatus((RandoCheckId)CUSTOM_ITEM_PARAM);
+                        if (Anchor::Instance)
+                            Anchor::Instance->SendPacket_SetCheckStatus((RandoCheckId)CUSTOM_ITEM_PARAM);
                         randoSaveCheck.eligible = false;
                         queued = false;
                         CUSTOM_ITEM_PARAM = randoItemId;
@@ -115,9 +130,10 @@ void Rando::MiscBehavior::CheckQueue() {
                 .drawItem =
                     [](Actor* actor, PlayState* play) {
                         RandoItemId randoItemId;
+                        const bool isGiven = (CUSTOM_ITEM_FLAGS & CustomItem::CALLED_ACTION) != 0;
 
                         // If the item has been given, the CUSTOM_ITEM_PARAM is set to the RI, prior to that it's the RC
-                        if (CUSTOM_ITEM_FLAGS & CustomItem::CALLED_ACTION) {
+                        if (isGiven) {
                             if ((RandoItemId)(u16)CUSTOM_ITEM_PARAM == RI_TRAP) {
                                 randoItemId = RI_MAX_TRAP;
                             } else {
@@ -130,6 +146,10 @@ void Rando::MiscBehavior::CheckQueue() {
                         }
 
                         Matrix_Scale(30.0f, 30.0f, 30.0f, MTXMODE_APPLY);
+                        if (isGiven && givenChainStage != nullptr) {
+                            CustomItemRegistry_DrawAcquisition(givenChainStage, play);
+                            return;
+                        }
                         Rando::DrawItem(randoItemId, (RandoCheckId)CUSTOM_ITEM_PARAM, actor);
                     } });
             return;

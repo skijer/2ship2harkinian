@@ -29,7 +29,6 @@ FIELD_REWRITES = [
     (re.compile(r"(?<![Rr]oom)(\.|->)segment\b"), r"\1segmentVoid"),
     (re.compile(r"(\.|->)nextEntranceIndex\b"), r"\1nextEntrance"),
     (re.compile(r"(\.|->)entranceIndex\b"), r"\1entrance"),
-    # EnvironmentContext weather, same offsets in both games.
     (re.compile(r"(\.|->)indoors\b"), r"\1lightMode"),
     (re.compile(r"(\.|->)unk_EE\b"), r"\1precipitation"),
     (re.compile(r"(\.|->)gloomySkyMode\b"), r"\1stormRequest"),
@@ -69,14 +68,12 @@ FIELD_REWRITES = [
     (re.compile(r"(\.|->)adjFogColor\b"), r"\1adjLightSettings.fogColor"),
     (re.compile(r"(\.|->)adjFogNear\b"), r"\1adjLightSettings.fogNear"),
     (re.compile(r"(\.|->)adjFogFar\b"), r"\1adjLightSettings.zFar"),
-    # Curve skeleton members (the types are aliased in z64oot_names.h).
     (re.compile(r"(\.|->)firstChildIdx\b"), r"\1child"),
     (re.compile(r"(\.|->)nextLimbIdx\b"), r"\1sibling"),
     (re.compile(r"(\.|->)transUpdIdx\b"), r"\1animation"),
     (re.compile(r"(\.|->)animFinalFrame\b"), r"\1endFrame"),
     (re.compile(r"(\.|->)animCurFrame\b"), r"\1curFrame"),
     (re.compile(r"(\.|->)sceneNum\b"), r"\1sceneId"),
-    # Player members MM moved or renamed (same meaning and type).
     (re.compile(r"(\.|->)unk_858\b"), r"\1unk_B08"),
     # OoT 0x864-0x880 (walk phase, blend weights, yaw delta) sit at MM 0xB34-0xB50 in the same order.
     (re.compile(r"(\.|->)unk_864\b"), r"\1unk_B34"),
@@ -106,7 +103,6 @@ FIELD_REWRITES = [
     (re.compile(r"\bENHORSE_ACT_MOUNTED_IDLE_WHINNEYING\b"), "ENHORSE_ACTION_MOUNTED_IDLE_WHINNYING"),
     (re.compile(r"\bENHORSE_ACT_"), "ENHORSE_ACTION_"),
     (re.compile(r"(\.|->)sfx\b"), r"\1sfxId"),
-    # Collider names the MM decomp renamed; the structs keep OoT's layout.
     (re.compile(r"\bCOLTYPE_"), "COL_MATERIAL_"),
     (re.compile(r"\bELEMTYPE_"), "ELEM_MATERIAL_"),
     (re.compile(r"\bTOUCH_"), "ATELEM_"),
@@ -120,7 +116,6 @@ FIELD_REWRITES = [
     (re.compile(r"(\.|->)acHitInfo\b"), r"\1acHitElem"),
 ]
 
-# OoT actor members MM renamed, rewritten only on expressions of that actor type.
 ACTOR_MEMBERS = {
     "EnArrow": {"timer": "unk_260", "hitFlags": "unk_261", "touchedPoly": "unk_262", "isCsNut": "unk_263",
                 "hitActor": "unk_264", "weaponInfo": "unk_244", "effectIndex": "unk_240", "unk_210": "unk_228",
@@ -150,7 +145,6 @@ def rewrite_actor_members(text):
     return text
 
 
-# Ship-only data: EffectBlureInit's trail colour type, and rando pool sources, which are OoT randomizer ids.
 DROPPED_CODE = [
     re.compile(r",\s*TRAIL_TYPE_\w+(?=\s*,?\s*\})"),
     re.compile(r"[^;{}\n]*(?:\.|->)(?:trailType|poolSources|poolSourceCount)\s*=[^;]*;"),
@@ -309,7 +303,6 @@ BUTTON_ITEM = re.compile(r"\bgSaveContext\.save\.saveInfo\.equips\.buttonItems\[
 BUTTON_SLOT = re.compile(r"\bgSaveContext\.save\.saveInfo\.equips\.cButtonSlots\[([^\]]+)\]")
 
 
-# OoT's SaveContext is flat; MM nests the same fields (oot_save_fields.json, from gen_oot_compat.py).
 def relocate_save_fields(text):
     text = SAVE_FIELD.sub(lambda match: "gSaveContext." + SAVE_FIELDS.get(match.group(1), match.group(1)), text)
     for pointer in set(SAVE_POINTER.findall(text)):
@@ -365,7 +358,6 @@ MEMBER_RENAMES = [(re.compile(rf"\b{match.group(1)}\b(?=\s*(?:\[[^\]]*\]\s*)*[;,
 STRUCT_BODY = re.compile(r"\b(?:struct|union)\s*\w*\s*\{[^{}]*\}")
 
 
-# A struct the mod declares itself keeps its members in step with the renamed accesses.
 def rename_struct_members(text):
     def rename(match):
         body = match.group(0)
@@ -375,7 +367,6 @@ def rename_struct_members(text):
     return STRUCT_BODY.sub(rename, text)
 
 
-# The save goes first: its OoT names (entranceIndex) are what the relocation table knows.
 def rewrite_fields(text):
     text = rename_struct_members(rewrite_actor_members(drop_ship_only_code(relocate_save_fields(text))))
     for pattern, replacement in FIELD_REWRITES:
@@ -410,7 +401,6 @@ class OotAssets:
         self.mm_keep_symbols = {match.group(2) for match in
                                 ASSET_DEFINITION.finditer(keep.read_text(encoding="utf-8", errors="ignore"))}
 
-    # (kind, file) -> resource names, from the ZAPD descriptions Ship extracts OoT with.
     @staticmethod
     def load_symbols(xml_root):
         symbols = {}
@@ -484,7 +474,6 @@ def is_resolvable(header, including_path, roots):
     return (including_path.parent / header).is_file() or any((root / header).is_file() for root in roots)
 
 
-# OoT headers MM lacks (actor structs, asset symbols) are copied from Ship into <mod>/oot_include, translated too.
 def vendor_missing_headers(destination, sources, roots, ship_root, oot_assets):
     vendor = destination / VENDOR_DIRECTORY
     ship_roots = ship_include_roots(ship_root)

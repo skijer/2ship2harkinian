@@ -84,7 +84,6 @@ std::vector<StoreOption> ReadOptions(const Json& object) {
     return options;
 }
 
-// Keeps only the mods the catalog really lists, so a pack can be drawn without checking each id again.
 std::optional<StorePack> ReadPack(const Json& object, const std::map<std::string, StoreMod>& mods) {
     if (!object.is_object() || object.value("game", std::string("oot")) != StoreGame) {
         return std::nullopt;

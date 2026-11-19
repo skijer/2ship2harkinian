@@ -8,6 +8,7 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "FleetRando.h"
 #include "FleetForeignItems.h"
+#include "FleetItemDraw.h"
 #include "FleetRuntime.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "2s2h/BenGui/BenMenu.h"
@@ -44,16 +45,23 @@ extern std::shared_ptr<BenMenu> mBenMenu;
 
 #include "2s2h/BenGui/Notification.h"
 
+#include "2s2h/CustomMessage/CustomMessage.h"
+
 extern "C" {
 #include "functions.h"
+#include "message_data_fmt_nes.h"
+#include "message_data_static.h"
 #include "sfx.h"
 #include "variables.h"
+extern MessageTableEntry* sMessageTableNES;
+void OTRMessage_Init();
 }
 
 extern std::unordered_map<int32_t, const char*> logicOptions;
 extern std::unordered_map<int32_t, const char*> accessDungeonOptions;
 extern std::unordered_map<int32_t, const char*> accessTrialsOptions;
 extern std::unordered_map<int32_t, const char*> dungeonItemPlacementOptions;
+extern std::unordered_map<int32_t, const char*> majoraSoulOptions;
 
 namespace {
 
@@ -61,17 +69,16 @@ using Rando::StaticData::RandoStaticItem;
 
 uint32_t sSeed = 0;
 
-// The combined Triforce Hunt. pieces is this game's share, -1 = unset; the required count is combined.
 struct ComboOptions {
     bool hunt = false;
     uint32_t required = 0;
     int pieces = -1;
+    int totalPieces = -1;
 };
 ComboOptions sComboOptions;
 
 // The game's own save while the oracle borrows gSaveContext; restored by the "Finish" request.
 std::unique_ptr<SaveContext> sLiveSave;
-// The prepared seed before any query: options, starting items, prices and confined placements.
 std::unique_ptr<SaveContext> sSeedSave;
 std::vector<RandoItemId> sOracleModItems;
 
@@ -81,8 +88,6 @@ char* CopyString(const std::string& text) {
     return copy;
 }
 
-// Checks and items travel by their unique readable names ("Moon Majora Pot 01", "Piece of the Triforce"):
-// the combined engine keys its win conditions on them.
 const char* CheckName(RandoCheckId id) {
     return Rando::StaticData::GetCheckDisplayName(id).c_str();
 }
@@ -95,17 +100,14 @@ bool IsNamed(const char* name) {
     return name != nullptr && name[0] != '\0';
 }
 
-// A mod item's pool name is its key; its definition holds the name the player reads.
 std::string DisplayName(RandoItemId id, const RandoStaticItem& item) {
-    const char* key = RandoItems_GetKey(id);
-    const auto* definition = key != nullptr ? CustomItemRegistry_Find(key) : nullptr;
-    if (definition != nullptr && IsNamed(definition->displayName)) {
-        return definition->displayName;
+    const std::string name = CustomItemRegistry_GetDisplayName(RandoItems_GetKey(id));
+    if (!name.empty()) {
+        return name;
     }
     return IsNamed(item.name) ? item.name : ItemName(id);
 }
 
-// Traps never gate logic, so they fill like junk.
 bool IsAdvancement(const RandoStaticItem& item) {
     if (const char* key = RandoItems_GetKey(item.randoItemId); key != nullptr) {
         const auto* definition = CustomItemRegistry_Find(key);
@@ -169,7 +171,6 @@ bool IsDungeonMap(RandoItemId item) {
     }
 }
 
-// MM's own items Ship carries as mods, or natively under a fleet.* key: Fleet pairs equal keys.
 const char* ReplicaKey(RandoItemId item) {
     static const std::unordered_map<RandoItemId, const char*> keys = {
         { RI_MASK_POSTMAN, "mm.mask.postman" },
@@ -216,7 +217,6 @@ const char* ReplicaKey(RandoItemId item) {
     return found != keys.end() ? found->second : nullptr;
 }
 
-// The pool viewer's section; coarser than the fill categories and shared with Ship.
 const char* PoolGroup(const RandoStaticItem& item) {
     if (item.randoItemId == RI_TRAP) {
         return "traps";
@@ -256,12 +256,140 @@ nlohmann::json PoolEntry(RandoItemId item) {
              { "group", PoolGroup(staticItem) } };
 }
 
+void AddPickupVariant(nlohmann::json& entry, RandoItemId item) {
+    const char* key = RandoItems_GetKey(item);
+    const S2HCustomPickupVariant* variant = key != nullptr ? CustomItemRegistry_GetPickupVariant(key) : nullptr;
+    if (variant == nullptr || variant->itemKey == nullptr) {
+        return;
+    }
+    const S2HCustomItemDefinition* owner = CustomItemRegistry_Find(variant->itemKey);
+    entry["variantOf"] = variant->itemKey;
+    entry["variantOfName"] = owner != nullptr && owner->displayName != nullptr ? owner->displayName : variant->itemKey;
+}
+
+bool IsNativeSong(RandoItemId item) {
+    switch (item) {
+        case RI_PROGRESSIVE_LULLABY:
+        case RI_SONG_DOUBLE_TIME:
+        case RI_SONG_ELEGY:
+        case RI_SONG_EPONA:
+        case RI_SONG_HEALING:
+        case RI_SONG_INVERTED_TIME:
+        case RI_SONG_LULLABY_INTRO:
+        case RI_SONG_LULLABY:
+        case RI_SONG_NOVA:
+        case RI_SONG_OATH:
+        case RI_SONG_SARIA:
+        case RI_SONG_SOARING:
+        case RI_SONG_SONATA:
+        case RI_SONG_STORMS:
+        case RI_SONG_SUN:
+        case RI_SONG_TIME:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool IsSong(RandoItemId item) {
+    const char* key = RandoItems_GetKey(item);
+    return key != nullptr ? std::strstr(key, ".song.") != nullptr : IsNativeSong(item);
+}
+
+const char* CheckType(const Rando::StaticData::RandoStaticCheck& check) {
+    switch (check.randoCheckType) {
+        case RCTYPE_SONG:
+            return "song";
+        case RCTYPE_REMAINS:
+            return "dungeonReward";
+        default:
+            return "";
+    }
+}
+
+nlohmann::json CheckEntry(RandoCheckId check) {
+    nlohmann::json entry = { { "name", CheckName(check) }, { "type", "" }, { "area", "" }, { "vanilla", "" } };
+    const auto staticCheck = Rando::StaticData::Checks.find(check);
+    if (staticCheck == Rando::StaticData::Checks.end()) {
+        return entry;
+    }
+    entry["type"] = CheckType(staticCheck->second);
+    entry["area"] = Ship_GetSceneName(staticCheck->second.sceneId);
+    entry["vanilla"] = ItemName(staticCheck->second.randoItemId);
+    return entry;
+}
+
+std::string ReadableText(const std::string& bytes) {
+    static const char* const kButtons[] = { "A",    "B",      "C",      "L",       "R",        "Z",
+                                            "C-Up", "C-Down", "C-Left", "C-Right", "Z-Target", "Control Stick" };
+    std::string text;
+    for (size_t i = 0; i < bytes.size(); i++) {
+        const uint8_t byte = static_cast<uint8_t>(bytes[i]);
+        if (byte == MESSAGE_END) {
+            break;
+        }
+        if (byte == MESSAGE_NEWLINE || byte == MESSAGE_BOX_BREAK || byte == MESSAGE_BOX_BREAK2) {
+            text += ' ';
+        } else if (byte == MESSAGE_SHIFT) {
+            i += 1;
+        } else if (byte >= MESSAGE_BOX_BREAK_DELAYED && byte <= MESSAGE_DELAY) {
+            i += 2;
+        } else if (byte >= MESSAGE_BTN_A && byte <= MESSAGE_CONTROL_PAD) {
+            text += kButtons[byte - MESSAGE_BTN_A];
+        } else if (byte >= ' ' && byte < 0x7F) {
+            text += static_cast<char>(byte);
+        }
+    }
+    std::string collapsed;
+    for (char character : text) {
+        if (character != ' ' || (!collapsed.empty() && collapsed.back() != ' ')) {
+            collapsed += character;
+        }
+    }
+    while (!collapsed.empty() && collapsed.back() == ' ') {
+        collapsed.pop_back();
+    }
+    return collapsed;
+}
+
+std::string NativeDescription(const RandoStaticItem& item) {
+    if (item.itemId == ITEM_NONE || sMessageTableNES == nullptr) {
+        return "";
+    }
+    const u16 textId = 0x1700 + item.itemId;
+    const MessageTableEntry* entry = OTRMessage_Find(sMessageTableNES, textId);
+    if (entry == nullptr || entry->textId != textId || entry->msgSize <= MESSAGE_HEADER_SIZE) {
+        return "";
+    }
+    std::string bytes(entry->segment + MESSAGE_HEADER_SIZE, entry->msgSize - MESSAGE_HEADER_SIZE);
+    const bool startsWithName = static_cast<uint8_t>(bytes.front()) > MESSAGE_COLOR_DEFAULT &&
+                                static_cast<uint8_t>(bytes.front()) <= MESSAGE_COLOR_ORANGE;
+    const size_t nameEnd = bytes.find(static_cast<char>(MESSAGE_NEWLINE));
+    if (startsWithName && nameEnd != std::string::npos) {
+        bytes.erase(0, nameEnd + 1);
+    }
+    return ReadableText(bytes);
+}
+
+std::string Description(RandoItemId item, const RandoStaticItem& staticItem) {
+    const char* key = RandoItems_GetKey(item);
+    if (key == nullptr) {
+        return NativeDescription(staticItem);
+    }
+    const auto* definition = CustomItemRegistry_Find(key);
+    if (definition == nullptr || definition->pauseText == nullptr) {
+        return "";
+    }
+    std::string text = CustomMessage::RemoveColorCodes(definition->pauseText);
+    std::replace(text.begin(), text.end(), '&', ' ');
+    return ReadableText(text);
+}
+
 uint8_t MaxStartingCount(RandoItemId item) {
     const auto found = Rando::StaticData::MaxStartingItemsMap.find(item);
     return found != Rando::StaticData::MaxStartingItemsMap.end() ? found->second : 1;
 }
 
-// Every item the native Starting Items page offers, with the player's chosen count.
 nlohmann::json StartingItems() {
     const std::vector<RandoItemId> chosen = Rando::GetStartingItemsFromConfig();
     nlohmann::json items = nlohmann::json::array();
@@ -304,19 +432,22 @@ nlohmann::json FixedEntry(RandoCheckId check, RandoItemId item, bool hintable) {
     return entry;
 }
 
-// The combined goal replaces the player's own hunt settings in the seed's options.
 void ApplyComboOptions() {
-    RANDO_SAVE_OPTIONS[RO_SHUFFLE_TRIFORCE_PIECES] = sComboOptions.hunt ? RO_GENERIC_YES : RO_GENERIC_NO;
-    if (!sComboOptions.hunt) {
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_SONG_SUN] = RO_GENERIC_YES;
+    const bool arePiecesShuffled = sComboOptions.hunt || sComboOptions.totalPieces > 0;
+    RANDO_SAVE_OPTIONS[RO_SHUFFLE_TRIFORCE_PIECES] = arePiecesShuffled ? RO_GENERIC_YES : RO_GENERIC_NO;
+    RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED] = sComboOptions.hunt ? sComboOptions.required : 0;
+    if (sComboOptions.pieces < 0) {
         return;
     }
-    RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED] = sComboOptions.required;
-    if (sComboOptions.pieces >= 0) {
-        RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_MAX] = static_cast<uint32_t>(sComboOptions.pieces);
+    RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_MAX] = static_cast<uint32_t>(sComboOptions.pieces);
+    const uint32_t countable =
+        static_cast<uint32_t>(std::max(sComboOptions.hunt ? sComboOptions.pieces : sComboOptions.totalPieces, 0));
+    for (RandoOptionId option : { RO_ACCESS_MOON_TRIFORCE_COUNT, RO_MAJORA_SOUL_TRIFORCE_COUNT }) {
+        RANDO_SAVE_OPTIONS[option] = std::min(RANDO_SAVE_OPTIONS[option], countable);
     }
 }
 
-// The native generator's preparation up to its free fill, in a fresh save. Leaves the free pools behind.
 void PrepareSeed(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>& itemPool,
                  std::vector<RandoCheckId>& confinedChecks) {
     if (sLiveSave == nullptr) {
@@ -339,7 +470,6 @@ void PrepareSeed(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>&
             confinedChecks.push_back(check);
         }
     }
-    // GeneratePools leaves fewer items than checks; the native generator pads with junk the same way.
     while (itemPool.size() < checkPool.size()) {
         itemPool.push_back(RI_JUNK);
     }
@@ -348,21 +478,20 @@ void PrepareSeed(std::vector<RandoCheckId>& checkPool, std::vector<RandoItemId>&
 
 const char* const kExcludedChecksKey = "gRando.ExcludedChecks";
 const char* const kStartingItemsKey = "gRando.StartingItems";
-// Starting items the native list cannot hold (mod items and the like), named as the pool names them.
-// The fill and the oracle treat them as owned; Fleet delivers them once the file is played.
 const char* const kFleetStartingItemsKey = "fleet.startingItems";
 std::vector<std::string> sFleetStartingItems;
+std::optional<nlohmann::json> sPlayerSettings;
 
 void GiveOracleItem(const std::string& name) {
     const RandoItemId item = Rando::StaticData::GetItemIdFromDisplayName(name);
     if (RandoItems_IsModItem(item)) {
+        Rando::GiveKeyRingKeys(item);
         sOracleModItems.push_back(item);
     } else if (item != RI_UNKNOWN && item != RI_TRAP) {
         Rando::GiveItem(Rando::ConvertItem(item));
     }
 }
 
-// One pool copy per Fleet starting item leaves the pool; the fill pads the gap with junk.
 void RemoveFleetStartingItems(nlohmann::json& pool) {
     for (const std::string& name : sFleetStartingItems) {
         const auto found = std::find_if(pool.begin(), pool.end(),
@@ -373,7 +502,6 @@ void RemoveFleetStartingItems(nlohmann::json& pool) {
     }
 }
 
-// Every option lives in its CVar; excluded checks and starting items are config lists named by their tokens.
 nlohmann::json DumpSettings() {
     nlohmann::json settings = nlohmann::json::object();
     for (const auto& [id, option] : Rando::StaticData::Options) {
@@ -403,8 +531,6 @@ nlohmann::json DumpSettings() {
     return { { "settings", std::move(settings) } };
 }
 
-// The snapshot is authoritative: an absent exclusion list clears the local one. The lists stay in memory,
-// so the player's own config file is never rewritten.
 void RestoreSettings(const nlohmann::json& snapshot) {
     const nlohmann::json settings = snapshot.value("settings", nlohmann::json::object());
     std::vector<RandoCheckId> excluded;
@@ -440,6 +566,25 @@ void RestoreSettings(const nlohmann::json& snapshot) {
     }
 }
 
+void FinishRequest() {
+    if (sLiveSave != nullptr) {
+        gSaveContext = *sLiveSave;
+        sLiveSave.reset();
+    }
+    sSeedSave.reset();
+    if (sPlayerSettings.has_value()) {
+        RestoreSettings(*sPlayerSettings);
+        sPlayerSettings.reset();
+    }
+    Rando::OverrideExcludedChecks(std::nullopt);
+    Rando::OverrideStartingItems(std::nullopt);
+    sSeed = 0;
+    sComboOptions = {};
+    sOracleModItems.clear();
+    sFleetStartingItems.clear();
+    FleetCrossDungeon_Reset();
+}
+
 void InitRandoHeadless() {
     static bool initialized = false;
     if (initialized) {
@@ -461,12 +606,12 @@ void InitRandoHeadless() {
     }
     GameInteractor::Instance = new GameInteractor();
     ModMenu_LoadArchives();
+    OTRMessage_Init();
     ShipInit::Init(Rando::Logic::RegionGraphPath);
     ModApi_Init();
     Rando::StaticData::PopulateCheckNames();
 }
 
-// The cross-game entrance services; nullopt for any other request.
 std::optional<nlohmann::json> HandleCrossDungeonRequest(const std::string& request, const nlohmann::json& input) {
     if (request == "DumpCrossDungeonCatalogue") {
         return FleetCrossDungeon_DumpCatalogue(input);
@@ -510,9 +655,10 @@ char* FleetRando_DumpStaticData(void) {
 
     nlohmann::json checks = nlohmann::json::array();
     for (RandoCheckId check : checkPool) {
-        if (IsNamed(CheckName(check))) {
-            checks.push_back({ { "name", CheckName(check) } });
+        if (!IsNamed(CheckName(check))) {
+            continue;
         }
+        checks.push_back(CheckEntry(check));
     }
 
     nlohmann::json pool = nlohmann::json::array();
@@ -536,7 +682,6 @@ char* FleetRando_DumpStaticData(void) {
         if (fixedChecks.contains(id) || freeChecks.contains(id) || !IsNamed(CheckName(id))) {
             continue;
         }
-        // Unshuffled remains still gate the Moon, so the fill must credit them where they stand.
         const bool vanillaRemains =
             check.randoCheckType == RCTYPE_REMAINS && RANDO_SAVE_OPTIONS[RO_SHUFFLE_BOSS_REMAINS] == RO_GENERIC_NO;
         const bool vanillaCollection = !RANDO_SAVE_CHECKS[id].shuffled && (check.randoCheckType == RCTYPE_SKULL_TOKEN ||
@@ -568,6 +713,13 @@ char* FleetRando_DumpStaticData(void) {
                                  { "trickNames", Rando::StaticData::GetTrickNames(id) },
                                  { "weightClass", Rando::GetItemHintWeight(id) } };
         entry["displayName"] = DisplayName(id, item);
+        if (IsSong(id)) {
+            entry["song"] = true;
+        }
+        AddPickupVariant(entry, id);
+        if (const std::string description = Description(id, item); !description.empty()) {
+            entry["description"] = description;
+        }
         if (const char* replica = ReplicaKey(id); replica != nullptr) {
             entry["pairKey"] = replica;
         }
@@ -578,7 +730,6 @@ char* FleetRando_DumpStaticData(void) {
         items.push_back(std::move(entry));
     }
 
-    // Cross-game hints phrase MM checks the way MM's own gossip stones do.
     nlohmann::json locationHints = nlohmann::json::object();
     for (const auto& [id, check] : Rando::StaticData::Checks) {
         if (IsNamed(CheckName(id))) {
@@ -626,7 +777,6 @@ void FleetRando_SetOwnedItems(const char* itemsJson) {
     }
 }
 
-// GlitchlessLogic's fixpoint without placing anything: regions and events unlock each other until both settle.
 char* FleetRando_GetReachableChecks(void) {
     RandoSeedGenerationScope modApiScope;
     for (const RandoItemId item : sOracleModItems) {
@@ -691,6 +841,10 @@ char* FleetRando_Request(const char* op, const char* json) {
     if (request == "RuntimeCycleSmoke") {
         return CopyString(FleetRuntime_CycleSmoke().dump());
     }
+    if (request == "CatchUpParked") {
+        FleetRuntime_CatchUpParked();
+        return CopyString("{}");
+    }
     if (request == "DumpSettingDefinitions") {
         auto definitions = nlohmann::json::array();
         for (const auto& [id, option] : Rando::StaticData::Options) {
@@ -740,6 +894,28 @@ char* FleetRando_Request(const char* op, const char* json) {
                 case RO_ACCESS_MAJORA_REMAINS_COUNT:
                 case RO_ACCESS_MOON_REMAINS_COUNT:
                     entry["max"] = 4;
+                    break;
+                case RO_ACCESS_MOON_TRIFORCE_COUNT:
+                case RO_MAJORA_SOUL_TRIFORCE_COUNT:
+                    entry["max"] = 100;
+                    break;
+                case RO_SHUFFLE_MAJORA_SOUL:
+                    choices = &majoraSoulOptions;
+                    break;
+                case RO_MAJORA_SOUL_STONE_COUNT:
+                    entry["max"] = 3;
+                    break;
+                case RO_MAJORA_SOUL_MEDALLION_COUNT:
+                    entry["max"] = 6;
+                    break;
+                case RO_MAJORA_SOUL_REWARD_COUNT:
+                    entry["max"] = 13;
+                    break;
+                case RO_MAJORA_SOUL_DUNGEON_COUNT:
+                    entry["max"] = 4;
+                    break;
+                case RO_MAJORA_SOUL_TOKEN_COUNT:
+                    entry["max"] = 60;
                     break;
                 case RO_STARTING_HEALTH:
                     entry["min"] = 1;
@@ -803,14 +979,11 @@ char* FleetRando_Request(const char* op, const char* json) {
         }
         return CopyString("{}");
     }
-    // Fleet's own confirmations (a seed dropped on the window) in the game the player is looking at.
     if (request == "Notify") {
         Notification::Emit({ .message = input.value("message", std::string{}) });
         Audio_PlaySfx(NA_SE_SY_QUIZ_CORRECT);
         return CopyString("{}");
     }
-    // Fleet's item test: every randomizer item this game can hand out, by pool name. The session's stand-ins for
-    // the other game's items ("fleet:" keys) are its owner's to draw, not this game's.
     if (request == "ListItems") {
         nlohmann::json items = nlohmann::json::array();
         for (const auto& [id, item] : Rando::StaticData::Items) {
@@ -838,12 +1011,13 @@ char* FleetRando_Request(const char* op, const char* json) {
         return CopyString("{}");
     }
     if (request == "SetComboOptions") {
+        const int pieces = std::clamp(input.value("pieces", -1), -1, 100);
         sComboOptions = { .hunt = input.value("hunt", false),
                           .required = static_cast<uint32_t>(std::clamp(input.value("required", 0), 0, 100)),
-                          .pieces = std::clamp(input.value("pieces", -1), -1, 100) };
+                          .pieces = pieces,
+                          .totalPieces = std::clamp(input.value("totalPieces", pieces), -1, 100) };
         return CopyString("{}");
     }
-    // A saved seed's prices win over this preparation's rolls, so wallet logic judges what the player pays.
     if (request == "SetCheckPrices") {
         if (sSeedSave == nullptr) {
             return nullptr;
@@ -867,17 +1041,21 @@ char* FleetRando_Request(const char* op, const char* json) {
         return CopyString("{}");
     }
     if (request == "RestoreSettings") {
+        if (!sPlayerSettings.has_value()) {
+            sPlayerSettings = DumpSettings();
+        }
         RestoreSettings(input.is_object() ? input : nlohmann::json::object());
         return CopyString("{}");
     }
+    if (request == "ItemTextboxIcon") {
+        const auto item = input.find("item");
+        const bool isNamed = item != input.end() && item->is_string();
+        const char* path =
+            isNamed ? FleetItemDraw_TextboxIconPath(item->get_ref<const std::string&>().c_str()) : nullptr;
+        return CopyString(nlohmann::json{ { "path", path != nullptr ? path : "" } }.dump());
+    }
     if (request == "Finish") {
-        if (sLiveSave != nullptr) {
-            gSaveContext = *sLiveSave;
-            sLiveSave.reset();
-        }
-        sSeedSave.reset();
-        Rando::OverrideExcludedChecks(std::nullopt);
-        Rando::OverrideStartingItems(std::nullopt);
+        FinishRequest();
         return CopyString("{}");
     }
     try {
@@ -907,7 +1085,9 @@ void FleetRando_ApplyCombinedSave(const nlohmann::json& seed) {
     const auto goal = seed.at("goal");
     sComboOptions.hunt = goal.value("type", "bosses") == "triforceHunt";
     sComboOptions.required = goal.value("requiredPieces", 0u);
-    sComboOptions.pieces = goal.value("totalPieces", 0) / 2;
+    const int totalPieces = sComboOptions.hunt ? goal.value("totalPieces", 0) : goal.value("pieces", 0);
+    sComboOptions.pieces = totalPieces / 2;
+    sComboOptions.totalPieces = totalPieces;
     Rando::MiscBehavior::PersistSeedOptions(sSeed);
     ApplyComboOptions();
     Ship_Random_Seed(sSeed);

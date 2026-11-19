@@ -162,7 +162,6 @@ static void LocatePortArchive() {
                               portArchiveVersion.patch == gBuildVersionPatch;
 }
 
-// Runs in the window Fleet opened, with 2ship's own resources registered beside the other game's.
 static Ship::Context* JoinFleetContext() {
     Ship::Context* context = Ship::Context::GetRawInstance();
     FleetGame_JoinHostContext();
@@ -234,7 +233,6 @@ OTRGlobals::OTRGlobals() {
     previousImGuiScaleIndex = -1;
     previousImGuiScale = defaultImGuiScale;
     ScaleImGui();
-    // Fleet's backend already built the font atlas; the fonts added above need it rebuilt.
     if (hosted) {
         context->GetWindow()->GetGui()->RebuildFontTexture();
     }
@@ -314,7 +312,6 @@ extern std::shared_ptr<BenGui::BenMenu> mBenMenu;
 }
 
 void OTRGlobals::RunExtract(int argc, char* argv[]) {
-    // Inside Fleet the archives come with 2ship's install, already checked when Fleet attached it.
     if (FleetGame_IsHosted()) {
         return;
     }
@@ -1105,7 +1102,8 @@ extern "C" void SaveManager_ThreadPoolWait() {
 }
 
 extern "C" void DeinitOTR() {
-    if (Anchor::Instance != nullptr) Anchor::Instance->Disable();
+    if (Anchor::Instance != nullptr)
+        Anchor::Instance->Disable();
     SDLNet_Quit();
     SaveManager_ThreadPoolWait();
     OTRAudio_Exit();
@@ -1120,7 +1118,6 @@ extern "C" void DeinitOTR() {
     benFast3dWindow = nullptr;
 
     OTRGlobals::Instance->context = nullptr;
-    // Fleet owns the Context it hosts 2ship in.
     if (FleetGame_IsHosted()) {
         FleetGame_LeaveHostContext();
     } else {
@@ -1584,7 +1581,6 @@ extern "C" char* ResourceMgr_LoadPlayerAnimByName(const char* animPath) {
 }
 
 // An OPAM resource is a raw s16 payload, not a PlayerAnimationHeader: casting it would read frame 0 as the header.
-// The wrapper is cached for the session so the returned pointer stays valid.
 extern "C" PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeader(const char* animPath) {
     constexpr size_t S16PerFrame = 67;
 
@@ -1637,7 +1633,8 @@ std::unordered_map<std::string, std::unordered_map<std::string, GfxPatch>> origi
 // using OTRs instead (When that is available). Index can be found using the commented out section below.
 extern "C" void ResourceMgr_PatchGfxByName(const char* path, const char* patchName, int index, Gfx instruction) {
     auto resource = Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path);
-    if (resource == nullptr || resource->GetInitData()->Type != static_cast<uint32_t>(Fast::ResourceType::DisplayList)) {
+    if (resource == nullptr ||
+        resource->GetInitData()->Type != static_cast<uint32_t>(Fast::ResourceType::DisplayList)) {
         return;
     }
     auto res = std::static_pointer_cast<Fast::DisplayList>(resource);
@@ -1784,7 +1781,6 @@ extern "C" u8* ResourceMgr_LoadArrayByNameAsU8(const char* path, u8* buffer) {
     return buffer;
 }
 
-// Widens an s16 vertex Array resource to collision vertices (Vec3i).
 // mallocs a new buffer that must be freed by the caller.
 extern "C" Vec3i* ResourceMgr_LoadArrayByNameAsVec3i(const char* path) {
     auto res = std::static_pointer_cast<SOH::Array>(GetResourceByName(path));
@@ -2473,19 +2469,24 @@ extern "C" bool Ship_HandleConsoleCrashAsReset() {
 }
 
 extern "C" bool OTRAudio_LockRegistry(void) {
-    if (audio.thread.get_id() == std::this_thread::get_id()) return false;
+    if (audio.thread.get_id() == std::this_thread::get_id())
+        return false;
     audio.mutex.lock();
     return true;
 }
-extern "C" void OTRAudio_UnlockRegistry(void) { audio.mutex.unlock(); }
+extern "C" void OTRAudio_UnlockRegistry(void) {
+    audio.mutex.unlock();
+}
 
 extern "C" void ModApi_InitializeRuntime(void) {
     static bool initialized = false;
-    if (initialized) return;
+    if (initialized)
+        return;
     initialized = true;
     ModApi_Init();
     SceneDB_Init();
     DungeonRegistry_Load();
     S2H::Unbound::LoadCustomActors();
-    if (CVarGetInteger("gNetwork.Anchor.Enabled", 0)) Anchor::Instance->Enable();
+    if (CVarGetInteger("gNetwork.Anchor.Enabled", 0))
+        Anchor::Instance->Enable();
 }

@@ -49,7 +49,6 @@ typedef struct {
     /* 0x4 */ s16 angle;
 } VecPolar; // size = 0x8
 
-// 2S2H [Unbound] positions are f32 (world extent); sizes stay s16 since overlays step them through s16*
 typedef struct {
     /* 0x0 */ Vec3f center;
     /* 0xC */ s16   radius;

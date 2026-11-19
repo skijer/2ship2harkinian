@@ -27,7 +27,6 @@ static_assert(kPassages[0].mm == ENTRANCE(ROAD_TO_IKANA, 0) && kPassages[1].mm =
               kPassages[2].mm == ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 0) &&
               kPassages[3].mm == ENTRANCE(WOODS_OF_MYSTERY, 0));
 
-// Mountain Village thaws into its own scene; both seasons keep the passage beside the same spawn.
 bool IsPassageScene(size_t passage, s16 scene) {
     switch (passage) {
         case 0:
@@ -44,7 +43,6 @@ bool IsPassageScene(size_t passage, s16 scene) {
 }
 
 constexpr float kTriggerRadius = 20.0f;
-// A player who arrives beside the hole must step this far away before it can take them back.
 constexpr float kArmRadius = 70.0f;
 
 struct PassageHole {
@@ -92,7 +90,6 @@ void UpdateHole(Actor* actor, PlayState* play) {
     }
 }
 
-// Dry floor at the spawn's own height, beside its approach rather than on it.
 std::optional<Vec3f> FindHoleSpot(PlayState* play, const ActorEntry& spawn) {
     const float forwardX = Math_SinS(spawn.rot.y);
     const float forwardZ = Math_CosS(spawn.rot.y);

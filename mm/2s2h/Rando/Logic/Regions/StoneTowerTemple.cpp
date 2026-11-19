@@ -434,6 +434,9 @@ static RegisterShipInitFunc initFunc([]() {
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_CANYON, 15),                        ONE_WAY_EXIT, true),
         },
+        .events = {
+            EVENT(RE_CLEARED_STONE_TOWER_TEMPLE, CanKillEnemy(ACTOR_BOSS_02)),
+        },
         .oneWayEntrances = {
             ENTRANCE(TWINMOLDS_LAIR, 0), // Blue warp exit
         }

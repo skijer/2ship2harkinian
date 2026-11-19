@@ -12,10 +12,6 @@ extern PlayState* gPlayState;
 extern s16 D_801CFF94[250];
 }
 
-/**
- * GIVE_ITEM
- */
-
 void Anchor::SendPacket_GiveItem(u16 modId, s16 getItemId, std::string targetTeamId) {
     if (!IsSaveLoaded() || !roomState.syncItemsAndFlags || isProcessingIncomingPacket) {
         return;

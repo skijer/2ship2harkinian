@@ -58,7 +58,6 @@ void Rando::MiscBehavior::PersistSeedOptions(uint32_t finalSeed) {
         RANDO_SAVE_OPTIONS[RO_SKULLTULA_TOKENS_REQUIRED] = SPIDER_HOUSE_TOKENS_REQUIRED;
     }
 
-    // Starting with every Stray Fairy means the Great Fairies always have their full set
     if (RANDO_SAVE_OPTIONS[RO_PLACEMENT_STRAY_FAIRIES] == RO_DUNGEON_ITEM_START_WITH) {
         RANDO_SAVE_OPTIONS[RO_STRAY_FAIRIES_REQUIRED] = STRAY_FAIRY_SCATTERED_TOTAL;
     }

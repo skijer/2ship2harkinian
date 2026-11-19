@@ -27,21 +27,30 @@ std::map<TrapTypes, const char*> trapToCvarMap = {
     { TRAP_KNOCKBACK, "gRando.Traps.Knockback" }
 };
 
-std::vector<TrapTypes> getEnabledTrapTypes() {
+static void (*sModTrapEffect)(void) = nullptr;
+
+static std::vector<TrapTypes> GetEnabledTrapTypes() {
     std::vector<TrapTypes> enabledTrapTypes;
     for (auto& trap : trapToCvarMap) {
         if (CVarGetInteger(trap.second, 0)) {
             enabledTrapTypes.push_back(trap.first);
         }
     }
-    if (enabledTrapTypes.size() == 0) {
-        enabledTrapTypes.push_back(TRAP_FREEZE);
-    }
     return enabledTrapTypes;
-};
+}
 
 int RollTrapType() {
-    auto enabledTraps = getEnabledTrapTypes();
+    std::vector<TrapTypes> enabledTraps = GetEnabledTrapTypes();
+    uint32_t candidateCount = static_cast<uint32_t>(enabledTraps.size());
+    sModTrapEffect = nullptr;
+    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnTrapRoll>(&candidateCount, &sModTrapEffect);
+    if (sModTrapEffect != nullptr) {
+        roll = TRAP_MAX;
+        return roll;
+    }
+    if (enabledTraps.empty()) {
+        enabledTraps.push_back(TRAP_FREEZE);
+    }
     roll = enabledTraps[rand() % enabledTraps.size()];
     return roll;
 }
@@ -144,6 +153,10 @@ std::string GetTrapMessage() {
 
 void Rando::MiscBehavior::OfferTrapItem() {
     if (!gPlayState) {
+        return;
+    }
+    if (sModTrapEffect != nullptr) {
+        GameInteractor::Instance->events.emplace_back(GIEventTrap{ .action = sModTrapEffect });
         return;
     }
 

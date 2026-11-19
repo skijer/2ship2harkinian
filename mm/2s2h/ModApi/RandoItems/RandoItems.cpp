@@ -9,6 +9,7 @@
 
 #include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
 #include "2s2h/ModApi/RandoOptions/RandoOptions.h"
+#include "2s2h/Rando/Rando.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "ShipUtils.h"
 
@@ -34,7 +35,6 @@ struct ModItem {
     uint16_t flag;
 };
 
-// Deque: the item table keeps the key pointers of every row it was handed.
 std::deque<ModItem> sItems;
 std::unordered_map<std::string, size_t> sKeysToIndex;
 std::unordered_map<int32_t, size_t> sRandoItemsToIndex;
@@ -70,6 +70,9 @@ const S2HCustomItemRandomizer* GetRandomizerBlock(const ModItem& item) {
 }
 
 RandoItemType GetItemType(const S2HCustomItemRandomizer& block) {
+    if (block.keyRing != nullptr) {
+        return RITYPE_SMALL_KEY;
+    }
     const bool isAdvancement = (block.flags & S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT) != 0;
     return isAdvancement ? RITYPE_MAJOR : RITYPE_LESSER;
 }
@@ -80,7 +83,6 @@ void BuildRow(const ModItem& item) {
         SPDLOG_ERROR("Randomizer item {} lost its definition", item.key);
         return;
     }
-    // Mod items have no vanilla ItemId, GetItemId or draw id: their name and icon come from the custom item registry.
     Rando::StaticData::Items[static_cast<RandoItemId>(item.randoItem)] = { static_cast<RandoItemId>(item.randoItem),
                                                                            item.key.c_str(),
                                                                            "",
@@ -89,6 +91,39 @@ void BuildRow(const ModItem& item) {
                                                                            ITEM_NONE,
                                                                            GI_NONE,
                                                                            GID_NONE };
+}
+
+RandoItemId GetSmallKey(uint8_t dungeon) {
+    switch (dungeon) {
+        case DUNGEON_SCENE_INDEX_WOODFALL_TEMPLE:
+            return RI_WOODFALL_SMALL_KEY;
+        case DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE:
+            return RI_SNOWHEAD_SMALL_KEY;
+        case DUNGEON_SCENE_INDEX_GREAT_BAY_TEMPLE:
+            return RI_GREAT_BAY_SMALL_KEY;
+        case DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE:
+            return RI_STONE_TOWER_SMALL_KEY;
+        default:
+            SPDLOG_ERROR("Key ring names unknown dungeon {}", dungeon);
+            return RI_UNKNOWN;
+    }
+}
+
+bool IsKeyRingInSeed(const ModItem& item, const S2HKeyRing& keyRing) {
+    const uint32_t placement = RANDO_SAVE_OPTIONS[RO_PLACEMENT_SMALL_KEYS];
+    if (placement == RO_DUNGEON_ITEM_START_WITH || placement == RO_DUNGEON_ITEM_VANILLA) {
+        return false;
+    }
+    return keyRing.isShuffled == nullptr ||
+           keyRing.isShuffled(item.key.c_str(), gSaveContext.save.shipSaveInfo.rando.finalSeed);
+}
+
+void AddKeyRingToPool(const ModItem& item, const S2HKeyRing& keyRing, std::vector<RandoItemId>& itemPool) {
+    if (!IsKeyRingInSeed(item, keyRing)) {
+        return;
+    }
+    std::erase(itemPool, GetSmallKey(keyRing.dungeon));
+    itemPool.push_back(static_cast<RandoItemId>(item.randoItem));
 }
 
 S2HRandoInfBank GetActiveBank() {
@@ -193,6 +228,10 @@ void RandoItems_AddToPool(std::vector<RandoItemId>& itemPool) {
         if (block == nullptr) {
             continue;
         }
+        if (block->keyRing != nullptr) {
+            AddKeyRingToPool(item, *block->keyRing, itemPool);
+            continue;
+        }
         if (block->poolModeOption != nullptr) {
             const bool match = RandoOptions_GetForSeed(block->poolModeOption) == block->poolModeValue;
             if (match == block->poolModeInvert) {
@@ -229,11 +268,16 @@ void RandoItems_Remove(RandoItemId randoItemId) {
     RandoItems_SetOwned(randoItemId, GetActiveBank(), false);
 }
 
-// The registry owns the real state, so a logic simulation starts from it rather than from the flags alone.
 void RandoItems_SeedLogicBank() {
     for (const ModItem& item : sItems) {
         RandoInfCustom_Set(S2H_RANDO_INF_LOGIC, item.flag, CustomItemRegistry_IsOwned(item.key.c_str()));
     }
+}
+
+const S2HKeyRing* RandoItems_GetKeyRing(RandoItemId randoItemId) {
+    const ModItem* item = Find(randoItemId);
+    const S2HCustomItemRandomizer* block = item != nullptr ? GetRandomizerBlock(*item) : nullptr;
+    return block != nullptr ? block->keyRing : nullptr;
 }
 
 const char* RandoItems_GetIconPath(RandoItemId randoItemId) {
@@ -272,9 +316,12 @@ void RandoItems_Draw(RandoItemId randoItemId) {
     vertices[2] = VTX(-half, -half, 0, 0, 32 << 5, 255, 255, 255, 255);
     vertices[3] = VTX(half, -half, 0, 32 << 5, 32 << 5, 255, 255, 255, 255);
 
-    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATERGBA, G_CC_MODULATERGBA);
-    gDPLoadTextureBlock(POLY_XLU_DISP++, icon, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
-                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+    // Setup DL 25 is lit and two-cycle: the corners carry colours, not normals, and a second texel read is stale.
+    gSPClearGeometryMode(POLY_XLU_DISP++, G_CULL_BOTH | G_LIGHTING);
+    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_PASS2);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPLoadTextureBlock(POLY_XLU_DISP++, icon, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0, G_TX_CLAMP, G_TX_CLAMP,
+                        G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
     gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(vertices), 4, 0);
     gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 1, 3, 2, 0);
 

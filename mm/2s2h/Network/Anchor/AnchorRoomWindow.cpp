@@ -43,7 +43,6 @@ void AnchorRoomWindow::DrawElement() {
         return;
     }
 
-    // First build a list of teams
     std::set<std::string> teams;
     for (auto& [clientId, client] : Anchor::Instance->clients) {
         teams.insert(client.teamId);

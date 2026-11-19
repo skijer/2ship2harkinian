@@ -250,7 +250,7 @@ typedef struct Inventory {
     /* 0x48 */ u32 upgrades;                            // "non_equip_register" some bits are wallet upgrades
     /* 0x4C */ u32 questItems;                          // "collect_register"
     /* 0x50 */ u8 dungeonItems[10];                     // "key_compass_map"
-    /* 0x5A */ s8 dungeonKeys[10];                      // "key_register", plus Unbound context
+    /* 0x5A */ s8 dungeonKeys[10];                      // "key_register"
     /* 0x63 */ s8 defenseHearts;
     /* 0x64 */ s8 strayFairies[10];                     // "orange_fairy"
     // 2S2H [Comment] These char[] are not null-terminated, they will not work correctly in string functions
@@ -267,7 +267,7 @@ typedef struct RespawnData {
     /* 0x00 */ Vec3f pos;
     /* 0x0C */ s16 yaw;
     /* 0x0E */ s16 playerParams;
-    /* 0x10 */ u32 entrance; // 2S2H [Unbound] 32-bit like every entrance
+    /* 0x10 */ u32 entrance;
     /* 0x12 */ u16 roomIndex;
     /* 0x13 */ s8 data;
     /* 0x14 */ u32 tempSwitchFlags;
@@ -614,7 +614,6 @@ int32_t DungeonRegistry_KeyIndex(int32_t scene);
 uint32_t DungeonRegistry_ResolveEntrance(uint32_t entrance);
 
 #define DUNGEON_KEY_COUNT(dungeonSceneIndex) (gSaveContext.save.saveInfo.inventory.dungeonKeys[(void)0, dungeonSceneIndex])
-// 2S2H [Unbound] Scene flags of a scene id, vanilla or custom (custom ones live outside the Save struct).
 s32 SceneFlags_GetRoomVisited(s16 sceneId, s32 room);
 void SceneFlags_SetRoomVisited(s16 sceneId, s32 room);
 void SceneFlags_ClearRoomVisited(s16 sceneId, s32 room);

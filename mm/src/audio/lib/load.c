@@ -1263,7 +1263,8 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
     memset(&gAudioCtx.seqLoadStatus[seqListSize], LOAD_STATUS_PERMANENT, customSeqListSize);
     for (size_t i = 0; i < seqListSize; i++) {
         SequenceData sDat = ResourceMgr_LoadSeqByName(seqList[i]);
-        if (!UnboundAudio_GrowSequenceMap((uint32_t)sDat.seqNumber + 1)) continue;
+        if (!UnboundAudio_GrowSequenceMap((uint32_t)sDat.seqNumber + 1))
+            continue;
         gSequenceMap[sDat.seqNumber] = strdup(seqList[i]);
         gAudioCtx.seqLoadStatus[sDat.seqNumber] = 0;
         seqCachePolicyMap[sDat.seqNumber] = sDat.cachePolicy;
@@ -1340,11 +1341,13 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
             seqNum++;
         }
 
-        if (seqNum >= UINT16_MAX) continue;
+        if (seqNum >= UINT16_MAX)
+            continue;
         AudioCollection_AddToCollection(customSeqList[j], seqNum);
 
         sDat->seqNumber = seqNum;
-        if (!UnboundAudio_GrowSequenceMap((uint32_t)sDat->seqNumber + 1)) continue;
+        if (!UnboundAudio_GrowSequenceMap((uint32_t)sDat->seqNumber + 1))
+            continue;
         gSequenceMap[sDat->seqNumber] = strdup(customSeqList[j]);
         gAudioCtx.seqLoadStatus[sDat->seqNumber] = LOAD_STATUS_PERMANENT;
         seqNum++;

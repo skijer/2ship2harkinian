@@ -1324,7 +1324,6 @@ static u16 sOwlWarpEntrances[OWL_WARP_MAX - 1] = {
     ENTRANCE(STONE_TOWER, 3),              // OWL_WARP_STONE_TOWER
 };
 
-// 2S2H [Fleet] The per-session state file select resets when it starts gameplay from an opened save.
 void Sram_PrepareLoadedSave(void) {
     s32 i;
 
@@ -1982,7 +1981,6 @@ void Sram_CopySave(FileSelectState* fileSelect2, SramContext* sramCtx) {
     gSaveContext.flashSaveAvailable = D_801F6AF2;
 }
 
-// 2S2H [Fleet] A new save in gSaveContext only, written later like any other; file select and Fleet both start here.
 void Sram_InitNamedSave(s32 fileNum, const u8* playerName) {
     s32 i;
 

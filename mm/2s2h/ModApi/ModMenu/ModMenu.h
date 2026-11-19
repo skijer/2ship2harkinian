@@ -37,7 +37,6 @@ typedef struct {
     float minFloat;
     float maxFloat;
     S2HModMenuCallback onChange;
-    // Combobox entries; the cvar holds the chosen index.
     const char* const* values;
     uint32_t valueCount;
 } S2HModMenuWidget;

@@ -104,7 +104,6 @@ std::vector<const S2HCustomEquipDefinition*> GetOwnedPieces(uint8_t slot) {
     return pieces;
 }
 
-// Walks vanilla -> each wearable piece in registration order -> vanilla, so one button reaches every piece.
 void CycleSlotPiece(uint8_t slot) {
     const std::vector<const S2HCustomEquipDefinition*> pieces = GetOwnedPieces(slot);
     const char* wornKey = CustomEquipRegistry_GetWorn(slot);
@@ -132,11 +131,12 @@ void CycleSlotPiece(uint8_t slot) {
 
 void DescribeWornPiece(PlayState* play, uint8_t slot) {
     const S2HCustomEquipDefinition* worn = CustomEquipRegistry_Find(CustomEquipRegistry_GetWorn(slot));
-    if (worn == nullptr || worn->pauseText == nullptr) {
+    if (worn == nullptr) {
         return;
     }
     S2HCustomItemDefinition description = {};
     description.pauseText = worn->pauseText;
+    description.getItemText = worn->getItemText;
     KaleidoItemManager_OpenPauseDescription(play, &description, play->pauseCtx.cursorYIndex[PAUSE_QUEST]);
 }
 
@@ -220,7 +220,6 @@ void KaleidoEquipManager_Init(void) {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveLoad>([](s16) { sShownPage.reset(); });
 }
 
-// C-Right steps the cursor's sword or shield through the owned custom pieces, and C-Up describes the worn one.
 void KaleidoEquipManager_Update(PlayState* play) {
     const PauseContext* pauseCtx = &play->pauseCtx;
     const std::optional<uint8_t> slot = GetQuestPointSlot(pauseCtx->cursorPoint[PAUSE_QUEST]);

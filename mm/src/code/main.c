@@ -51,7 +51,6 @@ size_t gSystemHeapSize = 0;
 void InitOTR(int argc, char* argv[]);
 void Heaps_Free(void);
 
-// Entered from the launcher (mm/launcher/main.c); argv is UTF-8 on every platform.
 int S2H_RunMain(int argc, char* argv[]) {
     intptr_t fb;
     intptr_t sysHeap;
@@ -60,8 +59,7 @@ int S2H_RunMain(int argc, char* argv[]) {
 
     const bool hosted = FleetGame_IsHosted();
 
-// Attach console for windows so we can conditionally display it when running the extractor.
-// Inside Fleet the console and the locale are Fleet's.
+// Attach console for windows so we can conditionally display it when running the extractor
 #ifdef _WIN32
     if (!hosted) {
         AllocConsole();

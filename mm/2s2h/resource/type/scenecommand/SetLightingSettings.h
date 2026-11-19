@@ -5,7 +5,6 @@
 #include <libultraship/libultra/types.h>
 
 namespace SOH {
-// 2S2H [Unbound] mirrors WorldFog in z64light.h
 typedef struct {
     /* 0x0 */ f32 fogStart;
     /* 0x4 */ f32 fogEnd;
@@ -13,7 +12,6 @@ typedef struct {
     /* 0xC */ f32 nearPlane;
 } WorldFog; // size = 0x10
 
-// Mirrors EnvLightSettings in z64environment.h (static_asserts in z_scene_2SH.cpp)
 typedef struct {
     /* 0x00 */ u8 ambientColor[3];
     /* 0x03 */ s8 light1Dir[3];

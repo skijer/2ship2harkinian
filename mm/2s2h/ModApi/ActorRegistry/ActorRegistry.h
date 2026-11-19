@@ -32,12 +32,10 @@ typedef struct {
     S2HActorFunc destroy;
     S2HActorFunc update;
     S2HActorFunc draw;
-    // Clears the mod's static state once the last instance is gone, like the port's vanilla actors.
     S2HActorResetFunc reset;
     uint32_t enemyFlags;
     int16_t enemyParams;
     int16_t enemySpawnHeight;
-    // Tatl's line when C-up is pressed on the targeted actor; Ship's name kept for shared mod sources.
     const char* naviHint;
 } S2HActorDefinition;
 
@@ -57,7 +55,6 @@ typedef struct {
     int16_t spawnHeight;
 } S2HCustomEnemy;
 
-// A registered key returns its runtime id; vanilla actors answer to their debug name ("En_Torch2").
 int16_t ActorRegistry_Register(const S2HActorDefinition* definition);
 int16_t ActorRegistry_GetId(const char* key);
 int16_t ActorRegistry_FindCustomId(const char* key);
@@ -71,7 +68,6 @@ const S2HCustomEnemy* ActorRegistry_FindEnemyById(int16_t actorId);
 #include <string>
 #include <vector>
 
-// Every actor type a mod registered, with the mod that registered it.
 struct S2HRegisteredActor {
     std::string key;
     std::string owner;

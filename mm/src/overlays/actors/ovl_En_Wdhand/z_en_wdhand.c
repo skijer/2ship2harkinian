@@ -292,7 +292,6 @@ void EnWdhand_SetTransform(EnWdhand* this, s32 limbIndex, s32 arg2, Vec3f* trans
     currentMatrix->mf[3][2] = translation->z;
 }
 
-
 s16 EnWdhand_GetLimbXRotation(EnWdhand* this, s32 limbIndex) {
     return this->limbRotations[limbIndex].z * Math_SinF((this->timer - limbIndex * 20) * (M_PIf / 40));
 }

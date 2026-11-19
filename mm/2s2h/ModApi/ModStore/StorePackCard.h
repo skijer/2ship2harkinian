@@ -5,7 +5,6 @@
 #include <string>
 #include <imgui.h>
 
-// Presentation only: activation uses ImGui's selectable so mouse and keyboard behave alike.
 namespace StorePackCard {
 
 constexpr int TitleLines = 3;
@@ -127,7 +126,6 @@ inline const char* FindLineEnd(const Layout& layout, const char* line, const cha
     if (wrap > line) {
         return wrap;
     }
-    // A single glyph wider than the card would never advance: take one whole character anyway.
     wrap = line + 1;
     while (IsUtf8Continuation(*wrap)) {
         ++wrap;
@@ -173,9 +171,7 @@ inline void DrawHoverTooltip(const Content& content, bool expanded) {
     ImGui::EndTooltip();
 }
 
-// Returns true on the frame the card is activated.
 inline bool Draw(const Content& content, bool expanded, float width) {
-    // Resets the previous table cell's text baseline before placing the card.
     ImGui::Dummy(ImVec2(0, 0));
     const Layout layout = MeasureLayout(width);
     const ImVec2 size(width, layout.end.y - layout.start.y);

@@ -2964,12 +2964,10 @@ void Player_SetCylinderForAttack(Player* this, u32 dmgFlags, s32 damage, s32 rad
     }
 }
 
-// 2S2H [Mods] `formHasIt` is vanilla's form test; mods lend the ability to other forms (OoT equipment).
 static bool Player_HasFormAbility(Player* this, SOHPlayerAbility ability, bool formHasIt) {
     return GameInteractor_Should(VB_PLAYER_USE_FORM_ABILITY, formHasIt, this, ability);
 }
 
-// A non-Zora form on Zora underwater boots (a mod's OoT iron boots) walks the bottom like on land.
 static bool Player_IsBottomWalking(Player* this) {
     return (this->transformation != PLAYER_FORM_ZORA) && (this->currentBoots >= PLAYER_BOOTS_ZORA_UNDERWATER) &&
            Player_HasFormAbility(this, SOH_PLAYER_ABILITY_BOTTOM_WALK, false);
@@ -2980,7 +2978,6 @@ static PlayerAnimationHeader* Player_GetSwimAnim(Player* this, PlayerAnimGroup l
     return Player_IsBottomWalking(this) ? D_8085BE84[landGroup][this->modelAnimType] : swimAnim;
 }
 
-// The underwater handler list has no grab or item handler; a bottom walker on the floor gets the ground's.
 static bool Player_TryBottomWalkActions(Player* this, PlayState* play) {
     return Player_IsBottomWalking(this) && (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) &&
            (Player_ActionHandler_2(this, play) || Player_ActionHandler_13(this, play));
@@ -6076,7 +6073,8 @@ void func_80833B18(PlayState* play, Player* this, s32 arg2, f32 speed, f32 veloc
                 this->speedXZ = 3.0f;
                 this->actor.velocity.y = 6.0f;
 
-                Player_Anim_PlayOnceFreeze(play, this, Player_ResolveAnim(PLAYER_ANIMGROUP_damage_run, this->modelAnimType));
+                Player_Anim_PlayOnceFreeze(play, this,
+                                           Player_ResolveAnim(PLAYER_ANIMGROUP_damage_run, this->modelAnimType));
                 Player_AnimSfx_PlayVoice(this, NA_SE_VO_LI_DAMAGE_S);
             } else {
                 this->actor.speed = speed;
@@ -7094,8 +7092,8 @@ s32 Player_ActionHandler_1(Player* this, PlayState* play) {
                     ((this->doorType != PLAYER_DOORTYPE_HANDLE) ||
                      (ENDOOR_GET_TYPE(doorActor) != ENDOOR_TYPE_FRAMED))) {
                     s16 roomNum = play->transitionActors.list[DOOR_GET_TRANSITION_ID(doorActor)]
-                                     .sides[(this->doorDirection > 0) ? 0 : 1]
-                                     .room;
+                                      .sides[(this->doorDirection > 0) ? 0 : 1]
+                                      .room;
 
                     if ((roomNum >= 0) && (roomNum != play->roomCtx.curRoom.num)) {
                         Room_RequestNewRoom(play, &play->roomCtx, roomNum);
@@ -7193,7 +7191,8 @@ void func_80836B3C(PlayState* play, Player* this, f32 arg2) {
 
     if (this->transformation == PLAYER_FORM_GORON) {
         func_80836AD8(play, this);
-        PlayerAnimation_Change(play, &this->skelAnime, Player_ResolveAnim(PLAYER_ANIMGROUP_landing_roll, this->modelAnimType),
+        PlayerAnimation_Change(play, &this->skelAnime,
+                               Player_ResolveAnim(PLAYER_ANIMGROUP_landing_roll, this->modelAnimType),
                                1.5f * sWaterSpeedFactor, 0.0f, 6.0f, ANIMMODE_ONCE, 0.0f);
     } else {
         PlayerAnimationHeader* anim = Player_ResolveAnim(PLAYER_ANIMGROUP_landing_roll, this->modelAnimType);
@@ -7789,7 +7788,6 @@ void func_8083827C(Player* this, PlayState* play) {
             return;
         }
 
-        // Without this the fall action rips the aim off Link every frame
         if ((Player_Action_43 == this->actionFunc) && GameInteractor_Should(VB_PLAYER_ALLOW_MIDAIR_AIM, false, this)) {
             return;
         }
@@ -7804,7 +7802,6 @@ void func_8083827C(Player* this, PlayState* play) {
             return;
         }
 
-        // OoT func_8083AA10: gravity nets the 1.0f out, and property 9 keeps the ledge hop from triggering.
         if (GameInteractor_Should(VB_PLAYER_WALK_ON_AIR, false, this)) {
             this->actor.velocity.y = 1.0f;
             sPrevFloorProperty = FLOOR_PROPERTY_9;
@@ -8241,7 +8238,6 @@ s32 Player_ActionHandler_13(Player* this, PlayState* play) {
                     Player_StopCutscene(this);
                     if (!(this->stateFlags1 & PLAYER_STATE1_800000)) {
                         Player_SetAction(play, this, Player_Action_43, 1);
-                        // Vanilla delays aim-camera control for 13 updates, which reads as a frozen camera in the air
                         this->av2.actionVar2 = GameInteractor_Should(VB_PLAYER_ALLOW_MIDAIR_AIM, false, this) ? 0 : 13;
                         func_80836D8C(this);
                         if (GameInteractor_Should(VB_PLAYER_ALLOW_MIDAIR_AIM, false, this)) {
@@ -9271,8 +9267,7 @@ void func_8083BB4C(PlayState* play, Player* this) {
         Audio_SetBaseFilter(0);
     } else {
         Audio_SetBaseFilter(0x20);
-        if (Player_HasFormAbility(this, SOH_PLAYER_ABILITY_WATER_BREATHING,
-                                  this->transformation == PLAYER_FORM_ZORA) ||
+        if (Player_HasFormAbility(this, SOH_PLAYER_ABILITY_WATER_BREATHING, this->transformation == PLAYER_FORM_ZORA) ||
             (sp1C < 10.0f)) {
             this->underwaterTimer = 0;
         } else if (this->underwaterTimer < 300) {
@@ -9496,7 +9491,6 @@ s32 func_8083C62C(Player* this, s32 arg1) {
 Vec3f D_8085D218 = { 0.0f, 100.0f, 40.0f };
 
 void func_8083C6E8(Player* this, PlayState* play) {
-    // The floor and fall look-down upkeep below would overwrite the focus rotation the airborne aim owns
     if ((this->unk_AA5 == PLAYER_UNKAA5_3) && GameInteractor_Should(VB_PLAYER_ALLOW_MIDAIR_AIM, false, this)) {
         return;
     }
@@ -10454,8 +10448,8 @@ void func_8083EE60(Player* this, PlayState* play) {
         f32 temp_fs0 = R_UPDATE_RATE / 2.0f;
 
         func_8083EA44(this, REG(35) / 1000.0f);
-        PlayerAnimation_LoadToJoint(play, &this->skelAnime, Player_ResolveAnim(PLAYER_ANIMGROUP_back_walk, this->modelAnimType),
-                                    this->unk_B38);
+        PlayerAnimation_LoadToJoint(play, &this->skelAnime,
+                                    Player_ResolveAnim(PLAYER_ANIMGROUP_back_walk, this->modelAnimType), this->unk_B38);
         this->unk_B34 += (1.0f * 1.0f) * temp_fs0;
         if (this->unk_B34 >= 1.0f) {
             this->unk_B34 = 1.0f;
@@ -10469,7 +10463,8 @@ void func_8083EE60(Player* this, PlayState* play) {
             func_8083EA44(this, ((REG(35)) / 1000.0f) + (((REG(36)) / 1000.0f) * this->speedXZ));
 
             PlayerAnimation_LoadToJoint(play, &this->skelAnime,
-                                        Player_ResolveAnim(PLAYER_ANIMGROUP_back_walk, this->modelAnimType), this->unk_B38);
+                                        Player_ResolveAnim(PLAYER_ANIMGROUP_back_walk, this->modelAnimType),
+                                        this->unk_B38);
         } else {
             var_fs0 = (REG(37) / 1000.0f) * temp_fv0;
             if (var_fs0 < 1.0f) {
@@ -10480,7 +10475,8 @@ void func_8083EE60(Player* this, PlayState* play) {
             }
 
             PlayerAnimation_LoadToMorph(play, &this->skelAnime,
-                                        Player_ResolveAnim(PLAYER_ANIMGROUP_back_walk, this->modelAnimType), this->unk_B38);
+                                        Player_ResolveAnim(PLAYER_ANIMGROUP_back_walk, this->modelAnimType),
+                                        this->unk_B38);
             PlayerAnimation_LoadToJoint(play, &this->skelAnime, &gPlayerAnim_link_normal_back_run,
                                         this->unk_B38 * (16.0f / 29.0f));
         }
@@ -10548,11 +10544,11 @@ void func_8083F358(Player* this, s32 arg1, PlayState* play) {
     Math_ScaledStepToS(&this->unk_B70, var_a1, 0x190);
     if ((this->modelAnimType == PLAYER_ANIMTYPE_3) || ((this->unk_B70 == 0) && (this->unk_AB8 <= 0.0f))) {
         if (!arg1) {
-            PlayerAnimation_LoadToJoint(play, &this->skelAnime, Player_ResolveAnim(PLAYER_ANIMGROUP_walk, this->modelAnimType),
-                                        this->unk_B38);
+            PlayerAnimation_LoadToJoint(play, &this->skelAnime,
+                                        Player_ResolveAnim(PLAYER_ANIMGROUP_walk, this->modelAnimType), this->unk_B38);
         } else {
-            PlayerAnimation_LoadToMorph(play, &this->skelAnime, Player_ResolveAnim(PLAYER_ANIMGROUP_walk, this->modelAnimType),
-                                        this->unk_B38);
+            PlayerAnimation_LoadToMorph(play, &this->skelAnime,
+                                        Player_ResolveAnim(PLAYER_ANIMGROUP_walk, this->modelAnimType), this->unk_B38);
         }
         return;
     }
@@ -10576,11 +10572,13 @@ void func_8083F358(Player* this, s32 arg1, PlayState* play) {
     }
 
     if (!arg1) {
-        PlayerAnimation_BlendToJoint(play, &this->skelAnime, Player_ResolveAnim(PLAYER_ANIMGROUP_walk, this->modelAnimType),
-                                     this->unk_B38, climbAnim, this->unk_B38, var_fv1, this->blendTableBuffer);
+        PlayerAnimation_BlendToJoint(play, &this->skelAnime,
+                                     Player_ResolveAnim(PLAYER_ANIMGROUP_walk, this->modelAnimType), this->unk_B38,
+                                     climbAnim, this->unk_B38, var_fv1, this->blendTableBuffer);
     } else {
-        PlayerAnimation_BlendToMorph(play, &this->skelAnime, Player_ResolveAnim(PLAYER_ANIMGROUP_walk, this->modelAnimType),
-                                     this->unk_B38, climbAnim, this->unk_B38, var_fv1, this->blendTableBuffer);
+        PlayerAnimation_BlendToMorph(play, &this->skelAnime,
+                                     Player_ResolveAnim(PLAYER_ANIMGROUP_walk, this->modelAnimType), this->unk_B38,
+                                     climbAnim, this->unk_B38, var_fv1, this->blendTableBuffer);
     }
 }
 
@@ -10593,8 +10591,8 @@ void func_8083F57C(Player* this, PlayState* play) {
 
         temp_fs0 = R_UPDATE_RATE / 2.0f;
         func_8083EA44(this, REG(35) / 1000.0f);
-        PlayerAnimation_LoadToJoint(play, &this->skelAnime, Player_ResolveAnim(PLAYER_ANIMGROUP_walk, this->modelAnimType),
-                                    this->unk_B38);
+        PlayerAnimation_LoadToJoint(play, &this->skelAnime,
+                                    Player_ResolveAnim(PLAYER_ANIMGROUP_walk, this->modelAnimType), this->unk_B38);
 
         // required
         this->unk_B34 += 1 * temp_fs0;
@@ -11075,7 +11073,8 @@ s32 func_80840A30(PlayState* play, Player* this, f32* arg2, f32 arg3) {
                         this->speedXZ *= 0.2f;
                     } else {
                         Player_SetAction(play, this, Player_Action_26, 0);
-                        Player_Anim_PlayOnce(play, this, Player_ResolveAnim(PLAYER_ANIMGROUP_hip_down, this->modelAnimType));
+                        Player_Anim_PlayOnce(play, this,
+                                             Player_ResolveAnim(PLAYER_ANIMGROUP_hip_down, this->modelAnimType));
                         this->av2.actionVar2 = 1;
                     }
                 }
@@ -11348,8 +11347,9 @@ void Player_InitCommon(Player* this, PlayState* play, FlexSkeletonHeader* skelHe
         ((gSaveContext.respawnFlag != 2) || (gSaveContext.respawn[RESPAWN_MODE_RETURN].playerParams !=
                                              PLAYER_PARAMS(0xFF, PLAYER_START_MODE_TELESCOPE)))) {
         func_808309CC(play, this);
-        SkelAnime_InitPlayer(play, &this->skelAnime, skelHeader, Player_ResolveAnim(PLAYER_ANIMGROUP_wait, this->modelAnimType),
-                             1 | 8, this->jointTableBuffer, this->morphTableBuffer, PLAYER_LIMB_MAX);
+        SkelAnime_InitPlayer(play, &this->skelAnime, skelHeader,
+                             Player_ResolveAnim(PLAYER_ANIMGROUP_wait, this->modelAnimType), 1 | 8,
+                             this->jointTableBuffer, this->morphTableBuffer, PLAYER_LIMB_MAX);
         this->skelAnime.baseTransl = sPlayerSkeletonBaseTransl;
 
         SkelAnime_InitPlayer(play, &this->skelAnimeUpper, skelHeader, Player_GetIdleAnim(this), 1 | 8,
@@ -11370,6 +11370,17 @@ void Player_InitCommon(Player* this, PlayState* play, FlexSkeletonHeader* skelHe
     Collider_InitAndSetQuad(play, &this->meleeWeaponQuads[0], &this->actor, &D_8085C344);
     Collider_InitAndSetQuad(play, &this->meleeWeaponQuads[1], &this->actor, &D_8085C344);
     Collider_InitAndSetQuad(play, &this->shieldQuad, &this->actor, &D_8085C394);
+}
+
+// Nothing but this init ever turns AT_ON back on: a form that strikes with Link's quads hands them back here.
+void Player_ResetMeleeWeaponColliders(PlayState* play, Player* this) {
+    this->meleeWeaponState = PLAYER_MELEE_WEAPON_STATE_0;
+    for (s32 quad = 0; quad < ARRAY_COUNT(this->meleeWeaponQuads); quad++) {
+        Collider_SetQuad(play, &this->meleeWeaponQuads[quad], &this->actor, &D_8085C344);
+    }
+    for (s32 info = 0; info < ARRAY_COUNT(this->meleeWeaponInfo); info++) {
+        this->meleeWeaponInfo[info].active = false;
+    }
 }
 
 void func_80841A50(PlayState* play, Player* this) {
@@ -12134,7 +12145,6 @@ void Player_ProcessSceneCollision(PlayState* play, Player* this) {
         if ((this->actor.bgCheckFlags & BGCHECKFLAG_PLAYER_WALL_INTERACT) && (sShapeYawToTouchedWall < 0x3000)) {
             CollisionPoly* wallPoly = this->actor.wallPoly;
 
-            // 2S2H [Mods] Climbable-anywhere sources also lift the slant limit, or no slanted wall could be grabbed
             if ((ABS_ALT(wallPoly->normal.y) < 600) || GameInteractor_Should(VB_BE_CLIMBABLE_SURFACE, false)) {
                 f32 wallPolyNormalX = COLPOLY_GET_NORMAL(wallPoly->normal.x);
                 f32 wallPolyNormalY = COLPOLY_GET_NORMAL(wallPoly->normal.y);
@@ -13706,7 +13716,6 @@ void Player_Destroy(Actor* thisx, PlayState* play) {
 }
 
 static s32 Ship_UpdateFirstPersonAimRotation(PlayState* play, Player* this, s32 arg2) {
-    // The weapon-aim test below depends on a timer the airborne handoff cannot keep alive, so decide it outright
     s32 midairWeaponAim =
         (this->unk_AA5 == PLAYER_UNKAA5_3) && GameInteractor_Should(VB_PLAYER_ALLOW_MIDAIR_AIM, false, this);
     s16 var_s0;
@@ -13789,7 +13798,6 @@ static s32 Ship_UpdateFirstPersonAimRotation(PlayState* play, Player* this, s32 
     return midairWeaponAim;
 }
 
-// Custom weapons share the native bow rotation processor and all its camera preferences.
 void Player_UpdateCustomAimingRotation(PlayState* play, Player* player, Input* input) {
     Input* previousInput = sPlayerControlInput;
     sPlayerControlInput = input;
@@ -14432,7 +14440,8 @@ s32 Player_UpperAction_5(Player* this, PlayState* play) {
     sPlayerUseHeldItem = sPlayerHeldItemButtonIsHeldDown;
     if (sPlayerUseHeldItem || PlayerAnimation_Update(play, &this->skelAnimeUpper)) {
         Player_SetUpperAction(play, this, Player_ResolveItemActionUpdate(this->heldItemAction));
-        PlayerAnimation_PlayLoop(play, &this->skelAnimeUpper, Player_ResolveAnim(PLAYER_ANIMGROUP_wait, this->modelAnimType));
+        PlayerAnimation_PlayLoop(play, &this->skelAnimeUpper,
+                                 Player_ResolveAnim(PLAYER_ANIMGROUP_wait, this->modelAnimType));
         this->idleType = PLAYER_IDLE_DEFAULT;
         this->upperActionFunc(this, play);
         return false;
@@ -15478,7 +15487,8 @@ void Player_Action_17(Player* this, PlayState* play) {
             Player_Anim_PlayOnceMorph(play, this, Player_ResolveAnim(PLAYER_ANIMGROUP_check, this->modelAnimType));
         }
     } else {
-        Player_Anim_PlayLoopOnceFinished(play, this, Player_ResolveAnim(PLAYER_ANIMGROUP_check_wait, this->modelAnimType));
+        Player_Anim_PlayLoopOnceFinished(play, this,
+                                         Player_ResolveAnim(PLAYER_ANIMGROUP_check_wait, this->modelAnimType));
     }
 
     if (DECR(this->av2.actionVar2) == 0) {
@@ -16641,7 +16651,6 @@ void Player_Action_43(Player* this, PlayState* play) {
         Player_DecelerateToZero(this);
     }
 
-    // The airborne item handoff can clear the aim subtype before this action's first update
     if (allowMidairAim && (this->unk_AA5 == PLAYER_UNKAA5_0)) {
         this->unk_AA5 = PLAYER_UNKAA5_3;
     }
@@ -16764,9 +16773,10 @@ void Player_Action_Talk(Player* this, PlayState* play) {
 
             if (ABS_ALT(temp_v0) > 0xFA0) {
                 PlayerAnimation_Change(
-                    play, &this->skelAnimeUpper, Player_ResolveAnim(PLAYER_ANIMGROUP_45_turn, this->modelAnimType), 0.4f, 0.0f,
-                    Animation_GetLastFrame(Player_ResolveAnim(PLAYER_ANIMGROUP_45_turn, this->modelAnimType)), ANIMMODE_ONCE,
-                    -6.0f);
+                    play, &this->skelAnimeUpper, Player_ResolveAnim(PLAYER_ANIMGROUP_45_turn, this->modelAnimType),
+                    0.4f, 0.0f,
+                    Animation_GetLastFrame(Player_ResolveAnim(PLAYER_ANIMGROUP_45_turn, this->modelAnimType)),
+                    ANIMMODE_ONCE, -6.0f);
                 this->av1.actionVar1 = 2;
             }
         }
@@ -16932,8 +16942,9 @@ void Player_Action_48(Player* this, PlayState* play) {
         Player_GetMovementSpeedAndYaw(this, &speedTarget, &yawTarget, SPEED_MODE_LINEAR, play);
         if (this->controlStickSpinAngles[this->controlStickDataIndex] >= 0) {
             func_808381A0(this,
-                          (this->av1.actionVar1 > 0) ? Player_ResolveAnim(PLAYER_ANIMGROUP_fall_up, this->modelAnimType)
-                                                     : Player_ResolveAnim(PLAYER_ANIMGROUP_jump_climb_up, this->modelAnimType),
+                          (this->av1.actionVar1 > 0)
+                              ? Player_ResolveAnim(PLAYER_ANIMGROUP_fall_up, this->modelAnimType)
+                              : Player_ResolveAnim(PLAYER_ANIMGROUP_jump_climb_up, this->modelAnimType),
                           play);
         } else if (CHECK_BTN_ALL(sPlayerControlInput->cur.button, BTN_A) || (this->actor.shape.feetFloorFlags != 0)) {
             func_80833A64(this);
@@ -17447,8 +17458,8 @@ void Player_Action_53(Player* this, PlayState* play) {
 
 s32 func_80850734(PlayState* play, Player* this) {
     if (Player_HasFormAbility(this, SOH_PLAYER_ABILITY_ZORA_SWIM, this->transformation == PLAYER_FORM_ZORA) &&
-        (this->windSpeed == 0.0f) &&
-        (this->currentBoots < PLAYER_BOOTS_ZORA_UNDERWATER) && CHECK_BTN_ALL(sPlayerControlInput->cur.button, BTN_A)) {
+        (this->windSpeed == 0.0f) && (this->currentBoots < PLAYER_BOOTS_ZORA_UNDERWATER) &&
+        CHECK_BTN_ALL(sPlayerControlInput->cur.button, BTN_A)) {
         func_8083B850(play, this);
         this->stateFlags2 |= PLAYER_STATE2_400;
         PlayerAnimation_Change(play, &this->skelAnime, &gPlayerAnim_pz_waterroll, PLAYER_ANIM_ADJUSTED_SPEED, 4.0f,
@@ -18766,8 +18777,7 @@ void Player_Action_SlideOnSlope(Player* this, PlayState* play) {
         return;
     }
 
-    if ((this->transformation == PLAYER_FORM_GORON) &&
-        Player_RunActionHandler(play, this, PLAYER_ACTION_HANDLER_6)) {
+    if ((this->transformation == PLAYER_FORM_GORON) && Player_RunActionHandler(play, this, PLAYER_ACTION_HANDLER_6)) {
         return;
     }
 
@@ -18803,8 +18813,9 @@ void Player_Action_SlideOnSlope(Player* this, PlayState* play) {
 
     if (Math_AsymStepToF(&this->speedXZ, speedXZTarget, speedXZIncrStep, speedXZDecrStep) && (speedXZTarget == 0.0f)) {
         func_80836A98(this,
-                      (!this->av1.facingUpSlope) ? Player_ResolveAnim(PLAYER_ANIMGROUP_down_slope_slip_end, this->modelAnimType)
-                                                 : Player_ResolveAnim(PLAYER_ANIMGROUP_up_slope_slip_end, this->modelAnimType),
+                      (!this->av1.facingUpSlope)
+                          ? Player_ResolveAnim(PLAYER_ANIMGROUP_down_slope_slip_end, this->modelAnimType)
+                          : Player_ResolveAnim(PLAYER_ANIMGROUP_up_slope_slip_end, this->modelAnimType),
                       play);
     }
 

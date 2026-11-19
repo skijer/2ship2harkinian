@@ -3,6 +3,7 @@
 
 #include <cstring>
 #include <iterator>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <fast/Fast3dGui.h>
@@ -29,8 +30,6 @@ namespace {
 
 constexpr const char* kGame = "mm";
 
-// A parked game state keeps the matrix stack and the archives alive; before the first one there is nothing to draw
-// with.
 bool CanDraw() {
     const auto game = Ship::GameRegistry::Get(kGame);
     return gGameState != nullptr && game != nullptr && game->Resources != nullptr;
@@ -50,7 +49,6 @@ RandoItemId FindItem(const std::string& name) {
     return found != items.end() ? found->second : RI_UNKNOWN;
 }
 
-// Draw functions read only the graphics context, the frame counters and the billboard from the play state.
 PlayState& BorrowPlayState(FleetItemDraw& request, GraphicsContext& gfx) {
     static PlayState play;
     // OPEN_DISPS marks the overlay list too; item drawings never submit to it, so the marks are discarded.
@@ -88,7 +86,6 @@ struct IconSource {
     ImVec4 tint;
 };
 
-// Pickups the inventory has no icon for borrow the HUD's rupee and heart.
 IconSource FindIconSource(RandoItemId item) {
     switch (item) {
         case RI_RUPEE_GREEN:
@@ -115,15 +112,18 @@ IconSource FindIconSource(RandoItemId item) {
     return { Rando::StaticData::GetIconTexturePath(item), Ship_GetItemColorTint(tintItem) };
 }
 
-// Mod icons are never preloaded into the GUI: each is loaded on first use, under its own path.
+std::shared_ptr<Fast::Texture> LoadTexture(const char* path) {
+    Ship::GameScope scope(kGame);
+    return std::dynamic_pointer_cast<Fast::Texture>(
+        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path, true));
+}
+
 ImTextureID LoadIconTexture(const char* path) {
     auto gui = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());
     if (gui->HasTextureByName(path)) {
         return gui->GetTextureByName(path);
     }
-    Ship::GameScope scope(kGame);
-    const auto texture = std::dynamic_pointer_cast<Fast::Texture>(
-        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path, true));
+    const auto texture = LoadTexture(path);
     if (texture == nullptr) {
         return 0;
     }
@@ -131,7 +131,28 @@ ImTextureID LoadIconTexture(const char* path) {
     return gui->GetTextureByName(path);
 }
 
+bool FitsTextbox(const Fast::Texture& texture) {
+    return texture.Type == Fast::TextureType::RGBA32bpp && texture.Width == texture.Height &&
+           texture.Height == 32 * texture.VPixelScale;
+}
+
 } // namespace
+
+const char* FleetItemDraw_TextboxIconPath(const char* name) {
+    if (name == nullptr) {
+        return nullptr;
+    }
+    const RandoItemId item = FindItem(name);
+    if (item == RI_UNKNOWN) {
+        return nullptr;
+    }
+    const char* path = FindIconSource(item).path;
+    if (path == nullptr) {
+        return nullptr;
+    }
+    const auto texture = LoadTexture(path);
+    return texture != nullptr && FitsTextbox(*texture) ? path : nullptr;
+}
 
 bool FleetItemDraw_Icon(const char* name, FleetItemIcon* icon) {
     if (name == nullptr || icon == nullptr) {
@@ -219,4 +240,11 @@ bool FleetItemDraw_DrawForeign(PlayState* play, const char* owner, const char* i
     gfx->polyXlu.p = static_cast<Gfx*>(request.xluHead);
     gfx->polyXlu.d = request.xluTail;
     return true;
+}
+
+std::string FleetItemDraw_ForeignTextboxIconPath(const char* owner, const char* item) {
+    using FindTextboxIcon = const char* (*)(const char*, const char*);
+    const auto find = reinterpret_cast<FindTextboxIcon>(FleetGame_GetHostFunction("GetItemTextboxIcon"));
+    const char* path = find != nullptr ? find(owner, item) : nullptr;
+    return path != nullptr ? path : "";
 }

@@ -24,7 +24,6 @@ void Player_Anim_PlayOnceMorph(PlayState* play, Player* player, PlayerAnimationH
 PlayerAnimationHeader* Player_GetIdleAnim(Player* player);
 }
 
-// Hijacking player->zTargetActiveTimer (unused s32 for the dummy) to store the clientId for convenience
 #define DUMMY_CLIENT_ID player->zTargetActiveTimer
 
 static DamageTable DummyPlayerDamageTable = {
@@ -62,11 +61,13 @@ static DamageTable DummyPlayerDamageTable = {
     /* Powder Keg     */ DMG_ENTRY(1, DUMMY_PLAYER_HIT_RESPONSE_NORMAL),
 };
 
-// Modeled after EnTest3_Init and Player_Init
 void DummyPlayer_Init(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
 
-    if (actor->params < 0 || static_cast<size_t>(actor->params) >= Anchor::Instance->actorIndexToClientId.size()) { Actor_Kill(actor); return; }
+    if (actor->params < 0 || static_cast<size_t>(actor->params) >= Anchor::Instance->actorIndexToClientId.size()) {
+        Actor_Kill(actor);
+        return;
+    }
     uint32_t clientId = Anchor::Instance->actorIndexToClientId[actor->params];
     DUMMY_CLIENT_ID = clientId;
 
@@ -87,10 +88,7 @@ void DummyPlayer_Init(Actor* actor, PlayState* play) {
     Player_SetModelGroup(player, PLAYER_MODELGROUP_DEFAULT);
     play->playerInit(player, play, gPlayerSkeletons[player->transformation]);
 
-    // Skipping Effect_Add(...), the dummy doesn't need weapon effects
-
     player->maskObjectSegment = ZeldaArena_Malloc(0x3800);
-    // Skipping part of play->func_18780, specifically Player_SetAction
     Player_Anim_PlayOnceMorph(play, player, Player_GetIdleAnim(player));
     player->yaw = player->actor.shape.rot.y;
 
@@ -109,7 +107,6 @@ void DummyPlayer_Init(Actor* actor, PlayState* play) {
     }
 }
 
-// Update the actor with new data from the client
 void DummyPlayer_Update(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
 
@@ -151,7 +148,6 @@ void DummyPlayer_Update(Actor* actor, PlayState* play) {
     player->unk_ACC = client.unk_ACC;
     player->invincibilityTimer = client.invincibilityTimer;
 
-    // Custom items share one action, so use the sender's actual model group.
     Player_SetModelGroup(player, (PlayerModelGroup)client.modelGroup);
     player->rightHandType = client.rightHandType;
     player->leftHandType = client.leftHandType;
@@ -223,8 +219,15 @@ void DummyPlayer_Draw(Actor* actor, PlayState* play) {
     gSaveContext.save.playerForm = player->transformation;
     FormModel_BeginOtherPlayerDraw(player, client.formKey.c_str());
     CustomItemRegistry_SetDrawingPlayer(player);
-    Player_DrawGameplay(play, player, 1, gCullBackDList, Player_OverrideLimbDrawGameplayDefault);
-    if (const auto* form = FormRegistry_Find(client.formKey.c_str()); form != nullptr && form->draw != nullptr) form->draw(play, player);
+    const S2HFormDefinition* form = FormRegistry_Find(client.formKey.c_str());
+    const bool hasFormDraw = form != nullptr && form->draw != nullptr;
+    const bool drawsOwnBody = hasFormDraw && form->kind == S2H_FORM_KIND_TAKEOVER;
+    if (!drawsOwnBody) {
+        Player_DrawGameplay(play, player, 1, gCullBackDList, Player_OverrideLimbDrawGameplayDefault);
+    }
+    if (hasFormDraw) {
+        form->draw(play, player);
+    }
     CustomItemRegistry_SetDrawingPlayer(nullptr);
     FormModel_EndOtherPlayerDraw();
     gSaveContext.save.playerForm = localForm;
@@ -233,10 +236,12 @@ void DummyPlayer_Draw(Actor* actor, PlayState* play) {
 void DummyPlayer_Destroy(Actor* actor, PlayState* play) {
     Player* player = reinterpret_cast<Player*>(actor);
     NameTag_RemoveAllForActor(actor);
-    if (player->maskObjectSegment != nullptr) ZeldaArena_Free(player->maskObjectSegment);
+    if (player->maskObjectSegment != nullptr)
+        ZeldaArena_Free(player->maskObjectSegment);
     player->maskObjectSegment = nullptr;
     Collider_DestroyCylinder(play, &player->cylinder);
     actor->id = ACTOR_PLAYER;
     auto found = Anchor::Instance->clients.find(DUMMY_CLIENT_ID);
-    if (found != Anchor::Instance->clients.end() && found->second.player == player) found->second.player = nullptr;
+    if (found != Anchor::Instance->clients.end() && found->second.player == player)
+        found->second.player = nullptr;
 }

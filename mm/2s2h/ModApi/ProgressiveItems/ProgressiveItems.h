@@ -28,7 +28,6 @@ typedef struct {
     uint16_t aliasCount;
     S2HProgressiveReadLevel readLevel;
     S2HProgressiveApplyLevel applyLevel;
-    // Optional seed policy; 0 retains automatic alias/pool inference.
     uint16_t (*readFirstLevel)(void);
 } S2HProgressiveChain;
 bool ProgressiveItems_Register(const S2HProgressiveChain* chain);

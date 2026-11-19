@@ -20,7 +20,6 @@ typedef struct {
     uint8_t icon;
     uint16_t nextMessageId;
     bool autoFormat;
-    // Optional translations; a missing one falls back to `text`.
     const char* textGerman;
     const char* textFrench;
     const char* textSpanish;
@@ -30,7 +29,6 @@ typedef struct {
 
 uint16_t ModMessages_Register(const S2HModMessage* message);
 uint16_t ModMessages_GetId(const char* key);
-// The Actor.hintId whose Tatl line (text 0x1900 + id) is this hint; 0xFF once every mod id is taken.
 uint8_t ModMessages_RegisterTatlHint(const char* actorKey, const char* hint);
 
 #ifdef __cplusplus

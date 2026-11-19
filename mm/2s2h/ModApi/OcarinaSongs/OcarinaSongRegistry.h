@@ -14,7 +14,6 @@ extern "C" {
 
 struct PlayState;
 
-// A song MM's ocarina recognises, plays back and shows on a quest page, like its own
 typedef struct {
     const char* itemKey;      // the custom item that teaches it; the song is playable while it is owned
     const OcarinaNote* notes; // ends with a zero-length note; at most 20, with 1 to 8 pitched ones

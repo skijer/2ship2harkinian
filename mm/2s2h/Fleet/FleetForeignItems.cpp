@@ -2,6 +2,7 @@
 #include "FleetItemDraw.h"
 
 #include <stdexcept>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -22,14 +23,22 @@ struct ForeignItem {
 
 std::vector<ForeignItem> sItems;
 std::unordered_set<std::string> sKeys;
+// Icon path to owner. Entries are never erased: the registry and the frame's display list point into them.
+std::unordered_map<std::string, std::string> sIconOwners;
 
-// Traps keep the disguise they were given; the drawing and the text never give the trap away.
+const char* RecordTextboxIcon(const ForeignItem& foreign) {
+    const std::string path = FleetItemDraw_ForeignTextboxIconPath(foreign.owner.c_str(), foreign.item.c_str());
+    if (path.empty()) {
+        return nullptr;
+    }
+    return sIconOwners.emplace(path, foreign.owner).first->first.c_str();
+}
+
 std::string PresentedName(const nlohmann::json& foreign) {
     const std::string fake = foreign.value("fakeItemName", "");
     return fake.empty() ? foreign.at("itemName").get<std::string>() : fake;
 }
 
-// MM keeps a custom get-item entry as registered, so tableId carries the index into sItems.
 void DrawForeignItem(PlayState* play, S2HGetItemEntry* entry) {
     if (entry->tableId < sItems.size()) {
         const ForeignItem& foreign = sItems[entry->tableId];
@@ -42,7 +51,6 @@ void DrawForeignItem(PlayState* play, S2HGetItemEntry* entry) {
 
 void Register(const std::string& key, const ForeignItem& foreign, const nlohmann::json& reward) {
     const bool shared = reward.value("shared", false);
-    // The tag in the name is the player's confirmation of where the item goes.
     const bool disguised = !reward.value("fakeItemName", std::string{}).empty();
     const std::string shown = disguised ? foreign.item : reward.value("label", foreign.item);
     const std::string text = "You found %y" + shown + (shared ? " (Shared)" : " (OoT)") + "%w!&" +
@@ -58,6 +66,9 @@ void Register(const std::string& key, const ForeignItem& foreign, const nlohmann
     definition.getItemText = text.c_str();
     definition.displayName = foreign.item.c_str();
     definition.pauseText = foreign.item.c_str();
+    definition.iconPath = RecordTextboxIcon(foreign);
+    // Only the textbox reads the icon inside its owner's archives; any other surface would search 2Ship's.
+    definition.disabledIconSurfaces = ~static_cast<uint32_t>(S2H_ITEM_ICON_TEXTBOX);
     definition.getItemEntry.tableId = static_cast<uint16_t>(sItems.size());
     definition.getItemEntry.drawFunc = DrawForeignItem;
     if (!CustomItemRegistry_Register(&definition)) {
@@ -94,4 +105,12 @@ void FleetForeignItems_Register(const nlohmann::json& seed) {
         sItems.push_back(item);
         sKeys.insert(key);
     }
+}
+
+const char* FleetForeignItems_FindIconOwner(const char* iconPath) {
+    if (iconPath == nullptr || sIconOwners.empty()) {
+        return nullptr;
+    }
+    const auto found = sIconOwners.find(iconPath);
+    return found != sIconOwners.end() ? found->second.c_str() : nullptr;
 }

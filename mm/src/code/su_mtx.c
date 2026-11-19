@@ -2,11 +2,6 @@
  * @file su_mtx.c
  * @brief "Fast" functions for constructing RSP-compatible matrices directly
  *
- * The three functions in this file construct scaling, rotation, and translation matrices, and combinations thereof.
- * Vanilla wrote the s16.16 halves by hand; 2S2H builds a float MtxF and copies it (GBI_FLOAT_MTX).
- *
- * We keep the RSP's column-major convention: we are acting on *row vectors* on the *right*.
- *
  * @remark Name inferred from shared Animal Forest functions, meaning of "su" is unclear.
  */
 
@@ -37,10 +32,6 @@ void Mtx_SetTranslateScaleMtx(Mtx* mtx, f32 scaleX, f32 scaleY, f32 scaleZ, f32 
 }
 
 /**
- * Creates a general scale, rotation, translation matrix \$f SRT \$f about a normalised axis.
- *
- * Each row of the rotation is scaled by the matching component of the scale.
- *
  * @warning The sign of the `axisY * sin` term is wrong on elements 20 and 02, which causes the matrix to not be a
  * rotation matrix (and indeed not even necessarily invertible). Kept for vanilla parity.
  *
@@ -69,8 +60,6 @@ void Mtx_SetTranslationRotationScaleMtx(Mtx* mtx, f32 scaleX, f32 scaleY, f32 sc
 
 // Unused
 /**
- * Should create an axis-angle rotation matrix; carries the same sign bug as Mtx_SetTranslationRotationScaleMtx().
- *
  * @remark Original name: probably something like "suMtxMakeR" or "suMtxMakeRotateVector"
  */
 void Mtx_SetRotationMtx(Mtx* mtx, s32 angle, f32 axisX, f32 axisY, f32 axisZ) {

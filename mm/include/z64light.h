@@ -17,7 +17,6 @@ typedef struct AdjLightSettings {
     /* 0x1A */ s16 zFar;
 } AdjLightSettings; // size = 0x1C
 
-// 2S2H [Unbound] position is f32 (world extent); mirrored in 2s2h/resource/type/scenecommand/SetLightList.h
 typedef struct LightPoint {
     /* 0x00 */ f32 x;
     /* 0x04 */ f32 y;
@@ -64,12 +63,11 @@ typedef struct LightsBuffer {
     /* 0x008 */ LightNode lights[LIGHTS_BUFFER_SIZE];
 } LightsBuffer; // size = 0x188
 
-// 2S2H [Unbound] fog and draw distance in world units from the camera; mirrored in SetLightingSettings.h
 typedef struct WorldFog {
     /* 0x0 */ f32 fogStart;
     /* 0x4 */ f32 fogEnd;
     /* 0x8 */ f32 drawDistance;
-    /* 0xC */ f32 nearPlane; // 0 keeps the view's own near plane
+    /* 0xC */ f32 nearPlane;
 } WorldFog; // size = 0x10
 
 typedef struct LightContext {
@@ -78,7 +76,6 @@ typedef struct LightContext {
     /* 0x07 */ u8 fogColor[3];
     /* 0x0A */ s16 fogNear; // how close until fog starts taking effect. range 0 - 996
     /* 0x0C */ s16 zFar; // draw distance. range 0 - 12800
-    // 2S2H [Unbound] when set, worldFog drives fog, projection and room culling; fogNear/zFar hold its vanilla equivalent
     /* 0x0E */ u8 hasWorldFog;
     /* 0x10 */ WorldFog worldFog;
 } LightContext; // size = 0x20

@@ -1,4 +1,3 @@
-// From marsh6487's ComboShip PR #2, ffa312d4, CrossEntranceMmGrottos.inc.h.
 #pragma once
 #include "CrossEntranceMmCatalogue.h"
 

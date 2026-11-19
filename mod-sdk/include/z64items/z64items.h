@@ -3,7 +3,6 @@
 
 #include "2s2h/ModApi/ModApi.h"
 
-// PlayerMeleeWeapon indices of Majora's Mask: the engine takes the blade length and damage of that weapon.
 #define Z64ITEMS_MELEE_NONE 0
 #define Z64ITEMS_MELEE_KOKIRI_SWORD 1
 #define Z64ITEMS_MELEE_RAZOR_SWORD 2
@@ -98,7 +97,6 @@ static inline void Z64Items_SetButtons(S2HCustomItemDefinition* definition, uint
     definition->flags |= S2H_CUSTOM_ITEM_EQUIPPABLE | buttonFlags;
 }
 
-// Legacy mask of Majora's Mask's own forms, one bit per S2H_CUSTOM_ITEM_FORM_BIT; Ship has no counterpart.
 static inline void Z64Items_SetForms(S2HCustomItemDefinition* definition, uint8_t formMask) {
     definition->formMask = formMask;
 }

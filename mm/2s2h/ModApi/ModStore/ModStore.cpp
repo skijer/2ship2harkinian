@@ -46,6 +46,8 @@ constexpr const char* PendingSuffix = ".pending";
 constexpr const char* DisabledSuffix = ".disabled";
 constexpr const char* DisableOperation = "disable";
 constexpr const char* RemoveOperation = "remove";
+constexpr const char* MigrateOperation = "migrate";
+constexpr const char* StoreFolderName = "neistore";
 #define CVAR_STORE_CHECK_AT_STARTUP CVAR_SETTING("ModStore.CheckAtStartup")
 #define CVAR_STORE_SKIPPED_VERSION CVAR_SETTING("ModStore.SkippedVersion")
 
@@ -140,6 +142,28 @@ fs::path PackagePath(const fs::path& modsDirectory, const std::string& id, const
     return modsDirectory / (id + PackageSuffix + suffix);
 }
 
+fs::path StoreDirectory(const fs::path& modsDirectory) {
+    return modsDirectory / StoreFolderName;
+}
+
+bool HasPackageFiles(const fs::path& directory, const std::string& id) {
+    std::error_code error;
+    for (const char* suffix : { "", PendingSuffix, DisabledSuffix }) {
+        if (fs::exists(PackagePath(directory, id, suffix), error)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+fs::path PackageDirectory(const fs::path& modsDirectory, const std::string& id) {
+    const fs::path store = StoreDirectory(modsDirectory);
+    if (HasPackageFiles(store, id) || !HasPackageFiles(modsDirectory, id)) {
+        return store;
+    }
+    return modsDirectory;
+}
+
 Json LoadJsonFile(const fs::path& path) {
     std::ifstream input(path);
     if (!input) {
@@ -221,7 +245,7 @@ void SetOperation(const std::string& id, const char* kind) {
 }
 
 StoreModState ReadState(const StoreMod& mod, const Json& operations) {
-    const fs::path mods = ModStore_ModsDirectory();
+    const fs::path mods = PackageDirectory(ModStore_ModsDirectory(), mod.id);
     std::error_code error;
     if (ReadOperation(operations, RemoveOperation).count(mod.id)) {
         return StoreModState::RemovedOnRestart;
@@ -249,6 +273,15 @@ std::map<std::string, StoreModState> ReadStates(const StoreCatalog& catalog) {
         states[id] = ReadState(mod, operations);
     }
     return states;
+}
+
+void AddMigration(const std::string& id) {
+    const fs::path path = ModStore_ModsDirectory() / OperationsFileName;
+    Json operations = LoadJsonFile(path);
+    std::set<std::string> ids = ReadOperation(operations, MigrateOperation);
+    ids.insert(id);
+    operations[MigrateOperation] = ids;
+    SaveJsonFile(path, operations);
 }
 
 bool IsRestartState(StoreModState state) {
@@ -370,7 +403,6 @@ std::vector<std::string> ResolveInstallOrder(const StoreCatalog& catalog, const 
     return order;
 }
 
-// A disabled mod counts too: a dependency left disabled would break the pack that was asked for.
 bool NeedsDownload(StoreModState state) {
     switch (state) {
         case StoreModState::NotInstalled:
@@ -400,14 +432,20 @@ bool DownloadPackage(const StoreMod& mod, std::string& error) {
         return false;
     }
 
-    const fs::path mods = ModStore_ModsDirectory();
+    const fs::path root = ModStore_ModsDirectory();
+    const fs::path store = StoreDirectory(root);
     std::error_code ignored;
-    fs::create_directories(mods, ignored);
-    if (!WriteFileReplacing(PackagePath(mods, mod.id, PendingSuffix), download.body)) {
-        error = "could not write " + PackagePath(mods, mod.id, PendingSuffix).string();
+    fs::create_directories(store, ignored);
+    if (!WriteFileReplacing(PackagePath(store, mod.id, PendingSuffix), download.body)) {
+        error = "could not write " + PackagePath(store, mod.id, PendingSuffix).string();
         return false;
     }
-    fs::remove(PackagePath(mods, mod.id, DisabledSuffix), ignored);
+    fs::remove(PackagePath(store, mod.id, DisabledSuffix), ignored);
+    if (HasPackageFiles(root, mod.id)) {
+        fs::remove(PackagePath(root, mod.id, PendingSuffix), ignored);
+        fs::remove(PackagePath(root, mod.id, DisabledSuffix), ignored);
+        AddMigration(mod.id);
+    }
     SetOperation(mod.id, nullptr);
     return true;
 }
@@ -497,7 +535,7 @@ void ModStore_Install(const std::vector<std::string>& ids) {
 
 void ModStore_Disable(const std::string& id) {
     Worker().Post([id] {
-        const fs::path mods = ModStore_ModsDirectory();
+        const fs::path mods = PackageDirectory(ModStore_ModsDirectory(), id);
         std::error_code ignored;
         fs::remove(PackagePath(mods, id, PendingSuffix), ignored);
         if (fs::exists(PackagePath(mods, id), ignored)) {
@@ -509,10 +547,9 @@ void ModStore_Disable(const std::string& id) {
 
 void ModStore_Enable(const std::string& id) {
     Worker().Post([id] {
-        const fs::path mods = ModStore_ModsDirectory();
+        const fs::path mods = PackageDirectory(ModStore_ModsDirectory(), id);
         SetOperation(id, nullptr);
         std::error_code error;
-        // An archive that is not mounted can be renamed now; the mods folder scan picks it up on the next launch.
         if (fs::exists(PackagePath(mods, id, DisabledSuffix), error)) {
             fs::rename(PackagePath(mods, id, DisabledSuffix), PackagePath(mods, id, PendingSuffix), error);
         }
@@ -522,7 +559,7 @@ void ModStore_Enable(const std::string& id) {
 
 void ModStore_Remove(const std::string& id) {
     Worker().Post([id] {
-        const fs::path mods = ModStore_ModsDirectory();
+        const fs::path mods = PackageDirectory(ModStore_ModsDirectory(), id);
         std::error_code ignored;
         fs::remove(PackagePath(mods, id, PendingSuffix), ignored);
         fs::remove(PackagePath(mods, id, DisabledSuffix), ignored);
@@ -569,12 +606,23 @@ void ModStore_ApplyPending(const fs::path& modsDirectory) {
     const fs::path path = modsDirectory / OperationsFileName;
     const Json operations = LoadJsonFile(path);
     std::error_code error;
+    for (const auto& entry : fs::directory_iterator(StoreDirectory(modsDirectory), error)) {
+        const fs::path pending = entry.path();
+        if (entry.is_regular_file() && pending.extension() == PendingSuffix) {
+            fs::remove(pending.parent_path() / pending.stem(), error);
+            fs::rename(pending, pending.parent_path() / pending.stem(), error);
+        }
+    }
+    for (const std::string& id : ReadOperation(operations, MigrateOperation)) {
+        fs::remove(PackagePath(modsDirectory, id), error);
+    }
     for (const std::string& id : ReadOperation(operations, DisableOperation)) {
-        fs::remove(PackagePath(modsDirectory, id, DisabledSuffix), error);
-        fs::rename(PackagePath(modsDirectory, id), PackagePath(modsDirectory, id, DisabledSuffix), error);
+        const fs::path directory = PackageDirectory(modsDirectory, id);
+        fs::remove(PackagePath(directory, id, DisabledSuffix), error);
+        fs::rename(PackagePath(directory, id), PackagePath(directory, id, DisabledSuffix), error);
     }
     for (const std::string& id : ReadOperation(operations, RemoveOperation)) {
-        fs::remove(PackagePath(modsDirectory, id), error);
+        fs::remove(PackagePath(PackageDirectory(modsDirectory, id), id), error);
     }
     fs::remove(path, error);
 }

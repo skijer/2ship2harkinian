@@ -57,7 +57,6 @@ std::shared_ptr<Ship::Gui> GetGui() {
     return Ship::Context::GetRawInstance()->GetWindow()->GetGui();
 }
 
-// The GUI caches MM item icons under their resource path, so an icon name goes through the item table.
 ImTextureID PackIcon(const std::string& icon) {
     static const std::map<std::string, ItemId> itemsByIconName = {
         { "ITEM_OCARINA_OF_TIME", ITEM_OCARINA_OF_TIME },
@@ -158,7 +157,6 @@ void DrawModLabel(const StoreView& view, const StoreMod& mod) {
     ImGui::TextColored(StateColor(state), "%s", DescribeState(state));
 }
 
-// Warns before a change that would leave other installed mods without something they need.
 void ConfirmIfNeeded(const StoreView& view, const StoreMod& mod, const char* verb, Actions& actions,
                      std::function<void()> change) {
     const std::vector<std::string> dependents = ModStore_FindDependents(view, mod.id);
@@ -192,7 +190,6 @@ std::vector<StorePack> PublishedCuratedPacks(const StoreCatalog& catalog) {
     return packs;
 }
 
-// The catalog still groups the curated mods its own way; only unrelated community packs are kept.
 bool IsCommunityPack(const StorePack& pack, const std::set<std::string>& curatedIds) {
     return std::none_of(pack.mods.begin(), pack.mods.end(), [&](const std::string& id) {
         return curatedIds.count(id) != 0 || id == ModStore_SharedAssetsMod;
@@ -340,7 +337,6 @@ std::map<std::string, std::vector<StoreOption>> ReadInstalledOptions() {
         try {
             optionsByMod[modId] = ReadArchiveOptions(*archive);
         } catch (const std::exception& error) {
-            // Optional presentation metadata must never keep the store from opening.
             SPDLOG_WARN("[ModStore] Could not read the options of {}: {}", modId, error.what());
         }
     }
@@ -424,7 +420,6 @@ void DrawSelectionShortcuts(const StorePack& pack, std::set<std::string>& unchec
     }
 }
 
-// Returns whether the mod is selected for the pack's "Install selection".
 bool DrawSelectableMod(const StoreView& view, const StorePack& pack, const StoreMod& mod) {
     std::set<std::string>& unchecked = PackSelection(pack.id);
     bool checked = unchecked.count(mod.id) == 0;
@@ -518,7 +513,6 @@ void DrawPacks(const StoreView& view, Actions& actions) {
         ImGui::TextDisabled("No packs found.");
         return;
     }
-    // Keeps three readable columns on narrow menus; the child supplies the horizontal scrolling.
     const float width = std::max(ImGui::GetContentRegionAvail().x, ImGui::GetFontSize() * 60.0f);
     ImGui::SetNextWindowContentSize(ImVec2(width, 0));
     if (ImGui::BeginChild("##PackGridScroll", ImVec2(0, 0), ImGuiChildFlags_None,

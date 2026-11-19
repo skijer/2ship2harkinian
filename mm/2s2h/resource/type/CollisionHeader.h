@@ -22,7 +22,6 @@ typedef struct {
     /* 0x08 */ Vec3s normal; // Unit normal vector
                              // Value ranges from -0x7FFF to 0x7FFF, representing -1.0 to 1.0; 0x8000 is invalid
 
-    // 2S2H [Unbound] s32 (world extent); every mirror here must match z64bgcheck.h (static_asserts in the factory)
     /* 0x10 */ s32 dist; // Plane distance from origin along the normal
 } CollisionPoly;         // size = 0x14
 

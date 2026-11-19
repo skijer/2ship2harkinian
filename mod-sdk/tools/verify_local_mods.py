@@ -8,7 +8,6 @@ from pathlib import Path
 
 import lief
 
-# Mods import from the game module; it forwards libultraship's symbols to libultraship.dll.
 HOST_MODULE = '2ship.dll'
 
 

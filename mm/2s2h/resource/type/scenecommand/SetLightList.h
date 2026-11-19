@@ -8,7 +8,6 @@
 #include "z64math.h"
 
 namespace SOH {
-// 2S2H [Unbound] mirrors z64light.h: position is f32 (world extent)
 typedef struct {
     /* 0x00 */ f32 x;
     /* 0x04 */ f32 y;
@@ -37,7 +36,6 @@ typedef struct {
 
 constexpr u8 LIGHT_INFO_TYPE_DIRECTIONAL = 1;
 
-// Archives store every light as three s16; a directional light's bytes are its packed dir fields, kept verbatim
 inline void LightInfo_SetCoords(LightInfo& light, f32 x, f32 y, f32 z) {
     if (light.type == LIGHT_INFO_TYPE_DIRECTIONAL) {
         const s16 packed[3] = { (s16)x, (s16)y, (s16)z };

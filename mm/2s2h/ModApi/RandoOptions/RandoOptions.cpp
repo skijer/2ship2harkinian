@@ -37,6 +37,7 @@ struct RegisteredOption {
     std::unordered_map<int32_t, const char*> comboValues;
     uint8_t defaultValue = 0;
     bool isSlider = false;
+    bool isHiddenFromRandoMenu = false;
 };
 
 struct SeedSnapshot {
@@ -85,6 +86,9 @@ bool IsMenuBuilt() {
 }
 
 void AddWidget(const RegisteredOption& option) {
+    if (option.isHiddenFromRandoMenu) {
+        return;
+    }
     WidgetPath path = { MenuSection, MenuSidebar, SECTION_COLUMN_1 };
     BenGui::mBenMenu->EnsureModSidebar(MenuSection, MenuSidebar, MenuSelectionCvar, 1);
 
@@ -170,6 +174,8 @@ bool RandoOptions_Register(const S2HModRandoOption* option) {
     registered.defaultValue = option->defaultValue;
     const bool hasWidgetField = option->structSize >= offsetof(S2HModRandoOption, widget) + sizeof(option->widget);
     registered.isSlider = hasWidgetField && option->widget == S2H_MOD_RANDO_WIDGET_SLIDER;
+    const bool hasFlagsField = option->structSize >= offsetof(S2HModRandoOption, flags) + sizeof(option->flags);
+    registered.isHiddenFromRandoMenu = hasFlagsField && (option->flags & S2H_MOD_RANDO_OPTION_HIDDEN_FROM_RANDO_MENU);
     for (uint32_t index = 0; index < option->valueCount; index++) {
         registered.values.emplace_back(option->values[index] == nullptr ? "" : option->values[index]);
     }
@@ -184,11 +190,7 @@ bool RandoOptions_Register(const S2HModRandoOption* option) {
 }
 
 uint8_t RandoOptions_Get(const char* key) {
-    const RegisteredOption* option = Find(key);
-    if (option == nullptr) {
-        return 0;
-    }
-    return IS_RANDO ? ReadCapturedChoice(*option) : ReadMenuChoice(*option);
+    return RandoOptions_GetForSeed(key);
 }
 
 uint8_t RandoOptions_GetForSeed(const char* key) {

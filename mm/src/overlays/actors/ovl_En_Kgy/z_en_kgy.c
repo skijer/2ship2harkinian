@@ -197,8 +197,7 @@ s32 func_80B40D8C(PlayState* play) {
 }
 
 s32 func_80B40DB4(PlayState* play) {
-    if ((CURRENT_DAY == 3) ||
-        ((CURRENT_DAY == 2) && (SceneFlags_GetPermanent(play->sceneId)->unk_14 & 2))) {
+    if ((CURRENT_DAY == 3) || ((CURRENT_DAY == 2) && (SceneFlags_GetPermanent(play->sceneId)->unk_14 & 2))) {
         return true;
     }
     return false;

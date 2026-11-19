@@ -9,17 +9,6 @@ extern "C" {
 extern PlayState* gPlayState;
 }
 
-/**
- * UPDATE_CLIENT_STATE
- *
- * Contains a small subset of data that is cached on the server and important for the client to know for various reasons
- *
- * Sent on various events, such as changing scenes, soft resetting, finishing the game, opening file select, etc.
- *
- * Note: This packet should be cross version compatible, so if you add anything here don't assume all clients will be
- * providing it, consider doing a `contains` check before accessing any version specific data
- */
-
 nlohmann::json Anchor::PrepClientState() {
     nlohmann::json payload;
     payload["name"] = CVarGetString("gNetwork.Anchor.Name", "");
@@ -28,7 +17,7 @@ nlohmann::json Anchor::PrepClientState() {
     payload["teamId"] = CVarGetString("gNetwork.Anchor.TeamId", "default");
     payload["online"] = true;
     payload["game"] = "mm";
-    payload["capabilities"] = {"unbound.mod-channel.v1", "unbound.form-key.v1", "unbound.custom-progress.v1"};
+    payload["capabilities"] = { "unbound.mod-channel.v1", "unbound.form-key.v1", "unbound.custom-progress.v1" };
 
     if (IsSaveLoaded()) {
         payload["seed"] = gSaveContext.save.shipSaveInfo.rando.finalSeed;

@@ -32,7 +32,6 @@ constexpr size_t SignatureSize = 64;
 constexpr size_t MaxImportedLibraries = 256;
 constexpr size_t MaxImportsPerLibrary = 4096;
 
-// Same lists as mod-sdk/tools/check_mod_binary.py, which enforces them before signing.
 constexpr std::string_view RuntimeLibraryPrefixes[] = { "vcruntime140", "msvcp140", "ucrtbase", "api-ms-win-crt-" };
 constexpr std::string_view StartupKernelImports[] = {
     "DisableThreadLibraryCalls",   "GetCurrentProcess",   "GetCurrentProcessId",      "GetCurrentThreadId",

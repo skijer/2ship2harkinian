@@ -186,7 +186,6 @@ typedef struct Actor {
     /* 0x138 */ ActorFunc update; // Update Routine. Called by `Actor_UpdateAll`
     /* 0x13C */ ActorFunc draw; // Draw Routine. Called by `Actor_Draw`
     /* 0x140 */ ActorOverlay* overlayEntry; // Pointer to the overlay table entry for this actor
-    // 2S2H [Unbound] index into play->transitionActors.list, -1 unless spawned from it; params only hold 6 bits
     /* 0x144 */ s16 transitionIndex;
 } Actor; // size = 0x148
 
@@ -465,7 +464,7 @@ typedef struct ActorContext {
     /* 0x006 */ UNK_TYPE1 pad6[0x5];
     /* 0x00B */ s8 lensActorsDrawn;
     /* 0x00C */ s16 halfDaysBit; // A single bit indicating the current half-day. It is one of HALFDAYBIT_DAYX_ macro values
-    /* 0x00E */ u16 totalLoadedActors; // 2S2H [Unbound] up to ACTOR_LOADED_MAX instead of 255
+    /* 0x00E */ u16 totalLoadedActors;
     /* 0x00F */ u8 numLensActors;
     /* 0x010 */ ActorListEntry actorLists[ACTORCAT_MAX];
     /* 0x0A0 */ Actor* lensActors[LENS_ACTOR_MAX]; // Draws up to LENS_ACTOR_MAX number of invisible actors

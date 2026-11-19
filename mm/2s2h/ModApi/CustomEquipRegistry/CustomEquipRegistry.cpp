@@ -51,7 +51,6 @@ std::unordered_map<std::string, RegisteredEquip*> sByKey;
 std::unordered_set<std::string> sOwned;
 std::unordered_set<std::string> sToggled;
 std::array<std::string, S2H_EQUIP_SLOT_MAX> sWorn;
-// MM keeps no vanilla ownership bits: the equipped value is the only record of the sword and shield the player has.
 std::array<uint16_t, S2H_EQUIP_SLOT_MAX> sRestoreValue = {};
 std::array<uint16_t, S2H_EQUIP_SLOT_MAX> sAppliedValue = {};
 std::string sSwordOnButton;
@@ -96,7 +95,6 @@ bool IsUsableNow(const S2HCustomEquipDefinition* definition) {
            IsFormAllowed(definition);
 }
 
-// Reads the host's copy, where a definition older than these fields left them zeroed.
 bool StoreUseRestrictions(RegisteredEquip& entry) {
     S2HCustomEquipDefinition& definition = entry.definition;
     const bool isAgeKnown = definition.ageRequirement <= S2H_CUSTOM_ITEM_AGE_ADULT;
@@ -164,7 +162,6 @@ bool BindMeleeSwordToButton(const RegisteredEquip* sword) {
     return true;
 }
 
-// B belongs to the form, and only the human one carries the sword, so the work waits until Link is human again.
 void ReconcileSwordButton() {
     if (!sIsSwordButtonDirty || gSaveContext.save.playerForm != PLAYER_FORM_HUMAN) {
         return;
@@ -177,8 +174,6 @@ void ReconcileSwordButton() {
     RestoreVanillaSwordButton();
 }
 
-// Wears incoming in the slot, or empties it when null. A vanilla slot is snapshotted on the first piece worn and
-// handed back exactly on the last one taken off, so wearing custom gear never grants or removes the vanilla piece.
 void SwitchWorn(uint8_t slot, RegisteredEquip* incoming, bool shouldRestoreVanilla) {
     if (!IsWearableSlot(slot)) {
         return;
@@ -302,7 +297,6 @@ void MarkOwnedFromPickup(const char* key) {
     CustomEquipRegistry_SetOwned(key, true);
 }
 
-// The companion item is what `give custom_item`, the randomizer and the B button see of a piece of equipment.
 static void ToggleCompanionEquipment(PlayState* play, Player* player) {
     const char* key = CustomItemRegistry_GetEquippedKey(player->heldItemButton);
     const auto* equip = CustomEquipRegistry_Find(key);
@@ -319,7 +313,6 @@ static void ToggleCompanionEquipment(PlayState* play, Player* player) {
     Audio_PlaySfx(NA_SE_SY_DECIDE);
 }
 
-// A sword on B is held like MM's own weapon of the same kind; without it Link's hand stays open and empty.
 uint8_t GetMeleeModelGroup(uint8_t meleeWeapon) {
     switch (meleeWeapon) {
         case PLAYER_MELEEWEAPON_SWORD_KOKIRI:

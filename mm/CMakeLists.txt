@@ -716,6 +716,15 @@ else()
 
 endif()
 
+# 2S2H [Unbound] NEI-Store downloads over libcurl on Linux and macOS; Windows uses WinHTTP. Without it the store is off.
+if(CMAKE_SYSTEM_NAME MATCHES "Linux|Darwin")
+    find_package(CURL)
+    if(CURL_FOUND)
+        list(APPEND ADDITIONAL_LIBRARY_DEPENDENCIES CURL::libcurl)
+        set_property(SOURCE 2s2h/ModApi/ModStore/StoreHttp.cpp APPEND PROPERTY COMPILE_DEFINITIONS UNBOUND_STORE_CURL)
+    endif()
+endif()
+
 if(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin|NintendoSwitch|CafeOS")
 # Linux installs into <prefix>/bin, so shared modules go to the sibling lib folder the AppImage expects.
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")

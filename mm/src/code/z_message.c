@@ -12,6 +12,7 @@
 #include "assets/archives/schedule_dma_static/schedule_dma_static_yar.h"
 #include "assets/archives/icon_item_static/icon_item_static_yar.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
+#include "2s2h/Fleet/FleetForeignItems.h"
 #include "2s2h/ModApi/OcarinaSongs/OcarinaSongRegistry.h"
 #include "assets/archives/icon_item_24_static/icon_item_24_static_yar.h"
 #include "assets/interface/message_static/message_static.h"
@@ -1144,10 +1145,18 @@ void Message_DrawItemIcon(PlayState* play, Gfx** gfxP) {
                             G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
                             G_TX_NOLOD);
     } else {
+        const char* iconOwner = FleetForeignItems_FindIconOwner(msgCtx->textboxSegment[TEXTBOX_SEG_ICON]);
+
         msgCtx->unk12016 = msgCtx->unk12014;
+        if (iconOwner != NULL) {
+            gSPComboRMPush(gfx++, iconOwner);
+        }
         gDPLoadTextureBlock(gfx++, msgCtx->textboxSegment[TEXTBOX_SEG_ICON], G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0,
                             G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
                             G_TX_NOLOD);
+        if (iconOwner != NULL) {
+            gSPComboRMPop(gfx++);
+        }
     }
 
     gSPTextureRectangle(gfx++, msgCtx->unk12010 << 2, msgCtx->unk12012 << 2, (msgCtx->unk12010 + msgCtx->unk12014) << 2,
@@ -2176,12 +2185,10 @@ void Message_DecodeHeader(PlayState* play) {
         if (((u8)font->msgBuf.schar[msgCtx->msgBufPos + 2]) != 0xFE) {
             msgCtx->unk11F18 = 0;
             if ((msgCtx->currentTextId == CUSTOM_MESSAGE_ID) && CustomMessage_GetActiveIconPath() != NULL) {
-                // Custom headers carry an icon path, not a vanilla message-table icon ID.
-                // Select the 32x32 RGBA32 inventory rendering branch explicitly.
                 msgCtx->itemId = ITEM_OCARINA_OF_TIME;
                 msgCtx->msgBufPos += 2;
             } else if ((msgCtx->currentTextId == 0x176F) || (msgCtx->currentTextId == 0x1770) ||
-                (msgCtx->currentTextId == 0x1771)) {
+                       (msgCtx->currentTextId == 0x1771)) {
                 msgCtx->itemId = ITEM_OCARINA_OF_TIME;
                 msgCtx->msgBufPos += 2;
             } else {

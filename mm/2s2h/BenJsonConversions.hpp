@@ -65,10 +65,16 @@ inline void to_json(json& j, const RandoSaveInfo& rando) {
 
 inline void from_json(const json& j, RandoSaveInfo& rando) {
     j.at("randoInf").get_to(rando.randoInf);
-    j.at("randoEvents").get_to(rando.randoEvents);
+    const json& events = j.at("randoEvents");
+    for (size_t i = 0; i < ARRAY_COUNT(rando.randoEvents); i++) {
+        rando.randoEvents[i] = i < events.size() ? events[i].get<u8>() : 0;
+    }
     j.at("randoSaveChecks").get_to(rando.randoSaveChecks);
     j.at("finalSeed").get_to(rando.finalSeed);
-    j.at("randoSaveOptions").get_to(rando.randoSaveOptions);
+    const json& options = j.at("randoSaveOptions");
+    for (size_t i = 0; i < ARRAY_COUNT(rando.randoSaveOptions); i++) {
+        rando.randoSaveOptions[i] = i < options.size() ? options[i].get<u32>() : 0;
+    }
     j.at("randoStartingItems").get_to(rando.randoStartingItems);
     for (size_t i = 0; i < ARRAY_COUNT(rando.foundDungeonKeys); i++) {
         rando.foundDungeonKeys[i] = i < j.at("foundDungeonKeys").size() ? j.at("foundDungeonKeys")[i].get<s8>() : -1;

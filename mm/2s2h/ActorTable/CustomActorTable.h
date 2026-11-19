@@ -7,7 +7,6 @@
 extern "C" {
 #endif
 
-// Ids from ACTOR_ID_MAX up belong to actors registered at runtime; NULL for an id with no actor.
 ActorOverlay* ActorOverlayTable_Get(s16 actorId);
 s16 ActorOverlayTable_GetCount(void);
 

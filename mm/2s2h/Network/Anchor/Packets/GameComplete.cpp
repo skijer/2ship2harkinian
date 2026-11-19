@@ -10,10 +10,6 @@ const std::string gameCompleteMessages[] = {
     "collected the Triforce", "is the Hero of Time", "proved Mido wrong",
 };
 
-/**
- * GAME_COMPLETE
- */
-
 void Anchor::SendPacket_GameComplete() {
     if (!IsSaveLoaded()) {
         return;

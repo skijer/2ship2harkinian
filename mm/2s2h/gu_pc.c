@@ -2,7 +2,6 @@
 #include <string.h>
 #include "z64.h"
 
-// 2S2H [Unbound] Mtx is float (GBI_FLOAT_MTX): the s16.16 packing that wrapped translations >= 32768 is a copy
 void guMtxF2L(float mf[4][4], Mtx* m) {
     memcpy(m->mf, mf, sizeof(m->mf));
 }

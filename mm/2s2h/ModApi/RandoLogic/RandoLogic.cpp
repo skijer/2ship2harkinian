@@ -195,7 +195,6 @@ bool IsInScope(const Grant& grant) {
     return !MatchesAny(grant.exclude, entry);
 }
 
-// A grant whose condition asks for what it grants answers false to itself instead of recursing.
 bool AnyGrantHolds(std::vector<Grant>& grants) {
     for (Grant& grant : grants) {
         if (grant.evaluating || !IsInScope(grant)) {
@@ -442,7 +441,6 @@ bool IsFormInMask(const S2HCustomItemDefinition& definition, PlayerTransformatio
     return definition.formMask == 0 || (definition.formMask & S2H_CUSTOM_ITEM_FORM_BIT(form)) != 0;
 }
 
-// Ages are Human Link's, and without a registered form he is a child.
 bool CanUseInNativeForm(const S2HCustomItemDefinition& definition, PlayerTransformation form) {
     const bool isChild = form == PLAYER_FORM_HUMAN;
     const bool isAgeMet = definition.ageRequirement == S2H_CUSTOM_ITEM_AGE_ANY ||
@@ -451,7 +449,6 @@ bool CanUseInNativeForm(const S2HCustomItemDefinition& definition, PlayerTransfo
            IsFormKeyAllowed(definition, FormRegistry_GetNativeKey(form)) && CanBecomeForm(form);
 }
 
-// A registered form is worn by Human Link and is reachable once the item that turns him into it is.
 bool IsRegisteredFormReachable(const S2HFormDefinition& form) {
     if (!CanBecomeForm(PLAYER_FORM_HUMAN)) {
         return false;

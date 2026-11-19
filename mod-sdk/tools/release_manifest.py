@@ -5,8 +5,6 @@ import re
 import sys
 from pathlib import Path
 
-# The game's updater reads unbound-release.json from the newest release, after checking the release key's
-# signature, and compares "version" with the gBuildForkVersion it was built with.
 RELEASE_FORMAT = 1
 PLATFORMS = ("windows_x64", "linux_x64", "darwin")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]

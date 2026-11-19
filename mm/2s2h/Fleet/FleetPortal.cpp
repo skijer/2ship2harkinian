@@ -4,6 +4,7 @@
 #include "FleetRuntime.h"
 
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <optional>
 #include <string>
@@ -13,6 +14,7 @@
 #include <nlohmann/json.hpp>
 
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/ModApi/ModApi.h"
 #include "2s2h/Rando/Rando.h"
 #include "2s2h/SaveManager/SaveManager.h"
 #include "2s2h/ShipInit.hpp"
@@ -28,6 +30,14 @@ extern "C" {
 namespace {
 
 constexpr const char* kMarketPortal = "market";
+constexpr const char* kOwlPortalPrefix = "owl:";
+constexpr s32 kOwlWarpEntrances[OWL_WARP_ENTRANCE] = {
+    ENTRANCE(GREAT_BAY_COAST, 11), ENTRANCE(ZORA_CAPE, 6),
+    ENTRANCE(SNOWHEAD, 3),         ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 8),
+    ENTRANCE(SOUTH_CLOCK_TOWN, 9), ENTRANCE(MILK_ROAD, 4),
+    ENTRANCE(WOODFALL, 4),         ENTRANCE(SOUTHERN_SWAMP_POISONED, 10),
+    ENTRANCE(IKANA_CANYON, 4),     ENTRANCE(STONE_TOWER, 3),
+};
 // "Link" in the file select font: capitals from 0x0A, small letters from 0x24, 0x3E pads.
 constexpr u8 kDefaultPlayerName[8] = { 0x15, 0x2C, 0x31, 0x2E, 0x3E, 0x3E, 0x3E, 0x3E };
 
@@ -35,16 +45,54 @@ struct Arrival {
     s32 entrance;
     s32 slot;
     bool cross = false;
+    s32 owlWarp = -1;
 };
 
 std::optional<std::string> sDeparture;
 std::optional<Arrival> sArrival;
 
-std::optional<s32> EntranceForPortal(const std::string& portal) {
-    if (portal == kMarketPortal) {
-        return ENTRANCE(SOUTH_CLOCK_TOWN, 0);
+std::optional<s32> OwlWarpForPortal(const std::string& portal) {
+    if (portal.rfind(kOwlPortalPrefix, 0) != 0) {
+        return std::nullopt;
     }
-    return FleetPassages_Entrance(portal);
+    const s32 owlWarp = std::atoi(portal.c_str() + std::strlen(kOwlPortalPrefix));
+    return owlWarp >= 0 && owlWarp < OWL_WARP_ENTRANCE ? std::optional<s32>(owlWarp) : std::nullopt;
+}
+
+std::optional<Arrival> ArrivalForPortal(const std::string& portal, s32 slot) {
+    if (portal == kMarketPortal) {
+        return Arrival{ ENTRANCE(SOUTH_CLOCK_TOWN, 0), slot };
+    }
+    if (const auto owlWarp = OwlWarpForPortal(portal)) {
+        return Arrival{ .entrance = kOwlWarpEntrances[*owlWarp], .slot = slot, .owlWarp = *owlWarp };
+    }
+    if (const auto entrance = FleetPassages_Entrance(portal)) {
+        return Arrival{ *entrance, slot };
+    }
+    return std::nullopt;
+}
+
+s32 OwlWarpEntrance(s32 owlWarp) {
+    const s32 entrance = kOwlWarpEntrances[owlWarp];
+    if (entrance == ENTRANCE(SOUTHERN_SWAMP_POISONED, 10) && CHECK_WEEKEVENTREG(WEEKEVENTREG_CLEARED_WOODFALL_TEMPLE)) {
+        return ENTRANCE(SOUTHERN_SWAMP_CLEARED, 10);
+    }
+    if (entrance == ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 8) && CHECK_WEEKEVENTREG(WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE)) {
+        return ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 8);
+    }
+    return entrance;
+}
+
+s32 ArrivalEntrance(const Arrival& arrival) {
+    if (arrival.cross) {
+        return FleetRuntime_ConsumeArrival();
+    }
+    if (arrival.owlWarp >= 0) {
+        // Off, the statue's owl start mode flies Link in instead of replaying an owl save.
+        gSaveContext.save.isOwlSave = false;
+        return FleetRuntime_Materialize(OwlWarpEntrance(arrival.owlWarp));
+    }
+    return FleetRuntime_Materialize(arrival.entrance);
 }
 
 bool IsPlaying() {
@@ -60,7 +108,6 @@ void Depart(const std::string& portal) {
     FleetGame_RequestSwitch(&destination);
 }
 
-// Only the owl flag of the file select is read, so a blank one opens the slot's cycle save.
 void OpenSave() {
     FileSelectState* fileSelect = static_cast<FileSelectState*>(std::calloc(1, sizeof(FileSelectState)));
     nlohmann::json saveFile;
@@ -77,7 +124,6 @@ void OpenSave() {
     std::free(fileSelect);
 }
 
-// The first arrival can find 2ship outside gameplay: it opens the slot Fleet names, or starts a new file there.
 void BootIntoPlay(const Arrival& arrival) {
     FleetRuntime_Initialize();
     gSaveContext.fileNum = arrival.slot;
@@ -104,8 +150,7 @@ void BootIntoPlay(const Arrival& arrival) {
         gSaveContext.respawnFlag = 0;
         gSaveContext.nextCutsceneIndex = 0xFFEF;
         gSaveContext.save.cutsceneIndex = 0;
-        gSaveContext.save.entrance =
-            arrival.cross ? FleetRuntime_ConsumeArrival() : FleetRuntime_Materialize(arrival.entrance);
+        gSaveContext.save.entrance = ArrivalEntrance(arrival);
         gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
     }
     STOP_GAMESTATE(gGameState);
@@ -128,9 +173,9 @@ void RegisterPortalHooks() {
     if (FleetRuntime_HasSession() && !sArrival) {
         sArrival = Arrival{ -1, FleetRuntime_Slot() };
     }
+    ModApi_PublishHostService("fleet.depart", reinterpret_cast<void*>(FleetPortal_RequestDeparture));
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s16 sceneId, s8 spawnNum) {
         FleetRuntime_ObserveScene(sceneId);
-        // Spawn 1 is the door from South Clock Town; the cycle resets land on the tower's other spawns.
         if (sceneId == SCENE_INSIDETOWER && spawnNum == 1 && gSaveContext.gameMode == GAMEMODE_NORMAL) {
             sDeparture = kMarketPortal;
         }
@@ -170,8 +215,8 @@ extern "C" void FleetPortal_Arrive(const FleetDestination* arrival) {
         sArrival = Arrival{ -1, slot };
     } else if (payload.value("cross", false)) {
         sArrival = Arrival{ payload.at("entrance").get<s32>(), slot, true };
-    } else if (const std::optional<s32> entrance = EntranceForPortal(payload.value("portal", ""))) {
-        sArrival = Arrival{ .entrance = *entrance, .slot = slot };
+    } else {
+        sArrival = ArrivalForPortal(payload.value("portal", ""), slot);
     }
     if (sArrival) {
         EnterArrival();

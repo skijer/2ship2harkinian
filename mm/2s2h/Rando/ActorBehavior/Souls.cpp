@@ -3,6 +3,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "Rando/DrawFuncs.h"
 #include "Rando/Logic/Logic.h"
+#include "2s2h/BenGui/Notification.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 
 extern "C" {
@@ -15,15 +16,22 @@ void BossHakugin_DrawIce(BossHakugin*, PlayState*);
 extern PlayState* gPlayState;
 }
 
-bool shouldMajoraRegister() {
-    bool registerStatus = false;
-    if (IS_RANDO) {
-        if (RANDO_SAVE_OPTIONS[RO_SHUFFLE_BOSS_SOULS] == RO_GENERIC_YES ||
-            RANDO_SAVE_OPTIONS[RO_SHUFFLE_TRIFORCE_PIECES] == RO_GENERIC_YES) {
-            registerStatus = true;
-        }
+static bool ShouldWithholdMajora() {
+    return IS_RANDO && (Rando::Logic::IsMajoraSoulRequired(gSaveContext.save.shipSaveInfo.rando) ||
+                        Rando::IsTriforceHuntOn(gSaveContext.save.shipSaveInfo.rando));
+}
+
+static void GrantMajoraSoulOnTrigger() {
+    if (Flags_GetRandoInf(RANDO_INF_OBTAINED_SOUL_OF_BOSS_MAJORA) ||
+        !Rando::Logic::MeetsMajoraSoulTrigger(Rando::Logic::TempleClearSource::Save)) {
+        return;
     }
-    return registerStatus;
+    Rando::GiveItem(RI_SOUL_BOSS_MAJORA);
+    Notification::Emit({
+        .itemIcon = Rando::StaticData::GetIconTexturePath(RI_SOUL_BOSS_MAJORA),
+        .message = "You received",
+        .suffix = Rando::StaticData::Items[RI_SOUL_BOSS_MAJORA].name,
+    });
 }
 
 // clang-format off
@@ -138,6 +146,11 @@ void SetEnemyInjureGrayscale(bool enable) {
 void Rando::ActorBehavior::InitSoulsBehavior() {
     bool shouldBossRegister = IS_RANDO && RANDO_SAVE_OPTIONS[RO_SHUFFLE_BOSS_SOULS] == RO_GENERIC_YES;
     bool shouldEnemyInjure = IS_RANDO && RANDO_SAVE_OPTIONS[RO_SHUFFLE_ENEMY_SOULS] == RO_GENERIC_YES;
+    const bool shouldWithholdMajora = ShouldWithholdMajora();
+    const bool isMajoraSoulTriggered =
+        IS_RANDO && Rando::Logic::IsMajoraSoulTriggered(gSaveContext.save.shipSaveInfo.rando);
+
+    COND_ID_HOOK(OnActorUpdate, ACTOR_PLAYER, isMajoraSoulTriggered, [](Actor* actor) { GrantMajoraSoulOnTrigger(); });
 
     COND_VB_SHOULD(VB_PERFORM_AC_COLLISION, shouldEnemyInjure, {
         Collider* at = va_arg(args, Collider*);
@@ -163,7 +176,7 @@ void Rando::ActorBehavior::InitSoulsBehavior() {
         ShouldActorDraw(actor, should, RANDO_INF_OBTAINED_SOUL_OF_BOSS_GYORG);
     });
 
-    COND_ID_HOOK(ShouldActorDraw, ACTOR_BOSS_07, shouldMajoraRegister(), [](Actor* actor, bool* should) {
+    COND_ID_HOOK(ShouldActorDraw, ACTOR_BOSS_07, shouldWithholdMajora, [](Actor* actor, bool* should) {
         ShouldActorDraw(actor, should, RANDO_INF_OBTAINED_SOUL_OF_BOSS_MAJORA);
     });
 
@@ -179,7 +192,7 @@ void Rando::ActorBehavior::InitSoulsBehavior() {
         ShouldActorUpdate(actor, should, RANDO_INF_OBTAINED_SOUL_OF_BOSS_GYORG);
     });
 
-    COND_ID_HOOK(ShouldActorUpdate, ACTOR_BOSS_07, shouldMajoraRegister(), [](Actor* actor, bool* should) {
+    COND_ID_HOOK(ShouldActorUpdate, ACTOR_BOSS_07, shouldWithholdMajora, [](Actor* actor, bool* should) {
         ShouldActorUpdate(actor, should, RANDO_INF_OBTAINED_SOUL_OF_BOSS_MAJORA);
     });
 

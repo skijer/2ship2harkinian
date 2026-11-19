@@ -11,7 +11,6 @@ extern "C" {
 
 bool FormModel_IsActive(void);
 
-// Player_DrawGameplay (z_player.c), right before Player_DrawImpl: wraps the limb override and forces the near LOD.
 void FormModel_BeginPlayerDraw(Player* player, s32* lod, OverrideLimbDrawFlex* overrideLimbDraw);
 
 #ifdef __cplusplus

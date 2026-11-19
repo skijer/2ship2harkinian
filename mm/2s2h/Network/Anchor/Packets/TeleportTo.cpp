@@ -9,12 +9,6 @@ extern "C" {
 extern PlayState* gPlayState;
 }
 
-/**
- * TELEPORT_TO
- *
- * See REQUEST_TELEPORT for more information, this is the second part of the process.
- */
-
 void Anchor::SendPacket_TeleportTo(uint32_t clientId) {
     if (!IsSaveLoaded()) {
         return;
@@ -37,7 +31,8 @@ void Anchor::HandlePacket_TeleportTo(nlohmann::json payload) {
         return;
     }
 
-    if (payload.value("summon", false) && payload.value("clientId", 0u) != roomState.ownerClientId) return;
+    if (payload.value("summon", false) && payload.value("clientId", 0u) != roomState.ownerClientId)
+        return;
     s32 entrance = payload["entrance"].get<s32>();
     s16 roomIndex = payload["roomIndex"].get<s16>();
     PosRot posRot = payload["posRot"].get<PosRot>();
@@ -55,9 +50,13 @@ void Anchor::HandlePacket_TeleportTo(nlohmann::json payload) {
 }
 
 void Anchor::SendPacket_Summon(uint32_t clientId) {
-    if (!IsSaveLoaded() || ownClientId != roomState.ownerClientId) return;
-    nlohmann::json packet = {{"type", TELEPORT_TO}, {"targetClientId", clientId}, {"summon", true},
-        {"entrance", gSaveContext.save.entrance}, {"roomIndex", gPlayState->roomCtx.curRoom.num},
-        {"posRot", GET_PLAYER(gPlayState)->actor.world}};
+    if (!IsSaveLoaded() || ownClientId != roomState.ownerClientId)
+        return;
+    nlohmann::json packet = { { "type", TELEPORT_TO },
+                              { "targetClientId", clientId },
+                              { "summon", true },
+                              { "entrance", gSaveContext.save.entrance },
+                              { "roomIndex", gPlayState->roomCtx.curRoom.num },
+                              { "posRot", GET_PLAYER(gPlayState)->actor.world } };
     QueueOutgoingPacket(packet);
 }

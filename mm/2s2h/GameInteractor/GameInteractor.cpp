@@ -118,7 +118,6 @@ void GameInteractor_ExecuteOnPlayDrawWorldEnd() {
 
 void GameInteractor_ExecuteOnPlayDestroy() {
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnPlayDestroy>();
-    // A scene change sets Play_Init as the next state; anything else leaves gameplay.
     if (gPlayState != nullptr && gPlayState->state.init != Play_Init) {
         GameInteractor::Instance->ExecuteHooks<GameInteractor::OnExitGame>(gSaveContext.fileNum);
     }
@@ -311,7 +310,6 @@ bool GameInteractor_Should(GIVanillaBehavior flag, uint32_t result, ...) {
     GameInteractor::Instance->ExecuteHooks<GameInteractor::ShouldVanillaBehavior>(flag, &boolResult, args);
     GameInteractor::Instance->ExecuteHooksForID<GameInteractor::ShouldVanillaBehavior>(flag, flag, &boolResult, args);
     GameInteractor::Instance->ExecuteHooksForFilter<GameInteractor::ShouldVanillaBehavior>(flag, &boolResult, args);
-    // Enhancements re-register their VB handlers on every settings apply; mods run after them regardless.
     GameInteractor::Instance->ExecuteHooksForID<GameInteractor::OnModVanillaBehavior>(flag, flag, &boolResult, args);
 
     va_end(args);

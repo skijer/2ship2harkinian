@@ -14,6 +14,10 @@ typedef enum {
     S2H_MOD_RANDO_WIDGET_SLIDER = 1,
 } S2HModRandoWidget;
 
+typedef enum {
+    S2H_MOD_RANDO_OPTION_HIDDEN_FROM_RANDO_MENU = 1 << 0,
+} S2HModRandoOptionFlags;
+
 typedef struct {
     uint32_t structSize;
     const char* key;
@@ -23,6 +27,7 @@ typedef struct {
     uint32_t valueCount;
     uint8_t defaultValue;
     uint8_t widget;
+    uint32_t flags;
 } S2HModRandoOption;
 
 #define S2H_MOD_RANDO_OPTION_MIN_SIZE \
@@ -41,7 +46,6 @@ uint8_t RandoOptions_GetForSeed(const char* key);
 void RandoOptions_Init();
 std::vector<std::string> RandoOptions_GetCvars();
 
-// While a seed is being generated the menu choice is the seed's value; afterwards the value captured with the save is.
 void RandoOptions_BeginSeedGeneration();
 void RandoOptions_EndSeedGeneration();
 #endif

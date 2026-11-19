@@ -867,8 +867,12 @@ s32 Flags_GetAllTreasure(PlayState* play) {
  * Tests if a current scene clear flag is set.
  */
 s32 Flags_GetClear(PlayState* play, s32 roomNumber) {
-    if (roomNumber < 0) { return false; }
-    if (roomNumber >= 32) { return SceneFlags_GetRoomClear(play->sceneId, roomNumber, 0); }
+    if (roomNumber < 0) {
+        return false;
+    }
+    if (roomNumber >= 32) {
+        return SceneFlags_GetRoomClear(play->sceneId, roomNumber, 0);
+    }
     return play->actorCtx.sceneFlags.clearedRoom & (1 << roomNumber);
 }
 
@@ -876,7 +880,9 @@ s32 Flags_GetClear(PlayState* play, s32 roomNumber) {
  * Sets a current scene clear flag.
  */
 void Flags_SetClear(PlayState* play, s32 roomNumber) {
-    if (roomNumber < 0) { return; }
+    if (roomNumber < 0) {
+        return;
+    }
     if (roomNumber >= 32) {
         s32 previous = SceneFlags_GetRoomClear(play->sceneId, roomNumber, 0);
         SceneFlags_SetRoomClear(play->sceneId, roomNumber, 0, 1);
@@ -896,7 +902,9 @@ void Flags_SetClear(PlayState* play, s32 roomNumber) {
  * Unsets a current scene clear flag.
  */
 void Flags_UnsetClear(PlayState* play, s32 roomNumber) {
-    if (roomNumber < 0) { return; }
+    if (roomNumber < 0) {
+        return;
+    }
     if (roomNumber >= 32) {
         s32 previous = SceneFlags_GetRoomClear(play->sceneId, roomNumber, 0);
         SceneFlags_SetRoomClear(play->sceneId, roomNumber, 0, 0);
@@ -916,8 +924,12 @@ void Flags_UnsetClear(PlayState* play, s32 roomNumber) {
  * Tests if a current scene temp clear flag is set.
  */
 s32 Flags_GetClearTemp(PlayState* play, s32 roomNumber) {
-    if (roomNumber < 0) { return false; }
-    if (roomNumber >= 32) { return SceneFlags_GetRoomClear(play->sceneId, roomNumber, 1); }
+    if (roomNumber < 0) {
+        return false;
+    }
+    if (roomNumber >= 32) {
+        return SceneFlags_GetRoomClear(play->sceneId, roomNumber, 1);
+    }
     return play->actorCtx.sceneFlags.clearedRoomTemp & (1 << roomNumber);
 }
 
@@ -925,7 +937,9 @@ s32 Flags_GetClearTemp(PlayState* play, s32 roomNumber) {
  * Sets a current scene temp clear flag.
  */
 void Flags_SetClearTemp(PlayState* play, s32 roomNumber) {
-    if (roomNumber < 0) { return; }
+    if (roomNumber < 0) {
+        return;
+    }
     if (roomNumber >= 32) {
         SceneFlags_SetRoomClear(play->sceneId, roomNumber, 1, 1);
         return;
@@ -937,7 +951,9 @@ void Flags_SetClearTemp(PlayState* play, s32 roomNumber) {
  * Unsets a current scene temp clear flag.
  */
 void Flags_UnsetClearTemp(PlayState* play, s32 roomNumber) {
-    if (roomNumber < 0) { return; }
+    if (roomNumber < 0) {
+        return;
+    }
     if (roomNumber >= 32) {
         SceneFlags_SetRoomClear(play->sceneId, roomNumber, 1, 0);
         return;
@@ -2540,7 +2556,8 @@ void Player_PlaySfx(Player* player, u16 sfxId) {
                              &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
     }
-    if (player->actor.id == ACTOR_PLAYER) GameInteractor_ExecuteOnPlayerSfx(sfxId);
+    if (player->actor.id == ACTOR_PLAYER)
+        GameInteractor_ExecuteOnPlayerSfx(sfxId);
 }
 
 /**
@@ -2800,8 +2817,8 @@ Actor* Actor_UpdateActor(UpdateActor_Params* params) {
             actor->xzDistToPlayer = Actor_WorldDistXZToActor(actor, &params->player->actor);
             actor->playerHeightRel = Actor_HeightDiff(actor, &params->player->actor);
             actor->yawTowardsPlayer = Actor_WorldYawTowardActor(actor, &params->player->actor);
-            GameInteractor_ExecuteOnActorResolvePlayerRelation(actor, &actor->xzDistToPlayer,
-                                                               &actor->playerHeightRel, &actor->yawTowardsPlayer);
+            GameInteractor_ExecuteOnActorResolvePlayerRelation(actor, &actor->xzDistToPlayer, &actor->playerHeightRel,
+                                                               &actor->yawTowardsPlayer);
             actor->xyzDistToPlayerSq = SQ(actor->xzDistToPlayer) + SQ(actor->playerHeightRel);
             actor->flags &= ~ACTOR_FLAG_SFX_FOR_PLAYER_BODY_HIT;
 
@@ -3389,7 +3406,6 @@ s32 Ship_CalcShouldDrawAndUpdate(PlayState* play, Actor* actor, Vec3f* projected
 
     f32 distMultiplier = MAX(CVarGetInteger("gEnhancements.Graphics.IncreaseActorDrawDistance", 1), 1);
 
-    // 2S2H [Unbound] uncull zones were tuned to the 12800 far plane; a scene drawing further keeps actors in step
     if (play->lightCtx.hasWorldFog && (play->lightCtx.worldFog.drawDistance > 12800.0f)) {
         distMultiplier *= play->lightCtx.worldFog.drawDistance / 12800.0f;
     }
@@ -3811,7 +3827,6 @@ ActorProfile* Actor_LoadOverlay(ActorContext* actorCtx, s16 index) {
     return profile;
 }
 
-// Set only around the spawn in Actor_SpawnTransitionActors, so the index is known before the actor's init runs
 static s16 sSpawningTransitionIndex = -1;
 
 Actor* Actor_SpawnAsChildAndCutscene(ActorContext* actorCtx, PlayState* play, s16 index, f32 x, f32 y, f32 z, s16 rotX,

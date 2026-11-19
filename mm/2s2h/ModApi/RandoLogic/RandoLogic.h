@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// X(name, macro): the macro is the token of Rando/Logic/Logic.h that capability selectors look for in a condition.
 #define RANDO_LOGIC_CAPABILITIES(X)                           \
     X(BlastOrSmash, "CAN_USE_EXPLOSIVE")                      \
     X(HasExplosives, "CAN_USE_EXPLOSIVE")                     \
@@ -52,8 +51,6 @@ typedef enum {
 #define S2H_LOGIC_TARGET_ALL 0
 #define S2H_LOGIC_ANY (-1)
 
-// checkType is a RandoCheckType, region and entranceTo are RandoRegionIds, scene is a SceneId, logicEvent is a
-// RandoEvent and checks are RandoCheckIds. Events carry no condition text, so only the other fields can select them.
 typedef struct {
     uint32_t structSize;
     uint32_t targets;
@@ -88,9 +85,6 @@ typedef enum {
     S2H_LOGIC_GRANT_ENEMY_KILL,
 } S2HLogicGrantKind;
 
-// While condition holds, a capability, a vanilla item (value = RandoItemId, for HasItem and CanUse) or the kill
-// of an enemy (value = ActorId) counts as had. include/exclude scope it like a rule's selectors; no
-// include means everywhere. A check's scope knows its scene and type, not its region.
 typedef struct {
     uint32_t structSize;
     const char* owner;
@@ -119,7 +113,6 @@ void RandoLogic_RemoveOwner(const char* name);
 
 bool RandoLogic_CanUseItem(int32_t randoItem);
 bool RandoLogic_HasLogicItem(int32_t randoItem);
-// MM has no ages: Child is "Link can be Human", Adult is "Link can be any transformed form".
 bool RandoLogic_IsChild(void);
 bool RandoLogic_IsAdult(void);
 bool RandoLogic_IsAtDay(void);
@@ -135,8 +128,6 @@ bool RandoLogic_ResolveEvent(int32_t logicEvent, bool vanillaResult);
 #ifdef __cplusplus
 }
 
-// Everything the mod API changes while a seed is generated, undone when the scope ends: the world's conditions
-// are wrapped with the registered rules, and mod item ownership and options switch to their generation state.
 class RandoSeedGenerationScope {
   public:
     RandoSeedGenerationScope();

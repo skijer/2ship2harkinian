@@ -347,7 +347,8 @@ void DrawTriforcePiece(RandoItemId randoItemId) {
     Matrix_Scale(0.03f, 0.03f, 0.03f, MTXMODE_APPLY);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
-    if (currentTriforcePieces >= RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED]) {
+    if (Rando::IsTriforceHuntOn(gSaveContext.save.shipSaveInfo.rando) &&
+        currentTriforcePieces >= RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED]) {
         gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gTriforcePieceCompletedDL);
     } else {
         if (randoItemId == RI_TRIFORCE_PIECE_PREVIOUS) {

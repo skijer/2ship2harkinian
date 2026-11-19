@@ -25,7 +25,6 @@ bool VanillaItems_Give(struct PlayState* play, uint16_t vanillaItem);
 bool VanillaItems_Drop(struct PlayState* play, uint16_t vanillaItem);
 bool VanillaItems_IsVanillaSuppressed(uint16_t vanillaItem);
 bool VanillaItems_IsRandoItemSuppressed(int32_t randoItem);
-// Fills entry from MM's get-item table; false (entry zeroed) for GI_NONE or an id past GI_MAX.
 bool VanillaItems_GetItemEntry(int16_t getItemId, struct S2HGetItemEntry* entry);
 
 #ifdef __cplusplus

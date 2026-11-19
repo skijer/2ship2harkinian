@@ -36,7 +36,6 @@ extern std::map<RandoCheckId, std::string> CheckNames;
 RandoStaticCheck GetCheckFromFlag(FlagType flagType, s32 flag, s16 sceneId = SCENE_MAX);
 RandoCheckId GetCheckIdFromName(const char* name);
 void PopulateCheckNames();
-// Unique readable names, one-to-one with ids: the names a combined seed speaks.
 const std::string& GetCheckDisplayName(RandoCheckId randoCheckId);
 RandoCheckId GetCheckIdFromDisplayName(const std::string& name);
 std::string GetLocationNameForHint(RandoCheckId randoCheckId, bool exact);

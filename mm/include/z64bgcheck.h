@@ -25,11 +25,9 @@ struct PlayState;
 #define DYNAPOLY_INVALIDATE_LOOKUP (1 << 0)
 
 #define BGACTOR_NEG_ONE -1
-// 2S2H [Unbound] stable sentinel, independent of the allocated dyna table.
 #define BG_ACTOR_MAX 0x7FFFFFFF
 #define DYNA_WATERBOX_MAX 30
 #define BGCHECK_SCENE BG_ACTOR_MAX
-// 2S2H [Unbound] world extent: 2^20 keeps ~0.06-unit f32 precision at the edge; Y_MIN is the exact "no floor" sentinel
 #define BGCHECK_Y_MAX 1048576.0f
 #define BGCHECK_Y_MIN -2147483648.0f
 #define BGCHECK_XYZ_ABSMAX 1048576.0f
@@ -116,7 +114,6 @@ typedef struct CollisionPoly {
     /* 0x8 */ Vec3s normal; // Unit normal vector
                              // Value ranges from -0x7FFF to 0x7FFF, representing -1.0 to 1.0; 0x8000 is invalid
 
-    // 2S2H [Unbound] s32 (world extent). Must match SOH::CollisionPoly in 2s2h/resource/type/CollisionHeader.h
     /* 0x10 */ s32 dist; // Plane distance from origin along the normal
 } CollisionPoly; // size = 0x14
 
@@ -140,7 +137,6 @@ typedef struct {
     /* 0x10 */ s16 unk_10;
 } BgCamFuncData; // size = 0x12
 
-// 2S2H [Unbound] extents are s32 (world extent). Must match SOH::WaterBox in 2s2h/resource/type/CollisionHeader.h
 typedef struct {
     /* 0x00 */ Vec3i minPos;
     /* 0x0C */ s32 xLength;
@@ -293,7 +289,6 @@ typedef struct {
 
 } SurfaceType; // size = 0x8
 
-// 2S2H [Unbound] bounds and vertices are s32 (world extent); mirrored by SOH::CollisionHeaderData
 typedef struct CollisionHeader {
     /* 0x00 */ Vec3i minBounds; // minimum coordinates of poly bounding box
     /* 0x0C */ Vec3i maxBounds; // maximum coordinates of poly bounding box

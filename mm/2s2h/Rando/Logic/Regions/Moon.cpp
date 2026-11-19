@@ -67,8 +67,8 @@ static RegisterShipInitFunc initFunc([]() {
         .checks = {
             // TODO: 1) Add a check for Game Completion?
             //       2) Determine if it's ok for these pots to be shuffled since we cannot return from here.
-            CHECK(RC_MOON_MAJORA_POT_01, true),
-            CHECK(RC_MOON_MAJORA_POT_02, true),
+            CHECK(RC_MOON_MAJORA_POT_01, CanFightMajora()),
+            CHECK(RC_MOON_MAJORA_POT_02, CanFightMajora()),
         },
         .oneWayEntrances = {
             ENTRANCE(MAJORAS_LAIR, 0), // From moon

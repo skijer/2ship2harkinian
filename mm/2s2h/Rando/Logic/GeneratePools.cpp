@@ -45,7 +45,9 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     // First loop through all regions and add checks/items to the pool
     for (auto& [randoRegionId, randoRegion] : Rando::Logic::Regions) {
         for (auto& [randoCheckId, _] : randoRegion.checks) {
-            if (DungeonRegistry_AddCheckToPool(saveInfo, randoCheckId, checkPool, itemPool)) { continue; }
+            if (DungeonRegistry_AddCheckToPool(saveInfo, randoCheckId, checkPool, itemPool)) {
+                continue;
+            }
             auto& randoStaticCheck = Rando::StaticData::Checks[randoCheckId];
 
             // Initialize the check with it's vanilla item
@@ -207,11 +209,13 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     // Boss Souls
     if (saveInfo.randoSaveOptions[RO_SHUFFLE_BOSS_SOULS] == RO_GENERIC_YES) {
         for (int i = RI_SOUL_BOSS_GOHT; i <= RI_SOUL_BOSS_TWINMOLD; i++) {
-            if (i == RI_SOUL_BOSS_MAJORA && saveInfo.randoSaveOptions[RO_SHUFFLE_TRIFORCE_PIECES] == RO_GENERIC_YES) {
-                continue;
+            if (i != RI_SOUL_BOSS_MAJORA) {
+                itemPool.push_back((RandoItemId)i);
             }
-            itemPool.push_back((RandoItemId)i);
         }
+    }
+    if (IsMajoraSoulShuffled(saveInfo)) {
+        itemPool.push_back(RI_SOUL_BOSS_MAJORA);
     }
 
     // Enemy Souls
@@ -400,6 +404,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
 
     RandoItems_AddToPool(itemPool);
     ProgressiveItems_ConfigurePool(itemPool);
+    PlaceVanillaDungeonItems(saveInfo, checkPool, itemPool);
 }
 
 } // namespace Logic

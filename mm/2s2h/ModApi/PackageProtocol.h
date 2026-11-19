@@ -3,8 +3,6 @@
 #include <string>
 #include <nlohmann/json.hpp>
 
-// Package metadata identifies the game. Native loading and the mod's declared
-// requirements determine whether its binary can run on this host.
 inline bool ModPackage_IsCompatible(const nlohmann::json& manifest, const char* game, std::string& error) {
     const auto format = manifest.find("format");
     const auto target = manifest.find("game");

@@ -255,8 +255,10 @@ void GetSplitByActorId(int16_t actorId, uint32_t specialType = 0) {
         splitList[active].splitId == static_cast<uint32_t>(actorId)) {
         splitList[active].splitCurrentTime = (GetUnixTimestamp() - gSaveContext.save.shipSaveInfo.fileCreatedAt) / 100;
         splitList[active].splitStatus = SPLIT_COMPLETE;
-        if (active + 1 < splitList.size()) splitList[active + 1].splitStatus = SPLIT_ACTIVE;
-        else CheckSplitsCompleted(active);
+        if (active + 1 < splitList.size())
+            splitList[active + 1].splitStatus = SPLIT_ACTIVE;
+        else
+            CheckSplitsCompleted(active);
         return;
     }
     uint32_t activeIndex = GetCurrentActiveSplit(splitList);

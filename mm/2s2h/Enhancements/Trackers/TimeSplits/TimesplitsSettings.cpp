@@ -559,7 +559,9 @@ void DrawEntranceList() {
     if (ImGui::BeginChild("Entrance List")) {
         if (ImGui::BeginTable("Entrances", 2)) {
             const size_t first = ModLabels_HasCustomSplits() ? 0 : sceneRange.startIndex;
-            const size_t last = ModLabels_HasCustomSplits() ? sceneObjectList.size() : std::min<size_t>(sceneRange.endIndex + 1, sceneObjectList.size());
+            const size_t last = ModLabels_HasCustomSplits()
+                                    ? sceneObjectList.size()
+                                    : std::min<size_t>(sceneRange.endIndex + 1, sceneObjectList.size());
             for (size_t i = first; i < last; i++) {
                 ImGui::TableNextColumn();
                 ImGui::PushID(sceneObjectList[i].splitId);
@@ -589,7 +591,8 @@ void DrawEntranceList() {
 void DrawItemList(const char* tableName, IndexRangeObject range, uint32_t tableSize) {
     if (ImGui::BeginTable(tableName, tableSize)) {
         const size_t first = ModLabels_HasCustomSplits() ? 0 : range.startIndex;
-        const size_t last = ModLabels_HasCustomSplits() ? splitObjectList.size() : std::min<size_t>(range.endIndex + 1, splitObjectList.size());
+        const size_t last = ModLabels_HasCustomSplits() ? splitObjectList.size()
+                                                        : std::min<size_t>(range.endIndex + 1, splitObjectList.size());
         for (size_t i = first; i < last; i++) {
             ImGui::TableNextColumn();
             SplitsPushImageButtonStyle();
@@ -752,7 +755,9 @@ void TimesplitsSettingsWindow::InitElement() {
 }
 
 const char* GetSplitImage(const TimesplitObject& split) {
-    if (split.splitType == SPLIT_TYPE_SCENE) return gPauseUnusedCursorTex;
-    if (split.splitType == SPLIT_TYPE_BOSS) return gDungeonMapSkullTex;
+    if (split.splitType == SPLIT_TYPE_SCENE)
+        return gPauseUnusedCursorTex;
+    if (split.splitType == SPLIT_TYPE_BOSS)
+        return gDungeonMapSkullTex;
     return GetItemImageById(split.splitId);
 }
