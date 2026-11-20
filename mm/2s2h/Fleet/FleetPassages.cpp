@@ -42,6 +42,7 @@ bool IsPassageScene(size_t passage, s16 scene) {
     }
 }
 
+constexpr size_t kGreatBayPassage = 1;
 constexpr float kTriggerRadius = 20.0f;
 constexpr float kArmRadius = 70.0f;
 
@@ -90,10 +91,10 @@ void UpdateHole(Actor* actor, PlayState* play) {
     }
 }
 
-std::optional<Vec3f> FindHoleSpot(PlayState* play, const ActorEntry& spawn) {
+std::optional<Vec3f> FindHoleSpot(PlayState* play, const ActorEntry& spawn, std::initializer_list<float> sides) {
     const float forwardX = Math_SinS(spawn.rot.y);
     const float forwardZ = Math_CosS(spawn.rot.y);
-    for (float side : { 150.0f, -150.0f, 220.0f, -220.0f }) {
+    for (float side : sides) {
         for (float ahead : { 80.0f, 160.0f }) {
             Vec3f probe = { spawn.pos.x + forwardX * ahead + forwardZ * side, spawn.pos.y + 50.0f,
                             spawn.pos.z + forwardZ * ahead - forwardX * side };
@@ -114,6 +115,16 @@ std::optional<Vec3f> FindHoleSpot(PlayState* play, const ActorEntry& spawn) {
     return std::nullopt;
 }
 
+// Great Bay's arrival walks straight down the beach, so its hole first tries spots well off that path.
+std::optional<Vec3f> FindPassageSpot(PlayState* play, size_t passage, const ActorEntry& spawn) {
+    if (passage == kGreatBayPassage) {
+        if (const auto spot = FindHoleSpot(play, spawn, { 420.0f, -420.0f, 320.0f, -320.0f })) {
+            return spot;
+        }
+    }
+    return FindHoleSpot(play, spawn, { 150.0f, -150.0f, 220.0f, -220.0f });
+}
+
 // The spawn list is indexed through the scene's entrance list; linkActorEntry points into it.
 const ActorEntry* SpawnFor(PlayState* play, s32 entrance) {
     const ActorEntry* spawns = play->linkActorEntry - play->setupEntranceList[play->curSpawn].spawn;
@@ -129,7 +140,7 @@ void SpawnHoles() {
         if (!IsPassageScene(index, gPlayState->sceneId) || !IsPassageEnabled(passage.key)) {
             continue;
         }
-        const auto spot = FindHoleSpot(gPlayState, *SpawnFor(gPlayState, passage.mm));
+        const auto spot = FindPassageSpot(gPlayState, index, *SpawnFor(gPlayState, passage.mm));
         if (spot) {
             Actor_Spawn(&gPlayState->actorCtx, gPlayState, sHoleId, spot->x, spot->y, spot->z, 0, 0, 0,
                         static_cast<s32>(index));

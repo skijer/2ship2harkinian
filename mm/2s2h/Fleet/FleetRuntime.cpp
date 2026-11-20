@@ -923,6 +923,10 @@ extern "C" int FleetRuntime_EntrancesEnabled(void) {
     return sSession.is_object() && sRoutes.Enabled();
 }
 
+void FleetRuntime_SkipNextRoute() {
+    sSkipTransition = true;
+}
+
 extern "C" int32_t FleetRuntime_ResolveTransition(int32_t entrance) {
     if (sSkipTransition) {
         sSkipTransition = false;

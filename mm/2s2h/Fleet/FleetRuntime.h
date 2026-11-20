@@ -20,4 +20,5 @@ bool FleetRuntime_TakeDeparture(FleetDestination& destination, std::string& payl
 bool FleetRuntime_QueueArrival(int32_t entrance);
 int32_t FleetRuntime_ConsumeArrival();
 int32_t FleetRuntime_Materialize(int32_t entrance);
+void FleetRuntime_SkipNextRoute();
 void FleetRuntime_ObserveScene(int32_t scene);

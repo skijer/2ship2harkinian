@@ -7,6 +7,7 @@
 #include <ship/resource/ResourceManager.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "FleetRando.h"
+#include "FleetFieldTest.h"
 #include "FleetForeignItems.h"
 #include "FleetItemDraw.h"
 #include "FleetRuntime.h"
@@ -837,6 +838,10 @@ char* FleetRando_Request(const char* op, const char* json) {
     const std::string request = op != nullptr ? op : "";
     if (request == "RuntimeStatus") {
         return CopyString(FleetRuntime_Status().dump());
+    }
+    if (request.starts_with("Test")) {
+        const auto input = nlohmann::json::parse(json != nullptr ? json : "{}", nullptr, false);
+        return CopyString(FleetFieldTest_Request(request, input).value_or("{}"));
     }
     if (request == "RuntimeCycleSmoke") {
         return CopyString(FleetRuntime_CycleSmoke().dump());

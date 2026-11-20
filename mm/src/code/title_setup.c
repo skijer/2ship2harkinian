@@ -50,12 +50,14 @@ void Setup_InitRegs(void) {
 }
 
 void Setup_InitImpl(SetupState* this) {
-    if (FleetPortal_LoadPending())
+    // Fleet boots straight into Play: the title card fade and HUD layout still need these registers.
+    Setup_InitRegs();
+    if (FleetPortal_LoadPending()) {
         return;
+    }
     SysFlashrom_InitFlash();
     SaveContext_Init();
     Sram_LoadGlobalOptions();
-    Setup_InitRegs();
 
     STOP_GAMESTATE(&this->state);
     SET_NEXT_GAMESTATE(&this->state, ConsoleLogo_Init, sizeof(ConsoleLogoState));

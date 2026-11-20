@@ -1223,6 +1223,11 @@ void DmChar08_Draw(Actor* thisx, PlayState* play) {
 }
 
 void DmChar08_Reset(void) {
+    // The overlay can unload without any turtle having run Init, e.g. leaving Zora Cape for another game.
+    if (sTurtleGreatBayTempleColData == NULL) {
+        return;
+    }
+
     // Free up our managed memory
     free(sTurtleGreatBayTempleColVerticesData);
     free(sTurtleGreatBayTempleColVertices2Data);
