@@ -1789,10 +1789,10 @@ static void RegisterMask(void) {
     Z64Items_SetPlacement(&mask, RITO_MASK_PAGE, RITO_MASK_SLOT, RITO_MASK_WHEEL_PRIORITY);
     mask.getItemEntry.drawFunc = DrawMaskPickup;
     Z64Items_SetTextbox(&mask, "You got the %rRito Mask%w!&The face of a proud bird of the north wind.^Wear it "
-                               "with %y\xA1%w to become a %rRito%w: an updraft to ride, wings to glide and a bow "
+                               "with %y\xB2%w to become a %rRito%w: an updraft to ride, wings to glide and a bow "
                                "that never runs dry.");
-    Z64Items_SetPauseText(&mask, "%rRito Mask&%wPress %y\xA1%w to become a Rito.&Hold %y\x9F%w: updraft (magic)  "
-                                 "%y\x9F%w in the air: glide&%y\xA0%w: bow, tap for a seed  %y\xA3%w: shield");
+    Z64Items_SetPauseText(&mask, "%rRito Mask&%wPress %y\xB2%w to become a Rito.&Hold %y\xB0%w: updraft (magic)  "
+                                 "%y\xB0%w in the air: glide&%y\xB1%w: bow, tap for a seed  %y\xB4%w: shield");
     Z64Items_SetCanUse(&mask, CanWearMask);
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);

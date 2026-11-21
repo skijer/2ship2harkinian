@@ -549,10 +549,10 @@ SOH_MOD_EXPORT void ModInit(void) {
     item.init = Use;
     item.getItemEntry.drawFunc = GetDraw;
     Z64Items_SetTextbox(
-        &item, "You got the %rPossession Cap%w!&Target a compatible enemy and&press its %y\xA1%w button.^"
-               "Move with the Stick, use %b\x9F%w&and %g\xA0%w for its own actions,&and %y\xA5%w to return to Link.");
+        &item, "You got the %rPossession Cap%w!&Target a compatible enemy and&press its %y\xB2%w button.^"
+               "Move with the Stick, use %b\xB0%w&and %g\xB1%w for its own actions,&and %y\xB6%w to return to Link.");
     Z64Items_SetPauseText(&item,
-                          "%rPossession Cap&%y\xA4%w-target an enemy, then use %y\xA1%w.&%y\xA5%w returns to Link.");
+                          "%rPossession Cap&%y\xB5%w-target an enemy, then use %y\xB2%w.&%y\xB6%w returns to Link.");
     if (!Z64Items_Register(sApi, &item))
         return;
     if (SOH_MOD_API_HAS(sApi, PublishService))

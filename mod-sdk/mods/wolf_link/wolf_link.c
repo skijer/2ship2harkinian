@@ -2041,9 +2041,9 @@ static void RegisterCrystal(void) {
     crystal.getItemScale = 0.6f;
     Z64Items_SetTextbox(&crystal, "You got the %rShadow Crystal%w!&A shard of twilight that remembers&the shape of "
                                   "a beast.^"
-                                  "Use it with %y\xA1%w to take the form of a&wolf, and again to be yourself.");
-    Z64Items_SetPauseText(&crystal, "%rShadow Crystal&%wPress %y\xA1%w to become a wolf.&As a wolf: %y\xA0%w bites, "
-                                    "%y\xA1%w dashes,&%y\xA1%w with %y\xA4%w hops aside.");
+                                  "Use it with %y\xB2%w to take the form of a&wolf, and again to be yourself.");
+    Z64Items_SetPauseText(&crystal, "%rShadow Crystal&%wPress %y\xB2%w to become a wolf.&As a wolf: %y\xB1%w bites, "
+                                    "%y\xB2%w dashes,&%y\xB2%w with %y\xB5%w hops aside.");
     Z64Items_SetCanUse(&crystal, CanUseCrystal);
     Z64Items_SetAction(&crystal, UseCrystal, NULL);
     Z64Items_SetLogic(&crystal, &sCrystalLogic);

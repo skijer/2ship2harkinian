@@ -30,9 +30,12 @@ static const char* const sHooks[] = { "OnPlayerShieldBlocked", "OnCollisionResol
 static const SOHModRequirements sRequirements = { sizeof(SOHModRequirements), sHooks, ARRAY_COUNT(sHooks) };
 
 static bool Ready(PlayState* play, Player* p) {
+    // Custom shields such as the Shield of Ikana keep the vanilla slot on the mirror shield.
+    const char* custom = sApi->GetWornEquipment(SOH_EQUIP_SLOT_SHIELD);
     const char* form = SOH_MOD_API_HAS(sApi, GetActiveForm) ? sApi->GetActiveForm() : NULL;
     return p->transformation == PLAYER_FORM_HUMAN && CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) == EQUIP_VALUE_SHIELD_MIRROR &&
-           (!form || !form[0]) && play->pauseCtx.state == 0 && (p->stateFlags1 & PLAYER_STATE1_SHIELDING) &&
+           (!custom || !custom[0]) && (!form || !form[0]) && play->pauseCtx.state == 0 &&
+           (p->stateFlags1 & PLAYER_STATE1_SHIELDING) &&
            !(p->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_LOADING));
 }
 static Counter CounterFor(Actor* source, ColliderInfo* attack) {

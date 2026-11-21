@@ -149,8 +149,8 @@ SOH_MOD_EXPORT void ModInit(void) {
     equip.namePath = name;
     equip.getItemText =
         "You got %rRavio's Bracelet%w!&Your magic bar turns purple&and recovers after use.^"
-        "Spells keep their normal cost.&Stop using magic to recover.&Press %b\x9F%w in pause to toggle it.";
-    equip.pauseText = "%rRavio's Bracelet&%wPurple magic recovers after use.&%b\x9F%w toggles its effect.";
+        "Spells keep their normal cost.&Stop using magic to recover.&Press %b\xB0%w in pause to toggle it.";
+    equip.pauseText = "%rRavio's Bracelet&%wPurple magic recovers after use.&%b\xB0%w toggles its effect.";
     equip.slot = SOH_EQUIP_SLOT_UPGRADE;
     equip.page = 0;
     equip.row = 3;

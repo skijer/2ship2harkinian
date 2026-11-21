@@ -990,7 +990,7 @@ static void UpdateSomaria(Player* player) {
 
     if (IsAimedMode(mode) && !sIsCasting) {
         UpdateGhost(player, play, mode);
-    } else {
+    } else if (!sIsCasting) {
         sIsGhostValid = false;
     }
     if (sIsCastPending && !sIsCasting) {

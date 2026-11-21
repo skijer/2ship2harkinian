@@ -1587,10 +1587,10 @@ static void RegisterMask(void) {
     mask.flags |= S2H_CUSTOM_ITEM_INSTANT | S2H_CUSTOM_ITEM_WEARABLE;
     Z64Items_SetPlacement(&mask, GERUDO_MASK_PAGE, GERUDO_MASK_SLOT, GERUDO_MASK_WHEEL_PRIORITY);
     mask.getItemEntry.drawFunc = DrawMaskPickup;
-    Z64Items_SetTextbox(&mask, "You got the %rGerudo Mask%w!&The face of a desert warrior.^Wear it with %y\xA1%w to "
+    Z64Items_SetTextbox(&mask, "You got the %rGerudo Mask%w!&The face of a desert warrior.^Wear it with %y\xB2%w to "
                                "become a %rGerudo%w: twin scimitars, a blade guard, and the fury of Urbosa.");
-    Z64Items_SetPauseText(&mask, "%rGerudo Mask&%wPress %y\xA1%w to become a Gerudo.&%y\xA0%w: dual blades  Hold "
-                                 "%y\x9F%w: sprint  %y\xA3%w+%y\xA0%w: Urbosa's Fury");
+    Z64Items_SetPauseText(&mask, "%rGerudo Mask&%wPress %y\xB2%w to become a Gerudo.&%y\xB1%w: dual blades  Hold "
+                                 "%y\xB0%w: sprint  %y\xB4%w+%y\xB1%w: Urbosa's Fury");
     Z64Items_SetCanUse(&mask, CanWearMask);
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);

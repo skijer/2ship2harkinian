@@ -405,9 +405,9 @@ SOH_MOD_EXPORT void ModInit(void) {
     equip.namePath = gCojiroItemNameENGTex;
     equip.getItemText =
         "%bCojiro%w wants to travel with you!&He follows you wherever you go.^"
-        "Press %b\x9F%w on his pause slot to&call him or send him away.&Three hits make him rest briefly.^"
+        "Press %b\xB0%w on his pause slot to&call him or send him away.&Three hits make him rest briefly.^"
         "Play the %rCommand Melody%w&to control him directly.";
-    equip.pauseText = "%bCojiro&%b\x9F%w calls him or sends him away.&Command Melody lets you guide him.";
+    equip.pauseText = "%bCojiro&%b\xB0%w calls him or sends him away.&Command Melody lets you guide him.";
     equip.slot = SOH_EQUIP_SLOT_UPGRADE;
     equip.page = 0;
     equip.row = 2;

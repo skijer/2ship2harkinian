@@ -205,9 +205,9 @@ SOH_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&arrows, SOH_CUSTOM_ITEM_C_BUTTON | SOH_CUSTOM_ITEM_DPAD);
     Z64Items_SetPlacement(&arrows, SOH_ITEM_PAGE_VANILLA, SLOT_ARROW_LIGHT, 0);
     Z64Items_SetTextbox(&arrows, "You got the %rBomb Arrows%w!&Powder packed behind the&arrowhead.^"
-                                 "Press %y\xA1%w to tip your arrows, and&every shot bursts where it&lands.^"
+                                 "Press %y\xB2%w to tip your arrows, and&every shot bursts where it&lands.^"
                                  "Each one spends a %rbomb%w as&well as an arrow, so keep your&bag full.");
-    Z64Items_SetPauseText(&arrows, "%rBomb Arrows&%wPress %y\xA1%w to tip your arrows. Each&shot spends a bomb.");
+    Z64Items_SetPauseText(&arrows, "%rBomb Arrows&%wPress %y\xB2%w to tip your arrows. Each&shot spends a bomb.");
     Z64Items_SetCanUse(&arrows, CanArmBombArrows);
     Z64Items_SetAmmo(&arrows, GetBombArrowShots);
     Z64Items_SetAction(&arrows, ToggleBombArrows, NULL);

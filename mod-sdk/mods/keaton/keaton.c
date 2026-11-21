@@ -1533,9 +1533,9 @@ static void RegisterMask(void) {
     mask.getItemEntry.drawFunc = DrawMaskPickup;
     Z64Items_SetTextbox(&mask, "You got the %rKeaton Mask%w!&The gate guard paid you for a&look at it and let you "
                                "keep it.^"
-                               "Wear it with %y\xA1%w and you don't just&look like Keaton: you become him.");
-    Z64Items_SetPauseText(&mask, "%rKeaton Mask&%wPress %y\xA1%w to become Keaton.&As Keaton: %y\xA1%w punches, held "
-                                 "%y\xA1%w&throws fire, %y\xA0%w leaps and climbs.");
+                               "Wear it with %y\xB2%w and you don't just&look like Keaton: you become him.");
+    Z64Items_SetPauseText(&mask, "%rKeaton Mask&%wPress %y\xB2%w to become Keaton.&As Keaton: %y\xB2%w punches, held "
+                                 "%y\xB2%w&throws fire, %y\xB1%w leaps and climbs.");
     Z64Items_SetCanUse(&mask, CanWearMask);
     Z64Items_SetAction(&mask, WearMask, NULL);
 

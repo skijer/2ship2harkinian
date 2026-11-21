@@ -140,11 +140,7 @@ static std::vector<uint8_t> ReadResource(const char* path) {
     return resource;
 }
 
-// Fleet's seed generator has no window to ask from, so only a game opened on its own writes this archive.
 static void CreateSharedAssets() {
-    if (S2H_MOD_API_HAS(sApi, FindService) && sApi->FindService("fleet.hosted") != nullptr) {
-        return;
-    }
     static const std::vector<SharedAssetArchive::SongTint> kQuestSongTints = {
         { "Minuet", 150, 255, 100 }, { "Bolero", 255, 80, 40 },     { "Serenade", 100, 150, 255 },
         { "Requiem", 255, 160, 0 },  { "Nocturne", 255, 100, 255 }, { "Prelude", 255, 240, 100 },
@@ -164,6 +160,17 @@ static void CreateSharedAssets() {
         const std::vector<uint8_t> archive = SharedAssetArchive::BuildStoredZip(files);
         sApi->SaveToModsFolder("oot_shared_assets.o2r", archive.data(), archive.size());
     }
+}
+
+// Waits for the game loop: Fleet's seed generator starts this mod with no window to ask the save permission from,
+// and it never runs a scene.
+static void CreateSharedAssetsOnce(s16 sceneId, s8 spawnNum) {
+    static bool isDone = false;
+    if (isDone) {
+        return;
+    }
+    isDone = true;
+    CreateSharedAssets();
 }
 
 static void DrawLoaderMenu() {
@@ -195,5 +202,5 @@ extern "C" S2H_MOD_EXPORT void ModInit() {
         ExtractAssets();
         return;
     }
-    CreateSharedAssets();
+    S2H_REGISTER_HOOK(sApi, OnSceneInit, CreateSharedAssetsOnce);
 }

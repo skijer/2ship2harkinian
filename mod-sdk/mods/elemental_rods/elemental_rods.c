@@ -20,6 +20,8 @@
 #define ROD_TRAIL_POINTS 6
 #define ROD_LINE_COUNT 6
 #define ROD_LINE_SPACING 40.0f
+#define ROD_BOLT_HIT_RADIUS 10.0f
+#define ROD_BOLT_HIT_HEIGHT 20.0f
 #define ROD_LINE_FRAMES 30
 #define ROD_SPIN_HEIGHT 80
 #define ROD_SPIN_START_RADIUS 50.0f
@@ -673,8 +675,9 @@ static void LaunchBolts(const RodConfig* cfg, Player* player, PlayState* play, V
 }
 
 static void SizeBoltCollider(const RodConfig* cfg, ColliderCylinder* collider, Vec3f* pos, f32 scale, PlayState* play) {
-    collider->dim.radius = (s16)(scale * 1.5f + 2.0f);
-    collider->dim.height = (s16)(scale * 2.0f + 3.0f);
+    collider->dim.radius = (s16)(scale * 5.0f + ROD_BOLT_HIT_RADIUS);
+    collider->dim.height = (s16)(scale * 8.0f + ROD_BOLT_HIT_HEIGHT);
+    collider->dim.yShift = -collider->dim.height / 2;
     collider->dim.pos.x = (s16)pos->x;
     collider->dim.pos.y = (s16)pos->y;
     collider->dim.pos.z = (s16)pos->z;

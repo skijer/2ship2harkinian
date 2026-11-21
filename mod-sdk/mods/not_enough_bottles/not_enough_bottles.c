@@ -1273,9 +1273,9 @@ static bool RegisterNet(void) {
     Z64Items_SetButtons(&net, SOH_CUSTOM_ITEM_C_BUTTON | SOH_CUSTOM_ITEM_DPAD);
     Z64Items_SetPlacement(&net, SOH_ITEM_PAGE_VANILLA, SLOT_BOTTLE_5, 0);
     Z64Items_SetTextbox(&net, "You got the %rNet%w! A&long-handled net that scoops&up what a bottle would.^"
-                              "Swing it with %y\xA1%w at a fairy, a&fish, a bug or a flame and it&"
+                              "Swing it with %y\xB2%w at a fairy, a&fish, a bug or a flame and it&"
                               "lands in an empty bottle.");
-    Z64Items_SetPauseText(&net, "%rNet&%wSwing it with %y\xA1%w to catch something&into an empty bottle.");
+    Z64Items_SetPauseText(&net, "%rNet&%wSwing it with %y\xB2%w to catch something&into an empty bottle.");
     Z64Items_SetAction(&net, TakeOutNet, HoldNet);
     Z64Items_SetMeleeWeapon(&net, 2);
     Z64Items_SetHeldCallbacks(&net, SwingNetRequest, NULL, NULL);
@@ -1316,7 +1316,7 @@ static bool RegisterExtraBottle(int8_t bottle) {
     extra.onAcquire = NoteAcquiredBottle;
     extra.onReceive = ReceiveExtraBottle;
     Z64Items_SetTextbox(&extra, "You got an %rEmpty Bottle%w! You&can put something in this&bottle.");
-    Z64Items_SetPauseText(&extra, "%rBottle&%wWhatever it holds, %y\xA1%w uses it like&any other bottle.");
+    Z64Items_SetPauseText(&extra, "%rBottle&%wWhatever it holds, %y\xB2%w uses it like&any other bottle.");
     const SOHCustomItemRandomizer randomizer = {
         sizeof(SOHCustomItemRandomizer),
         0,

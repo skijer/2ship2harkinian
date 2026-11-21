@@ -31,10 +31,10 @@ static const ALIGN_ASSET(2) char sIcon[] = "__OTR__textures/icon_item_custom/gIt
 static const ALIGN_ASSET(2) char sName[] = "__OTR__textures/item_name_custom/gMagicCapeNameTex";
 static const ALIGN_ASSET(2) char sGetItemCapeDL[] = "__OTR__objects/object_nei_magic_cape/gNeiMagicCapeDL";
 static const ALIGN_ASSET(2) char sGetItemCapeWaveDL[] = "__OTR__objects/object_nei_magic_cape/gNeiMagicCapeWaveDL";
-static const ALIGN_ASSET(2) char sMantMaterialDL[] = "__OTR__objects/object_nei_magic_cape/gMantMaterialDL";
-static const ALIGN_ASSET(2) char sMantDL[] = "__OTR__objects/object_nei_magic_cape/gMantDL";
-static const ALIGN_ASSET(2) char sMant1Vtx[] = "__OTR__objects/object_nei_magic_cape/gMant1Vtx";
-static const ALIGN_ASSET(2) char sMant2Vtx[] = "__OTR__objects/object_nei_magic_cape/gMant2Vtx";
+static const ALIGN_ASSET(2) char sMantMaterialDL[] = "__OTR__overlays/oot_ovl_En_Ganon_Mant/gMantMaterialDL";
+static const ALIGN_ASSET(2) char sMantDL[] = "__OTR__overlays/oot_ovl_En_Ganon_Mant/gMantDL";
+static const ALIGN_ASSET(2) char sMant1Vtx[] = "__OTR__overlays/oot_ovl_En_Ganon_Mant/gMant1Vtx";
+static const ALIGN_ASSET(2) char sMant2Vtx[] = "__OTR__overlays/oot_ovl_En_Ganon_Mant/gMant2Vtx";
 
 Vtx* ResourceMgr_LoadVtxByName(const char* path);
 

@@ -461,9 +461,9 @@ SOH_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&item, SOH_CUSTOM_ITEM_C_BUTTON | SOH_CUSTOM_ITEM_DPAD);
     Z64Items_SetPlacement(&item, 4, 0, 0);
     Z64Items_SetTextbox(&item,
-                        "You got the %rRay Gun%w!&Press its %y\xA1%w button to draw it,&then press again to fire.^"
-                        "Its ray throws enemies back&and kills whatever it hits.&Press %y\xA5%w to aim.");
-    Z64Items_SetPauseText(&item, "%rRay Gun&%y\xA1%w draws it, then fires.&%y\xA5%w aims. Its ray is lethal.");
+                        "You got the %rRay Gun%w!&Press its %y\xB2%w button to draw it,&then press again to fire.^"
+                        "Its ray throws enemies back&and kills whatever it hits.&Press %y\xB6%w to aim.");
+    Z64Items_SetPauseText(&item, "%rRay Gun&%y\xB2%w draws it, then fires.&%y\xB6%w aims. Its ray is lethal.");
     Z64Items_SetAction(&item, TakeOut, Upper);
     Z64Items_SetHeldCallbacks(&item, Use, PutAway, NULL);
     item.getItemEntry.drawFunc = GetDraw;

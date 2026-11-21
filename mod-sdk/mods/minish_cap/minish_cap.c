@@ -247,9 +247,9 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&cap, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetPlacement(&cap, 0, 18, 0);
     Z64Items_SetTextbox(&cap, "You got %rThe Minish Cap%w!&Ezlo, who was a sage before he was&a hat, and is in a "
-                              "mood about it.^Press %y\xA1%w to become %yMinish%w:&small and slow, but small enough "
+                              "mood about it.^Press %y\xB2%w to become %yMinish%w:&small and slow, but small enough "
                               "for&a crawlspace. Press again, or load a&scene, to grow back.");
-    Z64Items_SetPauseText(&cap, "%rThe Minish Cap&%wPress %y\xA1%w to shrink or grow.");
+    Z64Items_SetPauseText(&cap, "%rThe Minish Cap&%wPress %y\xB2%w to shrink or grow.");
     Z64Items_SetCanUse(&cap, CanUseCap);
     Z64Items_SetAction(&cap, UseCap, NULL);
     Z64Items_SetGetItemModel(&cap, sCapDL);

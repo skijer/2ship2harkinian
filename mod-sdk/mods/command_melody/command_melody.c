@@ -283,10 +283,10 @@ static void RegisterSong(void) {
     Z64Items_SetTextbox(
         &song, "You learned the %rCommand Melody%w!&Play it to control a nearby&companion. Target one to choose.^"
                "%b\x9F %y\xA7 %b\x9F %y\xA8 %b\x9F %y\xA7 %b\x9F %y\xA8%w^"
-               "Use the Stick to move, %b\x9F%w to jump,&and %g\xA0%w to attack. Press %y\xA5%w&to return to Link.");
+               "Use the Stick to move, %b\xB0%w to jump,&and %g\xB1%w to attack. Press %y\xB6%w&to return to Link.");
     Z64Items_SetPauseText(
         &song,
-        "%rCommand Melody&%b\x9F %y\xA7 %b\x9F %y\xA8 %b\x9F %y\xA7 %b\x9F %y\xA8%w&Control a nearby companion.");
+        "%rCommand Melody&%b\xB0 %y\xB8 %b\xB0 %y\xB9 %b\xB0 %y\xB8 %b\xB0 %y\xB9%w&Control a nearby companion.");
     Z64Items_SetLogic(&song, &randomizer);
     Z64Items_Register(sApi, &song);
 }

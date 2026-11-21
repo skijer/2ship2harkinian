@@ -8,6 +8,7 @@
 
 #include "align_asset_macro.h"
 #include "functions.h"
+#include "soh/ResourceManagerHelpers.h"
 #include "macros.h"
 #include "variables.h"
 
@@ -301,7 +302,8 @@ void EnSbeetle_Init(Actor* thisx, PlayState* play) {
 void EnSbeetle_Destroy(Actor* thisx, PlayState* play) {
     EnSbeetle* self = (EnSbeetle*)thisx;
 
-    SkelAnime_Free(&self->skelAnime, play);
+    // The joint tables live inside the actor; freeing them would corrupt the arena.
+    ResourceMgr_UnregisterSkeleton(&self->skelAnime);
     Collider_DestroyCylinder(play, &self->collider);
     Collider_DestroyCylinder(play, &self->pincerLCollider);
     Collider_DestroyCylinder(play, &self->pincerRCollider);

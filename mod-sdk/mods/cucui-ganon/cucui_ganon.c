@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "functions.h"
+#include "soh/ResourceManagerHelpers.h"
 #include "macros.h"
 #include "align_asset_macro.h"
 #include "variables.h"
@@ -2303,7 +2304,8 @@ static void CucuiDestroy(Actor* actor, PlayState* play) {
     if (boss->subCamId > CAM_ID_MAIN)
         ReleaseIntroCamera(boss, play);
     OnGanondorfDestroy(actor);
-    SkelAnime_Free(&boss->skelAnime, play);
+    // The joint tables live inside the boss; freeing them would corrupt the arena.
+    ResourceMgr_UnregisterSkeleton(&boss->skelAnime);
 }
 
 static void CucuiDraw(Actor* actor, PlayState* play) {

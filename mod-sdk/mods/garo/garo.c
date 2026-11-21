@@ -2038,10 +2038,10 @@ static void RegisterMask(void) {
     Z64Items_SetVanillaMode(&mask, S2H_VANILLA_ITEM_REPLACE, RI_MASK_GARO);
     mask.getItemEntry.drawFunc = DrawMaskPickup;
     Z64Items_SetTextbox(&mask, "You got %rGaro's Mask%w!&The face of the Garo, Ikana's ninja spies.^Wear it with "
-                               "%y\xA1%w to become a %rGaro%w: twin blades, a guard that answers every blow, and a "
+                               "%y\xB2%w to become a %rGaro%w: twin blades, a guard that answers every blow, and a "
                                "rod of elemental magic.");
-    Z64Items_SetPauseText(&mask, "%rGaro's Mask&%wPress %y\xA1%w to become a Garo.&%y\xA0%w: spin  Hold %y\xA0%w: rod "
-                                 "(%y\xA2%w/%y\xA3%w element)  %y\x9F%w: dash  %y\xA3%w: guard");
+    Z64Items_SetPauseText(&mask, "%rGaro's Mask&%wPress %y\xB2%w to become a Garo.&%y\xB1%w: spin  Hold %y\xB1%w: rod "
+                                 "(%y\xB3%w/%y\xB4%w element)  %y\xB0%w: dash  %y\xB4%w: guard");
     Z64Items_SetCanUse(&mask, CanWearMask);
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);

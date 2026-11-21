@@ -380,9 +380,9 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetButtons(&gate, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetPlacement(&gate, 0, 7, 0);
     Z64Items_SetTextbox(&gate, "You got the %rTime Gate%w!&A relic of the Sages that folds&the years between "
-                               "past and future.^Press %y\xA1%w on solid ground to open&it and travel through "
+                               "past and future.^Press %y\xB2%w on solid ground to open&it and travel through "
                                "%ytime%w.^Opening the gate costs %gmuch magic%w.");
-    Z64Items_SetPauseText(&gate, "%rTime Gate&%wPress %y\xA1%w on the ground, then choose&Yes to change age.");
+    Z64Items_SetPauseText(&gate, "%rTime Gate&%wPress %y\xB2%w on the ground, then choose&Yes to change age.");
     Z64Items_SetCanUse(&gate, CanOpenGate);
     Z64Items_SetAction(&gate, OpenGate, NULL);
     Z64Items_SetGetItemModel(&gate, sGateDL);
