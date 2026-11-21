@@ -5,6 +5,7 @@
 #include "FleetRando.h"
 #include "FleetItemDraw.h"
 #include "2s2h/BenGui/BenInputEditorWindow.h"
+#include "2s2h/SaveManager/SaveManager.h"
 #include <ship/window/Window.h>
 #include <ship/window/gui/Gui.h>
 
@@ -76,6 +77,7 @@ void Run(const FleetDestination* arrival) {
 }
 
 void Detach() {
+    SaveManager_StopFleetSaves();
     sHostFunction = nullptr;
 }
 
@@ -217,6 +219,7 @@ FleetAutomaticSave::~FleetAutomaticSave() {
 extern "C" void FleetGame_CommitSave(void) {
     const auto commit = reinterpret_cast<void (*)()>(FleetGame_GetHostFunction("CommitSave"));
     if (commit != nullptr && sAutomaticSaves == 0) {
+        FleetRuntime_FinishSaving();
         commit();
     }
 }

@@ -70,6 +70,14 @@ PlayState& BorrowPlayState(FleetItemDraw& request, GraphicsContext& gfx) {
     return play;
 }
 
+// MM item DLs jump to 0x08-0x0A, which native MM defaults to an empty DL every frame. The requester's
+// interpreter still holds its own pointers there (OoT: Link's face texture paths), executed as commands.
+void ClearItemSegments(Gfx** gfx) {
+    for (uint8_t segment = 0x08; segment <= 0x0A; segment++) {
+        gSPSegment((*gfx)++, segment, reinterpret_cast<uintptr_t>(gEmptyDL));
+    }
+}
+
 void ReturnArenas(FleetItemDraw& request, const GraphicsContext& gfx) {
     request.opaHead = gfx.polyOpa.p;
     request.opaTail = gfx.polyOpa.d;
@@ -198,10 +206,12 @@ bool FleetItemDraw_Draw(FleetItemDraw* request) {
     OPEN_DISPS(&gfx);
     gSPComboRMPush(POLY_OPA_DISP++, kGame);
     gSPComboRMPush(POLY_XLU_DISP++, kGame);
-    const Gfx* opaBeforeDraw = POLY_OPA_DISP;
-    const Gfx* xluBeforeDraw = POLY_XLU_DISP;
+    ClearItemSegments(&POLY_OPA_DISP);
+    ClearItemSegments(&POLY_XLU_DISP);
+    const Gfx* opaBeforeItem = POLY_OPA_DISP;
+    const Gfx* xluBeforeItem = POLY_XLU_DISP;
     Rando::DrawItem(item);
-    submitted = POLY_OPA_DISP != opaBeforeDraw || POLY_XLU_DISP != xluBeforeDraw;
+    submitted = POLY_OPA_DISP != opaBeforeItem || POLY_XLU_DISP != xluBeforeItem;
     gSPComboRMPop(POLY_OPA_DISP++);
     gSPComboRMPop(POLY_XLU_DISP++);
     CLOSE_DISPS(&gfx);

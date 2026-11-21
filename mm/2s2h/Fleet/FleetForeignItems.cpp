@@ -1,6 +1,7 @@
 #include "FleetForeignItems.h"
 #include "FleetItemDraw.h"
 
+#include <algorithm>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -105,6 +106,12 @@ void FleetForeignItems_Register(const nlohmann::json& seed) {
         sItems.push_back(item);
         sKeys.insert(key);
     }
+}
+
+std::vector<std::string> FleetForeignItems_ListKeys() {
+    std::vector<std::string> keys(sKeys.begin(), sKeys.end());
+    std::sort(keys.begin(), keys.end());
+    return keys;
 }
 
 const char* FleetForeignItems_FindIconOwner(const char* iconPath) {

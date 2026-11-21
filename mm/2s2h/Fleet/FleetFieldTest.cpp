@@ -1,4 +1,5 @@
 #include "FleetFieldTest.h"
+#include "FleetForeignItems.h"
 #include "FleetPortal.h"
 #include "FleetRuntime.h"
 
@@ -7,15 +8,21 @@
 #include <set>
 #include <vector>
 
+#include <libultraship/bridge/consolevariablebridge.h>
+
 #include "2s2h/CustomItem/CustomItem.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "2s2h/Rando/Rando.h"
+#include "2s2h/SaveManager/SaveSections.h"
+#include "2s2h/ShipInit.hpp"
 
 extern "C" {
 #include "z64.h"
 #include "functions.h"
 #include "variables.h"
+#include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"
 extern PlayState* gPlayState;
 }
 
@@ -35,8 +42,28 @@ constexpr float kRainRadius = 220.0f;
 constexpr float kRainHeight = 160.0f;
 constexpr float kOnLinkHeight = 20.0f;
 constexpr int kMessageCloseFrames = 600;
+constexpr size_t kShowcaseBatch = 24;
+constexpr int kShowcaseDrawFrames = 45;
+constexpr int kShowcaseTextFrames = 30;
+constexpr u16 kNoShownSlot = 0xFF;
+constexpr const char* kItemUnequipCvar = "gEnhancements.Equipment.ItemUnequip";
+
+enum class ShowcasePhase { NotStarted, Drawing, Texts, Done };
+
+// Draws every foreign item in a real frame next to Link, then opens each one's get-item text until its icon draws.
+struct Showcase {
+    ShowcasePhase phase = ShowcasePhase::NotStarted;
+    std::vector<std::string> keys;
+    std::set<std::string> shownIcons;
+    size_t next = 0;
+    size_t texts = 0;
+    int frames = 0;
+};
 
 std::optional<Travel> sTravel;
+Showcase sShowcase;
+bool sIsButtonCheckQueued = false;
+nlohmann::json sButtonCheck;
 std::string sTravelResult = "idle";
 std::optional<int> sRainCount;
 std::vector<Actor*> sRainDrops;
@@ -236,6 +263,176 @@ int CountCollected() {
     }));
 }
 
+void DrawShowcaseDrop(Actor* actor, PlayState* play) {
+    const size_t index = static_cast<size_t>(CUSTOM_ITEM_PARAM);
+    if (index >= sShowcase.keys.size()) {
+        return;
+    }
+    Matrix_Scale(30.0f, 30.0f, 30.0f, MTXMODE_APPLY);
+    CustomItemRegistry_DrawAcquisition(sShowcase.keys[index].c_str(), play);
+}
+
+void DrawNextShowcaseBatch(PlayState* play) {
+    ClearRain(play);
+    if (sShowcase.next == sShowcase.keys.size()) {
+        sShowcase.phase = ShowcasePhase::Texts;
+        sShowcase.next = 0;
+        return;
+    }
+    const Vec3f feet = GET_PLAYER(play)->actor.world.pos;
+    const size_t end = std::min(sShowcase.next + kShowcaseBatch, sShowcase.keys.size());
+    for (size_t index = sShowcase.next; index < end; index++) {
+        const s16 angle = static_cast<s16>((index - sShowcase.next) * 0x10000 / kShowcaseBatch);
+        EnItem00* drop = CustomItem::Spawn(feet.x + Math_SinS(angle) * kRainRadius, feet.y + kRainHeight,
+                                           feet.z + Math_CosS(angle) * kRainRadius, 0, CustomItem::TOSS_ON_SPAWN,
+                                           static_cast<s16>(index), nullptr, DrawShowcaseDrop);
+        if (drop != nullptr) {
+            sRainDrops.push_back(&drop->actor);
+        }
+    }
+    sShowcase.next = end;
+    sShowcase.frames = kShowcaseDrawFrames;
+}
+
+void ShowNextShowcaseText(PlayState* play) {
+    if (play->msgCtx.msgMode != MSGMODE_NONE) {
+        if (Message_GetState(&play->msgCtx) != TEXT_STATE_CLOSING) {
+            Message_CloseTextbox(play);
+        }
+        return;
+    }
+    while (sShowcase.next < sShowcase.keys.size()) {
+        const std::string& key = sShowcase.keys[sShowcase.next++];
+        const char* icon = CustomItemRegistry_ResolveTexture(key.c_str(), S2H_ITEM_ICON_TEXTBOX);
+        if (icon == nullptr || !sShowcase.shownIcons.insert(icon).second) {
+            continue;
+        }
+        if (CustomItemRegistry_ShowGetItemText(play, key.c_str())) {
+            ++sShowcase.texts;
+            sShowcase.frames = kShowcaseTextFrames;
+            return;
+        }
+    }
+    sShowcase.phase = ShowcasePhase::Done;
+}
+
+void AdvanceShowcase(PlayState* play) {
+    if (sShowcase.frames > 0) {
+        --sShowcase.frames;
+        return;
+    }
+    switch (sShowcase.phase) {
+        case ShowcasePhase::Drawing:
+            DrawNextShowcaseBatch(play);
+            break;
+        case ShowcasePhase::Texts:
+            ShowNextShowcaseText(play);
+            break;
+        default:
+            break;
+    }
+}
+
+const char* ShowcasePhaseName() {
+    switch (sShowcase.phase) {
+        case ShowcasePhase::NotStarted:
+            return "notStarted";
+        case ShowcasePhase::Drawing:
+            return "drawing";
+        case ShowcasePhase::Texts:
+            return "texts";
+        case ShowcasePhase::Done:
+            return "done";
+        default:
+            return "unknown";
+    }
+}
+
+bool IsOnAnyButton(const std::string& key) {
+    for (uint8_t button = 0; button < S2H_ITEM_BUTTON_COUNT; button++) {
+        const char* equipped = CustomItemRegistry_GetEquippedKey(button);
+        if (equipped != nullptr && key == equipped) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Owns the first C-button custom item that is free and usable now; the caller restores ownership.
+std::string BorrowCButtonItem(bool* wasOwned) {
+    for (const std::string& key : CustomItemRegistry_ListKeys()) {
+        const S2HCustomItemDefinition* definition = CustomItemRegistry_Find(key.c_str());
+        const uint32_t needed = S2H_CUSTOM_ITEM_EQUIPPABLE | S2H_CUSTOM_ITEM_C_BUTTON;
+        if (definition == nullptr || (definition->flags & needed) != needed || IsOnAnyButton(key)) {
+            continue;
+        }
+        *wasOwned = CustomItemRegistry_IsOwned(key.c_str());
+        CustomItemRegistry_SetOwned(key.c_str(), true);
+        if (CustomItemRegistry_IsUsableNow(key.c_str())) {
+            return key;
+        }
+        CustomItemRegistry_SetOwned(key.c_str(), *wasOwned);
+    }
+    return "";
+}
+
+bool IsKeySavedOnButton(const nlohmann::json& saveFile, const std::string& key, uint8_t button) {
+    const nlohmann::json equipped = saveFile.value(nlohmann::json::json_pointer("/sections/owl/customItems/equipped"),
+                                                   nlohmann::json::array());
+    return std::any_of(equipped.begin(), equipped.end(), [&](const nlohmann::json& entry) {
+        return entry.value("button", -1) == button && entry.value("key", "") == key;
+    });
+}
+
+void SetItemUnequip(int value) {
+    CVarSetInteger(kItemUnequipCvar, value);
+    // Fleet's settings sync re-registers the hook after the ModApi's, which is the order that cleared the button.
+    ShipInit::Init(kItemUnequipCvar);
+}
+
+// Item Unequip must not undo a custom equip, and a key whose button was overwritten must not reach the save.
+nlohmann::json CheckCustomButtons(PlayState* play) {
+    constexpr uint8_t button = S2H_ITEM_BUTTON_C_FIRST;
+    bool wasOwned = false;
+    const std::string key = BorrowCButtonItem(&wasOwned);
+    if (key.empty()) {
+        return { { "passed", true }, { "skipped", "no free C-button custom item" } };
+    }
+    const char* previous = CustomItemRegistry_GetEquippedKey(button);
+    const std::string previousKey = previous != nullptr ? previous : "";
+    const u8 previousItem = BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_C_LEFT);
+    const u8 previousSlot = C_SLOT_EQUIP(0, EQUIP_SLOT_C_LEFT);
+    const int previousUnequip = CVarGetInteger(kItemUnequipCvar, 0);
+
+    SetItemUnequip(1);
+    const bool isEquipped = CustomItemRegistry_Equip(button, key.c_str());
+    play->pauseCtx.equipTargetCBtn = PAUSE_EQUIP_C_LEFT;
+    GameInteractor_Should(VB_KALEIDO_EQUIP_ITEM_TO_BUTTON, true, kNoShownSlot, ITEM_CUSTOM);
+    const char* kept = CustomItemRegistry_GetEquippedKey(button);
+    const bool isKept = kept != nullptr && key == kept;
+
+    BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_C_LEFT) = ITEM_NONE;
+    nlohmann::json saveFile;
+    SaveSections_Write(saveFile, true);
+    const bool isGhostSaved = IsKeySavedOnButton(saveFile, key, button);
+
+    CustomItemRegistry_Unequip(button);
+    if (previousKey.empty()) {
+        BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_C_LEFT) = previousItem;
+        C_SLOT_EQUIP(0, EQUIP_SLOT_C_LEFT) = previousSlot;
+        Interface_LoadItemIconImpl(play, EQUIP_SLOT_C_LEFT);
+    } else {
+        CustomItemRegistry_Equip(button, previousKey.c_str());
+    }
+    CustomItemRegistry_SetOwned(key.c_str(), wasOwned);
+    SetItemUnequip(previousUnequip);
+    return { { "passed", isEquipped && isKept && !isGhostSaved },
+             { "key", key },
+             { "equipped", isEquipped },
+             { "keptAfterItemUnequip", isKept },
+             { "ghostSaved", isGhostSaved } };
+}
+
 nlohmann::json Status() {
     const bool isPlaying = IsPlaying();
     nlohmann::json status = { { "playing", isPlaying },
@@ -243,7 +440,15 @@ nlohmann::json Status() {
                               { "transitioning", isPlaying && IsTransitioning(gPlayState) },
                               { "travel", sTravel ? "queued" : sTravelResult },
                               { "rained", sRained.size() },
-                              { "collected", CountCollected() } };
+                              { "collected", CountCollected() },
+                              { "showcase",
+                                { { "phase", ShowcasePhaseName() },
+                                  { "keys", sShowcase.keys.size() },
+                                  { "texts", sShowcase.texts } } },
+                              { "slowestSaveMs", FleetRuntime_SlowestSaveMilliseconds() } };
+    if (!sButtonCheck.is_null()) {
+        status["buttons"] = sButtonCheck;
+    }
     if (isPlaying) {
         const Player* player = GET_PLAYER(gPlayState);
         const Vec3f& pos = player->actor.world.pos;
@@ -267,6 +472,11 @@ std::optional<std::string> FleetFieldTest_Request(const std::string& request, co
         sRainCount = input.value("count", 24);
     } else if (request == "TestNudge") {
         Nudge(input);
+    } else if (request == "TestForeignShowcase") {
+        sShowcase = { ShowcasePhase::Drawing, FleetForeignItems_ListKeys() };
+    } else if (request == "TestCustomButtons") {
+        sButtonCheck = nullptr;
+        sIsButtonCheckQueued = true;
     } else if (request != "TestStatus") {
         return std::nullopt;
     }
@@ -282,8 +492,19 @@ void FleetFieldTest_FrameEnd() {
     }
     PlayState* play = gPlayState;
     CloseRainMessages(play);
-    if (IsTransitioning(play) || play->msgCtx.msgMode != MSGMODE_NONE || play->pauseCtx.state != PAUSE_STATE_OFF) {
+    if (IsTransitioning(play) || play->pauseCtx.state != PAUSE_STATE_OFF) {
         return;
+    }
+    if (sShowcase.phase == ShowcasePhase::Drawing || sShowcase.phase == ShowcasePhase::Texts) {
+        AdvanceShowcase(play);
+        return;
+    }
+    if (play->msgCtx.msgMode != MSGMODE_NONE) {
+        return;
+    }
+    if (sIsButtonCheckQueued) {
+        sButtonCheck = CheckCustomButtons(play);
+        sIsButtonCheckQueued = false;
     }
     if (sTravel) {
         sTravelResult = RunTravel(play, *sTravel) ? "started" : "unknown mode " + sTravel->mode;

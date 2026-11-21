@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <algorithm>
+#include <chrono>
 #include <fstream>
 #include <optional>
 #include <set>
@@ -402,7 +403,9 @@ bool CanEquipSharedButton(size_t index) {
 void EquipSharedItem(size_t index, const SharedEquip& equip) {
     const u8 item = OwnedButtonItem(equip);
     const EquipButton target = SharedButton(index);
-    if (item == ITEM_NONE || !CanEquipSharedButton(index) || FindEquipOnButton(target) == &equip) {
+    // A custom item's key lives in the item registry; overwriting or swapping its button here would orphan it.
+    if (item == ITEM_NONE || !CanEquipSharedButton(index) || *target.item == ITEM_CUSTOM ||
+        FindEquipOnButton(target) == &equip) {
         return;
     }
     for (size_t other = 0; other < kSharedButtons; other++) {
@@ -683,30 +686,66 @@ int FleetRuntime_Slot() {
     return sSession.is_object() ? sSession.at("slot").get<int>() : -1;
 }
 
+static double sSlowestSaveMilliseconds = 0.0;
+
+static void QueueFleetSave();
+
 void FleetRuntime_Save() {
+    const auto start = std::chrono::steady_clock::now();
+    QueueFleetSave();
+    const std::chrono::duration<double, std::milli> elapsed = std::chrono::steady_clock::now() - start;
+    sSlowestSaveMilliseconds = std::max(sSlowestSaveMilliseconds, elapsed.count());
+}
+
+void FleetRuntime_FinishSaving() {
+    SaveManager_WaitForFleetSaves();
+    const std::string error = SaveManager_TakeFleetSaveError();
+    if (!error.empty()) {
+        throw std::runtime_error(error);
+    }
+}
+
+double FleetRuntime_SlowestSaveMilliseconds() {
+    return sSlowestSaveMilliseconds;
+}
+
+static void MergeSections(nlohmann::json& saveFile, const char* variant, const nlohmann::json& sections) {
+    for (const auto& [name, section] : sections.items()) {
+        saveFile["sections"][variant][name] = section;
+    }
+}
+
+// Snapshots the state on the game thread; the save thread reads the file, serializes and writes it.
+static void QueueFleetSave() {
+    const std::string pastError = SaveManager_TakeFleetSaveError();
+    if (!pastError.empty()) {
+        throw std::runtime_error(pastError);
+    }
     if (IsPlaying()) {
         auto& rupees = gSaveContext.save.saveInfo.playerData.rupees;
         rupees =
             static_cast<int16_t>(std::clamp<int>(rupees + gSaveContext.rupeeAccumulator, 0, CUR_CAPACITY(UPG_WALLET)));
         gSaveContext.rupeeAccumulator = 0;
     }
-    nlohmann::json saveFile;
-    const std::string fileName = SaveManager_GetFileName(gSaveContext.fileNum + 1);
-    if (SaveManager_ReadSaveFile(fileName, saveFile) == -2) {
-        throw std::runtime_error("cannot replace corrupt MM Fleet save");
-    }
-    saveFile["version"] = 7;
-    saveFile["type"] = "2S2H_SAVE";
-    SaveContext owlContext = gSaveContext;
-    owlContext.save.isOwlSave = true;
-    owlContext.save.shipSaveInfo.pauseSaveEntrance = owlContext.save.entrance;
-    saveFile["owlSave"] = owlContext;
-    SaveSections_Write(saveFile, true);
-    if (!saveFile.contains("newCycleSave")) {
-        saveFile["newCycleSave"]["save"] = gSaveContext.save;
-        SaveSections_Write(saveFile, false);
-    }
-    SaveManager_WriteFleetSave(fileName, saveFile);
+    auto owlContext = std::make_shared<SaveContext>(gSaveContext);
+    owlContext->save.isOwlSave = true;
+    owlContext->save.shipSaveInfo.pauseSaveEntrance = owlContext->save.entrance;
+    auto cycleSave = std::make_shared<Save>(gSaveContext.save);
+    nlohmann::json written;
+    SaveSections_Write(written, true);
+    auto sections = std::make_shared<nlohmann::json>(
+        written.value(nlohmann::json::json_pointer("/sections/owl"), nlohmann::json::object()));
+    SaveManager_QueueFleetSave(SaveManager_GetFileName(gSaveContext.fileNum + 1),
+                               [owlContext, cycleSave, sections](nlohmann::json& saveFile) {
+                                   saveFile["version"] = 7;
+                                   saveFile["type"] = "2S2H_SAVE";
+                                   saveFile["owlSave"] = *owlContext;
+                                   MergeSections(saveFile, "owl", *sections);
+                                   if (!saveFile.contains("newCycleSave")) {
+                                       saveFile["newCycleSave"]["save"] = *cycleSave;
+                                       MergeSections(saveFile, "newCycle", *sections);
+                                   }
+                               });
 }
 
 void FleetRuntime_CatchUpParked() {
@@ -836,6 +875,7 @@ bool FleetRuntime_TakeDeparture(FleetDestination& destination, std::string& payl
     gPlayState->transitionMode = TRANS_MODE_OFF;
     gSaveContext.save.entrance = FleetRuntime_Materialize(transition.checkpoint.index);
     FleetRuntime_Save();
+    FleetRuntime_FinishSaving();
     payload = nlohmann::json{
         { "cross", true }, { "slot", FleetRuntime_Slot() }, { "entrance", transition.to.index }
     }.dump();

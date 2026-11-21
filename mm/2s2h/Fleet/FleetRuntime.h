@@ -14,6 +14,9 @@ nlohmann::json FleetRuntime_Status();
 bool FleetRuntime_CollectForSmoke(const std::string& check);
 nlohmann::json FleetRuntime_CycleSmoke();
 void FleetRuntime_Save();
+// Blocks until queued saves reach disk; required before the host reads or copies the save folder.
+void FleetRuntime_FinishSaving();
+double FleetRuntime_SlowestSaveMilliseconds();
 void FleetRuntime_InstallRoutes();
 int32_t FleetRuntime_Route(int32_t entrance, bool beforeNative);
 bool FleetRuntime_TakeDeparture(FleetDestination& destination, std::string& payload);

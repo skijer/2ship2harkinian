@@ -275,11 +275,18 @@ void EquipCursorItem(bool* should, va_list args) {
         return;
     }
     const S2HCustomItemDefinition* definition = GetShownSlotItem(static_cast<uint8_t>(cursorSlot));
-    const bool isEquipped = definition != nullptr &&
-                            CustomItemRegistry_Equip(
-                                KaleidoItemManager_ToHeldButton(gPlayState->pauseCtx.equipTargetCBtn), definition->key);
-    PlayPauseSfx(isEquipped ? NA_SE_SY_DECIDE : NA_SE_SY_ERROR);
+    const uint8_t button = KaleidoItemManager_ToHeldButton(gPlayState->pauseCtx.equipTargetCBtn);
     *should = false;
+    const char* equippedKey = CustomItemRegistry_GetEquippedKey(button);
+    const bool isAlreadyOnButton =
+        definition != nullptr && equippedKey != nullptr && std::strcmp(equippedKey, definition->key) == 0;
+    if (isAlreadyOnButton && CVarGetInteger("gEnhancements.Equipment.ItemUnequip", 0)) {
+        CustomItemRegistry_Unequip(button);
+        PlayPauseSfx(NA_SE_SY_DECIDE);
+        return;
+    }
+    const bool isEquipped = definition != nullptr && CustomItemRegistry_Equip(button, definition->key);
+    PlayPauseSfx(isEquipped ? NA_SE_SY_DECIDE : NA_SE_SY_ERROR);
 }
 
 void DisplayCursorItemText(bool* should, va_list args) {

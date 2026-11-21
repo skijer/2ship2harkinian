@@ -102,6 +102,7 @@ bool IsPlaying() {
 void Depart(const std::string& portal) {
     if (FleetRuntime_HasSession()) {
         FleetRuntime_Save();
+        FleetRuntime_FinishSaving();
     }
     const std::string payload = nlohmann::json{ { "portal", portal }, { "slot", gSaveContext.fileNum } }.dump();
     const FleetDestination destination = { .game = nullptr, .entrance = 0, .payloadJson = payload.c_str() };
@@ -136,6 +137,7 @@ void BootIntoPlay(const Arrival& arrival) {
             throw std::runtime_error("MM could not create the combined randomizer save");
         }
         FleetRuntime_Save();
+        FleetRuntime_FinishSaving();
     }
     gSaveContext.gameMode = GAMEMODE_NORMAL;
     if (FleetRuntime_HasSession() && (!IS_RANDO || gSaveContext.save.shipSaveInfo.rando.finalSeed !=

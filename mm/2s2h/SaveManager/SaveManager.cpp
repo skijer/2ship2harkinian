@@ -2,8 +2,14 @@
 #include "SaveSections.h"
 #include "2s2h/Fleet/FleetGame.h"
 
+#include <chrono>
+#include <condition_variable>
 #include <fstream>
 #include <filesystem>
+#include <mutex>
+#include <optional>
+#include <thread>
+#include <utility>
 #include <nlohmann/json.hpp>
 #ifdef _WIN32
 #include <Windows.h>
@@ -117,26 +123,150 @@ int SaveManager_MigrateSave(nlohmann::json& j) {
     }
 }
 
-void SaveManager_WriteFleetSave(const std::filesystem::path& fileName, const nlohmann::json& save) {
-    std::filesystem::create_directories(SavesFolderPath());
-    const auto path = SavesFolderPath() / fileName;
-    const std::filesystem::path temporary = path.string() + ".fleet.tmp";
-    {
-        std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
-        stream.exceptions(std::ios::badbit | std::ios::failbit);
-        stream << save.dump(4);
-        stream.flush();
+namespace {
+
+int ReadJsonFile(const std::filesystem::path& filePath, nlohmann::json& j) {
+    if (!std::filesystem::exists(filePath)) {
+        return -1;
     }
+    try {
+        std::ifstream stream(filePath, std::ios::binary);
+        const std::string contents((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+        j = nlohmann::json::parse(contents);
+        return 0;
+    } catch (...) {
+        SPDLOG_ERROR("Failed to read save file");
+        return -2;
+    }
+}
+
+struct FleetSaveJob {
+    std::filesystem::path path;
+    FleetSaveFill fill;
+};
+
+// Fleet saves on every collected check. Reading, serializing and writing the multi-megabyte file happens on this
+// thread so the frame never waits; only the newest pending save is kept, since each one holds the whole state.
+struct FleetSaveWriter {
+    std::mutex mutex;
+    std::condition_variable changed;
+    std::optional<FleetSaveJob> pending;
+    bool isWriting = false;
+    bool isStopping = false;
+    std::string error;
+    std::thread* thread = nullptr;
+};
+
+// Leaked on purpose: the host may unload this module, and a static destructor would run after its threads died.
+FleetSaveWriter& Writer() {
+    static FleetSaveWriter* writer = new FleetSaveWriter();
+    return *writer;
+}
+
+// The host copies the save folder on commits; a replace refused by its open handle is retried.
+void ReplaceFile(const std::filesystem::path& temporary, const std::filesystem::path& path) {
 #ifdef _WIN32
-    if (!MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-        throw std::runtime_error("could not commit MM Fleet save");
+    constexpr int kAttempts = 50;
+    for (int attempt = 0; attempt < kAttempts; attempt++) {
+        if (MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+            return;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+    throw std::runtime_error("could not commit MM Fleet save");
 #else
     std::filesystem::rename(temporary, path);
 #endif
 }
 
+void WriteFleetSave(const FleetSaveJob& job) {
+    nlohmann::json saveFile;
+    if (ReadJsonFile(job.path, saveFile) == -2) {
+        throw std::runtime_error("cannot replace corrupt MM Fleet save");
+    }
+    job.fill(saveFile);
+    std::filesystem::create_directories(job.path.parent_path());
+    const std::filesystem::path temporary = job.path.string() + ".fleet.tmp";
+    {
+        std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
+        stream.exceptions(std::ios::badbit | std::ios::failbit);
+        stream << saveFile.dump();
+        stream.flush();
+    }
+    ReplaceFile(temporary, job.path);
+}
+
+void RunFleetSaveWriter() {
+    FleetSaveWriter& writer = Writer();
+    std::unique_lock lock(writer.mutex);
+    while (true) {
+        writer.changed.wait(lock, [&writer] { return writer.pending.has_value() || writer.isStopping; });
+        if (!writer.pending) {
+            return;
+        }
+        const FleetSaveJob job = std::move(*writer.pending);
+        writer.pending.reset();
+        writer.isWriting = true;
+        lock.unlock();
+        std::string error;
+        try {
+            WriteFleetSave(job);
+        } catch (const std::exception& exception) {
+            error = exception.what();
+        }
+        lock.lock();
+        writer.isWriting = false;
+        if (!error.empty()) {
+            writer.error = error;
+        }
+        writer.changed.notify_all();
+    }
+}
+
+} // namespace
+
+void SaveManager_QueueFleetSave(const std::filesystem::path& fileName, FleetSaveFill fill) {
+    FleetSaveWriter& writer = Writer();
+    {
+        std::lock_guard lock(writer.mutex);
+        writer.pending = FleetSaveJob{ SavesFolderPath() / fileName, std::move(fill) };
+        if (writer.thread == nullptr) {
+            writer.isStopping = false;
+            writer.thread = new std::thread(RunFleetSaveWriter);
+        }
+    }
+    writer.changed.notify_all();
+}
+
+void SaveManager_WaitForFleetSaves() {
+    FleetSaveWriter& writer = Writer();
+    std::unique_lock lock(writer.mutex);
+    writer.changed.wait(lock, [&writer] { return !writer.pending && !writer.isWriting; });
+}
+
+std::string SaveManager_TakeFleetSaveError() {
+    FleetSaveWriter& writer = Writer();
+    std::lock_guard lock(writer.mutex);
+    return std::exchange(writer.error, std::string());
+}
+
+void SaveManager_StopFleetSaves() {
+    FleetSaveWriter& writer = Writer();
+    std::thread* thread = nullptr;
+    {
+        std::lock_guard lock(writer.mutex);
+        writer.isStopping = true;
+        thread = std::exchange(writer.thread, nullptr);
+    }
+    writer.changed.notify_all();
+    if (thread != nullptr) {
+        thread->join();
+        delete thread;
+    }
+}
+
 void SaveManager_WriteSaveFile(const std::filesystem::path& fileName, nlohmann::json j) {
+    SaveManager_WaitForFleetSaves();
     const std::filesystem::path filePath = SavesFolderPath() / fileName;
 
     if (!std::filesystem::exists(SavesFolderPath())) {
@@ -151,6 +281,7 @@ void SaveManager_WriteSaveFile(const std::filesystem::path& fileName, nlohmann::
 }
 
 void SaveManager_DeleteSaveFile(const std::filesystem::path& fileName) {
+    SaveManager_WaitForFleetSaves();
     const std::filesystem::path filePath = SavesFolderPath() / fileName;
 
     try {
@@ -161,21 +292,8 @@ void SaveManager_DeleteSaveFile(const std::filesystem::path& fileName) {
 }
 
 int SaveManager_ReadSaveFile(const std::filesystem::path& fileName, nlohmann::json& j) {
-    const std::filesystem::path filePath = SavesFolderPath() / fileName;
-
-    if (!std::filesystem::exists(filePath)) {
-        return -1;
-    }
-
-    try {
-        std::ifstream i(filePath);
-        i >> j;
-        i.close();
-        return 0;
-    } catch (...) {
-        SPDLOG_ERROR("Failed to read save file");
-        return -2;
-    }
+    SaveManager_WaitForFleetSaves();
+    return ReadJsonFile(SavesFolderPath() / fileName, j);
 }
 
 // Special "auto save" to prevent save scumming Saria's Song hint. This can be more generic if we
@@ -207,6 +325,7 @@ void SaveManager_PersistSariaHintsAvailable() {
 }
 
 void SaveManager_MoveInvalidSaveFile(const std::filesystem::path& fileName, const std::string& message) {
+    SaveManager_WaitForFleetSaves();
     const std::filesystem::path filePath = SavesFolderPath() / fileName;
     const std::filesystem::path backupFilePath =
         SavesFolderPath() / (fileName.stem().string() + "_invalid_" + std::to_string(std::time(nullptr)) + ".json");

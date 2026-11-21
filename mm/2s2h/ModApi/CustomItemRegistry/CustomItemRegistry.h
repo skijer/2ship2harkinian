@@ -161,6 +161,7 @@ const S2HCustomPickupVariant* CustomItemRegistry_GetPickupVariant(const char* ke
 const char* CustomItemRegistry_FindPickupKey(const char* itemKey, const char* variantKey);
 void CustomItemRegistry_DrawAcquisition(const char* key, struct PlayState* play);
 void CustomItemRegistry_PrepareAcquisitionMessage(const char* key);
+bool CustomItemRegistry_ShowGetItemText(struct PlayState* play, const char* key);
 
 typedef struct {
     uint32_t structSize;
@@ -325,6 +326,7 @@ void CustomItemRegistry_RegisterAppearanceDrawing();
 std::string CustomItemRegistry_GetOwner(const char* key);
 std::vector<std::string> CustomItemRegistry_ListWorn();
 std::vector<std::string> CustomItemRegistry_ListOwned();
+std::vector<std::string> CustomItemRegistry_ListKeys();
 std::string CustomItemRegistry_GetDisplayName(const char* key);
 std::vector<const S2HCustomPickupVariant*> CustomItemRegistry_ListPickupVariants(const char* itemKey);
 void CustomItemRegistry_SetDrawingPlayer(Player* player);

@@ -42,6 +42,10 @@ void RegisterItemUnequip() {
     COND_VB_SHOULD(VB_KALEIDO_EQUIP_ITEM_TO_BUTTON, CVAR, {
         u16 cursorSlot = va_arg(args, int);
         u16 cursorItem = va_arg(args, int);
+        // Every custom item shares ITEM_CUSTOM; the registry unequips them by key.
+        if (cursorItem == ITEM_CUSTOM) {
+            return;
+        }
 
         PauseContext* pauseCtx = &gPlayState->pauseCtx;
         s32 targetSlot = -1;

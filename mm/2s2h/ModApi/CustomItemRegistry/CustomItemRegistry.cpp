@@ -160,11 +160,20 @@ void SyncButton(uint8_t button) {
     }
 }
 
-void SyncAllButtons() {
+// Kaleido, Item Unequip and Fleet's Shared Equips replace C and D-pad items without unequipping the key.
+bool IsKeyOverwritten(uint8_t button) {
+    return button != S2H_ITEM_BUTTON_B && GetVanillaButtonItem(button) != ITEM_CUSTOM;
+}
+
+void ReconcileButtonsWithSave() {
     for (uint8_t button = 0; button < S2H_ITEM_BUTTON_COUNT; ++button) {
-        if (IsValidButton(button)) {
-            SyncButton(button);
+        if (!IsValidButton(button)) {
+            continue;
         }
+        if (IsKeyOverwritten(button)) {
+            EquippedKey(button).clear();
+        }
+        SyncButton(button);
     }
 }
 
@@ -175,7 +184,7 @@ nlohmann::json WriteSection() {
     for (size_t form = 0; form < sEquippedKeys.size(); ++form) {
         for (size_t button = 0; button < S2H_ITEM_BUTTON_COUNT; ++button) {
             const std::string& key = sEquippedKeys[form][button];
-            if (!key.empty()) {
+            if (!key.empty() && !IsKeyOverwritten(static_cast<uint8_t>(button))) {
                 equipped.push_back({ { "form", form }, { "button", button }, { "key", key } });
             }
         }
@@ -248,13 +257,15 @@ const S2HCustomItemDefinition* GetEquippedDefinition(uint8_t button) {
 }
 
 void SwapOutOfOtherButtons(uint8_t targetButton, const std::string& key) {
+    // A target already holding the key would hand the duplicate straight back.
+    const bool targetHoldsKey = GetVanillaButtonItem(targetButton) == ITEM_CUSTOM && EquippedKey(targetButton) == key;
+    const uint8_t item = targetHoldsKey ? ITEM_NONE : GetVanillaButtonItem(targetButton);
+    const uint8_t slot = targetHoldsKey ? SLOT_NONE : GetVanillaButtonSlot(targetButton);
     for (uint8_t other = 0; other < S2H_ITEM_BUTTON_COUNT; ++other) {
         if (other == targetButton || !IsValidButton(other) || GetVanillaButtonItem(other) != ITEM_CUSTOM ||
             EquippedKey(other) != key) {
             continue;
         }
-        const uint8_t item = GetVanillaButtonItem(targetButton);
-        const uint8_t slot = GetVanillaButtonSlot(targetButton);
         EquippedKey(other) = item == ITEM_CUSTOM ? EquippedKey(targetButton) : std::string();
         SetVanillaButton(other, item, slot);
         ReloadButtonIcon(other);
@@ -670,7 +681,7 @@ void CustomItemRegistry_Init() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>(PutAwayStalledHeldItem);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerFilterInput>(HoldStillWhileAiming);
     CustomItemRegistry_RegisterAppearanceDrawing();
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveLoad>([](s16) { SyncAllButtons(); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveLoad>([](s16) { ReconcileButtonsWithSave(); });
 }
 
 const S2HCustomPickupVariant* CustomItemRegistry_GetPickupVariant(const char* key) {
@@ -1343,14 +1354,22 @@ bool CustomItemRegistry_Give(PlayState* play, const char* key) {
     sMessageItem = definition->key;
     CustomItemRegistry_ReceiveGetItem(key);
     Audio_PlayFanfare(NA_BGM_GET_ITEM);
-    if (definition->getItemText != nullptr) {
-        CustomMessage::Entry entry;
-        if (definition->iconPath != nullptr && ResourceMgr_FileExists(definition->iconPath)) {
-            entry.icon = ITEM_OCARINA_OF_TIME;
-            entry.iconPath = definition->iconPath;
-        }
-        CustomMessage::StartTextbox(definition->getItemText, entry);
+    CustomItemRegistry_ShowGetItemText(play, definition->key);
+    return true;
+}
+
+bool CustomItemRegistry_ShowGetItemText(PlayState* play, const char* key) {
+    const S2HCustomItemDefinition* definition = CustomItemRegistry_Find(key);
+    if (play == nullptr || definition == nullptr || definition->getItemText == nullptr) {
+        return false;
     }
+    sMessageItem = definition->key;
+    CustomMessage::Entry entry;
+    if (definition->iconPath != nullptr && ResourceMgr_FileExists(definition->iconPath)) {
+        entry.icon = ITEM_OCARINA_OF_TIME;
+        entry.iconPath = definition->iconPath;
+    }
+    CustomMessage::StartTextbox(definition->getItemText, entry);
     return true;
 }
 
@@ -1374,4 +1393,14 @@ void CustomItemRegistry_ClearCurrentMod() {
 
 std::vector<std::string> CustomItemRegistry_ListOwned() {
     return { sOwnedItems.begin(), sOwnedItems.end() };
+}
+
+std::vector<std::string> CustomItemRegistry_ListKeys() {
+    std::vector<std::string> keys;
+    keys.reserve(sCustomItems.size());
+    for (const auto& [key, item] : sCustomItems) {
+        keys.push_back(key);
+    }
+    std::sort(keys.begin(), keys.end());
+    return keys;
 }
