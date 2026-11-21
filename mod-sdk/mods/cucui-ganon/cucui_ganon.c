@@ -69,8 +69,7 @@ static const ALIGN_ASSET(2) char sEntryMusic[] = "custom/music/Cucui-Ganon-Entry
 static const ALIGN_ASSET(2) char sMutedMusic[] = "custom/music/Cucui-Ganon-Loop-Muted_bgm";
 static const ALIGN_ASSET(2) char sFullMusic[] = "custom/music/Cucui-Ganon-Loop-Full_bgm";
 static const ALIGN_ASSET(2) char sBossTitleTex[] = "__OTR__textures/cucui_ganon/gCucuiGanonTitleCardENGTex";
-// OoT's Ganondorf overlay carries the same triforce glow as Ganon's, which oot.o2r does not extract.
-static const ALIGN_ASSET(2) char sTriforceDL[] = "__OTR__overlays/oot_ovl_Boss_Ganon/gGanondorfTriforceDL";
+static const ALIGN_ASSET(2) char sTriforceDL[] = "__OTR__overlays/oot_ovl_Boss_Ganon2/gGanonTriforceDL";
 
 typedef struct {
     Vec3f root;

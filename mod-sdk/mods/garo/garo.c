@@ -13,7 +13,6 @@
 #include "2s2h/Rando/Types.h"
 #include "2s2h/ModApi/RandoInfCustom/RandoInfCustom.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
-#include "objects/gameplay_keep/gameplay_keep.h"
 
 #define GARO_MASK_KEY "nei.garo_form_mask"
 #define GARO_FORM_KEY "nei.garo"
@@ -88,7 +87,6 @@
 #define ROD_BALL_SCALE_MAX 7.0f
 #define ROD_BALL_AHEAD 55.0f
 
-#define ORB_SHADOW_UNIT 0.0125f
 #define ORB_TRAIL_DRAWN 12
 #define ORB_STREAK_SCALE 0.008f
 
@@ -152,7 +150,10 @@ static const ALIGN_ASSET(2) char sMaskDL[] = "__OTR__objects/object_mask_json/ob
 static const ALIGN_ASSET(2) char sHybridSkelPath[] = "__OTR__objects/object_jso/gGaroSkel";
 static const ALIGN_ASSET(2) char sHybridIdlePath[] = "__OTR__objects/object_jso/gGaroIdleAnim";
 
+#define GANON2 "__OTR__overlays/oot_ovl_Boss_Ganon2/"
 #define GANON "__OTR__overlays/oot_ovl_Boss_Ganon/"
+static const ALIGN_ASSET(2) char sOrbMaterialDL[] = GANON2 "gGanonLightOrbMaterialDL";
+static const ALIGN_ASSET(2) char sOrbModelDL[] = GANON2 "gGanonLightOrbModelDL";
 static const ALIGN_ASSET(2) char sBigMagicMaterialDL[] = GANON "gGanondorfLightBallMaterialDL";
 static const ALIGN_ASSET(2) char sBigMagicBallDL[] = GANON "gGanondorfSquareDL";
 static const ALIGN_ASSET(2) char sBigMagicFlecksDL[] = GANON "gGanondorfLightFlecksDL";
@@ -1833,22 +1834,28 @@ static void HideLinkBody(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDL
     }
 }
 
-// Ganon2's light orb is not in oot.o2r; the shadow ball uses MM's own light orb.
 static void DrawShadowBall(PlayState* play, Vec3f pos, f32 scale) {
-    static const u8 prim[3] = { 140, 80, 220 };
-    static const u8 env[3] = { 40, 10, 100 };
-
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 185, 115, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, 85, 20, 165, 0);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sOrbMaterialDL);
     Matrix_Translate(pos.x, pos.y, pos.z, MTXMODE_NEW);
     Matrix_ReplaceRotation(&play->billboardMtxF);
-    Matrix_RotateZS((s16)(play->gameplayFrames * 0x400), MTXMODE_APPLY);
-    Matrix_Scale(scale, scale, 1.0f, MTXMODE_APPLY);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gLightOrbMaterial1DL);
-    gDPSetEnvColor(POLY_XLU_DISP++, env[0], env[1], env[2], 128);
-    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, prim[0], prim[1], prim[2], 255);
+    Matrix_Scale(scale * 1.9f, scale * 1.9f, scale * 1.9f, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gLightOrbModelDL);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sOrbModelDL);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sOrbMaterialDL);
+    gDPSetCycleType(POLY_XLU_DISP++, G_CYC_1CYCLE);
+    gDPSetCombineLERP(POLY_XLU_DISP++, 0, 0, 0, PRIMITIVE, TEXEL0, 0, PRIMITIVE, 0, 0, 0, 0, PRIMITIVE, TEXEL0, 0,
+                      PRIMITIVE, 0);
+    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_AA_ZB_XLU_SURF, G_RM_AA_ZB_XLU_SURF2);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 46, 0, 72, 255);
+    Matrix_Translate(pos.x, pos.y, pos.z, MTXMODE_NEW);
+    Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(scale * 0.8f, scale * 0.8f, scale * 0.8f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sOrbModelDL);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
@@ -1978,7 +1985,7 @@ static void DrawProjectiles(PlayState* play, Player* player) {
     }
     if (sMove == GARO_MOVE_BANISH_SHADOW) {
         f32 t = MIN((f32)sShadowTimer / (f32)BANISH_SHADOW_FRAMES, 1.0f);
-        DrawShadowBall(play, sShadowPos, (3.4f + t * 1.6f) * ORB_SHADOW_UNIT);
+        DrawShadowBall(play, sShadowPos, 3.4f + t * 1.6f);
     }
     for (s32 i = 0; i < ORB_POOL_MAX; i++) {
         RodOrb* orb = &sOrbs[i];

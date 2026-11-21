@@ -1,16 +1,19 @@
 #include "2s2h/ModApi/ModApi.h"
+#include "cojiro_assets.h"
 #include "shared_asset_archive.h"
 
 #include <algorithm>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <vector>
 
 static const S2HModApi* sApi;
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), nullptr, 0 };
 static bool HasExtractedAssets() {
-    if (!S2H_MOD_API_HAS(sApi, HasModArchiveFile) || !sApi->HasModArchiveFile("oot.o2r"))
+    if (!S2H_MOD_API_HAS(sApi, HasModArchiveFile) || !sApi->HasModArchiveFile("oot.o2r")) {
         return false;
+    }
     const char* markers[] = {
         "overlays/oot_ovl_Boss_Ganon/gGanondorfDotDL",
         "textures/oot_icon_item_nes_static/gPauseEquipment10ENGTex",
@@ -47,11 +50,12 @@ static bool HasExtractedAssets() {
         "overlays/oot_ovl_Magic_Fire/sModelDL",
         "overlays/oot_ovl_Magic_Dark/sDiamondModelDL",
         "overlays/oot_ovl_Magic_Wind/sSkel",
+        "objects/oot_object_xc/gSheikHarpDL",
+        "overlays/oot_ovl_Boss_Ganon2/gGanonLightOrbModelDL",
+        "overlays/oot_ovl_Boss_Ganon2/gGanonTriforceDL",
     };
-    for (const char* marker : markers)
-        if (!sApi->HasResource(marker))
-            return false;
-    return true;
+    return std::all_of(std::begin(markers), std::end(markers),
+                       [](const char* marker) { return sApi->HasResource(marker); });
 }
 
 static uint32_t ReadBE(const uint8_t* data) {
@@ -140,23 +144,29 @@ static std::vector<uint8_t> ReadResource(const char* path) {
     return resource;
 }
 
+static bool IsAnyAssetMissing(const std::vector<SharedAssetArchive::ArchiveFile>& files) {
+    return std::any_of(files.begin(), files.end(), [](const SharedAssetArchive::ArchiveFile& file) {
+        return !sApi->HasResource(file.path.c_str());
+    });
+}
+
 static void CreateSharedAssets() {
     static const std::vector<SharedAssetArchive::SongTint> kQuestSongTints = {
         { "Minuet", 150, 255, 100 }, { "Bolero", 255, 80, 40 },     { "Serenade", 100, 150, 255 },
         { "Requiem", 255, 160, 0 },  { "Nocturne", 255, 100, 255 }, { "Prelude", 255, 240, 100 },
         { "Lullaby", 255, 20, 20 },  { "Custom", 255, 255, 255 },
     };
-    bool isAssetMissing = !sApi->HasResource("textures/oot_icon_item_static/gItemIconOotSongMinuetTex");
     std::vector<SharedAssetArchive::ArchiveFile> files =
         SharedAssetArchive::MakeSongNoteIcons(ReadResource("textures/oot_icon_item_static/gSongNoteTex"),
                                               "textures/oot_icon_item_static/gItemIconOotSong", kQuestSongTints);
     for (const SharedAsset& asset : kSharedAssets) {
         if (sApi->HasResource(asset.source)) {
-            isAssetMissing = isAssetMissing || !sApi->HasResource(asset.target);
             files.push_back({ asset.target, ReadResource(asset.source) });
         }
     }
-    if (isAssetMissing && !files.empty()) {
+    std::vector<SharedAssetArchive::ArchiveFile> cojiro = CojiroAssets::MakeCojiroAssets(ReadResource);
+    files.insert(files.end(), std::make_move_iterator(cojiro.begin()), std::make_move_iterator(cojiro.end()));
+    if (IsAnyAssetMissing(files)) {
         const std::vector<uint8_t> archive = SharedAssetArchive::BuildStoredZip(files);
         sApi->SaveToModsFolder("oot_shared_assets.o2r", archive.data(), archive.size());
     }

@@ -1,0 +1,76 @@
+<Root>
+    <ExternalFile XmlPath="objects/gameplay_keep.xml" OutPath="objects/oot_gameplay_keep/" />
+    <File Name="object_xc" Segment="6" OutName="oot_object_xc" Game="OOT">
+        <Animation Name="gSheikAnim_01A048" Offset="0x1AA68" />
+        <Animation Name="gSheikArmsCrossedIdleAnim" Offset="0x144C4" />
+        <Animation Name="gSheikContortionsAnim" Offset="0x17408" />
+        <DList Name="gSheikDL_011620" Offset="0x12040" />
+        <DList Name="gSheikDL_012970" Offset="0x13390" />
+        <Animation Name="gSheikDefenseStanceAnim" Offset="0x19520" />
+        <Texture Name="gSheikEyeHalfClosedTex" Offset="0x5AE0" Format="ci8" Width="32" Height="32" />
+        <Texture Name="gSheikEyeOpenTex" Offset="0x56E0" Format="ci8" Width="32" Height="32" />
+        <Texture Name="gSheikEyeShutTex" Offset="0x5EE0" Format="ci8" Width="32" Height="32" />
+        <Texture Name="gSheikEyeSquintingTex" Offset="0x62E0" Format="ci8" Width="32" Height="32" />
+        <Animation Name="gSheikFallingFromContortionsAnim" Offset="0x15404" />
+        <Animation Name="gSheikFallingFromSkyAnim" Offset="0x1CB08" />
+        <DList Name="gSheikHarpDL" Offset="0x11B70" />
+        <Animation Name="gSheikHittingGroundAnim" Offset="0x1A998" />
+        <Animation Name="gSheikIdleAnim" Offset="0x5248" />
+        <Animation Name="gSheikInitialHarpAnim" Offset="0x18674" />
+        <Animation Name="gSheikKneelingAnim" Offset="0x1A650" />
+        <Animation Name="gSheikPlayingHarp2Anim" Offset="0x2D38" />
+        <Animation Name="gSheikPlayingHarp3Anim" Offset="0x3CE8" />
+        <Animation Name="gSheikPlayingHarp4Anim" Offset="0x4F90" />
+        <Animation Name="gSheikPlayingHarp5Anim" Offset="0x18218" />
+        <Animation Name="gSheikPlayingHarpAnim" Offset="0xDB8" />
+        <Animation Name="gSheikPullingOutHarpAnim" Offset="0x1BBBC" />
+        <Animation Name="gSheikShowingTriforceOnHandAnim" Offset="0x1C58" />
+        <Animation Name="gSheikShowingTriforceOnHandIdleAnim" Offset="0x1F64" />
+        <Skeleton Name="gSheikSkel" Offset="0x13510" Type="Flex" LimbType="Standard" />
+        <Animation Name="gSheikThrowingNutAnim" Offset="0x19FB8" />
+        <Animation Name="gSheikWalkingAnim" Offset="0x139F0" />
+        <Texture Name="object_xcTLUT_004840" Offset="0x5260" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_xcTLUT_00F6C0" Offset="0x100E0" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_xcTLUT_00F720" Offset="0x10140" Format="rgba16" Width="16" Height="16" />
+        <Texture Name="object_xcTex_004C40" Offset="0x5660" Format="ci8" Width="8" Height="8" TlutOffset="0x5260" />
+        <Texture Name="object_xcTex_004C80" Offset="0x56A0" Format="ci8" Width="8" Height="8" TlutOffset="0x5260" />
+        <Texture Name="object_xcTex_005CC0" Offset="0x66E0" Format="ci8" Width="32" Height="32" TlutOffset="0x5460" />
+        <Texture Name="object_xcTex_0060C0" Offset="0x6AE0" Format="ci8" Width="32" Height="32" TlutOffset="0x5260" />
+        <Texture Name="object_xcTex_0064C0" Offset="0x6EE0" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="object_xcTex_006CC0" Offset="0x76E0" Format="ci8" Width="8" Height="16" TlutOffset="0x5260" />
+        <Texture Name="object_xcTex_006D40" Offset="0x7760" Format="ci8" Width="8" Height="8" TlutOffset="0x5260" />
+        <Texture Name="object_xcTex_006D80" Offset="0x77A0" Format="ci8" Width="16" Height="16" TlutOffset="0x5260" />
+        <Texture Name="object_xcTex_006E80" Offset="0x78A0" Format="ci8" Width="32" Height="32" TlutOffset="0x5460" />
+        <Texture Name="object_xcTex_007280" Offset="0x7CA0" Format="ci8" Width="16" Height="16" TlutOffset="0x5260" />
+        <Texture Name="object_xcTex_007380" Offset="0x7DA0" Format="rgba16" Width="32" Height="32" />
+        <Texture Name="object_xcTex_007B80" Offset="0x85A0" Format="ci8" Width="32" Height="64" TlutOffset="0x5260" />
+        <Texture Name="object_xcTex_008380" Offset="0x8DA0" Format="ci8" Width="32" Height="64" TlutOffset="0x5260" />
+        <Texture Name="object_xcTex_008B80" Offset="0x95A0" Format="ci8" Width="16" Height="8" TlutOffset="0x5260" />
+        <Texture Name="object_xcTex_008C00" Offset="0x9620" Format="ci8" Width="32" Height="16" TlutOffset="0x5260" />
+        <Texture Name="object_xcTex_00F790" Offset="0x101B0" Format="ci8" Width="8" Height="8" TlutOffset="0x100E0" />
+        <Texture Name="object_xcTex_00F7D0" Offset="0x101F0" Format="ci8" Width="32" Height="32" TlutOffset="0x10140" />
+        <Texture Name="object_xcTex_00FBD0" Offset="0x105F0" Format="ci8" Width="16" Height="16" TlutOffset="0x100E0" />
+        <Texture Name="object_xcTex_00FCD0" Offset="0x106F0" Format="ci8" Width="8" Height="8" TlutOffset="0x100E0" />
+        <Texture Name="object_xcTex_00FD10" Offset="0x10730" Format="rgba16" Width="8" Height="8" />
+        <Texture Name="object_xcTex_00FD90" Offset="0x107B0" Format="i8" Width="8" Height="8" />
+        <Texture Name="object_xcTex_00FDD0" Offset="0x107F0" Format="rgba16" Width="16" Height="32" />
+        <Texture Name="object_xcTex_0101D0" Offset="0x10BF0" Format="rgba16" Width="8" Height="16" />
+        <Texture Name="object_xcTex_011930" Offset="0x12350" Format="i8" Width="64" Height="64" />
+        <Texture Name="object_xc_TLUT_004A40" Offset="0x5460" Format="rgba16" Width="16" Height="16" />
+        <DList Name="gSheikSkelLimbsLimb_013470DL_00DB40" Offset="0x00DB40" />
+        <DList Name="gSheikSkelLimbsLimb_0134C4DL_00E130" Offset="0x00E130" />
+        <DList Name="gSheikSkelLimbsLimb_0134A0DL_00E848" Offset="0x00E848" />
+        <DList Name="gSheikSkelLimbsLimb_0134ACDL_00EA18" Offset="0x00EA18" />
+        <DList Name="gSheikSkelLimbsLimb_0134B8DL_00EC40" Offset="0x00EC40" />
+        <DList Name="gSheikSkelLimbsLimb_01347CDL_00EE80" Offset="0x00EE80" />
+        <DList Name="gSheikSkelLimbsLimb_013488DL_00F050" Offset="0x00F050" />
+        <DList Name="gSheikSkelLimbsLimb_013494DL_00F278" Offset="0x00F278" />
+        <DList Name="gSheikSkelLimbsLimb_01341CDL_00F4B8" Offset="0x00F4B8" />
+        <DList Name="gSheikSkelLimbsLimb_01344CDL_00F600" Offset="0x00F600" />
+        <DList Name="gSheikSkelLimbsLimb_013458DL_00F7D0" Offset="0x00F7D0" />
+        <DList Name="gSheikSkelLimbsLimb_013464DL_00F9C0" Offset="0x00F9C0" />
+        <DList Name="gSheikSkelLimbsLimb_013428DL_00FB70" Offset="0x00FB70" />
+        <DList Name="gSheikSkelLimbsLimb_013434DL_00FD40" Offset="0x00FD40" />
+        <DList Name="gSheikSkelLimbsLimb_013440DL_00FF30" Offset="0x00FF30" />
+    </File>
+</Root>

@@ -19,9 +19,10 @@ The three white feather textures and the border-connected feather background
 of the eye texture are tinted blue in local copies of the cucco display lists.
 The eye's iris, pupil and inner highlights stay as in OoT, as do beak, comb and
 claw textures. This prevents a white square around the eye. Other cuccos'
-shared assets are never patched. Regenerate with `build_assets.py.txt` against
-the installed oot.o2r; the report records the seven limb bindings and material
-substitutions.
+shared assets are never patched. The mod ships no OoT data: the OoT Asset
+Loader builds these copies (`objects/object_nei_cojiro`) from the player's own
+oot.o2r into `oot_shared_assets.o2r`, and `limb_models.inc.c` binds them to the
+seven cucco limbs.
 
 Any attack type can hit him, including Link's attacks. Three distinct hits
 with a 16-update invulnerability interval dismiss him for 400 active gameplay

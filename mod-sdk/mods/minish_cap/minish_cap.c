@@ -1,3 +1,6 @@
+// The Minish Cap: shrinks Link to Minish size; as Minish on a soft soil, it opens a warp map to the soils visited.
+
+#include <math.h>
 
 #include "z64items.h"
 
@@ -6,8 +9,12 @@
 #include "macros.h"
 #include "regs.h"
 #include "variables.h"
+#include "archives/map_name_static/map_name_static.h"
+#include "interface/icon_item_field_static/icon_item_field_static.h"
 
 #define MINISH_CAP_KEY "nei.minish_cap"
+#define MINISH_CAP_OWNER "minish_cap"
+#define MINISH_CAP_TIME_PRIORITY 5000
 
 #define PLAYER_SCALE_NORMAL 0.01f
 #define MINISH_SCALE 0.001f
@@ -26,10 +33,12 @@ typedef enum {
 
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/gItemIconMinishCapTex";
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/gMinishCapNameTex";
+static const ALIGN_ASSET(2) char sPecoriTex[] = "__OTR__textures/icon_item_custom/gItemIconPecoriTex";
 static const ALIGN_ASSET(2) char sCapDL[] = "__OTR__objects/object_nei_minish_cap/Cylinder_opaque_dl";
 
 static const char* const sRequiredHooks[] = {
     "OnPlayerUpdate",
+    "OnInterfaceDrawEnd",
     "OnCameraResolveView",
     "OnActorResolveBgCheckFlags",
     "OnPlayerResolveMotionScale",
@@ -160,6 +169,10 @@ static void UpdateMinishSize(Player* player, PlayState* play) {
     }
 }
 
+#include "minish_warp_points.inc.c"
+#include "minish_travel.inc.c"
+#include "minish_map.inc.c"
+
 // The wall probe is sized for a full-size Link, so tiny Link reads as hugging a wall and vanilla throttles the cap.
 static void ResolveMotionScale(Player* player, s32 kind, f32* scale) {
     if (sSizePhase != MINISH_SIZE_TINY || kind != SOH_PLAYER_MOTION_SPEED_CAP) {
@@ -207,7 +220,20 @@ static void BlockLegPlanting(bool* should, va_list args) {
     }
 }
 
+static bool IsMapOrTravelActive(void) {
+    return sIsMapOpen || IsTravelling();
+}
+
+static void BlockPauseMenu(bool* should, va_list args) {
+    if (IsMapOrTravelActive()) {
+        *should = false;
+    }
+}
+
 static bool CanUseCap(Player* player, PlayState* play) {
+    if (IsMapOrTravelActive()) {
+        return false;
+    }
     return play->pauseCtx.state == PAUSE_STATE_OFF && play->transitionTrigger == TRANS_TRIGGER_OFF;
 }
 
@@ -225,7 +251,15 @@ static void StartPendingUse(Player* player, PlayState* play) {
     }
 
     if (sSizePhase == MINISH_SIZE_TINY) {
-        StartGrowing(player, play);
+        s8 soil = FindSoilUnderPlayer(player, play);
+
+        if (soil < 0) {
+            StartGrowing(player, play);
+        } else if (CanOpenMap(play)) {
+            OpenMap(soil);
+        } else {
+            Audio_PlaySfx(NA_SE_SY_ERROR);
+        }
         return;
     }
     if (sSizePhase != MINISH_SIZE_NORMAL) {
@@ -239,11 +273,21 @@ static void StartPendingUse(Player* player, PlayState* play) {
 }
 
 static void ResetOnSceneLoad(Player* player) {
+    if (sIsMapOpen) {
+        CloseMap();
+    }
     if (IsTiny()) {
         EndMinishSize(player);
     }
     sPlayerScale = PLAYER_SCALE_NORMAL;
     sIsUsePending = false;
+    if (sTravelPhase == MINISH_TRAVEL_IN_TRANSIT) {
+        ArriveAsMinish(player);
+        return;
+    }
+    if (IsTravelling()) {
+        FinishTravel();
+    }
 }
 
 static void UpdateMinishCap(Player* player) {
@@ -260,7 +304,14 @@ static void UpdateMinishCap(Player* player) {
         ResetOnSceneLoad(player);
     }
 
-    StartPendingUse(player, play);
+    MarkVisitedPoints(player, play);
+    if (IsTravelling()) {
+        UpdateTravel(player, play);
+    } else if (sIsMapOpen) {
+        UpdateMap(play);
+    } else {
+        StartPendingUse(player, play);
+    }
     if (IsTiny()) {
         UpdateMinishSize(player, play);
     }
@@ -281,7 +332,7 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
 S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomItemDefinition cap = Z64Items_Define(MINISH_CAP_KEY, sIconTex, sNameTex);
 
-    if (!S2H_MOD_API_HAS(sApi, GetActiveForm)) {
+    if (!S2H_MOD_API_HAS(sApi, GetActiveForm) || !S2H_MOD_API_HAS(sApi, StorageSet)) {
         return;
     }
     Z64Items_SetForms(&cap, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
@@ -289,8 +340,11 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetPlacement(&cap, 0, 18, 0);
     Z64Items_SetTextbox(&cap, "You got %rThe Minish Cap%w!&Ezlo, who was a sage before he was&a hat, and is in a "
                               "mood about it.^Press %y\xB2%w to become %yMinish%w:&small and slow, but small enough "
-                              "for&a crawlspace. Press again, or load a&scene, to grow back.");
-    Z64Items_SetPauseText(&cap, "%rThe Minish Cap&%wPress %y\xB2%w to shrink or grow.");
+                              "for&a crawlspace. Press again, or load a&scene, to grow back.^As %yMinish%w, press "
+                              "%y\xB2%w on a %ysoft soil%w&to open Ezlo's map and travel to any&soft soil you have "
+                              "already visited.");
+    Z64Items_SetPauseText(&cap, "%rThe Minish Cap&%w%y\xB2%w shrinks or grows you. As Minish&on a soft soil, it "
+                                "opens Ezlo's map.");
     Z64Items_SetCanUse(&cap, CanUseCap);
     Z64Items_SetAction(&cap, UseCap, NULL);
     Z64Items_SetGetItemModel(&cap, sCapDL);
@@ -302,8 +356,11 @@ S2H_MOD_EXPORT void ModInit(void) {
         return;
     }
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, UpdateMinishCap);
+    S2H_REGISTER_HOOK(sApi, OnInterfaceDrawEnd, DrawMap);
     S2H_REGISTER_HOOK(sApi, OnCameraResolveView, ResolveCameraView);
     S2H_REGISTER_HOOK(sApi, OnPlayerResolveMotionScale, ResolveMotionScale);
     S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorResolveBgCheckFlags, ACTOR_PLAYER, ResolveBgCheckFlags);
     sApi->RegisterVB(VB_PLAYER_ADJUST_LEGS_TO_FLOOR, BlockLegPlanting);
+    sApi->RegisterVB(VB_OPEN_PAUSE_MENU, BlockPauseMenu);
+    sApi->RegisterVB(VB_INFLICT_VOID_DAMAGE, WaiveVoidDamage);
 }
