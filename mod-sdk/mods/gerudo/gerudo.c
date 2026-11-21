@@ -12,6 +12,8 @@
 #include "macros.h"
 #include "variables.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
+#include "interface/parameter_static/parameter_static.h"
+#include "overlays/actors/ovl_En_M_Thunder/z_en_m_thunder.h"
 
 #define GERUDO_MASK_KEY "nei.gerudo_form_mask"
 #define GERUDO_FORM_KEY "nei.gerudo"
@@ -33,10 +35,10 @@
 #define COMBO_RESET_FRAMES 40
 #define LUNGE_SPEED 15.0f
 #define CHARGE_RATE 0.06f
+#define CHARGE_SPARK_COST (2 << 8)
 #define CHARGE_FAST_BEGIN 33.0f
 #define CHARGE_FAST_END 53.0f
 #define CHARGE_FAST_SCALE 3.0f
-#define CHARGE_RELEASE_REACH 1.8f
 #define SPIN_INVULNERABILITY (-8)
 #define SPIN_RADIUS 45
 #define SPIN_HEIGHT 60
@@ -51,6 +53,14 @@
 #define JUMP_GRAVITY (-1.2f)
 #define AERIAL_MIN_AIR_FRAMES 2
 #define CREEP_SPEED 18.0f
+#define SHEATHE_HIDE_FRAME 17.0f
+#define DRAW_SPEED 1.5f
+#define DRAW_MAX_SPEED 4.0f
+#define GUARD_AIM_PITCH_MAX 3500
+#define GUARD_TWIST_X 6954
+#define GUARD_TWIST_Y 3969
+#define GUARD_TWIST_Z 9412
+#define QUAD_TIP_REACH 1200.0f
 
 #define RAGE_BASE 400
 #define RAGE_HITS_TO_FILL 10
@@ -63,8 +73,9 @@
 #define FURY_STRIKE_FRAME 80.0f
 #define FURY_DIM 140
 #define FURY_DIM_FADE 10
-#define FURY_QUAKE_STRENGTH 6
-#define FURY_QUAKE_FRAMES 18
+#define FURY_QUAKE_STRENGTH 7
+#define FURY_QUAKE_FRAMES 22
+#define FURY_QUAKE_SPEED 27767
 #define FURY_DMG_FLAGS (DMG_SWORD | DMG_GORON_POUND | DMG_FIRE_ARROW | DMG_LIGHT_ARROW)
 
 #define ANIM_VALUES_PER_FRAME 67
@@ -72,11 +83,15 @@
 #define VOICE_SLOTS 4
 #define VOICE_ADVANCE 0.5f
 
-#define RAGE_BAR_X 20
-#define RAGE_BAR_Y 54
-#define RAGE_BAR_HEIGHT 5
-#define RAGE_BAR_NORMAL_WIDTH 50
-#define RAGE_BAR_DOUBLE_WIDTH 100
+// Magic_DrawMeter's layout: the rage meter takes the magic meter's place, or the row below it.
+#define RAGE_BAR_LEFT 18
+#define RAGE_BAR_MID_LEFT 26
+#define RAGE_BAR_Y_ONE_HEART_ROW 34
+#define RAGE_BAR_Y_TWO_HEART_ROWS 42
+#define RAGE_BAR_BELOW_MAGIC 12
+#define RAGE_BAR_FILL_TOP 3
+#define RAGE_BAR_FILL_BOTTOM 10
+#define TWO_HEART_ROWS_HEALTH 0xA0
 
 #define BUSY_STATE1                                                                                  \
     (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_200 | PLAYER_STATE1_400 |            \
@@ -88,6 +103,9 @@
 #define STATE1_DAMAGED PLAYER_STATE1_4000000
 #define STATE2_SPIN_ATTACKING PLAYER_STATE2_20000
 #define STATE2_NO_Z_TARGET_ROTATION PLAYER_STATE2_20
+#define STATE2_NO_ROTATION PLAYER_STATE2_40
+#define STATE2_HOPPING PLAYER_STATE2_80000
+#define STATE3_MIDAIR PLAYER_STATE3_2
 #define WALK_FRAMES 29
 #define RUN_FRAMES 20
 #define FIGHTER_COLUMNS ((1 << PLAYER_ANIMTYPE_1) | (1 << PLAYER_ANIMTYPE_3))
@@ -102,17 +120,26 @@
 #define CLIP_ROLL MHR("ForwardAcrobaticEvasion")
 #define CLIP_CHARGE MHR("LowExtendedChargeStance")
 #define CLIP_JUMP_SLASH MHR("ForwardRisingDoubleAerialSlash_Variant18")
+#define CLIP_HOP_LEFT MHR("RightRisingTripleLateralSlash")
+#define CLIP_HOP_RIGHT MHR("LeftDoubleLateralSlash")
+#define CLIP_BACKFLIP MHR("BackwardHighAerialLeftLeadDoubleSilkbindSlash")
 #define CLIP_FRONT_SLASH MHR("BackwardRisingDoubleAerialSlash")
 #define CLIP_AERIAL MHR("StationaryRisingTripleAerialSlash")
+#define CLIP_SHEATHE MHR("ForwardDoubleTwinSlash")
+#define CLIP_SOFT_HIT MHR("ForwardEvasiveStep")
+#define CLIP_FALL MHR("StationaryReadyIdle_Variant05")
+#define CLIP_CRIT_IDLE MHR("StationaryReadyIdle_Variant08")
 #define CLIP_SING "__OTR__misc/link_animetion/gPlayerAnim_mhr_npc_malon_sing"
 #define CLIP_FURY "__OTR__misc/link_animetion/gPlayerAnim_mhr_gs_wirebug_attack04"
-static const ALIGN_ASSET(2) char sMaskDL[] = "__OTR__objects/object_link_child/gLinkChildGerudoMaskDL";
+static const ALIGN_ASSET(2) char sMaskDL[] = "__OTR__objects/oot_object_link_child/gLinkChildGerudoMaskDL";
 static const ALIGN_ASSET(2) char sEmptyHandDL[] = "__OTR__" GERUDO_MODEL_PATH
                                                   "/object_link_child/gLinkChildRightHandNearDL";
 static const ALIGN_ASSET(2) char sScimitarDL[] = "__OTR__" GERUDO_MODEL_PATH
                                                  "/object_link_boy/gLinkAdultLeftHandHoldingMasterSwordNearDL";
-static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__icon_item_static_yar/gItemIconCaptainsHatTex";
-static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__item_name_static/gItemNameCaptainsHatENGTex";
+// The mask keeps the Captain's Hat slot, but it looks and reads as OoT's Gerudo Mask.
+static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/oot_icon_item_static/gItemIconMaskGerudoTex";
+static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/oot_item_name_static/gGerudoMaskItemNameENGTex";
+static const ALIGN_ASSET(2) char sGetItemDL[] = "__OTR__objects/oot_object_gi_gerudomask/gGiGerudoMaskDL";
 
 typedef struct {
     s16 begin;
@@ -148,7 +175,7 @@ static const SwingRow sRows[ROW_COUNT] = {
     { MHR("RightRisingTripleAerialSlash"), 1.7f, 41, { 12, 41 }, { 12, 41 }, true, PLAYER_MWA_RIGHT_COMBO_1H },
     { MHR("ForwardRisingLeftLeadDoubleAerialSlash"), 1.5f, -1, { 4, 30 }, { 4, 30 }, false, PLAYER_MWA_STAB_1H },
     { CLIP_LANDING, 1.0f, -1, { 2, 40 }, { 2, 40 }, true, PLAYER_MWA_JUMPSLASH_FINISH },
-    { MHR("ForwardTumbleDelayedCrossFinish"), 2.1f, -1, { 28, 40 }, { 28, 40 }, true, PLAYER_MWA_SPIN_ATTACK_1H },
+    { MHR("ForwardTumbleDelayedCrossFinish"), 2.1f, -1, { 28, 40 }, { 28, 40 }, false, PLAYER_MWA_SPIN_ATTACK_1H },
     { MHR("ForwardRisingDoubleRushSlash_Variant21"), 2.1f, -1, { 6, 60 }, { 6, 60 }, true, PLAYER_MWA_BIG_SPIN_1H },
 };
 
@@ -171,7 +198,8 @@ static const GerudoVoice sVoices[] = {
 static const char* const sRequiredHooks[] = {
     "OnPlayerActionHandler",    "OnPlayerResolveAnim", "OnPlayerResolveMotionScale", "OnPlayerResolveLimbDraw",
     "OnPlayerPostLimbDraw",     "OnActorPlaySfx",      "OnInterfaceDrawEnd",         "OnSceneInit",
-    "OnCollisionResolveDamage", "OnOcarinaInput",
+    "OnCollisionResolveDamage", "OnOcarinaInput",      "OnPlayerResolveAnimSite",    "OnActorUpdate",
+    "ShouldActorDraw",          "OnActorDestroy",
 };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -211,6 +239,9 @@ typedef enum {
     GERUDO_MOVE_JUMP_SLASH,
     GERUDO_MOVE_AERIAL,
     GERUDO_MOVE_FURY,
+    GERUDO_MOVE_SHEATHE,
+    GERUDO_MOVE_DRAW,
+    GERUDO_MOVE_GUARD,
 } GerudoMove;
 
 typedef struct {
@@ -247,11 +278,12 @@ void func_80833728(Player* player, s32 index, u32 dmgFlags, s32 damage);
 void func_8082FA5C(PlayState* play, Player* player, s32 meleeWeaponState);
 s32 func_80126440(PlayState* play, ColliderQuad* collider, WeaponInfo* weaponInfo, Vec3f* newTip, Vec3f* newBase);
 s32 Player_CanSpinAttack(Player* player);
+PlayerItemAction Player_ItemToItemAction(Player* player, ItemId item);
+void func_80123C58(Player* player);
 bool Player_IsZTargeting(Player* player);
 void Player_StopHorizontalMovement(Player* player);
 void Player_RequestRumble(PlayState* play, Player* player, s32 sourceIntensity, s32 decayTimer, s32 decayStep,
                           s32 distSq);
-int16_t OTRGetRectDimensionFromLeftEdge(float v);
 extern PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeader(const char* animPath);
 extern void* ResourceGetDataByName(const char* name);
 extern HOST_DATA u8 sCurOcarinaPitch;
@@ -260,6 +292,8 @@ extern HOST_DATA MeleeDamage D_8085D09C[];
 static const S2HModApi* sApi;
 static CachedClip sClipCache[CLIP_CACHE_MAX];
 static s32 sClipCacheCount;
+static PlayerAnimationHeader sBackflipClip;
+static s16* sBackflipData;
 
 static u8 sMove;
 static u8 sRow;
@@ -281,6 +315,10 @@ static ColliderCylinder sSpinCylinder;
 static bool sIsCylinderReady;
 static s32 sTrailRight = -1;
 static s16 sLockedYaw;
+static Vec3s sGuardAim;
+static bool sIsGuardLowering;
+static s8 sBladeVisibility = -1;
+static ItemId sPendingItem;
 static s16 sAirFrames;
 static s16 sJumpSlashFrames;
 static bool sIsJumpLooping;
@@ -349,6 +387,14 @@ static bool HoldsSword(Player* player) {
     return weapon >= PLAYER_MELEEWEAPON_SWORD_KOKIRI && weapon <= PLAYER_MELEEWEAPON_SWORD_GILDED;
 }
 
+// Sheathing and drawing override what the held item says, so the blades leave the hands mid-clip.
+static bool AreBladesOut(Player* player) {
+    if (sBladeVisibility >= 0) {
+        return sBladeVisibility != 0;
+    }
+    return HoldsSword(player);
+}
+
 static bool IsFighter(Player* player) {
     return HoldsSword(player) || (player->stateFlags1 & STATE1_SHIELDING);
 }
@@ -361,6 +407,13 @@ static u8 GetTierDamage(Player* player, bool isStrong) {
     MeleeDamage* info = &D_8085D09C[PLAYER_MELEEWEAPON_SWORD_KOKIRI + GetSwordTier(player)];
 
     return isStrong ? info->dmgHumanStrong : info->dmgHumanNormal;
+}
+
+// z_player_lib's sMeleeWeaponLengths for the three swords, so the right blade reaches as far as the left one.
+static f32 GetBladeLength(Player* player) {
+    static const f32 sBladeLengths[] = { 3000.0f, 3000.0f, 4000.0f };
+
+    return sBladeLengths[GetSwordTier(player)];
 }
 
 // In-place range loader: the MHR clips carry their root travel, so the root is pinned to the first
@@ -410,6 +463,40 @@ static PlayerAnimationHeader* LoadWholeClip(const char* path) {
     return LoadClip(path, -1, -1, 0);
 }
 
+// The flip's two halves are resampled at their own pace: a quick takeoff, then a slower fall.
+static PlayerAnimationHeader* LoadBackflipClip(void) {
+    const f32 compensation = 1.5f;
+    const s16 split = 31;
+
+    if (sBackflipClip.segmentVoid != NULL) {
+        return &sBackflipClip;
+    }
+    PlayerAnimationHeader* whole = LoadWholeClip(CLIP_BACKFLIP);
+    if (whole == NULL) {
+        return NULL;
+    }
+    s16 last = whole->common.frameCount - 1;
+    s16 framesA = (s16)MAX((f32)split / (1.5f * compensation) + 0.5f, 1.0f);
+    s16 framesB = (s16)MAX((f32)(last - split + 1) / (2.0f * compensation) + 0.5f, 1.0f);
+    PlayerAnimationHeader* partA = LoadClip(CLIP_BACKFLIP, 0, split - 1, framesA);
+    PlayerAnimationHeader* partB = LoadClip(CLIP_BACKFLIP, split, last, framesB);
+    if (partA == NULL || partB == NULL) {
+        return NULL;
+    }
+    s32 total = partA->common.frameCount + partB->common.frameCount;
+    sBackflipData = (s16*)malloc((size_t)total * ANIM_VALUES_PER_FRAME * sizeof(s16));
+    if (sBackflipData == NULL) {
+        return NULL;
+    }
+    size_t sizeA = (size_t)partA->common.frameCount * ANIM_VALUES_PER_FRAME * sizeof(s16);
+    memcpy(sBackflipData, partA->segmentVoid, sizeA);
+    memcpy((u8*)sBackflipData + sizeA, partB->segmentVoid,
+           (size_t)partB->common.frameCount * ANIM_VALUES_PER_FRAME * sizeof(s16));
+    sBackflipClip.common.frameCount = (s16)total;
+    sBackflipClip.segmentVoid = sBackflipData;
+    return &sBackflipClip;
+}
+
 static void PlayClip(PlayState* play, Player* player, PlayerAnimationHeader* clip, f32 speed, u8 mode, f32 morph) {
     if (clip == NULL) {
         return;
@@ -431,15 +518,11 @@ static PlayerAnimationHeader* GetFighterGroupClip(s32 group) {
             return LoadClip(sIsSprinting ? CLIP_SPRINT : CLIP_RUN, -1, -1, RUN_FRAMES);
         case PLAYER_ANIMGROUP_damage_run:
             return LoadClip(CLIP_DAMAGE_RUN, -1, -1, RUN_FRAMES);
-        case PLAYER_ANIMGROUP_defense:
-            return LoadClip(CLIP_GUARD, 1, 20, 10);
-        case PLAYER_ANIMGROUP_defense_wait:
-            return LoadClip(CLIP_GUARD, 30, 30, 2);
-        case PLAYER_ANIMGROUP_defense_end:
-            return LoadClip(CLIP_GUARD, 31, 45, 8);
         case PLAYER_ANIMGROUP_landing:
         case PLAYER_ANIMGROUP_short_landing:
             return LoadWholeClip(CLIP_LANDING);
+        case PLAYER_ANIMGROUP_landing_roll:
+            return LoadClip(CLIP_ROLL, 0, 30, 0);
         default:
             return NULL;
     }
@@ -468,6 +551,54 @@ static void ScaleSprintAndRoll(Player* player, s32 kind, f32* scale) {
         *scale *= ROLL_SCALE;
     } else if (sIsSprinting) {
         *scale *= SPRINT_SCALE;
+    }
+}
+
+// Site indices are z_player.c's: a hop is direction * 3 + phase (start, end, end while locked on).
+static PlayerAnimationHeader* GetHopClip(s32 index) {
+    s32 direction = index / 3;
+    s32 phase = index % 3;
+
+    if (phase != 0) {
+        return LoadClip(CLIP_LANDING, -1, -1, 8);
+    }
+    if (direction == PLAYER_STICK_DIR_BACKWARD) {
+        return LoadBackflipClip();
+    }
+    return LoadClip(direction == PLAYER_STICK_DIR_LEFT ? CLIP_HOP_LEFT : CLIP_HOP_RIGHT, -1, -1, 12);
+}
+
+// sFidgetAnimations flattened: rows 7 and 8 are the critical-health fidgets, in their second column.
+#define FIDGET_CRIT_START_ARMED (7 * 2 + 1)
+#define FIDGET_CRIT_LOOP_ARMED (8 * 2 + 1)
+// D_8085D0D4 lists the soft hits first.
+#define SOFT_HIT_COUNT 4
+
+static PlayerAnimationHeader* GetSiteClip(s32 site, s32 index) {
+    switch (site) {
+        case SOH_PLAYER_ANIM_SITE_HOP:
+            return GetHopClip(index);
+        case SOH_PLAYER_ANIM_SITE_DAMAGE:
+            return index < SOFT_HIT_COUNT ? LoadWholeClip(CLIP_SOFT_HIT) : NULL;
+        case SOH_PLAYER_ANIM_SITE_FIDGET:
+            if (index == FIDGET_CRIT_START_ARMED || index == FIDGET_CRIT_LOOP_ARMED) {
+                return LoadWholeClip(CLIP_CRIT_IDLE);
+            }
+            return NULL;
+        case SOH_PLAYER_ANIM_SITE_FALL:
+            return IsFighter(GET_PLAYER(gPlayState)) ? LoadWholeClip(CLIP_FALL) : NULL;
+        default:
+            return NULL;
+    }
+}
+
+static void ResolveSiteAnim(s32 site, s32 index, PlayerAnimationHeader** anim) {
+    if (!IsGerudo() || gPlayState == NULL) {
+        return;
+    }
+    PlayerAnimationHeader* clip = GetSiteClip(site, index);
+    if (clip != NULL) {
+        *anim = clip;
     }
 }
 
@@ -575,9 +706,10 @@ static void StopAllHits(PlayState* play, Player* player) {
 // Vanilla lays both quads along the left blade; the left hook keeps quad 0 there and the right hand takes quad 1
 // onto its own blade, with a trail of its own.
 static void PlaceRightBlade(PlayState* play, Player* player) {
-    Vec3f trailTip = { 5000.0f, 400.0f, 0.0f };
+    f32 length = GetBladeLength(player);
+    Vec3f trailTip = { length, 400.0f, 0.0f };
     Vec3f trailBase = { 0.0f, 400.0f, 0.0f };
-    Vec3f quadTip = { 5000.0f, 1400.0f, -1000.0f };
+    Vec3f quadTip = { length + QUAD_TIP_REACH, 1400.0f, -1000.0f };
     Vec3f quadBase = { 0.0f, 1400.0f, -1000.0f };
     Vec3f tip;
     Vec3f base;
@@ -680,8 +812,9 @@ static void EndMove(PlayState* play, Player* player) {
     StopAllHits(play, player);
     StopRightTrail();
     sMove = GERUDO_MOVE_NONE;
+    sBladeVisibility = -1;
     player->stateFlags1 &= ~PLAYER_STATE1_CHARGING_SPIN_ATTACK;
-    player->stateFlags2 &= ~(STATE2_SPIN_ATTACKING | PLAYER_STATE2_40);
+    player->stateFlags2 &= ~(STATE2_SPIN_ATTACKING | STATE2_NO_ROTATION);
     player->actor.gravity = JUMP_GRAVITY;
     func_8083B1A0(player, play);
 }
@@ -759,14 +892,15 @@ static void GateSwing(PlayState* play, Player* player, const SwingRow* swing, f3
     if (IsInWindow(&swing->right, prev, cur)) {
         mask |= 2;
     }
+    // En_M_Thunder drops SPIN_ATTACKING on the release; the release swing keeps it while its blades are live.
+    if (sRow == ROW_CHARGE_RELEASE && mask != 0) {
+        player->stateFlags2 |= STATE2_SPIN_ATTACKING;
+    }
     if (swing->isSpin) {
         GateBlades(play, player, 0);
         sIsCylinderOn = mask != 0;
         if (sIsCylinderOn) {
             TurnCylinderOn(DMG_SWORD, SPIN_DAMAGE);
-            if (sRow == ROW_CHARGE_RELEASE) {
-                sCylinderRadius = (s16)(SPIN_RADIUS * CHARGE_RELEASE_REACH);
-            }
         }
         return;
     }
@@ -815,12 +949,21 @@ static void RunSwing(PlayState* play, Player* player) {
     EndMove(play, player);
 }
 
+// The same spawn as z_player.c's spin charge: the actor reads unk_B08 for its sparks and turns into the release.
+static void SpawnChargeSparks(PlayState* play, Player* player) {
+    Vec3f* waist = &player->bodyPartsPos[PLAYER_BODYPART_WAIST];
+
+    Actor_Spawn(&play->actorCtx, play, ACTOR_EN_M_THUNDER, waist->x, waist->y, waist->z, 0, 0, 0,
+                GetSwordTier(player) | CHARGE_SPARK_COST);
+}
+
 static void StartCharge(PlayState* play, Player* player) {
     StartMove(play, player, GERUDO_MOVE_CHARGE);
     player->unk_B08 = 0.0f;
     player->stateFlags1 |= PLAYER_STATE1_CHARGING_SPIN_ATTACK;
     PlayClip(play, player, LoadClip(CLIP_CHARGE, 0, 24, 14), 1.0f, ANIMMODE_ONCE, -6.0f);
     sIsStanceLooping = false;
+    SpawnChargeSparks(play, player);
 }
 
 static void CreepWhileCharging(PlayState* play, Player* player) {
@@ -887,6 +1030,7 @@ static void RunFrontSlash(PlayState* play, Player* player) {
 
 static void StartJumpSlash(PlayState* play, Player* player) {
     StartMove(play, player, GERUDO_MOVE_JUMP_SLASH);
+    player->stateFlags3 |= STATE3_MIDAIR;
     player->meleeWeaponAnimation = PLAYER_MWA_JUMPSLASH_START;
     SetBladeFlags(player, DMG_SWORD, GetTierDamage(player, true), false);
     EnsureRightTrail(play);
@@ -912,6 +1056,7 @@ static void HomeOnTarget(Player* player, Actor* target) {
 }
 
 static void RunJumpSlash(PlayState* play, Player* player) {
+    player->stateFlags3 |= STATE3_MIDAIR;
     player->actor.gravity = JUMP_GRAVITY;
     if (PlayerAnimation_Update(play, &player->skelAnime) && !sIsJumpLooping) {
         sIsJumpLooping = true;
@@ -935,6 +1080,7 @@ static void RunJumpSlash(PlayState* play, Player* player) {
 
 static void StartAerial(PlayState* play, Player* player) {
     StartMove(play, player, GERUDO_MOVE_AERIAL);
+    player->stateFlags3 |= STATE3_MIDAIR;
     SetBladeFlags(player, DMG_SWORD, GetTierDamage(player, false), false);
     EnsureRightTrail(play);
     PlayClip(play, player, LoadWholeClip(CLIP_AERIAL), 1.2f, ANIMMODE_ONCE, -3.0f);
@@ -945,6 +1091,7 @@ static void StartAerial(PlayState* play, Player* player) {
 static void RunAerial(PlayState* play, Player* player) {
     static const Window sAerialWindow = { 2, 40 };
 
+    player->stateFlags3 |= STATE3_MIDAIR;
     player->actor.gravity = JUMP_GRAVITY;
     bool isDone = PlayerAnimation_Update(play, &player->skelAnime);
     f32 cur = player->skelAnime.curFrame;
@@ -1014,16 +1161,34 @@ static void SpawnCloudConvergence(PlayState* play, Player* player, s32 stage) {
     }
 }
 
+// The sky strike borrows the storm layer: LIGHTNING_LAST switches a dry scene's lightning back off by itself.
+static void StrikeFromSky(PlayState* play) {
+    if (gLightningStrike.state != LIGHTNING_STRIKE_WAIT) {
+        return;
+    }
+    Environment_AddLightningBolts(play, 3);
+    gLightningStrike.flashRed = 210;
+    gLightningStrike.flashGreen = 220;
+    gLightningStrike.flashBlue = 255;
+    gLightningStrike.flashAlphaTarget = 200;
+    gLightningStrike.state = LIGHTNING_STRIKE_START;
+    if (play->envCtx.lightningState == LIGHTNING_OFF) {
+        play->envCtx.lightningState = LIGHTNING_LAST;
+    }
+}
+
 static void SpawnFuryImpact(PlayState* play, Player* player) {
     Vec3f zero = { 0.0f, 0.0f, 0.0f };
     Vec3f ground = GetGroundPos(player);
 
+    StrikeFromSky(play);
     for (s32 i = 0; i < 7; i++) {
         Vec3f column = { ground.x, ground.y + 18.0f + i * 48.0f, ground.z };
         EffectSsLightning_Spawn(play, &column, (i & 1) ? &sFury.white : &sFury.blue, &sFury.gold, (s16)(250 - i * 12),
                                 (s16)(i * 0x1555), 13, 4);
     }
-    EffectSsBlast_SpawnWhiteShockwave(play, &ground, &zero, &zero);
+    EffectSsBlast_Spawn(play, &ground, &zero, &zero, &sFury.white, &sFury.orange, 80, 660, 42, 15);
+    EffectSsBlast_Spawn(play, &ground, &zero, &zero, &sFury.paleBlue, &sFury.deepBlue, 110, 500, 24, 21);
     for (s32 i = 0; i < 12; i++) {
         s16 yaw = (s16)(i * 0x1555 + (i % 3) * 0x500);
         f32 reach = 24.0f + (i % 4) * 12.0f;
@@ -1035,9 +1200,9 @@ static void SpawnFuryImpact(PlayState* play, Player* player) {
         EffectSsLightning_Spawn(play, &arc, prim, &sFury.orange, 105, yaw, 11, 2);
         EffectSsKirakira_SpawnFocused(play, &arc, &velocity, &accel, prim, &sFury.white, 420, 18);
     }
-    Actor_RequestQuake(play, FURY_QUAKE_STRENGTH, FURY_QUAKE_FRAMES);
+    Actor_RequestQuakeWithSpeed(play, FURY_QUAKE_STRENGTH, FURY_QUAKE_FRAMES, FURY_QUAKE_SPEED);
     Rumble_Request(0.0f, 255, 20, 150);
-    Player_PlaySfx(player, NA_SE_EV_LIGHTNING_HARD);
+    Player_PlaySfx(player, NA_SE_EV_LIGHTNING);
     Player_PlaySfx(player, NA_SE_IT_HAMMER_HIT);
 }
 
@@ -1164,6 +1329,112 @@ static void RunFury(PlayState* play, Player* player) {
     }
 }
 
+// The item changes hands at the end of the clip, so vanilla's own put-away and draw never play.
+static void HandOver(Player* player, ItemId item) {
+    player->heldItemId = item;
+    player->heldItemAction = item == ITEM_NONE ? PLAYER_IA_NONE : Player_ItemToItemAction(player, item);
+    func_80123C58(player);
+}
+
+static void StartSheathe(PlayState* play, Player* player) {
+    StartMove(play, player, GERUDO_MOVE_SHEATHE);
+    sBladeVisibility = 1;
+    sPendingItem = ITEM_NONE;
+    PlayClip(play, player, LoadWholeClip(CLIP_SHEATHE), DRAW_SPEED, ANIMMODE_ONCE, -3.0f);
+    Player_PlaySfx(player, NA_SE_IT_SWORD_PUTAWAY);
+}
+
+static void StartDraw(PlayState* play, Player* player, ItemId item) {
+    StartMove(play, player, GERUDO_MOVE_DRAW);
+    sBladeVisibility = 0;
+    sPendingItem = item;
+    PlayClip(play, player, LoadWholeClip(CLIP_SHEATHE), -DRAW_SPEED, ANIMMODE_ONCE, -3.0f);
+}
+
+static void RunSheathe(PlayState* play, Player* player) {
+    Plant(player);
+    bool isDone = PlayerAnimation_Update(play, &player->skelAnime);
+    if (player->skelAnime.curFrame >= SHEATHE_HIDE_FRAME) {
+        sBladeVisibility = 0;
+    }
+    if (isDone) {
+        HandOver(player, sPendingItem);
+        EndMove(play, player);
+    }
+}
+
+static void RunDraw(PlayState* play, Player* player) {
+    Plant(player);
+    bool isDone = PlayerAnimation_Update(play, &player->skelAnime);
+    if (sBladeVisibility == 0 && player->skelAnime.curFrame <= SHEATHE_HIDE_FRAME) {
+        sBladeVisibility = 1;
+        Player_PlaySfx(player, NA_SE_IT_SWORD_PICKOUT);
+    }
+    if (isDone) {
+        HandOver(player, sPendingItem);
+        EndMove(play, player);
+    }
+}
+
+static void StartGuard(PlayState* play, Player* player) {
+    StartMove(play, player, GERUDO_MOVE_GUARD);
+    sBladeVisibility = 1;
+    sIsGuardLowering = false;
+    sGuardAim.x = 0;
+    sGuardAim.y = 0;
+    PlayClip(play, player, LoadClip(CLIP_GUARD, 1, 20, 10), 1.0f, ANIMMODE_ONCE, -3.0f);
+    Player_PlaySfx(player, NA_SE_IT_SHIELD_SWING);
+}
+
+// The stick aims the crossed blades the way it aims a shield, on top of the guard's fixed twist.
+static void AimGuard(PlayState* play, Player* player) {
+    Input* input = &play->state.input[0];
+    f32 pitchInput = input->rel.stick_y * 100.0f;
+    f32 turnInput = input->rel.stick_x * -120.0f;
+    s16 yawToCamera = player->actor.shape.rot.y - Camera_GetInputDirYaw(GET_ACTIVE_CAM(play));
+    s16 pitch = (s16)(Math_SinS(yawToCamera) * turnInput + Math_CosS(yawToCamera) * pitchInput);
+    s16 turn = (s16)(Math_CosS(yawToCamera) * turnInput - Math_SinS(yawToCamera) * pitchInput);
+
+    pitch = MIN(pitch, GUARD_AIM_PITCH_MAX);
+    Math_ScaledStepToS(&sGuardAim.x, pitch, MAX((s16)(ABS(pitch - sGuardAim.x) * 0.25f), 100));
+    Math_ScaledStepToS(&sGuardAim.y, turn, MAX((s16)(ABS(turn - sGuardAim.y) * 0.25f), 50));
+    player->actor.focus.rot.x = sGuardAim.x;
+    player->upperLimbRot.x = sGuardAim.x + GUARD_TWIST_X;
+    player->upperLimbRot.y = sGuardAim.y + GUARD_TWIST_Y;
+    player->upperLimbRot.z = GUARD_TWIST_Z;
+    player->unk_AA6_rotFlags |= UNKAA6_ROT_FOCUS_X | UNKAA6_ROT_UPPER_X | UNKAA6_ROT_UPPER_Y | UNKAA6_ROT_UPPER_Z;
+}
+
+static void LowerGuard(PlayState* play, Player* player) {
+    sIsGuardLowering = true;
+    PlayClip(play, player, LoadClip(CLIP_GUARD, 31, 45, 8), 1.0f, ANIMMODE_ONCE, -2.0f);
+    Player_PlaySfx(player, NA_SE_IT_SHIELD_REMOVE);
+}
+
+static void RunGuard(PlayState* play, Player* player) {
+    Plant(player);
+    bool isDone = PlayerAnimation_Update(play, &player->skelAnime);
+
+    if (sIsGuardLowering) {
+        if (isDone) {
+            EndMove(play, player);
+        }
+        return;
+    }
+    player->stateFlags1 |= STATE1_SHIELDING;
+    if (isDone) {
+        PlayClip(play, player, LoadClip(CLIP_GUARD, 30, 30, 2), 1.0f, ANIMMODE_LOOP, 0.0f);
+    }
+    AimGuard(play, player);
+    if (IsPressed(play, BTN_B) && sRageMeter > 0) {
+        StartFury(play, player);
+        return;
+    }
+    if (!IsHeld(play, BTN_R) || !CanAct(player)) {
+        LowerGuard(play, player);
+    }
+}
+
 static void GerudoAction(Player* player, PlayState* play) {
     BankBladeHits(player);
     switch (sMove) {
@@ -1184,6 +1455,15 @@ static void GerudoAction(Player* player, PlayState* play) {
             break;
         case GERUDO_MOVE_FURY:
             RunFury(play, player);
+            break;
+        case GERUDO_MOVE_SHEATHE:
+            RunSheathe(play, player);
+            break;
+        case GERUDO_MOVE_DRAW:
+            RunDraw(play, player);
+            break;
+        case GERUDO_MOVE_GUARD:
+            RunGuard(play, player);
             break;
         default:
             EndMove(play, player);
@@ -1221,6 +1501,18 @@ static int32_t HandleSlash(PlayState* play, Player* player) {
     return S2H_FORM_ACTION_STARTED;
 }
 
+// The vanilla guard needs a shield, which the Gerudo never carries: the blades guard in its place.
+static int32_t HandleShield(PlayState* play, Player* player) {
+    if (!IsHeld(play, BTN_R)) {
+        return S2H_FORM_ACTION_VANILLA;
+    }
+    if (IsGerudoBusy(player) || !CanAct(player) || !IsGrounded(player)) {
+        return S2H_FORM_ACTION_BLOCKED;
+    }
+    StartGuard(play, player);
+    return S2H_FORM_ACTION_STARTED;
+}
+
 static int32_t HandleA(PlayState* play, Player* player) {
     if (!IsPressed(play, BTN_A) || !HoldsSword(player) || Player_IsZTargeting(player) || !IsGrounded(player)) {
         return S2H_FORM_ACTION_VANILLA;
@@ -1244,6 +1536,25 @@ static int32_t HandleZTargetA(PlayState* play, Player* player) {
     return S2H_FORM_ACTION_STARTED;
 }
 
+static bool IsSwordItem(s32 item) {
+    return item >= ITEM_SWORD_KOKIRI && item <= ITEM_SWORD_GILDED;
+}
+
+// B with the blades sheathed would draw and swing at once; standing, the Gerudo draws them first.
+static void InterceptDraw(bool* should, va_list args) {
+    s32 item = va_arg(args, s32);
+    Player* player = gPlayState == NULL ? NULL : GET_PLAYER(gPlayState);
+
+    if (player == NULL || !IsGerudo() || !*should || HoldsSword(player) || IsGerudoBusy(player)) {
+        return;
+    }
+    if (!IsSwordItem(item) || !IsGrounded(player) || !CanAct(player) || fabsf(player->speedXZ) > DRAW_MAX_SPEED) {
+        return;
+    }
+    *should = false;
+    StartDraw(gPlayState, player, (ItemId)item);
+}
+
 static void TrackA(PlayState* play, Player* player) {
     bool isEnabled = HoldsSword(player) && !IsGerudoBusy(player) && IsGrounded(player) && !IsRolling(player) &&
                      !(player->stateFlags1 & STATE1_SHIELDING);
@@ -1265,8 +1576,13 @@ static void TrackA(PlayState* play, Player* player) {
         return;
     }
     sIsAPending = false;
-    if (CanAct(player) && GetStickMagnitude(play) >= STICK_MOVING) {
+    if (!CanAct(player)) {
+        return;
+    }
+    if (GetStickMagnitude(play) >= STICK_MOVING) {
         func_80836B3C(play, player, 0.0f);
+    } else {
+        StartSheathe(play, player);
     }
 }
 
@@ -1282,7 +1598,8 @@ static void TryFury(PlayState* play, Player* player) {
 static void TryAerial(PlayState* play, Player* player) {
     sAirFrames = IsGrounded(player) ? 0 : MIN(sAirFrames + 1, 1000);
     if (!HoldsSword(player) || IsGerudoBusy(player) || IsGrounded(player) || !CanAct(player) ||
-        sAirFrames < AERIAL_MIN_AIR_FRAMES || !IsPressed(play, BTN_A) || player->meleeWeaponState != 0) {
+        sAirFrames < AERIAL_MIN_AIR_FRAMES || !IsPressed(play, BTN_A) || player->meleeWeaponState != 0 ||
+        (player->stateFlags2 & STATE2_HOPPING)) {
         return;
     }
     StartAerial(play, player);
@@ -1299,11 +1616,13 @@ static void CountComboGap(Player* player) {
 }
 
 static void DrawScimitars(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
-    if (!IsGerudo() || !HoldsSword(player)) {
+    if (!IsGerudo() || !AreBladesOut(player)) {
         return;
     }
     if (limbIndex == PLAYER_LIMB_LEFT_HAND || limbIndex == PLAYER_LIMB_RIGHT_HAND) {
         *dList = (Gfx*)sScimitarDL;
+    } else if (limbIndex == PLAYER_LIMB_SHEATH) {
+        *dList = NULL;
     }
 }
 
@@ -1464,36 +1783,228 @@ static void ResolveGerudoLimb(Player* player, s32 limbIndex, Gfx** dList, Gfx* l
     HideOcarina(player, limbIndex, dList, limbDList, pos);
 }
 
-static void FillRect(PlayState* play, s16 left, s16 top, s16 right, s16 bottom, u8 r, u8 g, u8 b) {
-    OPEN_DISPS(play->state.gfxCtx);
-    gDPPipeSync(OVERLAY_DISP++);
-    gDPSetCycleType(OVERLAY_DISP++, G_CYC_FILL);
-    gDPSetRenderMode(OVERLAY_DISP++, G_RM_NOOP, G_RM_NOOP2);
-    gDPSetFillColor(OVERLAY_DISP++, (GPACK_RGBA5551(r, g, b, 1) << 16) | GPACK_RGBA5551(r, g, b, 1));
-    gDPFillRectangle(OVERLAY_DISP++, left, top, right, bottom);
-    gDPPipeSync(OVERLAY_DISP++);
-    gDPSetCycleType(OVERLAY_DISP++, G_CYC_1CYCLE);
-    CLOSE_DISPS(play->state.gfxCtx);
+static s16 GetRageBarY(void) {
+    SavePlayerData* playerData = &gSaveContext.save.saveInfo.playerData;
+    s16 y = playerData->healthCapacity > TWO_HEART_ROWS_HEALTH ? RAGE_BAR_Y_TWO_HEART_ROWS : RAGE_BAR_Y_ONE_HEART_ROW;
+
+    return playerData->magicLevel != 0 ? y + RAGE_BAR_BELOW_MAGIC : y;
 }
 
+// The magic meter's own frame and fill textures, so the rage reads as a second meter.
 static void DrawRageMeter(PlayState* play) {
-    if (!IsGerudo() || sRageMeter <= 0 || play->pauseCtx.state != 0) {
+    if (!IsGerudo()) {
         return;
     }
-    s16 width = gSaveContext.save.saveInfo.playerData.magicLevel >= 2 ? RAGE_BAR_DOUBLE_WIDTH : RAGE_BAR_NORMAL_WIDTH;
-    s16 left = OTRGetRectDimensionFromLeftEdge(RAGE_BAR_X);
+    InterfaceContext* interfaceCtx = &play->interfaceCtx;
+    s16 width = gSaveContext.save.saveInfo.playerData.magicLevel >= 2 ? MAGIC_DOUBLE_METER : MAGIC_NORMAL_METER;
+    s16 barY = GetRageBarY();
+    s16 rightEnd = RAGE_BAR_MID_LEFT + width;
     s16 fillWidth = (s16)CLAMP((f32)sRageMeter / GetRageCapacity() * width, 0.0f, (f32)width);
     bool isReady = sRageMeter >= GetRageCapacity() / 4;
     u8 pulse = (u8)(200 + 55 * Math_SinS(play->gameplayFrames * 3000));
 
-    FillRect(play, left - 1, RAGE_BAR_Y - 1, left + width + 1, RAGE_BAR_Y + RAGE_BAR_HEIGHT + 1, 20, 10, 10);
-    if (fillWidth <= 0) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL39_Overlay(play->state.gfxCtx);
+    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->magicAlpha);
+    gDPSetEnvColor(OVERLAY_DISP++, 100, 50, 50, 255);
+    OVERLAY_DISP =
+        Gfx_DrawTexRectIA8(OVERLAY_DISP, (TexturePtr)gMagicMeterEndTex, 8, 16, RAGE_BAR_LEFT, barY, 8, 16, 1 << 10, 1 << 10);
+    OVERLAY_DISP = Gfx_DrawTexRectIA8(OVERLAY_DISP, (TexturePtr)gMagicMeterMidTex, 24, 16, RAGE_BAR_MID_LEFT, barY, width,
+                                      16, 1 << 10, 1 << 10);
+    gDPLoadTextureBlock(OVERLAY_DISP++, gMagicMeterEndTex, G_IM_FMT_IA, G_IM_SIZ_8b, 8, 16, 0, G_TX_MIRROR | G_TX_WRAP,
+                        G_TX_NOMIRROR | G_TX_WRAP, 3, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+    gSPWideTextureRectangle(OVERLAY_DISP++, rightEnd << 2, barY << 2, (rightEnd + 8) << 2, (barY + 16) << 2,
+                            G_TX_RENDERTILE, 256, 0, 1 << 10, 1 << 10);
+    gDPPipeSync(OVERLAY_DISP++);
+    gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, 0, 0, 0, PRIMITIVE, PRIMITIVE,
+                      ENVIRONMENT, TEXEL0, ENVIRONMENT, 0, 0, 0, PRIMITIVE);
+    gDPSetEnvColor(OVERLAY_DISP++, 0, 0, 0, 255);
+    if (isReady) {
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, pulse, pulse, 255, interfaceCtx->magicAlpha);
+    } else {
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 240, 140, 20, interfaceCtx->magicAlpha);
+    }
+    gDPLoadTextureBlock_4b(OVERLAY_DISP++, gMagicMeterFillTex, G_IM_FMT_I, 16, 16, 0, G_TX_NOMIRROR | G_TX_WRAP,
+                           G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+    if (fillWidth > 0) {
+        gSPWideTextureRectangle(OVERLAY_DISP++, RAGE_BAR_MID_LEFT << 2, (barY + RAGE_BAR_FILL_TOP) << 2,
+                                (RAGE_BAR_MID_LEFT + fillWidth) << 2, (barY + RAGE_BAR_FILL_BOTTOM) << 2,
+                                G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+#define CONE_RADIUS 1875.0f
+#define CONE_HEIGHT 900.0f
+#define CONE_ARC 0x5555
+#define CONE_SEGMENTS 10
+#define CONE_VERTEX_COUNT ((CONE_SEGMENTS + 1) * 2)
+#define CONE_ARM_CAP 24
+#define CONE_RAGE_HITS 2
+#define CONE_FOLLOW_FRAMES 8
+// Every En_M_Thunder list is drawn under this scale; subtype 0 is its private ENMTHUNDER_SUBTYPE_SPIN_GREAT.
+#define THUNDER_UNIT 0.02f
+#define THUNDER_SUBTYPE_SPIN_GREAT 0
+
+static EnMThunder* sCone;
+static u8 sConeWaitFrames;
+static bool sIsConeArmed;
+
+// En_M_Thunder sets its target scale only on the release, so a non-zero one tells a release from a charge.
+static bool IsThunderReleased(EnMThunder* thunder) {
+    return thunder->scaleTarget != 0;
+}
+
+static bool IsReleaseSwinging(void) {
+    return sMove == GERUDO_MOVE_SWING && sRow == ROW_CHARGE_RELEASE;
+}
+
+static bool ShouldArmCone(Player* player) {
+    return !IsReleaseSwinging() || player->skelAnime.curFrame >= CHARGE_FAST_BEGIN || sConeWaitFrames >= CONE_ARM_CAP;
+}
+
+static void HoldCone(EnMThunder* thunder) {
+    thunder->lightColorFrac = 1.0f;
+    thunder->alphaFrac = 0.0f;
+    thunder->timer = CONE_FOLLOW_FRAMES;
+    Actor_SetScale(&thunder->actor, 0.0f);
+    thunder->collider.base.atFlags &= ~AT_ON;
+    sConeWaitFrames++;
+}
+
+// Runs after the actor submitted its ring collider; the AT pass reads it later in the frame, so it hits as the cone.
+static void ShapeConeCollider(EnMThunder* thunder) {
+    f32 radius = CONE_RADIUS * THUNDER_UNIT * thunder->actor.scale.x;
+    s16 facing = thunder->actor.shape.rot.y + 0x8000;
+
+    thunder->collider.base.atFlags |= AT_ON;
+    thunder->collider.dim.radius = (s16)(radius * 0.62f);
+    thunder->collider.dim.height = 70;
+    thunder->collider.dim.yShift = -35;
+    Collider_UpdateCylinder(&thunder->actor, &thunder->collider);
+    thunder->collider.dim.pos.x += (s16)(Math_SinS(facing) * radius * 0.55f);
+    thunder->collider.dim.pos.z += (s16)(Math_CosS(facing) * radius * 0.55f);
+}
+
+// The charge release becomes a forward cone, held back until the swing reaches its fast cross.
+static void ShapeChargeRelease(Actor* actor) {
+    EnMThunder* thunder = (EnMThunder*)actor;
+
+    if (!IsGerudo() || gPlayState == NULL || !IsThunderReleased(thunder)) {
         return;
     }
-    if (isReady) {
-        FillRect(play, left, RAGE_BAR_Y, left + fillWidth, RAGE_BAR_Y + RAGE_BAR_HEIGHT, pulse, pulse, 255);
+    if (thunder != sCone) {
+        if (!IsReleaseSwinging()) {
+            return;
+        }
+        sCone = thunder;
+        sConeWaitFrames = 0;
+        sIsConeArmed = false;
+    }
+    if (!sIsConeArmed && !ShouldArmCone(GET_PLAYER(gPlayState))) {
+        HoldCone(thunder);
+        return;
+    }
+    sIsConeArmed = true;
+    ShapeConeCollider(thunder);
+}
+
+static void ForgetCone(Actor* actor) {
+    if (sCone != NULL && actor == &sCone->actor) {
+        sCone = NULL;
+    }
+}
+
+static void PayConeRage(Actor* victim, ColliderElement* attack, f32* damage) {
+    if (sCone != NULL && attack == &sCone->collider.elem && IsRageWorthy(victim)) {
+        GainRage(CONE_RAGE_HITS);
+    }
+}
+
+static void SetConeVertex(Vtx* vertex, s16 x, s16 y, s16 z, s16 u, s16 v) {
+    vertex->v.ob[0] = x;
+    vertex->v.ob[1] = y;
+    vertex->v.ob[2] = z;
+    vertex->v.flag = 0;
+    vertex->v.tc[0] = u;
+    vertex->v.tc[1] = v;
+    vertex->v.cn[0] = 255;
+    vertex->v.cn[1] = 255;
+    vertex->v.cn[2] = 255;
+    vertex->v.cn[3] = 255;
+}
+
+// Two tiles across the arc on the ring's own scroll; tc is s10.5, so the endless counter is wrapped into one tile.
+static Vtx* BuildConeWall(PlayState* play, f32 scroll) {
+    Vtx* vertices = GRAPH_ALLOC(play->state.gfxCtx, sizeof(Vtx) * CONE_VERTEX_COUNT);
+    f32 wrapped = scroll - 64.0f * floorf(scroll / 64.0f);
+
+    if (vertices == NULL) {
+        return NULL;
+    }
+    for (s32 i = 0; i <= CONE_SEGMENTS; i++) {
+        f32 t = (f32)i / CONE_SEGMENTS;
+        s16 angle = (s16)(-(CONE_ARC / 2) + (s32)(CONE_ARC * t));
+        s16 x = (s16)(Math_SinS(angle) * CONE_RADIUS);
+        s16 z = (s16)(Math_CosS(angle) * CONE_RADIUS);
+        s16 u = (s16)((t * 2.0f * 64.0f + wrapped) * 32.0f);
+
+        SetConeVertex(&vertices[i * 2], x, (s16)(-CONE_HEIGHT / 2), z, u, 32 * 32);
+        SetConeVertex(&vertices[i * 2 + 1], x, (s16)(CONE_HEIGHT / 2), z, u, 0);
+    }
+    return vertices;
+}
+
+// gameplay_keep exports no symbol for the ring's texture, so its lists run squashed to a point first: nothing is
+// rasterised, but they leave the ring's texture, tiles and combiner loaded for the arc drawn after them.
+static void DrawCone(EnMThunder* thunder, PlayState* play) {
+    Vtx* vertices = BuildConeWall(play, thunder->scroll);
+    bool isGreat = thunder->subtype == THUNDER_SUBTYPE_SPIN_GREAT;
+    u8 alpha = (u8)(thunder->alphaFrac * 255.0f);
+
+    if (vertices == NULL) {
+        return;
+    }
+    Gfx* scrollDL = Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 0xFF - ((u16)(s32)(thunder->scroll * 30.0f) & 0xFF), 0,
+                                       64, 32, 1, 0xFF - ((u16)(s32)(thunder->scroll * 20.0f) & 0xFF), 0, 8, 8, -30, 0,
+                                       -20, 0);
+    Gfx* ringWall = (Gfx*)(isGreat ? gGreatSpinAttackDiskDL : gSpinAttackDiskDL);
+    Gfx* ringRim = (Gfx*)(isGreat ? gGreatSpinAttackCylinderDL : gSpinAttackCylinderDL);
+
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    gSPSegment(POLY_XLU_DISP++, 0x08, (uintptr_t)scrollDL);
+    if (isGreat) {
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, 255, 255, 170, alpha);
     } else {
-        FillRect(play, left, RAGE_BAR_Y, left + fillWidth, RAGE_BAR_Y + RAGE_BAR_HEIGHT, 240, 140, 20);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, 170, 255, 255, alpha);
+    }
+    Matrix_Push();
+    Matrix_Scale(0.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, ringWall);
+    gSPDisplayList(POLY_XLU_DISP++, ringRim);
+    Matrix_Pop();
+
+    Matrix_Scale(THUNDER_UNIT, THUNDER_UNIT, THUNDER_UNIT, MTXMODE_APPLY);
+    Matrix_RotateYF(M_PIf, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR | G_CULL_BOTH);
+    gSPVertex(POLY_XLU_DISP++, (uintptr_t)vertices, CONE_VERTEX_COUNT, 0);
+    for (s32 i = 0; i < CONE_SEGMENTS; i++) {
+        s32 bottom = i * 2;
+        gSP2Triangles(POLY_XLU_DISP++, bottom, bottom + 1, bottom + 2, 0, bottom + 1, bottom + 3, bottom + 2, 0);
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawChargeRelease(Actor* actor, bool* shouldDraw) {
+    if (sCone == NULL || actor != &sCone->actor) {
+        return;
+    }
+    *shouldDraw = false;
+    if (sIsConeArmed) {
+        DrawCone(sCone, gPlayState);
     }
 }
 
@@ -1504,6 +2015,7 @@ static void ResetMoves(PlayState* play, Player* player) {
     sMove = GERUDO_MOVE_NONE;
     sBladeMask = 0;
     sIsCylinderOn = false;
+    sBladeVisibility = -1;
     sIsAPending = false;
     sIsSprinting = false;
     sComboStep = 0;
@@ -1536,6 +2048,7 @@ static void DropInterruptedMove(PlayState* play, Player* player) {
         RestoreFuryLights(play);
     }
     sMove = GERUDO_MOVE_NONE;
+    sBladeVisibility = -1;
     StopAllHits(play, player);
     StopRightTrail();
 }
@@ -1555,6 +2068,7 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
     sIsCylinderReady = false;
     sTrailRight = -1;
     sFuryPrevFrame = -1.0f;
+    sCone = NULL;
     ResetMoves(NULL, NULL);
 }
 
@@ -1572,8 +2086,11 @@ static const S2HCustomItemRandomizer sRandomizerItem = {
 };
 
 static void DrawMaskPickup(PlayState* play, S2HGetItemEntry* entry) {
-    (void)entry;
-    GetItem_Draw(play, GID_MASK_CAPTAIN);
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL26_Opa(play->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sGetItemDL);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static void AssignMaskFromPause(const char* key) {
@@ -1611,7 +2128,19 @@ static const S2HFormActionOverride sActions[] = {
     { SOH_PLAYER_ACTION_MELEE, HandleSlash },
     { SOH_PLAYER_ACTION_ROLL, HandleA },
     { SOH_PLAYER_ACTION_ZTARGET_A, HandleZTargetA },
+    { SOH_PLAYER_ACTION_SHIELD, HandleShield },
 };
+
+// No shield, and the scimitars always: a Link without a sword still fights with the Kokiri tier.
+static u16 ResolveGerudoEquipment(s32 equipType, u16 value) {
+    if (equipType == EQUIP_TYPE_SHIELD) {
+        return EQUIP_VALUE_SHIELD_NONE;
+    }
+    if (equipType == EQUIP_TYPE_SWORD && value == EQUIP_VALUE_SWORD_NONE) {
+        return EQUIP_VALUE_SWORD_KOKIRI;
+    }
+    return value;
+}
 
 static void RegisterForm(void) {
     S2HFormDefinition gerudo = { 0 };
@@ -1627,6 +2156,7 @@ static void RegisterForm(void) {
     gerudo.transformVoiceSfx = NA_SE_VO_LI_FALL_L;
     gerudo.actions = sActions;
     gerudo.actionCount = ARRAY_COUNT(sActions);
+    gerudo.resolveEquipment = ResolveGerudoEquipment;
     gerudo.onEnter = EnterGerudo;
     gerudo.onExit = ExitGerudo;
     gerudo.update = UpdateGerudo;
@@ -1667,6 +2197,12 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetScene);
     S2H_REGISTER_HOOK(sApi, OnOcarinaInput, NoteStruck);
     S2H_REGISTER_HOOK(sApi, OnCollisionResolveDamage, DealFuryDamage);
+    S2H_REGISTER_HOOK(sApi, OnCollisionResolveDamage, PayConeRage);
+    S2H_REGISTER_HOOK(sApi, OnPlayerResolveAnimSite, ResolveSiteAnim);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorUpdate, ACTOR_EN_M_THUNDER, ShapeChargeRelease);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldActorDraw, ACTOR_EN_M_THUNDER, DrawChargeRelease);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorDestroy, ACTOR_EN_M_THUNDER, ForgetCone);
+    sApi->RegisterVB(VB_CHANGE_HELD_ITEM_AND_USE_ITEM, InterceptDraw);
     sApi->RegisterVB(VB_USE_STRENGTH_UPGRADE, ResolveGerudoStrength);
     if (S2H_MOD_API_HAS(sApi, RegisterAudioMixInGroup)) {
         sApi->RegisterAudioMixInGroup(MixVoices, S2H_AUDIO_GROUP_SFX, NULL);

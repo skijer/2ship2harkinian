@@ -85,7 +85,8 @@ static const char* const sRequiredHooks[] = {
     "OnOcarinaInput",        "OnActorInit",
     "OnActorUpdate",         "ShouldActorDraw",
     "OnActorDrawEnd",        "OnSceneInit",
-    "ShouldItemGive",
+    "ShouldItemGive",        "OnInterfaceResolveButtonIcon",
+    "OnKaleidoResolveItemIcon",
 };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -768,6 +769,16 @@ static void DrawLandmine(Actor* actor, bool* shouldDraw) {
     }
 }
 
+static void ShowLandmineOnButton(PlayState* play, u8 button, u16 item, const char** iconPath) {
+    if (item == ITEM_BOMBCHU && sApi->IsFormActive(KAFEI_FORM_KEY)) {
+        *iconPath = sLandmineIconTex;
+    }
+}
+
+static void ShowLandmineInPause(PlayState* play, u16 item, const char** iconPath) {
+    ShowLandmineOnButton(play, 0, item, iconPath);
+}
+
 static void LoadAnims(void) {
     for (s32 i = 0; i < ARRAY_COUNT(sSlashArcs); i++) {
         sSlashAnims[i] = ResourceMgr_LoadPlayerAnimAsHeader(sSlashArcs[i].path);
@@ -934,5 +945,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorInit, ACTOR_EN_BOM_CHU, ArmLandmine);
     S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorUpdate, ACTOR_EN_BOM_CHU, LayLandmine);
     S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldActorDraw, ACTOR_EN_BOM_CHU, DrawLandmine);
+    S2H_REGISTER_HOOK(sApi, OnInterfaceResolveButtonIcon, ShowLandmineOnButton);
+    S2H_REGISTER_HOOK(sApi, OnKaleidoResolveItemIcon, ShowLandmineInPause);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetScene);
 }

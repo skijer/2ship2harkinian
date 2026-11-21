@@ -1,3 +1,6 @@
+#include <math.h>
+#include <string.h>
+
 #include "z64items.h"
 #include "soh/ResourceManagerHelpers.h"
 
@@ -8,7 +11,11 @@
 #include "variables.h"
 
 #define CLIMB_BOOTS_KEY "nei.equip.climb_boots"
-#define ADULT_BOOT_TO_CHILD_SCALE 0.75f
+#define CLIMB_BOOTS_VISUAL_CHANNEL "nei.climb_boots.visual"
+#define REMOTE_VISUAL_INTERVAL 5u
+// The OoT adult boot shrinks for the adult form and further for MM's child-sized human body.
+#define BOOT_SCALE_ADULT 0.85f
+#define BOOT_SCALE_CHILD 0.63f
 
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__textures/icon_item_custom/gItemIconClimbBootsTex";
 static const ALIGN_ASSET(2) char sName[] = "__OTR__textures/item_name_custom/gClimbBootsNameTex";
@@ -128,10 +135,94 @@ static void KeepBootsOnLoadedMatrix(void) {
     sIsPatched = true;
 }
 
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, CLIMB_BOOTS_VISUAL_CHANNEL, visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    return visual->active == 1 && visual->adult <= 1 && visual->scene == gPlayState->sceneId &&
+           !(player->stateFlags2 & PLAYER_STATE2_20000000);
+}
+
+static bool IsWornByLocalHuman(Player* player) {
+    return player->transformation == PLAYER_FORM_HUMAN && IsWorn();
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.adult = FormRegistry_IsCurrentFormAdult();
+        visual.active = IsWornByLocalHuman(GET_PLAYER(play));
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState(CLIMB_BOOTS_VISUAL_CHANNEL, &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel(CLIMB_BOOTS_VISUAL_CHANNEL, 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+    }
+}
+
+static bool ResolveBootScale(Player* player, f32* scale) {
+    RemoteVisualState visual;
+    if (player == GET_PLAYER(gPlayState)) {
+        *scale = FormRegistry_IsCurrentFormAdult() ? BOOT_SCALE_ADULT : BOOT_SCALE_CHILD;
+        return IsWornByLocalHuman(player);
+    }
+    if (!ReadRemoteVisual(player, &visual)) {
+        return false;
+    }
+    *scale = visual.adult ? BOOT_SCALE_ADULT : BOOT_SCALE_CHILD;
+    return true;
+}
+
 static void DrawClimbBootsOnFeet(Player* player, int32_t limbIndex) {
     PlayState* play = gPlayState;
-    if (play == NULL || player != GET_PLAYER(play) || player->transformation != PLAYER_FORM_HUMAN || !IsWorn() ||
-        (limbIndex != PLAYER_LIMB_LEFT_FOOT && limbIndex != PLAYER_LIMB_RIGHT_FOOT)) {
+    f32 bootScale;
+    if (play == NULL || (limbIndex != PLAYER_LIMB_LEFT_FOOT && limbIndex != PLAYER_LIMB_RIGHT_FOOT) ||
+        !ResolveBootScale(player, &bootScale)) {
         return;
     }
     const char* model = limbIndex == PLAYER_LIMB_LEFT_FOOT ? sLeftBootDL : sRightBootDL;
@@ -141,11 +232,11 @@ static void DrawClimbBootsOnFeet(Player* player, int32_t limbIndex) {
     KeepBootsOnLoadedMatrix();
     const u32 envColor = GetCurrentEnvColor(play);
     OPEN_DISPS(play->state.gfxCtx);
-    gDPPipeSync(POLY_OPA_DISP++);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
     gDPSetGrayscaleColor(POLY_OPA_DISP++, 205, 210, 220, 150);
     gSPGrayscale(POLY_OPA_DISP++, true);
     Matrix_Push();
-    Matrix_Scale(ADULT_BOOT_TO_CHILD_SCALE, ADULT_BOOT_TO_CHILD_SCALE, ADULT_BOOT_TO_CHILD_SCALE, MTXMODE_APPLY);
+    Matrix_Scale(bootScale, bootScale, bootScale, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)model);
     Matrix_Pop();
@@ -253,6 +344,7 @@ static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     S2HCustomEquipDefinition definition = { 0 };
 
     definition.getItemEntry.drawFunc = DrawGetItem;

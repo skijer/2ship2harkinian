@@ -384,7 +384,7 @@ void EnSbeetle_Draw(Actor* thisx, PlayState* play) {
 
     if (self->fireTimer != 0) {
         static Color_RGBA8 sFirePrimColor = { 200, 135, 50, 255 };
-        static Color_RGBA8 sFireEnvColor = { 200, 80, 50, 255 };
+        static Color_RGBA8 sFireEnvColor = { 200, 80, 50, 0 };
 
         thisx->colorFilterTimer++;
         self->fireTimer--;
@@ -1109,7 +1109,7 @@ void EnSbeetle_SetupDie(EnSbeetle* self, PlayState* play) {
 
 void EnSbeetle_Die(EnSbeetle* self, PlayState* play) {
     static Color_RGBA8 sDeathPrimColor = { 255, 255, 255, 255 };
-    static Color_RGBA8 sDeathEnvColor = { 0, 0, 255, 255 };
+    static Color_RGBA8 sDeathEnvColor = { 0, 0, 255, 0 };
     Vec3f zeroVec = { 0.0f, 0.0f, 0.0f };
     Vec3f effectVel = { 0.0f, 4.0f, 0.0f };
     Vec3f effectPos = self->actor.world.pos;
@@ -1150,6 +1150,9 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.destroy = EnSbeetle_Destroy;
     definition.update = EnSbeetle_Update;
     definition.draw = EnSbeetle_Draw;
+    definition.enemyFlags = S2H_ACTOR_ENEMY;
+    definition.naviHint = "Scissors Beetle&It attacks by throwing its %rpincers%w&like boomerangs! Keep moving,&"
+                          "then strike when they return!";
 
     if (sApi->RegisterActor(&definition) < 0) {
         sApi->Log("Could not register " SBEETLE_KEY);

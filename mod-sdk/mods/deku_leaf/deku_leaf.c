@@ -39,8 +39,13 @@
 #define DEKU_LEAF_WIND_MOTES 3
 #define DEKU_LEAF_AIR_BALL_MOTES 6
 
-#define DEKU_LEAF_BLOCKING_STATES \
-    (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_8000000)
+#define DEKU_LEAF_GIVE_SCALE 0.35f
+#define DEKU_LEAF_VISUAL_CHANNEL "nei.deku_leaf.visual"
+#define REMOTE_VISUAL_INTERVAL 5u
+#define DEKU_LEAF_BLOCKING_STATES                                                                                  \
+    (PLAYER_STATE1_DEAD | PLAYER_STATE1_20000000 | PLAYER_STATE1_1 | PLAYER_STATE1_10000000 | PLAYER_STATE1_TALKING | \
+     PLAYER_STATE1_400 | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 | PLAYER_STATE1_200000 | PLAYER_STATE1_800000 |    \
+     PLAYER_STATE1_100000 | PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_8000000)
 
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/gItemIconDekuLeafTex";
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/gDekuLeafNameTex";
@@ -414,9 +419,78 @@ static void DrawLeafInHand(Player* player, PlayState* play) {
     DrawLeaf(play, &hand, yaw, isSweeping ? DEKU_LEAF_SWEPT_SCALE : DEKU_LEAF_HELD_SCALE);
 }
 
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, DEKU_LEAF_VISUAL_CHANNEL, visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    return visual->active == 1 && visual->scene == gPlayState->sceneId && visual->flags[0] <= 1 &&
+           !(player->stateFlags2 & PLAYER_STATE2_20000000);
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+    visual.scene = -1;
+    if (play != NULL) {
+        Player* player = GET_PLAYER(play);
+        visual.scene = play->sceneId;
+        visual.active = sIsGliding || IsSwinging(player);
+        if (visual.active) {
+            visual.flags[0] = sIsGliding;
+        }
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState(DEKU_LEAF_VISUAL_CHANNEL, &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
 static void DrawDekuLeaf(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
-
+    if (player != GET_PLAYER(play)) {
+        RemoteVisualState visual;
+        if (!ReadRemoteVisual(player, &visual)) {
+            return;
+        }
+        if (visual.flags[0]) {
+            DrawCanopy(player, play);
+        } else {
+            DrawLeafInHand(player, play);
+        }
+        return;
+    }
     if (player->stateFlags2 & PLAYER_STATE2_20000000) {
         return;
     }
@@ -427,6 +501,37 @@ static void DrawDekuLeaf(Actor* actor, PlayState* play) {
     if (IsSwinging(player)) {
         DrawLeafInHand(player, play);
     }
+}
+
+static void DrawRemotePlayer(Actor* actor, PlayState* play) {
+    if (actor->id == ACTOR_PLAYER || !sRemoteVisualReady || sApi->GetNetPeerIdForActor(actor) == 0) {
+        return;
+    }
+    DrawDekuLeaf(actor, play);
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel(DEKU_LEAF_VISUAL_CHANNEL, 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+        S2H_REGISTER_HOOK(sApi, OnActorDrawEnd, DrawRemotePlayer);
+    }
+}
+
+// The leaf list clears culling and lighting; restoring them keeps the next get-item draw lit.
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(DEKU_LEAF_GIVE_SCALE, DEKU_LEAF_GIVE_SCALE, DEKU_LEAF_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sLeafDL);
+    gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK | G_LIGHTING);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static void DropGlideOnSceneChange(s16 sceneId, s8 spawnNum) {
@@ -448,6 +553,7 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, RegisterCustomItem)) {
         return;
     }
@@ -467,7 +573,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetCanUse(&leaf, CanSwingLeaf);
     leaf.flags |= S2H_CUSTOM_ITEM_INSTANT;
     Z64Items_SetGetItemModel(&leaf, sLeafDL);
-    leaf.getItemScale = 0.35f;
+    leaf.getItemScale = DEKU_LEAF_GIVE_SCALE;
+    leaf.getItemEntry.drawFunc = DrawGetItem;
 
     Z64Items_SetLogic(&leaf, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &leaf)) {

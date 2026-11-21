@@ -40,7 +40,7 @@
 #define HOURGLASS_RIBBON_QUADS (HOURGLASS_FRAMES / HOURGLASS_RIBBON_STEP)
 #define HOURGLASS_RIBBON_HALF_WIDTH 6.0f
 #define HOURGLASS_HELD_SCALE 0.07f
-#define HOURGLASS_GIVE_SCALE 0.16f
+#define HOURGLASS_GIVE_SCALE 0.18f
 #define HOURGLASS_HAND_DROP 2.0f
 #define HOURGLASS_MIXER_ADVANCE 0.5f
 #define HOURGLASS_MIXER_FADE_STEP 0.002f
@@ -53,6 +53,8 @@
 #define HOURGLASS_LADDER_STATE PLAYER_STATE1_200000
 #define HOURGLASS_HORSE_STATE PLAYER_STATE1_800000
 #define HOURGLASS_FIRST_PERSON_STATE PLAYER_STATE1_100000
+#define HOURGLASS_REMOTE_INTERVAL 5u
+#define HOURGLASS_VISUAL_CHANNEL "nei.phantom_hourglass.visual"
 #define HOURGLASS_DISABLE_DRAW_STATE PLAYER_STATE2_20000000
 #define HOURGLASS_BLOCKING_STATES                                                                               \
     (PLAYER_STATE1_DEAD | PLAYER_STATE1_1 | HOURGLASS_ITEM_CUTSCENE_STATE | PLAYER_STATE1_TALKING |             \
@@ -63,6 +65,7 @@ typedef enum {
     HOURGLASS_IDLE,
     HOURGLASS_AIMING,
     HOURGLASS_RECALLING,
+    HOURGLASS_REWINDING,
 } HourglassState;
 
 typedef enum {
@@ -117,13 +120,23 @@ static ColliderCylinderInit sImpactColliderInit = {
     { 40, 60, 0, { 0, 0, 0 } },
 };
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate",          "OnActorDrawEnd",
-                                              "OnActorResolveGrayscale", "OnRoomResolveGrayscale",
-                                              "OnPlayerResolveLimbDraw", "OnSceneInit" };
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate",      "OnPlayerUpdate",
+                                              "OnActorDrawEnd",         "OnActorResolveGrayscale",
+                                              "OnRoomResolveGrayscale", "OnPlayerResolveLimbDraw",
+                                              "OnSceneInit" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
 static const S2HModApi* sApi;
+
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
 static RecordedActor sSlots[HOURGLASS_SLOTS];
 static u8 sState;
 static Actor* sOffer;
@@ -133,6 +146,8 @@ static u32 sRecallStartFrame;
 static s16 sCastPoseFrames;
 static s8 sPreviousInvincibility;
 static bool sIsSelfRewinding;
+static bool sIsInHand;
+static bool sIsUsePending;
 static bool sIsColliderReady;
 static ColliderCylinder sImpactCollider;
 static Vtx sRibbonVtx[HOURGLASS_RIBBON_QUADS * 4];
@@ -833,10 +848,10 @@ static void BeginRecall(Player* player, PlayState* play, Actor* target) {
     Rumble_Request(300.0f, 150, 20, 60);
 }
 
-static bool TickSelfRewind(Player* player, PlayState* play) {
-    if (!(play->state.input[0].cur.button & BTN_R)) {
+static bool TickSelfRewind(Player* player, PlayState* play, bool isHeld, bool isBackToAim) {
+    if (!isHeld) {
         if (sIsSelfRewinding) {
-            EndSelfRewind(player, play, true);
+            EndSelfRewind(player, play, isBackToAim);
         }
         return false;
     }
@@ -853,7 +868,7 @@ static bool TickSelfRewind(Player* player, PlayState* play) {
     }
     sRecallFrames++;
     if ((sRecallFrames % HOURGLASS_DRAIN_INTERVAL) == 0 && !SpendMagic(play, HOURGLASS_DRAIN_COST)) {
-        EndSelfRewind(player, play, true);
+        EndSelfRewind(player, play, isBackToAim);
         return false;
     }
     player->invincibilityTimer = -HOURGLASS_SELF_IFRAMES;
@@ -863,16 +878,19 @@ static bool TickSelfRewind(Player* player, PlayState* play) {
     return true;
 }
 
-static Actor* OfferedActor(Player* player, PlayState* play) {
+static Actor* OfferedActor(Player* player, PlayState* play, s16 aimYaw) {
     Actor* locked = player->focusActor;
 
     if (locked != NULL && locked->update != NULL && IsRecallable(player, locked) && HasEnoughHistory(locked)) {
         return locked;
     }
-    return ScanForTarget(play, player, player->actor.focus.rot.y);
+    return ScanForTarget(play, player, aimYaw);
 }
 
 static void ResolveAimingHand(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
+    if (gPlayState == NULL || player != GET_PLAYER(gPlayState)) {
+        return;
+    }
     if (sState == HOURGLASS_AIMING && !sIsSelfRewinding && limbIndex == PLAYER_LIMB_RIGHT_HAND &&
         (player->stateFlags1 & HOURGLASS_FIRST_PERSON_STATE)) {
         *dList = gPhantomHourglassDL;
@@ -888,14 +906,14 @@ static void AimAction(Player* player, PlayState* play) {
         func_8083B1A0(player, play);
         return;
     }
-    if (TickSelfRewind(player, play)) {
+    if (TickSelfRewind(player, play, (play->state.input[0].cur.button & BTN_R) != 0, true)) {
         return;
     }
     Z64Aiming_Update(player, play);
     Player_StopHorizontalMovement(player);
     PlayerAnimation_Update(play, &player->skelAnime);
     PlayerAnimation_Update(play, &player->skelAnimeUpper);
-    sOffer = OfferedActor(player, play);
+    sOffer = OfferedActor(player, play, player->actor.focus.rot.y);
     if (!(play->state.input[0].press.button & buttonMask)) {
         return;
     }
@@ -930,6 +948,7 @@ static void TickRecalling(Player* player, PlayState* play, u16 buttonMask) {
     TickCastPose(player, play);
     StrikeWhatItPassesThrough(play, sTarget, &before);
     SpawnSand(play, sTarget);
+    // The press that confirmed the recall is still on the pad this frame and would read as the cancel.
     if (sRecallStartFrame == play->state.frames) {
         return;
     }
@@ -938,27 +957,109 @@ static void TickRecalling(Player* player, PlayState* play, u16 buttonMask) {
     }
 }
 
+static void TickRewinding(Player* player, PlayState* play, u16 buttonMask) {
+    bool isHeld = (play->state.input[0].cur.button & buttonMask) != 0;
+
+    if (IsLinkBusy(player) || !TickSelfRewind(player, play, isHeld, false)) {
+        Stow(player, play);
+    }
+}
+
+static void StartRewinding(Player* player, PlayState* play) {
+    sState = HOURGLASS_REWINDING;
+    if (!TickSelfRewind(player, play, true, false)) {
+        sState = HOURGLASS_IDLE;
+        PlayError(player);
+    }
+}
+
+static bool IsReadyInHand(Player* player) {
+    return sIsInHand && sState == HOURGLASS_IDLE && player->heldItemAction == PLAYER_IA_CUSTOM &&
+           !(player->stateFlags3 & PLAYER_STATE3_START_CHANGING_HELD_ITEM) && !IsLinkBusy(player);
+}
+
+// What keeps its colour is what a press recalls; holding R skips it so the press rewinds Link instead.
+static void MarkOffer(Player* player, PlayState* play) {
+    if (sState != HOURGLASS_IDLE) {
+        return;
+    }
+    if (!IsReadyInHand(player) || (play->state.input[0].cur.button & BTN_R)) {
+        sOffer = NULL;
+        return;
+    }
+    sOffer = OfferedActor(player, play, player->actor.shape.rot.y);
+}
+
+// With nothing offered the press rewinds Link himself, which works in midair too.
+static void UseHourglass(PlayState* play, Player* player) {
+    if (sOffer != NULL && sOffer->update != NULL) {
+        BeginRecall(player, play, sOffer);
+        return;
+    }
+    StartRewinding(player, play);
+}
+
+static void RunPendingUse(Player* player, PlayState* play) {
+    if (!sIsUsePending) {
+        return;
+    }
+    sIsUsePending = false;
+    if (IsReadyInHand(player)) {
+        UseHourglass(play, player);
+    }
+}
+
+static void AimOnCUp(Player* player, PlayState* play) {
+    if (IsReadyInHand(player) && (play->state.input[0].press.button & BTN_CUP)) {
+        RaiseHourglass(play, player);
+    }
+}
+
+static void TakeOutHourglass(PlayState* play, Player* player) {
+    sIsInHand = true;
+    sIsUsePending = false;
+}
+
+static s32 HoldHourglass(Player* player, PlayState* play) {
+    return 0;
+}
+
+// An action set inside the item-button pass is overwritten the same frame, so the use waits for the update's end.
+static void RequestUse(Player* player, PlayState* play) {
+    sIsUsePending = sState == HOURGLASS_IDLE;
+}
+
+static void PutHourglassAway(Player* player, PlayState* play) {
+    if (sState != HOURGLASS_IDLE) {
+        Stow(player, play);
+    }
+    sIsInHand = false;
+    sIsUsePending = false;
+    sOffer = NULL;
+}
+
 static void ResetState(void) {
     ClearAllSlots();
     sState = HOURGLASS_IDLE;
     sTarget = NULL;
     sOffer = NULL;
     sIsSelfRewinding = false;
+    sIsInHand = false;
+    sIsUsePending = false;
     Z64Aiming_Drop();
 }
 
 static void TickHourglass(Player* player) {
     PlayState* play = gPlayState;
-    u16 buttonMask;
 
-    if (play == NULL || player == NULL) {
+    if (play == NULL || player == NULL || player != GET_PLAYER(play)) {
         return;
     }
     if (play->sceneId != sSceneId) {
         sSceneId = play->sceneId;
         ResetState();
     }
-    buttonMask = FindEquippedButtons();
+    u16 buttonMask = FindEquippedButtons();
     if (buttonMask == 0) {
         if (sState != HOURGLASS_IDLE) {
             Stow(player, play);
@@ -968,15 +1069,19 @@ static void TickHourglass(Player* player) {
     }
     KeepMixerAlive();
     RecordEveryone(play, player);
+    // Anything that takes the player replaces the aim action silently and would leave the world frozen.
     if (sState == HOURGLASS_AIMING && player->actionFunc != AimAction) {
         Stow(player, play);
         return;
     }
     if (sState == HOURGLASS_RECALLING) {
         TickRecalling(player, play, buttonMask);
-    } else if (sState == HOURGLASS_IDLE && (play->state.input[0].press.button & buttonMask) && !IsLinkBusy(player)) {
-        RaiseHourglass(play, player);
+    } else if (sState == HOURGLASS_REWINDING) {
+        TickRewinding(player, play, buttonMask);
     }
+    RunPendingUse(player, play);
+    AimOnCUp(player, play);
+    MarkOffer(player, play);
 }
 
 static bool IsDrawnGray(Actor* actor) {
@@ -988,6 +1093,9 @@ static bool IsDrawnGray(Actor* actor) {
     }
     if (sState == HOURGLASS_RECALLING) {
         return actor == NULL || (actor->category != ACTORCAT_PLAYER && actor != sTarget);
+    }
+    if (sIsInHand) {
+        return actor == NULL || (actor->category != ACTORCAT_PLAYER && actor != sOffer);
     }
     return false;
 }
@@ -1113,11 +1221,15 @@ static void DrawHourglassInHand(Player* player, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static bool IsHourglassShown(void) {
+    return sState != HOURGLASS_IDLE || sIsInHand;
+}
+
 static void DrawHourglass(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
     Actor* path = PathActor();
 
-    if (sState == HOURGLASS_IDLE) {
+    if (!IsHourglassShown()) {
         return;
     }
     if (!(player->stateFlags2 & HOURGLASS_DISABLE_DRAW_STATE) &&
@@ -1129,7 +1241,7 @@ static void DrawHourglass(Actor* actor, PlayState* play) {
     }
     if (sState == HOURGLASS_AIMING && !sIsSelfRewinding) {
         Z64Aiming_DrawReticle(play, player, HOURGLASS_TRACK_RANGE,
-                              (Z64AimingReticleStyle){ Z64AIMING_TOGGLE_BOW, Z64AIMING_TINT_CONTROL });
+                              (Z64AimingReticleStyle){ Z64AIMING_TOGGLE_HOOKSHOT, Z64AIMING_TINT_CONTROL });
     }
 }
 
@@ -1138,9 +1250,80 @@ static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
     Matrix_Scale(HOURGLASS_GIVE_SCALE, HOURGLASS_GIVE_SCALE, HOURGLASS_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, gPhantomHourglassDL);
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, HOURGLASS_VISUAL_CHANNEL, visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    return visual->active == 1 && visual->scene == gPlayState->sceneId &&
+           !(player->stateFlags2 & HOURGLASS_DISABLE_DRAW_STATE);
+}
+
+static void PublishRemoteVisual(void) {
+    PlayState* play = gPlayState;
+    RemoteVisualState visual = { 0 };
+
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = IsHourglassShown();
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < HOURGLASS_REMOTE_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState(HOURGLASS_VISUAL_CHANNEL, &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void DrawRemoteHourglass(Actor* actor, PlayState* play) {
+    RemoteVisualState visual;
+
+    if (!sRemoteVisualReady || sApi->GetNetPeerIdForActor(actor) == 0) {
+        return;
+    }
+    if (ReadRemoteVisual((Player*)actor, &visual)) {
+        DrawHourglassInHand((Player*)actor, play);
+    }
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel(HOURGLASS_VISUAL_CHANNEL, 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+        S2H_REGISTER_HOOK(sApi, OnActorDrawEnd, DrawRemoteHourglass);
+    }
 }
 
 static void ForgetSceneState(s16 sceneId, s8 spawnNum) {
@@ -1161,6 +1344,7 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, RequestTimeControl)) {
         return;
     }
@@ -1171,15 +1355,15 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetForms(&hourglass, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&hourglass, 0, 17, 0);
     Z64Items_SetTextbox(&hourglass, "You got the %rPhantom&Hourglass%w! Sand that&remembers where everything&"
-                                    "has been.^"
-                                    "Press %y\xB2%w to hold the world still,&look at something and press&"
-                                    "again: it walks its own path&backwards.^"
-                                    "Hold %y\xB4%w while it is up and %gyou%w go&"
-                                    "back instead. It spends %gmagic%w.");
-    Z64Items_SetPauseText(&hourglass, "%rPhantom Hourglass&%wPress %y\xB2%w to stop time and aim,&"
-                                      "again to recall. %y\xB4%w rewinds you.");
-    // An item action would fire in the same frame and read the press a second time as the confirm.
-    hourglass.flags |= S2H_CUSTOM_ITEM_INSTANT;
+                                    "has been.^Ready it with %y\xB2%w: the world&greys but what you face. Press %y\xB2%w&"
+                                    "and it walks its path back.^With nothing there, or %y\xB4%w held,&"
+                                    "%gyou%w go back while %y\xB2%w is held.&"
+                                    "%y\xB6%w stops time to aim. It spends&%gmagic%w.");
+    Z64Items_SetPauseText(&hourglass, "%rPhantom Hourglass&%wPress %y\xB2%w to recall what keeps colour;&"
+                                      "hold it to rewind yourself. %y\xB6%w aims.");
+    Z64Items_SetAction(&hourglass, TakeOutHourglass, HoldHourglass);
+    Z64Items_SetHeldCallbacks(&hourglass, RequestUse, PutHourglassAway, NULL);
+    hourglass.modelGroup = PLAYER_MODELGROUP_DEFAULT;
     hourglass.getItemEntry.drawFunc = DrawGetItem;
 
     Z64Items_SetLogic(&hourglass, &sRandomizerItem);

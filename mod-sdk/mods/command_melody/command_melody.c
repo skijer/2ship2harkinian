@@ -262,12 +262,13 @@ static void Scene(s16 sceneId, s8 spawnNum) {
 
 static const ALIGN_ASSET(2) char sOotNoteIcon[] = "__OTR__textures/oot_icon_item_static/gItemIconOotSongCustomTex";
 static const ALIGN_ASSET(2) char sSongNoteDL[] = "__OTR__objects/object_gi_melody/gGiSongNoteDL";
+static const ALIGN_ASSET(2) char sSongColorDL[] = "__OTR__objects/object_gi_melody/gGiRequiemColorDL";
 
 static void DrawSongNote(PlayState* play, S2HGetItemEntry* entry) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sSongColorDL);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sSongNoteDL);
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -282,7 +283,7 @@ static void RegisterSong(void) {
     Z64Items_SetPlacement(&song, S2H_ITEM_PAGE_QUEST_VANILLA + 1, 16, 0);
     Z64Items_SetTextbox(
         &song, "You learned the %rCommand Melody%w!&Play it to control a nearby&companion. Target one to choose.^"
-               "%b\x9F %y\xA7 %b\x9F %y\xA8 %b\x9F %y\xA7 %b\x9F %y\xA8%w^"
+               "%b\xB0 %y\xB8 %b\xB0 %y\xB9 %b\xB0 %y\xB8 %b\xB0 %y\xB9%w^"
                "Use the Stick to move, %b\xB0%w to jump,&and %g\xB1%w to attack. Press %y\xB6%w&to return to Link.");
     Z64Items_SetPauseText(
         &song,

@@ -1,7 +1,11 @@
 {
     "name": "four_sword",
-  "dependencies": ["nei_equipment"],
+    "dependencies": ["nei_equipment"],
     "author": "Skijer",
-    "version": "1.0",
-    "description": "Four Sword: sword-slot equipment that splits Link in four, with a wheel of formations that push blocks, spin as one and stack into a totem."
+    "version": "1.0.1",
+    "description": "Four Sword: sword-slot equipment that splits Link in four, with a wheel of formations that push blocks, spin as one and stack into a totem.",
+    "permissions": [
+        "network"
+    ],
+    "display_name": "Four Sword"
 }

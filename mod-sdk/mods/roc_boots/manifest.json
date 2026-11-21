@@ -1,7 +1,11 @@
 {
     "name": "roc_boots",
-  "dependencies": ["oot_assets", "nei_equipment"],
+    "dependencies": ["oot_assets", "nei_equipment"],
     "author": "Skijer",
-    "version": "1.0",
-    "description": "Roc's Boots: boots-slot equipment with half gravity that walks on water, lava and quicksand."
+    "version": "1.0.1",
+    "description": "Roc's Boots: boots-slot equipment with half gravity that walks on water, lava and quicksand.",
+    "permissions": [
+        "network"
+    ],
+    "display_name": "Roc's Boots"
 }

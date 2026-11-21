@@ -17,7 +17,9 @@ s32 Player_GetMovementSpeedAndYaw(Player* player, f32* speed, s16* yaw, f32 mode
 #include "overlays/actors/ovl_Obj_Iceblock/z_obj_iceblock.h"
 #include "overlays/actors/ovl_En_Fz/z_en_fz.h"
 #include "overlays/actors/ovl_En_Snowman/z_en_snowman.h"
-void EnSnowman_SetupMelt(EnSnowman* snowman);
+#include "overlays/actors/ovl_En_Go/z_en_go.h"
+#include "overlays/actors/ovl_Bg_Dblue_Waterfall/z_bg_dblue_waterfall.h"
+#include "overlays/actors/ovl_Boss_Hakugin/z_boss_hakugin.h"
 
 #define BALL_KEY "nei.ball_and_chain"
 #define BALL_BUTTON_COUNT S2H_ITEM_BUTTON_COUNT
@@ -28,6 +30,11 @@ void EnSnowman_SetupMelt(EnSnowman* snowman);
 #define BALL_WALL_HEIGHT 20.0f
 #define BALL_ICE_REACH 140.0f
 #define BALL_BIGICE_REACH 200.0f
+#define BALL_FIRE_DAMAGE 2
+// Fire arrow damage effects, private to each overlay: ENGO_DMGEFF_FIRE, EN_SNOWMAN_DMGEFF_MELT and En_Fz's case 2.
+#define BALL_GORON_DMGEFF_FIRE 2
+#define BALL_EENO_DMGEFF_MELT 2
+#define BALL_FREEZARD_DMGEFF_FIRE 2
 #define BALL_HOLD_WALK_SCALE 0.5f
 #define BALL_SPIN_WALK_SCALE 0.35f
 #define BALL_GUARD_RADIUS_MIN 45.0f
@@ -37,18 +44,22 @@ void EnSnowman_SetupMelt(EnSnowman* snowman);
 #define BALL_HOLD_DROP 5.0f
 #define BALL_CHARGE_MAX 60
 #define BALL_CHARGE_MIN 15
+#define BALL_CHARGE_TAP 5
 #define BALL_SPIN_RADIUS 20.0f
 #define BALL_SPIN_HEIGHT_MIN 50.0f
 #define BALL_SPIN_HEIGHT_MAX 55.0f
 #define BALL_SPIN_SPEED_MIN 0x1000
 #define BALL_SPIN_SPEED_MAX 0x2000
+#define BALL_QUICK_SPIN_MULTIPLIER 2.5f
 #define BALL_STICK_DEADZONE 5.0f
 #define BALL_LEAN_TILT 40.0f
+#define BALL_WEAK_LEAN_SCALE 0.2f
 #define BALL_THROW_LEAN 3000
 #define BALL_LEAN_MIN 182.0f
 #define BALL_LEAN_MAX 910.0f
 #define BALL_HOLD_POSE_FRAME 8
 #define BALL_SPIN_POSE_FRAME 0
+#define BALL_LAUNCH_SPEED_SHORT 10.0f
 #define BALL_LAUNCH_SPEED_MIN 22.0f
 #define BALL_LAUNCH_SPEED_MAX 32.0f
 #define BALL_LAUNCH_LIFT 7.0f
@@ -69,6 +80,9 @@ void EnSnowman_SetupMelt(EnSnowman* snowman);
 #define BALL_CHAIN_STRAND_MAX 8
 #define BALL_CHAIN_THICKNESS 0.02f
 #define BALL_CHAIN_STRETCH 0.01f
+#define BALL_CHAIN_ARC_SEGMENTS 8
+#define BALL_CHAIN_ARC_HEIGHT 35.0f
+#define BALL_GIVE_SCALE 0.25f
 
 typedef enum {
     BALL_IDLE,
@@ -115,7 +129,10 @@ static ColliderCylinderInit sBallColliderInit = {
     { BALL_COLLIDER_RADIUS, BALL_COLLIDER_HEIGHT, 0, { 0, 0, 0 } },
 };
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate",
+static ColliderElement sFireArrowTouch = { { DMG_FIRE_ARROW, 0x00, BALL_FIRE_DAMAGE } };
+
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate",
+                                              "OnPlayerUpdate",
                                               "ShouldActorDraw",
                                               "OnActorDrawEnd",
                                               "OnPlayerFilterInput",
@@ -125,12 +142,27 @@ static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sR
                                                   ARRAY_COUNT(sRequiredHooks) };
 
 static const S2HModApi* sApi;
+
+#define REMOTE_VISUAL_INTERVAL 5u
+
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual);
+static void InitRemoteVisuals(void);
+
 static ColliderCylinder sBallCollider;
 static bool sIsColliderReady;
 static u8 sPhase;
 static s16 sCharge;
 static s16 sSpinAngle;
 static s16 sThrowYaw;
+static s16 sQuickSpinFrames;
 static s16 sThrownFrames;
 static s16 sRestTimer;
 static u8 sBounces;
@@ -145,6 +177,9 @@ bool Player_UpdateUpperBody(Player* player, PlayState* play);
 bool Player_IsZTargeting(Player* player);
 s32 Player_SetAction(PlayState* play, Player* player, PlayerActionFunc actionFunc, s32 flags);
 void func_8083B1A0(Player* player, PlayState* play);
+void EnGo_Frozen(EnGo* goron, PlayState* play);
+void BossHakugin_FrozenBeforeFight(BossHakugin* goht, PlayState* play);
+s32 func_80B83D04(BgDblueWaterfall* waterfall, PlayState* play);
 
 static u32 FindEquippedButtonMask(void) {
     for (u8 button = 0; button < BALL_BUTTON_COUNT; button++) {
@@ -172,6 +207,10 @@ static bool CanLiftBall(Player* player, PlayState* play) {
     return Strength() >= PLAYER_STRENGTH_HUMAN && !(player->stateFlags1 & PLAYER_STATE1_8000000);
 }
 
+static bool HasOnlyLiftingStrength(void) {
+    return Strength() == PLAYER_STRENGTH_HUMAN;
+}
+
 static bool CanWalkWithBall(void) {
     return Strength() >= PLAYER_STRENGTH_ZORA;
 }
@@ -181,6 +220,10 @@ static bool CanAimBall(void) {
 }
 
 static bool IsOneHanded(void) {
+    return Strength() >= PLAYER_STRENGTH_GORON;
+}
+
+static bool CanMeltIce(void) {
     return Strength() >= PLAYER_STRENGTH_GORON;
 }
 
@@ -214,7 +257,7 @@ static void StrikeWithBall(Player* player, PlayState* play) {
     bool isAtFootLevel = sBallPos.y - player->actor.world.pos.y < 30.0f;
 
     sBallCollider.elem.atDmgInfo.dmgFlags = isAtFootLevel ? DMG_GORON_POUND : DMG_GORON_PUNCH;
-    sBallCollider.elem.atDmgInfo.damage = Strength() >= PLAYER_STRENGTH_GORON ? BALL_GOLDEN_DAMAGE : BALL_DAMAGE;
+    sBallCollider.elem.atDmgInfo.damage = IsOneHanded() ? BALL_GOLDEN_DAMAGE : BALL_DAMAGE;
     sBallCollider.dim.pos.x = sBallPos.x;
     sBallCollider.dim.pos.y = sBallPos.y - BALL_COLLIDER_HEIGHT / 2;
     sBallCollider.dim.pos.z = sBallPos.z;
@@ -227,33 +270,117 @@ static void StrikeWithBall(Player* player, PlayState* play) {
     CollisionCheck_SetOC(play, &play->colChkCtx, &sBallCollider.base);
 }
 
-static void BurstIce(PlayState* play, Vec3f* pos) {
-    EffectSsIcePiece_SpawnBurst(play, pos, 1.5f);
-    Audio_PlaySfx_AtPos(pos, NA_SE_EV_ICE_BROKEN);
-}
-
-static void MeltRedIce(PlayState* play, Actor* actor) {
-    ObjIcePoly* ice = (ObjIcePoly*)actor;
-
-    if (ice->switchFlag != OBJICEPOLY_SWITCH_FLAG_NONE) {
-        Flags_SetSwitch(play, ice->switchFlag);
-        return;
-    }
-    BurstIce(play, &actor->world.pos);
-    Actor_Kill(actor);
-}
-
 static bool IsBallNear(Actor* actor, f32 reach) {
     return Math_Vec3f_DistXYZ(&sBallPos, &actor->world.pos) < reach;
 }
 
-static void BreakIceActor(PlayState* play, Actor* actor) {
+static bool IsBallInCylinder(ColliderCylinder* cylinder) {
+    f32 dx = sBallPos.x - cylinder->dim.pos.x;
+    f32 dz = sBallPos.z - cylinder->dim.pos.z;
+    f32 bottom = cylinder->dim.pos.y + cylinder->dim.yShift;
+
+    return sqrtf(SQ(dx) + SQ(dz)) < cylinder->dim.radius + BALL_COLLIDER_RADIUS &&
+           sBallPos.y > bottom - BALL_COLLIDER_RADIUS && sBallPos.y < bottom + cylinder->dim.height + BALL_COLLIDER_RADIUS;
+}
+
+// Ice melts through the fire arrow branch of its own update: a forged AC hit is read before its next SetAC reset.
+static void TouchWithFire(ColliderCylinder* cylinder, Player* player) {
+    cylinder->base.acFlags |= AC_HIT;
+    cylinder->base.ac = &player->actor;
+    cylinder->elem.acHitElem = &sFireArrowTouch;
+}
+
+static void BurnWithFire(ColliderCylinder* cylinder, Actor* target, Player* player, u8 damageEffect) {
+    TouchWithFire(cylinder, player);
+    target->colChkInfo.damageEffect = damageEffect;
+    target->colChkInfo.damage = BALL_FIRE_DAMAGE;
+}
+
+static bool IsStandingOn(Player* player, PlayState* play, Actor* actor) {
+    return DynaPoly_GetActor(&play->colCtx, player->actor.floorBgId) == (DynaPolyActor*)actor;
+}
+
+static void MeltIcePoly(Player* player, ObjIcePoly* ice) {
+    for (u32 i = 0; i < ARRAY_COUNT(ice->colliders2); i++) {
+        if (IsBallInCylinder(&ice->colliders2[i])) {
+            TouchWithFire(&ice->colliders2[i], player);
+            return;
+        }
+    }
+}
+
+static void MeltIceBlock(Player* player, PlayState* play, ObjIceblock* block) {
+    if (IsStandingOn(player, play, &block->dyna.actor) || !IsBallInCylinder(&block->collider)) {
+        return;
+    }
+    TouchWithFire(&block->collider, player);
+}
+
+static void ThawGoron(Player* player, EnGo* goron) {
+    if (goron->actionFunc != EnGo_Frozen || !IsBallInCylinder(&goron->colliderCylinder)) {
+        return;
+    }
+    BurnWithFire(&goron->colliderCylinder, &goron->actor, player, BALL_GORON_DMGEFF_FIRE);
+}
+
+static void ThawWaterfall(Player* player, PlayState* play, BgDblueWaterfall* waterfall) {
+    if (!func_80B83D04(waterfall, play) || !IsBallInCylinder(&waterfall->collider)) {
+        return;
+    }
+    TouchWithFire(&waterfall->collider, player);
+}
+
+static void ThawGoht(Player* player, BossHakugin* goht) {
+    if (goht->actionFunc != BossHakugin_FrozenBeforeFight || !IsBallInCylinder(&goht->iceCollider)) {
+        return;
+    }
+    TouchWithFire(&goht->iceCollider, player);
+}
+
+static void MeltFreezard(Player* player, EnFz* freezard) {
+    if (freezard->unk_BD8 != 0 || !IsBallNear(&freezard->actor, BALL_ICE_REACH)) {
+        return;
+    }
+    BurnWithFire(&freezard->collider1, &freezard->actor, player, BALL_FREEZARD_DMGEFF_FIRE);
+}
+
+static void MeltEeno(Player* player, EnSnowman* snowman) {
+    if (!(snowman->collider.base.acFlags & AC_ON) || !IsBallNear(&snowman->actor, BALL_ICE_REACH)) {
+        return;
+    }
+    BurnWithFire(&snowman->collider, &snowman->actor, player, BALL_EENO_DMGEFF_MELT);
+}
+
+static void MeltLikeFireArrow(Player* player, PlayState* play, Actor* actor) {
     switch (actor->id) {
         case ACTOR_OBJ_ICE_POLY:
-            if (IsBallNear(actor, BALL_BIGICE_REACH)) {
-                MeltRedIce(play, actor);
-            }
+            MeltIcePoly(player, (ObjIcePoly*)actor);
             break;
+        case ACTOR_OBJ_ICEBLOCK:
+            MeltIceBlock(player, play, (ObjIceblock*)actor);
+            break;
+        case ACTOR_EN_GO:
+            ThawGoron(player, (EnGo*)actor);
+            break;
+        case ACTOR_BG_DBLUE_WATERFALL:
+            ThawWaterfall(player, play, (BgDblueWaterfall*)actor);
+            break;
+        case ACTOR_BOSS_HAKUGIN:
+            ThawGoht(player, (BossHakugin*)actor);
+            break;
+        case ACTOR_EN_FZ:
+            MeltFreezard(player, (EnFz*)actor);
+            break;
+        case ACTOR_EN_SNOWMAN:
+            MeltEeno(player, (EnSnowman*)actor);
+            break;
+        default:
+            break;
+    }
+}
+
+static void ShatterIcicle(Actor* actor) {
+    switch (actor->id) {
         case ACTOR_BG_ICICLE:
             if (IsBallNear(actor, BALL_ICE_REACH)) {
                 ((BgIcicle*)actor)->collider.base.acFlags |= AC_HIT;
@@ -264,42 +391,25 @@ static void BreakIceActor(PlayState* play, Actor* actor) {
                 ((ObjBigicicle*)actor)->collider1.base.acFlags |= AC_HIT;
             }
             break;
-        case ACTOR_OBJ_ICEBLOCK: {
-            ObjIceblock* block = (ObjIceblock*)actor;
-
-            if (IsBallNear(actor, BALL_BIGICE_REACH) && !ICEBLOCK_GET_ICEBERG(actor) && block->meltTimer > 0) {
-                block->meltTimer = 0;
-            }
-            break;
-        }
-        case ACTOR_EN_FZ: {
-            EnFz* freezard = (EnFz*)actor;
-
-            if (IsBallNear(actor, BALL_ICE_REACH) && freezard->unk_BD8 == 0) {
-                freezard->actor.colChkInfo.damageEffect = 2;
-                freezard->collider1.base.acFlags |= AC_HIT;
-            }
-            break;
-        }
-        case ACTOR_EN_SNOWMAN:
-            if (IsBallNear(actor, BALL_ICE_REACH) && (((EnSnowman*)actor)->collider.base.acFlags & AC_ON)) {
-                EnSnowman_SetupMelt((EnSnowman*)actor);
-            }
-            break;
         default:
             break;
     }
 }
 
-static void BreakWhatTheBallReaches(PlayState* play) {
-    static const u8 sCategories[] = { ACTORCAT_PROP, ACTORCAT_BG, ACTORCAT_ITEMACTION, ACTORCAT_ENEMY };
+static void BreakWhatTheBallReaches(Player* player, PlayState* play) {
+    static const u8 sCategories[] = { ACTORCAT_BG,   ACTORCAT_NPC,        ACTORCAT_ENEMY,
+                                      ACTORCAT_PROP, ACTORCAT_ITEMACTION, ACTORCAT_BOSS };
+    bool canMelt = CanMeltIce();
 
     for (u32 i = 0; i < ARRAY_COUNT(sCategories); i++) {
         Actor* next;
 
         for (Actor* actor = play->actorCtx.actorLists[sCategories[i]].first; actor != NULL; actor = next) {
             next = actor->next;
-            BreakIceActor(play, actor);
+            ShatterIcicle(actor);
+            if (canMelt) {
+                MeltLikeFireArrow(player, play, actor);
+            }
         }
     }
 }
@@ -318,7 +428,7 @@ static void CrushArmoredFoes(void) {
 static void StrikeAndBreak(Player* player, PlayState* play) {
     CrushArmoredFoes();
     StrikeWithBall(player, play);
-    BreakWhatTheBallReaches(play);
+    BreakWhatTheBallReaches(player, play);
 }
 
 static void HoldBallInHands(Player* player) {
@@ -347,31 +457,54 @@ static void WeighDownPlayer(Player* player, s32 kind, f32* scale) {
 }
 
 static void FaceThrowDirection(Player* player) {
-    player->actor.shape.rot.y = player->actor.world.rot.y = player->yaw = sThrowYaw;
+    player->actor.shape.rot.y = sThrowYaw;
+    player->actor.world.rot.y = sThrowYaw;
+    player->yaw = sThrowYaw;
 }
 
+// A zero motion scale also stops vanilla turning, so arms that cannot walk with the ball turn on the spot here.
 static void TurnBallInPlace(Player* player, PlayState* play) {
-    if (!CanWalkWithBall() && !Player_IsZTargeting(player)) {
-        f32 speed;
-        s16 yaw;
-        if (Player_GetMovementSpeedAndYaw(player, &speed, &yaw, 1.0f, play)) {
-            Math_ScaledStepToS(&player->actor.shape.rot.y, yaw, 0x7D0);
-            player->yaw = player->actor.world.rot.y = player->actor.shape.rot.y;
-        }
-        Player_StopHorizontalMovement(player);
+    if (CanWalkWithBall() || Player_IsZTargeting(player)) {
+        return;
     }
+    f32 speed;
+    s16 yaw;
+
+    if (Player_GetMovementSpeedAndYaw(player, &speed, &yaw, 1.0f, play)) {
+        Math_ScaledStepToS(&player->actor.shape.rot.y, yaw, 0x7D0);
+        player->actor.world.rot.y = player->actor.shape.rot.y;
+        player->yaw = player->actor.shape.rot.y;
+    }
+    Player_StopHorizontalMovement(player);
+}
+
+static void ReadStickLean(Player* player, PlayState* play) {
+    s8 stickX = play->state.input[0].cur.stick_x;
+    s8 stickY = play->state.input[0].cur.stick_y;
+
+    sStickLeanX = 0.0f;
+    sStickLeanY = 0.0f;
+    if (!Player_IsZTargeting(player) && sqrtf(SQ(stickX) + SQ(stickY)) > BALL_STICK_DEADZONE) {
+        sStickLeanX = stickX / 127.0f;
+        sStickLeanY = stickY / 127.0f;
+    }
+}
+
+static s16 SpinStep(void) {
+    f32 speed = BALL_SPIN_SPEED_MIN + (BALL_SPIN_SPEED_MAX - BALL_SPIN_SPEED_MIN) * (f32)sCharge / BALL_CHARGE_MAX;
+    return (s16)(speed * (sQuickSpinFrames > 0 ? BALL_QUICK_SPIN_MULTIPLIER : 1.0f));
 }
 
 static void OrbitBallOverhead(Player* player) {
     f32 chargeRatio = (f32)sCharge / BALL_CHARGE_MAX;
+    f32 tilt = HasOnlyLiftingStrength() ? BALL_LEAN_TILT * BALL_WEAK_LEAN_SCALE : BALL_LEAN_TILT;
     f32 orbitX = Math_SinS(sSpinAngle) * BALL_SPIN_RADIUS;
     f32 orbitZ = Math_CosS(sSpinAngle) * BALL_SPIN_RADIUS;
     f32 orbitY = BALL_SPIN_HEIGHT_MIN + (BALL_SPIN_HEIGHT_MAX - BALL_SPIN_HEIGHT_MIN) * chargeRatio -
-                 Math_CosS(sSpinAngle) * sStickLeanY * BALL_LEAN_TILT -
-                 Math_SinS(sSpinAngle) * sStickLeanX * BALL_LEAN_TILT;
+                 Math_CosS(sSpinAngle) * sStickLeanY * tilt - Math_SinS(sSpinAngle) * sStickLeanX * tilt;
     s16 yaw = player->actor.shape.rot.y;
 
-    sSpinAngle += (s16)(BALL_SPIN_SPEED_MIN + (BALL_SPIN_SPEED_MAX - BALL_SPIN_SPEED_MIN) * chargeRatio);
+    sSpinAngle += SpinStep();
     sBallPos.x = player->actor.world.pos.x + orbitX * Math_CosS(yaw) + orbitZ * Math_SinS(yaw);
     sBallPos.y = player->actor.world.pos.y + orbitY;
     sBallPos.z = player->actor.world.pos.z - orbitX * Math_SinS(yaw) + orbitZ * Math_CosS(yaw);
@@ -382,7 +515,7 @@ static void BallThrownAction(Player* player, PlayState* play);
 static void ReturnBallToHands(Player* player, PlayState* play) {
     sPhase = BALL_HOLDING;
     EndTrail(play);
-    AudioSfx_StopById(NA_SE_PL_WALK_GROUND);
+    AudioSfx_StopById(NA_SE_PL_WALK_GROUND - SFX_FLAG);
     if (player->actionFunc == BallThrownAction) {
         func_8083B1A0(player, play);
     }
@@ -425,9 +558,16 @@ static void AimLaunch(Player* player, f32 launchSpeed) {
     LaunchAlong(player->actor.shape.rot.y, 0, launchSpeed);
 }
 
+static f32 GetLaunchSpeed(void) {
+    if (sCharge < BALL_CHARGE_MIN) {
+        f32 windUp = (f32)(sCharge - BALL_CHARGE_TAP) / (BALL_CHARGE_MIN - BALL_CHARGE_TAP);
+        return BALL_LAUNCH_SPEED_SHORT + (BALL_LAUNCH_SPEED_MIN - BALL_LAUNCH_SPEED_SHORT) * windUp;
+    }
+    return BALL_LAUNCH_SPEED_MIN + (BALL_LAUNCH_SPEED_MAX - BALL_LAUNCH_SPEED_MIN) * sCharge / BALL_CHARGE_MAX;
+}
+
 static void ThrowBall(Player* player, PlayState* play) {
-    f32 launchSpeed =
-        BALL_LAUNCH_SPEED_MIN + (BALL_LAUNCH_SPEED_MAX - BALL_LAUNCH_SPEED_MIN) * sCharge / BALL_CHARGE_MAX;
+    f32 launchSpeed = GetLaunchSpeed();
 
     sBallPos.x = player->actor.world.pos.x + Math_SinS(player->actor.shape.rot.y) * 20.0f;
     sBallPos.y = player->actor.world.pos.y + 45.0f;
@@ -439,14 +579,14 @@ static void ThrowBall(Player* player, PlayState* play) {
     Player_SetAction(play, player, BallThrownAction, 1);
     Player_StopHorizontalMovement(player);
     Player_AnimSfx_PlayVoice(player, NA_SE_VO_LI_SWORD_N);
-    Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_IT_SWORD_SWING_HARD);
+    Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_IT_HAMMER_SWING);
 }
 
 static void OrbitBallAround(Player* player) {
     f32 chargeRatio = (f32)sCharge / BALL_CHARGE_MAX;
     f32 radius = BALL_GUARD_RADIUS_MIN + (BALL_GUARD_RADIUS_MAX - BALL_GUARD_RADIUS_MIN) * chargeRatio;
 
-    sSpinAngle += (s16)(BALL_SPIN_SPEED_MIN + (BALL_SPIN_SPEED_MAX - BALL_SPIN_SPEED_MIN) * chargeRatio);
+    sSpinAngle += SpinStep();
     sBallPos.x = player->actor.world.pos.x + Math_SinS(sSpinAngle) * radius;
     sBallPos.y = player->actor.world.pos.y + BALL_GUARD_HEIGHT;
     sBallPos.z = player->actor.world.pos.z + Math_CosS(sSpinAngle) * radius;
@@ -466,6 +606,18 @@ static bool IsBallSwungUp(void) {
     return sCharge >= BALL_CHARGE_MIN;
 }
 
+static bool IsBallWoundUp(void) {
+    return sCharge >= BALL_CHARGE_TAP;
+}
+
+// The counter is raised first so SpinStep measures the quick step; the turn lasts one full revolution.
+static void StartQuickSpin(void) {
+    sQuickSpinFrames = 1;
+    s32 step = SpinStep();
+
+    sQuickSpinFrames = (s16)((0x10000 + step - 1) / step);
+}
+
 static void UpdateSpinning(Player* player, PlayState* play) {
     if (play->state.input[0].press.button & (BTN_A | BTN_B)) {
         sPhase = BALL_HOLDING;
@@ -475,21 +627,49 @@ static void UpdateSpinning(Player* player, PlayState* play) {
         StartAiming(player, play);
         return;
     }
-    sStickLeanX = sStickLeanY = 0.0f;
-    TurnBallInPlace(player, play);
-    sCharge = MIN(sCharge + 1, BALL_CHARGE_MAX);
+    if (HasOnlyLiftingStrength()) {
+        FaceThrowDirection(player);
+        player->upperLimbYawSecondary = 0;
+    }
+    bool isHeld = IsButtonHeld(play);
+
+    if (sQuickSpinFrames == 0 && !isHeld && !IsBallWoundUp() && CanAimBall()) {
+        StartQuickSpin();
+    }
+    ReadStickLean(player, play);
+    if (sQuickSpinFrames == 0) {
+        sCharge = MIN(sCharge + 1, BALL_CHARGE_MAX);
+    }
     SwingBall(player);
     StrikeAndBreak(player, play);
     FeedTrail(play);
-    Actor_PlaySfx_Flagged2(&player->actor, NA_SE_IT_HOOKSHOT_CHAIN - SFX_FLAG);
-    if (IsButtonHeld(play)) {
+    Actor_PlaySfx_Flagged(&player->actor, NA_SE_IT_SWORD_SWING - SFX_FLAG);
+    if (sQuickSpinFrames > 0) {
+        sQuickSpinFrames--;
+        if (sQuickSpinFrames == 0) {
+            sPhase = BALL_HOLDING;
+        }
         return;
     }
-    if (!IsBallSwungUp()) {
+    if (isHeld) {
+        return;
+    }
+    if (!IsBallWoundUp()) {
         sPhase = BALL_HOLDING;
         return;
     }
     ThrowBall(player, play);
+}
+
+static void GuardWithHeldBall(PlayState* play) {
+    sBallCollider.dim.pos.x = sBallPos.x;
+    sBallCollider.dim.pos.y = sBallPos.y - BALL_COLLIDER_HEIGHT / 2;
+    sBallCollider.dim.pos.z = sBallPos.z;
+    if (sBallCollider.base.acFlags & AC_HIT) {
+        sBallCollider.base.acFlags &= ~AC_HIT;
+        Audio_PlaySfx_AtPos(&sBallPos, NA_SE_IT_SHIELD_BOUND);
+    }
+    CollisionCheck_SetAC(play, &play->colChkCtx, &sBallCollider.base);
 }
 
 static int32_t UpdateBallInHand(Player* player, PlayState* play) {
@@ -499,14 +679,7 @@ static int32_t UpdateBallInHand(Player* player, PlayState* play) {
     if (sPhase == BALL_HOLDING) {
         TurnBallInPlace(player, play);
         HoldBallInHands(player);
-        sBallCollider.dim.pos.x = sBallPos.x;
-        sBallCollider.dim.pos.y = sBallPos.y - BALL_COLLIDER_HEIGHT / 2;
-        sBallCollider.dim.pos.z = sBallPos.z;
-        if (sBallCollider.base.acFlags & AC_HIT) {
-            sBallCollider.base.acFlags &= ~AC_HIT;
-            Audio_PlaySfx_AtPos(&sBallPos, NA_SE_IT_SHIELD_BOUND);
-        }
-        CollisionCheck_SetAC(play, &play->colChkCtx, &sBallCollider.base);
+        GuardWithHeldBall(play);
         EndTrail(play);
         return 0;
     }
@@ -530,7 +703,8 @@ static void BounceOffWall(PlayState* play, Vec3f* previousPos) {
         Audio_PlaySfx_AtPos(&sBallPos, NA_SE_IT_SHIELD_BOUND);
     }
     if (wall == NULL) {
-        sBallVelocity.x = sBallVelocity.z = 0.0f;
+        sBallVelocity.x = 0.0f;
+        sBallVelocity.z = 0.0f;
         return;
     }
     f32 normalX = COLPOLY_GET_NORMAL(wall->normal.x);
@@ -549,7 +723,8 @@ static void KeepChainTaut(Player* player) {
     if (reach > BALL_CHAIN_LENGTH) {
         sBallPos.x = player->actor.world.pos.x + dx * (BALL_CHAIN_LENGTH / reach);
         sBallPos.z = player->actor.world.pos.z + dz * (BALL_CHAIN_LENGTH / reach);
-        sBallVelocity.x = sBallVelocity.z = 0.0f;
+        sBallVelocity.x = 0.0f;
+        sBallVelocity.z = 0.0f;
     }
 }
 
@@ -567,8 +742,9 @@ static void LandOnFloor(Player* player, PlayState* play) {
     }
     sBallPos.y = floorY + BALL_RADIUS;
     Audio_PlaySfx_AtPos(&sBallPos, NA_SE_IT_HAMMER_HIT);
-    if (++sBounces >= BALL_MAX_BOUNCES || fabsf(sBallVelocity.y) < 3.0f) {
-        sBallVelocity.x = sBallVelocity.y = sBallVelocity.z = 0.0f;
+    sBounces++;
+    if (sBounces >= BALL_MAX_BOUNCES || fabsf(sBallVelocity.y) < 3.0f) {
+        sBallVelocity = gZeroVec3f;
         sPhase = BALL_RESTING;
         sRestTimer = BALL_REST_FRAMES;
         return;
@@ -603,14 +779,15 @@ static void ReelBallIn(Player* player, PlayState* play) {
     sBallPos.x += (hands.x - sBallPos.x) * step;
     sBallPos.y += (hands.y - sBallPos.y) * step;
     sBallPos.z += (hands.z - sBallPos.z) * step;
-    Actor_PlaySfx_Flagged2(&player->actor, NA_SE_PL_WALK_GROUND);
+    Actor_PlaySfx_Flagged(&player->actor, NA_SE_PL_WALK_GROUND - SFX_FLAG);
 }
 
 static void BallThrownAction(Player* player, PlayState* play) {
     Player_UpdateUpperBody(player, play);
     Player_StopHorizontalMovement(player);
     FaceThrowDirection(player);
-    if (!IsBallAway() || ++sThrownFrames > BALL_THROW_TIMEOUT) {
+    sThrownFrames++;
+    if (!IsBallAway() || sThrownFrames > BALL_THROW_TIMEOUT) {
         ReturnBallToHands(player, play);
         return;
     }
@@ -619,7 +796,8 @@ static void BallThrownAction(Player* player, PlayState* play) {
             FlyBall(player, play);
             break;
         case BALL_RESTING:
-            if (--sRestTimer <= 0) {
+            sRestTimer--;
+            if (sRestTimer <= 0) {
                 sPhase = BALL_RETRACTING;
             }
             break;
@@ -656,8 +834,9 @@ static void StartSpinning(Player* player, PlayState* play) {
     }
     sPhase = BALL_SPINNING;
     sCharge = 0;
+    sQuickSpinFrames = 0;
     sThrowYaw = player->actor.shape.rot.y;
-    Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_IT_SWORD_SWING_HARD);
+    Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_IT_HAMMER_SWING);
 }
 
 static void BallAimAction(Player* player, PlayState* play);
@@ -700,6 +879,12 @@ static void BallAimAction(Player* player, PlayState* play) {
     }
 }
 
+static void ClearUpperLimbRot(Player* player) {
+    player->upperLimbRot.x = 0;
+    player->upperLimbRot.y = 0;
+    player->upperLimbRot.z = 0;
+}
+
 static void PutBallAway(Player* player, PlayState* play) {
     if (sPhase == BALL_AIMING) {
         StopAiming(player, play);
@@ -710,10 +895,9 @@ static void PutBallAway(Player* player, PlayState* play) {
     EndTrail(play);
     sBallCollider.base.atFlags &= ~(AT_ON | AT_HIT);
     sPhase = BALL_IDLE;
-    player->upperLimbRot.x = player->upperLimbRot.y = player->upperLimbRot.z = 0;
-    AudioSfx_StopById(NA_SE_IT_SWORD_SWING_HARD);
-    AudioSfx_StopById(NA_SE_IT_HOOKSHOT_CHAIN - SFX_FLAG);
-    AudioSfx_StopById(NA_SE_PL_WALK_GROUND);
+    ClearUpperLimbRot(player);
+    AudioSfx_StopById(NA_SE_IT_SWORD_SWING - SFX_FLAG);
+    AudioSfx_StopById(NA_SE_PL_WALK_GROUND - SFX_FLAG);
 }
 
 // Posing an arm during the update is undone by Link's own animation; the queued frame lands before any draw.
@@ -744,6 +928,10 @@ static s16 GetBallBearing(Player* player) {
 static void LeanIntoSwing(Player* player) {
     s16 bearing = GetBallBearing(player);
     f32 pull = BALL_LEAN_MIN + (BALL_LEAN_MAX - BALL_LEAN_MIN) * sCharge / BALL_CHARGE_MAX;
+
+    if (HasOnlyLiftingStrength()) {
+        pull *= BALL_WEAK_LEAN_SCALE;
+    }
     s16 forwards = (s16)(Math_CosS(bearing) * pull);
     s16 sideways = (s16)(-Math_SinS(bearing) * pull);
 
@@ -752,28 +940,32 @@ static void LeanIntoSwing(Player* player) {
 
         shoulder->y -= forwards;
         shoulder->z += sideways;
-        player->upperLimbRot.x = player->upperLimbRot.y = player->upperLimbRot.z = 0;
+        ClearUpperLimbRot(player);
         return;
     }
-    player->upperLimbRot.x = 0;
-    player->upperLimbRot.z = 0;
+    player->upperLimbRot.x = forwards;
     player->upperLimbRot.y = 0;
+    player->upperLimbRot.z = sideways;
 }
 
 static void PoseArmsAroundBall(Actor* actor, bool* should) {
     Player* player = (Player*)actor;
 
-    if (sPhase == BALL_IDLE) {
+    if (gPlayState == NULL || actor != &GET_PLAYER(gPlayState)->actor || sPhase == BALL_IDLE) {
         return;
     }
     ApplyArmPose(player);
+    if (HasOnlyLiftingStrength() && sPhase == BALL_SPINNING) {
+        FaceThrowDirection(player);
+        player->upperLimbYawSecondary = 0;
+    }
     if (sPhase == BALL_HOLDING) {
-        player->upperLimbRot.x = player->upperLimbRot.y = player->upperLimbRot.z = 0;
+        ClearUpperLimbRot(player);
         return;
     }
     if (IsBallAway()) {
+        ClearUpperLimbRot(player);
         player->upperLimbRot.x = BALL_THROW_LEAN;
-        player->upperLimbRot.y = player->upperLimbRot.z = 0;
         return;
     }
     LeanIntoSwing(player);
@@ -782,7 +974,7 @@ static void PoseArmsAroundBall(Actor* actor, bool* should) {
 static void KeepBallStateSane(Player* player) {
     PlayState* play = gPlayState;
 
-    if (play == NULL || sPhase == BALL_IDLE) {
+    if (play == NULL || player != GET_PLAYER(play) || sPhase == BALL_IDLE) {
         return;
     }
     AnchorAgainstWind(player);
@@ -830,6 +1022,20 @@ static void DrawChain(PlayState* play, Vec3f* from, Vec3f* to) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static void DrawOverheadChain(PlayState* play, Vec3f* from, Vec3f* to) {
+    Vec3f previous = *from;
+
+    for (s32 i = 1; i <= BALL_CHAIN_ARC_SEGMENTS; i++) {
+        f32 t = (f32)i / BALL_CHAIN_ARC_SEGMENTS;
+        Vec3f point = { from->x + (to->x - from->x) * t,
+                        from->y + (to->y - from->y) * t + 4.0f * t * (1.0f - t) * BALL_CHAIN_ARC_HEIGHT,
+                        from->z + (to->z - from->z) * t };
+
+        DrawChain(play, &previous, &point);
+        previous = point;
+    }
+}
+
 static void DrawBall(PlayState* play) {
     bool isSwung = sPhase != BALL_HOLDING;
     f32 scale = isSwung ? BALL_SWUNG_SCALE : BALL_HELD_SCALE;
@@ -850,21 +1056,152 @@ static void DrawBall(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static bool IsChainArched(void) {
+    return IsOneHanded() && (sPhase == BALL_SPINNING || sPhase == BALL_AIMING);
+}
+
+static void DrawChainAndBall(PlayState* play, Player* player, bool isArched) {
+    Vec3f* left = &player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND];
+    Vec3f* right = &player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND];
+
+    DrawChain(play, left, right);
+    if (isArched) {
+        DrawOverheadChain(play, right, &sBallPos);
+    } else {
+        DrawChain(play, right, &sBallPos);
+    }
+    DrawBall(play);
+}
+
+static void DrawRemoteBallAndChain(Player* player, PlayState* play) {
+    RemoteVisualState visual;
+
+    if (!ReadRemoteVisual(player, &visual)) {
+        return;
+    }
+    Vec3f savedPosition = sBallPos;
+    u8 savedPhase = sPhase;
+
+    sBallPos.x = visual.values[0];
+    sBallPos.y = visual.values[1];
+    sBallPos.z = visual.values[2];
+    sPhase = visual.flags[0] ? BALL_SPINNING : BALL_HOLDING;
+    DrawChainAndBall(play, player, visual.flags[1]);
+    sPhase = savedPhase;
+    sBallPos = savedPosition;
+}
+
 static void DrawBallAndChain(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
 
+    if (player != GET_PLAYER(play)) {
+        DrawRemoteBallAndChain(player, play);
+        return;
+    }
+    if (sPhase == BALL_AIMING) {
+        Z64Aiming_DrawReticle(play, player, BALL_CHAIN_LENGTH,
+                              (Z64AimingReticleStyle){ Z64AIMING_TOGGLE_HOOKSHOT, Z64AIMING_TINT_LAUNCH });
+    }
     if (sPhase == BALL_IDLE || (player->stateFlags2 & PLAYER_STATE2_20000000)) {
         return;
     }
-    DrawChain(play, &player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND],
-              &player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND]);
-    DrawChain(play, &player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND], &sBallPos);
-    DrawBall(play);
+    DrawChainAndBall(play, player, IsChainArched());
+}
+
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(BALL_GIVE_SCALE, BALL_GIVE_SCALE, BALL_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sGiveDL);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, BALL_KEY, BALL_KEY, "",
 };
+
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, "nei.ball_and_chain.visual", visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    if (visual->active != 1 || visual->adult > 1 || visual->scene != gPlayState->sceneId || visual->flags[0] > 1 ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return false;
+    }
+    for (uint32_t i = 0; i < ARRAY_COUNT(visual->values); i++) {
+        if (!isfinite(visual->values[i]) || fabsf(visual->values[i]) > 10000000.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = (sPhase != BALL_IDLE);
+        if (visual.active) {
+            visual.flags[0] = sPhase != BALL_HOLDING;
+            visual.flags[1] = IsChainArched();
+            visual.values[0] = sBallPos.x;
+            visual.values[1] = sBallPos.y;
+            visual.values[2] = sBallPos.z;
+        }
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState("nei.ball_and_chain.visual", &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void DrawRemotePlayer(Actor* actor, PlayState* play) {
+    if (actor->id == ACTOR_PLAYER || !sRemoteVisualReady || sApi->GetNetPeerIdForActor(actor) == 0) {
+        return;
+    }
+    DrawBallAndChain(actor, play);
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel("nei.ball_and_chain.visual", 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+        S2H_REGISTER_HOOK(sApi, OnActorDrawEnd, DrawRemotePlayer);
+    }
+}
 
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
@@ -886,6 +1223,7 @@ static void GrantBallLogic(void) {
 
 S2H_MOD_EXPORT void ModInit(void) {
     GrantBallLogic();
+    InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, RegisterCustomItem)) {
         return;
     }
@@ -900,15 +1238,15 @@ S2H_MOD_EXPORT void ModInit(void) {
                                "Its weight roots you where&%ywind%w would move anyone else,&"
                                "and it crushes %yarmor%w and&shatters %bice%w.^"
                                "Stronger forms carry it&farther: the %gZora%w frees your&feet and your aim,^"
-                               "and the %gGoron%w swings it&one-handed to %rguard%w you.");
+                               "and the %gGoron%w swings it&one-handed to %rguard%w you,&"
+                               "hard enough to melt %bice%w&like a %rfire arrow%w.");
     Z64Items_SetPauseText(&ball, "%rBall and Chain&%wHold %y\xB2%w to spin, release to throw. %g\xB5%w&"
                                  "or %y\xB6%w to aim.");
     Z64Items_SetCanUse(&ball, CanLiftBall);
     Z64Items_SetAction(&ball, TakeOutBall, UpdateBallInHand);
     Z64Items_SetHeldCallbacks(&ball, StartSpinning, PutBallAway, NULL);
-    Z64Items_SetGetItemModel(&ball, sGiveDL);
-    ball.getItemScale = 0.13333333f;
     ball.modelGroup = PLAYER_MODELGROUP_DEFAULT;
+    ball.getItemEntry.drawFunc = DrawGetItem;
 
     Z64Items_SetLogic(&ball, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &ball)) {

@@ -60,6 +60,60 @@ static void ClaimNativeMirror(u8 item, bool* should) {
     CustomEquipRegistry_SetOwned(IKANA_SHIELD_KEY, true);
 }
 
+static ColliderCylinder sSoulHit;
+static bool sIsSoulHitReady;
+static Actor* sSoulTarget;
+static s16 sSoulFrames;
+
+static void StrikeSoulTarget(PlayState* play, Player* player) {
+    static ColliderCylinderInit sSoulHitInit = {
+        { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_CYLINDER },
+        { ELEM_MATERIAL_UNK0, { DMG_SWORD, 0, SOUL_DRAIN }, { 0, 0, 0 }, ATELEM_ON | ATELEM_SFX_NORMAL, ACELEM_NONE,
+          OCELEM_NONE },
+        { 30, 60, 0, { 0, 0, 0 } },
+    };
+
+    if (sSoulTarget == NULL || sSoulFrames <= 0 || sSoulTarget->update == NULL) {
+        return;
+    }
+    if (!sIsSoulHitReady) {
+        Collider_InitCylinder(play, &sSoulHit);
+        sIsSoulHitReady = true;
+    }
+    Collider_SetCylinder(play, &sSoulHit, &player->actor, &sSoulHitInit);
+    sSoulHit.dim.pos.x = (s16)sSoulTarget->world.pos.x;
+    sSoulHit.dim.pos.y = (s16)sSoulTarget->world.pos.y;
+    sSoulHit.dim.pos.z = (s16)sSoulTarget->world.pos.z;
+    CollisionCheck_SetAT(play, &play->colChkCtx, &sSoulHit.base);
+    sSoulFrames--;
+}
+
+static void ForgetSoulTarget(void) {
+    sSoulTarget = NULL;
+    sSoulFrames = 0;
+}
+
+static void ForgetSoulActor(Actor* actor) {
+    if (actor == sSoulTarget) {
+        ForgetSoulTarget();
+    }
+}
+
+static void ResolveSoulDamage(Actor* victim, ColliderElement* attack, f32* damage) {
+    if (attack != &sSoulHit.elem) {
+        return;
+    }
+    if (victim != sSoulTarget) {
+        *damage = 0;
+        return;
+    }
+    *damage = SOUL_DRAIN;
+    ForgetSoulTarget();
+    if (gPlayState != NULL) {
+        Health_ChangeBy(gPlayState, SOUL_HEAL);
+    }
+}
+
 static void TickShield(Player* player) {
     PlayState* play = gPlayState;
 
@@ -67,6 +121,7 @@ static void TickShield(Player* player) {
         return;
     }
     FadeReviveFlash(play);
+    StrikeSoulTarget(play, player);
     if (!IsWorn()) {
         return;
     }
@@ -76,21 +131,11 @@ static void TickShield(Player* player) {
     TrackGuard(player);
 }
 
-// Zeroing health is not enough: most enemies only die from their own AC_HIT handling, which the drain bypasses,
-// so the kill is driven by hand. Bosses keep their scripted death and need a real last hit.
-static void DrainSoul(PlayState* play, Player* player, Actor* attacker) {
-    if (attacker->colChkInfo.health > SOUL_DRAIN) {
-        attacker->colChkInfo.health -= SOUL_DRAIN;
-    } else {
-        attacker->colChkInfo.health = 0;
-        if (attacker->category != ACTORCAT_BOSS) {
-            Enemy_StartFinishingBlow(play, attacker);
-            Item_DropCollectibleRandom(play, attacker, &attacker->world.pos, 0xA0);
-            Actor_Kill(attacker);
-        }
-    }
+// Enemies only take damage and die through their own AC_HIT handling, so the drain lands as a real hit.
+static void DrainSoul(Player* player, Actor* attacker) {
+    sSoulTarget = attacker;
+    sSoulFrames = 2;
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_IT_SHIELD_REFLECT_MG);
-    Health_ChangeBy(play, SOUL_HEAL);
 }
 
 static void DrainOnGuard(PlayState* play, Player* player, Actor* attacker) {
@@ -98,7 +143,7 @@ static void DrainOnGuard(PlayState* play, Player* player, Actor* attacker) {
         return;
     }
     if (sIkana.isGuarding && sIkana.guardTimer <= GUARD_WINDOW) {
-        DrainSoul(play, player, attacker);
+        DrainSoul(player, attacker);
     }
 }
 
@@ -122,6 +167,8 @@ static void SaveFromDeath(s16 amount) {
 }
 
 static void RenewDeathSave(s16 sceneId, s8 spawnNum) {
+    sIsSoulHitReady = false;
+    ForgetSoulTarget();
     sIkana.isDeathSaveUsed = false;
     sIkana.flashTimer = 0;
 }
@@ -131,8 +178,9 @@ static void ForgetGuard(const char* key) {
     sIkana.isGuarding = false;
 }
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnPlayerShieldBlocked", "OnPlayerHealthChange",
-                                              "OnSceneInit", "ShouldItemGive" };
+static const char* const sRequiredHooks[] = { "OnPlayerUpdate",           "OnPlayerShieldBlocked", "OnPlayerHealthChange",
+                                              "OnCollisionResolveDamage", "OnActorDestroy",        "OnSceneInit",
+                                              "ShouldItemGive" };
 
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -186,6 +234,8 @@ S2H_MOD_EXPORT void ModInit(void) {
 
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, TickShield);
     S2H_REGISTER_HOOK(sApi, OnPlayerShieldBlocked, DrainOnGuard);
+    S2H_REGISTER_HOOK(sApi, OnCollisionResolveDamage, ResolveSoulDamage);
+    S2H_REGISTER_HOOK(sApi, OnActorDestroy, ForgetSoulActor);
     S2H_REGISTER_HOOK(sApi, OnPlayerHealthChange, SaveFromDeath);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, RenewDeathSave);
     S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldItemGive, ITEM_SHIELD_MIRROR, ClaimNativeMirror);

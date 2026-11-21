@@ -6,5 +6,6 @@
     "oot_assets"
   ],
   "description": "Majora replacement: a custom Ganondorf actor with its own intro, two-phase dance fight, Spanish lyrics, Tatl hints and MM ending.",
+  "display_name": "Cucui Ganon",
   "game": "mm"
 }

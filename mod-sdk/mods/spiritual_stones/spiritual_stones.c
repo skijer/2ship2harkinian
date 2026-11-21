@@ -1,4 +1,3 @@
-
 #include <string.h>
 
 #include "z64items.h"
@@ -7,18 +6,23 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
+#include "2s2h/ModApi/Player/PlayerHookTypes.h"
 
 #define MOD_NAME "spiritual_stones"
 #define STATUE_ACTOR_KEY "spiritual_stones.statue"
 #define STORAGE_FIELD "warps"
+#define STORAGE_PASSIVES_FIELD "speed-effects-disabled"
 
-#define STONE_HOLD_FRAMES 60
 #define STATUE_SCALE 0.005f
-#define STATUE_GLOW_HEIGHT 62.0f
-#define STATUE_GLOW_SCALE 0.006f
+#define STATUE_JEWEL_HEIGHT 62.0f
+#define STATUE_JEWEL_SCALE 0.10f
+#define STATUE_JEWEL_SPIN 0x100
 #define STONE_WALK_BOOST 1.5f
 #define STONE_SWIM_BOOST 2.0f
-#define STONE_CLIMB_BOOST 2.0f
+#define STONE_CLIMBING_STATE PLAYER_STATE1_200000
+#define STONE_SWIMMING_STATE PLAYER_STATE1_8000000
+#define SILVER_TEXT "\x07"
+#define GREEN_TEXT "\x02"
 
 typedef enum {
     STONE_KOKIRI,
@@ -26,6 +30,12 @@ typedef enum {
     STONE_ZORA,
     STONE_MAX,
 } Stone;
+
+typedef enum {
+    WARP_CHOICE_PLANT,
+    WARP_CHOICE_TRAVEL,
+    WARP_CHOICE_NOTHING,
+} WarpChoice;
 
 typedef struct {
     const char* key;
@@ -53,16 +63,16 @@ static const ALIGN_ASSET(2) char sStoneIcons[STONE_MAX][64] = {
     "__OTR__textures/icon_item_custom/gItemIconZoraSapphireTex",
 };
 
+static const ALIGN_ASSET(2) char sPassiveOffIcons[STONE_MAX][64] = {
+    "__OTR__textures/icon_item_custom/gStonePassiveOff0Tex",
+    "__OTR__textures/icon_item_custom/gStonePassiveOff1Tex",
+    "__OTR__textures/icon_item_custom/gStonePassiveOff2Tex",
+};
+
 static const ALIGN_ASSET(2) char sStoneNames[STONE_MAX][72] = {
     "__OTR__textures/item_name_static/gKokiriEmeraldItemNameENGTex",
     "__OTR__textures/item_name_static/gGoronsRubyItemNameENGTex",
     "__OTR__textures/item_name_static/gZorasSapphireItemNameENGTex",
-};
-
-static const ALIGN_ASSET(2) char sOotStoneIcons[STONE_MAX][64] = {
-    "__OTR__textures/oot_item_icons/gItemIconKokiriEmeraldTex",
-    "__OTR__textures/oot_item_icons/gItemIconGoronRubyTex",
-    "__OTR__textures/oot_item_icons/gItemIconZoraSapphireTex",
 };
 
 static const ALIGN_ASSET(2) char sOotStoneNames[STONE_MAX][72] = {
@@ -95,11 +105,9 @@ static const Color_RGB8 sGemEnv[STONE_MAX] = {
     { 50, 0, 150 },
 };
 
-static const ALIGN_ASSET(2) char sFlashDL[] = "__OTR__objects/gameplay_keep/gEffFlash1DL";
 static const ALIGN_ASSET(2) char sOwlStatueDL[] = "__OTR__objects/object_sek/gOwlStatueOpenedDL";
 
-// The statue's display list branches into segment 0x0C for a cull list nothing binds here, so it is pointed at a
-// dead end.
+// The statue's display list branches into segment 0x0C for a cull list nothing binds here.
 static const Gfx sEmptySegment[4] = {
     gsSPEndDisplayList(),
     gsSPEndDisplayList(),
@@ -110,31 +118,26 @@ static const Gfx sEmptySegment[4] = {
 static const StoneInfo sStones[STONE_MAX] = {
     { "nei.spiritual_stone.kokiri", sStoneIcons[STONE_KOKIRI], sStoneNames[STONE_KOKIRI],
       "You got the %gKokiri's Emerald%w!&The forest quickens your step&while you carry it.^"
-      "%rHold%w %y\xB2%w to plant an owl statue&here, and tap it to return to it.",
-      "%gKokiri's Emerald&%w%y\xB0%w toggles walking speed. Hold&%y\xB2%w to plant a warp, tap it to&return." },
+      "Press %y\xB2%w to choose a new warp&point or return to your saved&owl statue.",
+      "%gKokiri's Emerald&%wYou walk faster; %y\xB0%w toggles it.&Press %y\xB2%w for the warp point menu." },
     { "nei.spiritual_stone.goron", sStoneIcons[STONE_GORON], sStoneNames[STONE_GORON],
       "You got the %rGoron's Ruby%w! The&mountain steadies your climb&while you carry it.^"
-      "%rHold%w %y\xB2%w to plant an owl statue&here, and tap it to return to it.",
-      "%rGoron's Ruby&%w%y\xB0%w toggles climbing speed. Hold&%y\xB2%w to plant a warp, tap it to&return." },
+      "Press %y\xB2%w to choose a new warp&point or return to your saved&owl statue.",
+      "%rGoron's Ruby&%wYou climb faster; %y\xB0%w toggles it.&Press %y\xB2%w for the warp point menu." },
     { "nei.spiritual_stone.zora", sStoneIcons[STONE_ZORA], sStoneNames[STONE_ZORA],
       "You got the %bZora's Sapphire%w!&The lake carries you while you&carry it.^"
-      "%rHold%w %y\xB2%w to plant an owl statue&here, and tap it to return to it.",
-      "%bZora's Sapphire&%w%y\xB0%w toggles swimming speed. Hold&%y\xB2%w to plant a warp, tap it to&return." },
+      "Press %y\xB2%w to choose a new warp&point or return to your saved&owl statue.",
+      "%bZora's Sapphire&%wYou swim faster; %y\xB0%w toggles it.&Press %y\xB2%w for the warp point menu." },
 };
 
 static const char* const sStoneLabels[STONE_MAX] = { "Kokiri's Emerald", "Goron's Ruby", "Zora's Sapphire" };
-
-static const Color_RGB8 sStoneGlow[STONE_MAX] = {
-    { 0, 255, 100 },
-    { 255, 60, 60 },
-    { 60, 160, 255 },
-};
 
 static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
 static const char* const sRequiredHooks[] = {
-    "OnPlayerUpdate", "OnPlayerResolveMotionScale", "OnSceneInit", "OnLoadFile", "OnSceneSpawnActors",
+    "OnPlayerUpdate", "OnPlayerResolveMotionScale", "OnGameFrameUpdate",
+    "OnSceneInit",    "OnLoadFile",                 "OnSceneSpawnActors",
 };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -144,15 +147,24 @@ static SavedState sSaved;
 static uint8_t sDisabledSpeedMask;
 static int16_t sStatueActorId = -1;
 static bool sHasOwlStatue;
+static bool sHasJewelModel;
 static bool sIsVoidDamageWaived;
-static uint8_t sStoneHoldFrames[STONE_MAX];
 static Actor* sStatues[STONE_MAX];
 static int8_t sPendingWarpStone = -1;
+static u16 sWarpPromptTextId;
+static const char* sShownIcons[STONE_MAX];
+static const char* sBaseIcons[STONE_MAX];
+
+void Player_Action_50(Player* player, PlayState* play);
 
 static bool IsPlayerBusy(Player* player, PlayState* play) {
     return player == NULL || Message_GetState(&play->msgCtx) != TEXT_STATE_NONE ||
            play->pauseCtx.state != PAUSE_STATE_OFF || Player_InCsMode(play) ||
            (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING)) != 0;
+}
+
+static void PlaySfxAt(Player* player, u16 sfxId) {
+    Audio_PlaySfx_AtPos(&player->actor.projectedPos, sfxId);
 }
 
 static void StoreState(void) {
@@ -167,7 +179,7 @@ static void LoadState(void) {
     }
     sApi->StorageGet(MOD_NAME, STORAGE_FIELD, &sSaved, sizeof(sSaved));
     sDisabledSpeedMask = 0;
-    sApi->StorageGet(MOD_NAME, "speed-effects-disabled", &sDisabledSpeedMask, sizeof(sDisabledSpeedMask));
+    sApi->StorageGet(MOD_NAME, STORAGE_PASSIVES_FIELD, &sDisabledSpeedMask, sizeof(sDisabledSpeedMask));
 }
 
 static uint16_t FindEquippedButtonMask(const char* key) {
@@ -181,26 +193,54 @@ static uint16_t FindEquippedButtonMask(const char* key) {
     return 0;
 }
 
+static int8_t FindStone(const char* key) {
+    for (uint8_t stone = 0; stone < STONE_MAX; stone++) {
+        if (strcmp(key, sStones[stone].key) == 0) {
+            return (int8_t)stone;
+        }
+    }
+    return -1;
+}
+
 static bool IsStoneOwned(uint8_t stone) {
     return sApi->IsCustomItemOwned(sStones[stone].key);
 }
 
-static bool StoneSpeedActive(const char* key) {
-    for (uint8_t i = 0; i < STONE_MAX; ++i)
-        if (strcmp(key, sStones[i].key) == 0)
-            return !(sDisabledSpeedMask & (1 << i));
-    return true;
+static bool IsPassiveEnabled(uint8_t stone) {
+    return !(sDisabledSpeedMask & (1 << stone));
 }
-static void ToggleStoneSpeed(const char* key) {
-    for (uint8_t i = 0; i < STONE_MAX; ++i)
-        if (strcmp(key, sStones[i].key) == 0) {
-            sDisabledSpeedMask ^= (1 << i);
-            sApi->StorageSet(MOD_NAME, "speed-effects-disabled", &sDisabledSpeedMask, sizeof(sDisabledSpeedMask));
-            break;
+
+static bool IsPassiveKeyEnabled(const char* key) {
+    int8_t stone = FindStone(key);
+
+    return stone < 0 || IsPassiveEnabled((uint8_t)stone);
+}
+
+static void TogglePassive(const char* key) {
+    int8_t stone = FindStone(key);
+
+    if (stone < 0) {
+        return;
+    }
+    sDisabledSpeedMask ^= (1 << stone);
+    sApi->StorageSet(MOD_NAME, STORAGE_PASSIVES_FIELD, &sDisabledSpeedMask, sizeof(sDisabledSpeedMask));
+}
+
+static bool IsPassiveOn(uint8_t stone) {
+    return IsStoneOwned(stone) && IsPassiveEnabled(stone);
+}
+
+// The off icons belong to the pause screen alone; the item buttons keep the stone's own art.
+static void ShowPassiveIcons(void) {
+    bool isPaused = gPlayState != NULL && gPlayState->pauseCtx.state != PAUSE_STATE_OFF;
+
+    for (uint8_t stone = 0; stone < STONE_MAX; stone++) {
+        const char* icon = isPaused && !IsPassiveEnabled(stone) ? sPassiveOffIcons[stone] : sBaseIcons[stone];
+
+        if (icon != sShownIcons[stone] && sApi->SetCustomItemIconPath(sStones[stone].key, icon)) {
+            sShownIcons[stone] = icon;
         }
-}
-static bool IsStoneSpeedOn(uint8_t stone) {
-    return IsStoneOwned(stone) && StoneSpeedActive(sStones[stone].key);
+    }
 }
 
 static bool IsStoneWarpReady(uint8_t stone) {
@@ -238,7 +278,7 @@ static void PlantStatue(PlayState* play, Player* player, uint8_t stone) {
     StoreState();
     RemoveStatue(stone);
     SpawnStatue(play, stone);
-    Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_SY_GET_ITEM);
+    PlaySfxAt(player, NA_SE_SY_GET_ITEM);
 }
 
 // respawnFlag 1 is the "you fell in a hole" landing, the only one that honours a hand-written position,
@@ -268,81 +308,146 @@ static void WarpToStatue(PlayState* play, uint8_t stone) {
     sIsVoidDamageWaived = true;
 }
 
-static void ResolveWarpPrompt(PlayState* play) {
-    if (sPendingWarpStone < 0 || Message_GetState(&play->msgCtx) != TEXT_STATE_CHOICE || !Message_ShouldAdvance(play)) {
+static void RefuseMissingWarp(Player* player, PlayState* play) {
+    PlaySfxAt(player, NA_SE_SY_ERROR);
+    play->state.input[0].press.button &= ~(BTN_A | BTN_B | BTN_CUP);
+    play->state.input[0].cur.button &= ~BTN_B;
+}
+
+static void ResolveWarpPrompt(Player* player, PlayState* play) {
+    if (sPendingWarpStone < 0) {
+        return;
+    }
+    if (play->msgCtx.currentTextId != sWarpPromptTextId || play->msgCtx.msgMode == MSGMODE_NONE) {
+        sPendingWarpStone = -1;
+        return;
+    }
+    if (Message_GetState(&play->msgCtx) != TEXT_STATE_CHOICE || !Message_ShouldAdvance(play)) {
         return;
     }
     uint8_t stone = (uint8_t)sPendingWarpStone;
-
+    uint8_t choice = play->msgCtx.choiceIndex;
+    if (choice == WARP_CHOICE_TRAVEL && !IsStoneWarpReady(stone)) {
+        RefuseMissingWarp(player, play);
+        return;
+    }
     Message_CloseTextbox(play);
-    if (play->msgCtx.choiceIndex == 0) {
+    sPendingWarpStone = -1;
+    if (choice == WARP_CHOICE_PLANT && sHasOwlStatue) {
+        PlantStatue(play, player, stone);
+    } else if (choice == WARP_CHOICE_TRAVEL) {
         WarpToStatue(play, stone);
     }
-    sPendingWarpStone = -1;
 }
 
+// Without a saved statue the middle choice stays listed in silver and refuses the press.
 static void OpenWarpPrompt(PlayState* play, uint8_t stone) {
-    if (!sApi->ShowTextbox(play, "Return to your waypoint?\n\xC2%gYes\nNo%w", true)) {
+    const char* text = IsStoneWarpReady(stone)
+                           ? "What do you want to do?\n\xC3%gNew Warp Point\nGo to Warp Point\nNothing%w"
+                           : "What do you want to do?\n\xC3%gNew Warp Point\n" SILVER_TEXT
+                             "Go to Warp Point\n" GREEN_TEXT "Nothing%w";
+
+    if (!sApi->ShowTextbox(play, text, true)) {
         return;
     }
     sPendingWarpStone = (int8_t)stone;
+    sWarpPromptTextId = play->msgCtx.currentTextId;
 }
 
-static void TickStoneButtons(Player* player, PlayState* play) {
+static void TickStoneButtons(PlayState* play) {
+    if (sPendingWarpStone >= 0) {
+        return;
+    }
     for (uint8_t stone = 0; stone < STONE_MAX; stone++) {
         uint16_t button = FindEquippedButtonMask(sStones[stone].key);
 
-        if (button == 0 || !IsStoneOwned(stone)) {
-            sStoneHoldFrames[stone] = 0;
-            continue;
-        }
-        if (play->state.input[0].cur.button & button) {
-            if (sStoneHoldFrames[stone] < STONE_HOLD_FRAMES && ++sStoneHoldFrames[stone] == STONE_HOLD_FRAMES &&
-                sHasOwlStatue) {
-                PlantStatue(play, player, stone);
-            }
-            continue;
-        }
-        if (sStoneHoldFrames[stone] > 0 && sStoneHoldFrames[stone] < STONE_HOLD_FRAMES && sPendingWarpStone < 0 &&
-            IsStoneWarpReady(stone)) {
+        if (button != 0 && IsStoneOwned(stone) && (play->state.input[0].press.button & button)) {
             OpenWarpPrompt(play, stone);
+            return;
         }
-        sStoneHoldFrames[stone] = 0;
     }
 }
 
+static bool IsClimbing(Player* player) {
+    return (player->stateFlags1 & STONE_CLIMBING_STATE) != 0;
+}
+
 static void ScaleStoneMovement(Player* player, s32 kind, f32* scale) {
-    if (kind != SOH_PLAYER_MOTION_STICK_SPEED || gPlayState == NULL || IsPlayerBusy(player, gPlayState))
+    if (gPlayState == NULL || IsPlayerBusy(player, gPlayState)) {
         return;
-    if (IsStoneSpeedOn(STONE_ZORA) && (player->stateFlags1 & PLAYER_STATE1_8000000)) {
+    }
+    bool isSwimming = (player->stateFlags1 & STONE_SWIMMING_STATE) != 0;
+    if (kind == SOH_PLAYER_MOTION_WATER_SPEED && isSwimming && IsPassiveOn(STONE_ZORA)) {
         *scale *= STONE_SWIM_BOOST;
-    } else if (IsStoneSpeedOn(STONE_KOKIRI) && (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
+        return;
+    }
+    bool isWalkingKind = kind == SOH_PLAYER_MOTION_STICK_SPEED || kind == SOH_PLAYER_MOTION_SPEED_CAP;
+    if (isWalkingKind && !isSwimming && !IsClimbing(player) && (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) &&
+        IsPassiveOn(STONE_KOKIRI)) {
         *scale *= STONE_WALK_BOOST;
     }
 }
 
-static void ApplyStoneBuffs(Player* player) {
-    if (IsStoneSpeedOn(STONE_GORON) && (player->stateFlags1 & PLAYER_STATE1_200000)) {
-        f32 speed = player->skelAnime.playSpeed;
-        player->skelAnime.playSpeed = CLAMP(speed * STONE_CLIMB_BOOST, -STONE_CLIMB_BOOST, STONE_CLIMB_BOOST);
+// The climbing action runs twice in one frame, so Link covers twice the wall.
+static void BoostStoneClimb(bool* should, va_list args) {
+    Player* player = va_arg(args, Player*);
+    PlayState* play = gPlayState;
+
+    if (!*should || play == NULL || player != GET_PLAYER(play) || IsPlayerBusy(player, play) ||
+        !IsPassiveOn(STONE_GORON) || !IsClimbing(player) || player->actionFunc != Player_Action_50) {
+        return;
+    }
+    *should = false;
+    Player_Action_50(player, play);
+    if (player->actionFunc == Player_Action_50 && IsClimbing(player)) {
+        Player_Action_50(player, play);
     }
 }
 
-static void StatueDraw(Actor* thisx, PlayState* play) {
-    Color_RGB8 glow = sStoneGlow[thisx->params % STONE_MAX];
+// OoT GetItem_DrawJewel. The gem calls segment 0x09 and the setting 0x08: left unbound, both still hold the
+// texture paths of Link's face and the renderer runs them as display lists.
+static void DrawJewel(PlayState* play, Stone stone) {
+    GraphicsContext* gfxCtx = play->state.gfxCtx;
+    Color_RGB8 prim = sGemPrim[stone];
+    Color_RGB8 env = sGemEnv[stone];
 
+    OPEN_DISPS(gfxCtx);
+    Matrix_Push();
+    Matrix_RotateZYX(0, -0x4000, 0x4000, MTXMODE_APPLY);
+    Gfx_SetupDL25_Xlu(gfxCtx);
+    gSPSegment(POLY_XLU_DISP++, 0x09, (uintptr_t)Gfx_TwoTexScroll(gfxCtx, 0, 0, 255, 64, 64, 1, 0, 255, 16, 16));
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 128, prim.r, prim.g, prim.b, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, env.r, env.g, env.b, 255);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sGemDLs[stone]);
+    Gfx_SetupDL25_Opa(gfxCtx);
+    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)Gfx_TexScroll(gfxCtx, 0, 0, 16, 16));
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 128, 255, 255, 170, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, 150, 120, 0, 255);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sSettingDLs[stone]);
+    Matrix_Pop();
+    CLOSE_DISPS(gfxCtx);
+}
+
+static void DrawStoneGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    DrawJewel(play, (Stone)(entry->drawItemId % STONE_MAX));
+}
+
+static void StatueDraw(Actor* thisx, PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)sEmptySegment);
     Gfx_DrawDListOpa(play, (Gfx*)sOwlStatueDL);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, glow.r, glow.g, glow.b, 200);
-    gDPSetEnvColor(POLY_XLU_DISP++, glow.r / 2, glow.g / 2, glow.b / 2, 255);
-    Matrix_Translate(thisx->world.pos.x, thisx->world.pos.y + STATUE_GLOW_HEIGHT, thisx->world.pos.z, MTXMODE_NEW);
-    Matrix_RotateYS((int16_t)(play->gameplayFrames * 0x400), MTXMODE_APPLY);
-    Matrix_Scale(STATUE_GLOW_SCALE, STATUE_GLOW_SCALE, STATUE_GLOW_SCALE, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sFlashDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    if (!sHasJewelModel) {
+        return;
+    }
+    Matrix_Push();
+    Matrix_Translate(thisx->world.pos.x, thisx->world.pos.y + STATUE_JEWEL_HEIGHT, thisx->world.pos.z, MTXMODE_NEW);
+    Matrix_RotateYS((s16)(play->gameplayFrames * STATUE_JEWEL_SPIN), MTXMODE_APPLY);
+    Matrix_Scale(STATUE_JEWEL_SCALE, STATUE_JEWEL_SCALE, STATUE_JEWEL_SCALE, MTXMODE_APPLY);
+    DrawJewel(play, (Stone)(thisx->params % STONE_MAX));
+    Matrix_Pop();
 }
 
 static void StatueInit(Actor* thisx, PlayState* play) {
@@ -368,7 +473,6 @@ static void PlantStatuesForScene(void) {
 }
 
 static void ForgetSceneState(s16 sceneId, s8 spawnNum) {
-    memset(sStoneHoldFrames, 0, sizeof(sStoneHoldFrames));
     memset(sStatues, 0, sizeof(sStatues));
     sPendingWarpStone = -1;
 }
@@ -380,15 +484,14 @@ static void ReloadState(s32 fileNum) {
 static void TickMod(Player* player) {
     PlayState* play = gPlayState;
 
-    if (play == NULL || player == NULL) {
+    if (play == NULL || player == NULL || player != GET_PLAYER(play)) {
         return;
     }
-    ResolveWarpPrompt(play);
+    ResolveWarpPrompt(player, play);
     if (IsPlayerBusy(player, play)) {
         return;
     }
-    TickStoneButtons(player, play);
-    ApplyStoneBuffs(player);
+    TickStoneButtons(play);
 }
 
 static bool RegisterStatueActor(void) {
@@ -408,35 +511,13 @@ static bool RegisterStatueActor(void) {
     return sStatueActorId >= 0;
 }
 
-// OoT GetItem_DrawJewel. The gem calls segment 0x09 and the setting 0x08: left unbound, both still hold the
-// texture paths of Link's face and the renderer runs them as display lists.
-static void DrawStoneGetItem(PlayState* play, S2HGetItemEntry* entry) {
-    GraphicsContext* gfxCtx = play->state.gfxCtx;
-    Stone stone = (Stone)(entry->drawItemId % STONE_MAX);
-    Color_RGB8 prim = sGemPrim[stone];
-    Color_RGB8 env = sGemEnv[stone];
-
-    OPEN_DISPS(gfxCtx);
-    Matrix_Push();
-    Matrix_RotateZYX(0, -0x4000, 0x4000, MTXMODE_APPLY);
-    Gfx_SetupDL25_Xlu(gfxCtx);
-    gSPSegment(POLY_XLU_DISP++, 0x09, (uintptr_t)Gfx_TwoTexScroll(gfxCtx, 0, 0, 255, 64, 64, 1, 0, 255, 16, 16));
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
-    gDPSetPrimColor(POLY_XLU_DISP++, 0, 128, prim.r, prim.g, prim.b, 255);
-    gDPSetEnvColor(POLY_XLU_DISP++, env.r, env.g, env.b, 255);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sGemDLs[stone]);
-    Gfx_SetupDL25_Opa(gfxCtx);
-    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)Gfx_TexScroll(gfxCtx, 0, 0, 16, 16));
-    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
-    gDPSetPrimColor(POLY_OPA_DISP++, 0, 128, 255, 255, 170, 255);
-    gDPSetEnvColor(POLY_OPA_DISP++, 150, 120, 0, 255);
-    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sSettingDLs[stone]);
-    Matrix_Pop();
-    CLOSE_DISPS(gfxCtx);
-}
-
-static bool HasOotStoneModel(Stone stone) {
-    return sApi->HasResource(sGemDLs[stone]) != 0 && sApi->HasResource(sSettingDLs[stone]) != 0;
+static bool HasJewelModels(void) {
+    for (uint8_t stone = 0; stone < STONE_MAX; stone++) {
+        if (!sApi->HasResource(sGemDLs[stone]) || !sApi->HasResource(sSettingDLs[stone])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 static bool RegisterStone(Stone stone) {
@@ -445,13 +526,10 @@ static bool RegisterStone(Stone stone) {
         sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, sStones[stone].key, sStones[stone].key, "",
     };
 
-    if (sApi->HasResource(sOotStoneIcons[stone])) {
-        jewel.iconPath = sOotStoneIcons[stone];
-    }
     if (sApi->HasResource(sOotStoneNames[stone])) {
         jewel.namePath = sOotStoneNames[stone];
     }
-    if (HasOotStoneModel(stone)) {
+    if (sHasJewelModel) {
         jewel.getItemEntry.drawFunc = DrawStoneGetItem;
         jewel.getItemEntry.drawItemId = (uint16_t)stone;
     }
@@ -460,10 +538,12 @@ static bool RegisterStone(Stone stone) {
     Z64Items_SetTextbox(&jewel, sStones[stone].getItemText);
     Z64Items_SetPauseText(&jewel, sStones[stone].pauseText);
     jewel.flags |= S2H_CUSTOM_ITEM_INSTANT;
-    jewel.onPauseToggle = ToggleStoneSpeed;
-    jewel.isPauseActive = StoneSpeedActive;
+    jewel.onPauseToggle = TogglePassive;
+    jewel.isPauseActive = IsPassiveKeyEnabled;
     jewel.displayName = sStoneLabels[stone];
     Z64Items_SetLogic(&jewel, &randomizer);
+    sBaseIcons[stone] = jewel.iconPath;
+    sShownIcons[stone] = jewel.iconPath;
     return Z64Items_Register(sApi, &jewel);
 }
 
@@ -480,6 +560,7 @@ S2H_MOD_EXPORT void ModInit(void) {
         return;
     }
     sHasOwlStatue = sApi->HasResource(sOwlStatueDL) != 0 && RegisterStatueActor();
+    sHasJewelModel = HasJewelModels();
     for (uint8_t stone = 0; stone < STONE_MAX; stone++) {
         if (!RegisterStone((Stone)stone)) {
             return;
@@ -487,9 +568,13 @@ S2H_MOD_EXPORT void ModInit(void) {
     }
     LoadState();
     sApi->RegisterVB(VB_INFLICT_VOID_DAMAGE, WaiveVoidDamage);
+    sApi->RegisterVB(VB_EXECUTE_PLAYER_ACTION_FUNC, BoostStoneClimb);
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, TickMod);
     S2H_REGISTER_HOOK(sApi, OnPlayerResolveMotionScale, ScaleStoneMovement);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetSceneState);
     S2H_REGISTER_HOOK(sApi, OnLoadFile, ReloadState);
     S2H_REGISTER_HOOK(sApi, OnSceneSpawnActors, PlantStatuesForScene);
+    if (S2H_MOD_API_HAS(sApi, SetCustomItemIconPath)) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, ShowPassiveIcons);
+    }
 }

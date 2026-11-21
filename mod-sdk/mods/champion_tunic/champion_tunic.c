@@ -1,4 +1,5 @@
 #include <math.h>
+#include <string.h>
 
 #include "z64items.h"
 
@@ -6,6 +7,7 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
+#include "objects/gameplay_keep/gameplay_keep.h"
 
 #define CHAMPION_TUNIC_KEY "nei.equip.champion_tunic"
 #define TIME_OWNER CHAMPION_TUNIC_KEY
@@ -23,6 +25,7 @@
 #define ATTACK_SNAPSHOT_MAX 24
 #define TARGET_COLLIDER_MAX 4
 #define BULLET_FLOAT 1.15f
+#define BULLET_MIN_HEIGHT 5.0f
 #define SCREEN_FLASH_FRAMES 5
 #define TINT_OFFER_ALPHA 200
 #define TINT_RUSH_ALPHA 120
@@ -75,8 +78,36 @@ static bool IsAimableAction(s8 itemAction) {
     return (itemAction >= PLAYER_IA_BOW && itemAction <= PLAYER_IA_HOOKSHOT) || itemAction == PLAYER_IA_ZORA_BOOMERANG;
 }
 
+static bool IsAimableCustomItem(void) {
+    static const char* const sAimableKeys[] = { "nei.beetle", "nei.dominion_rod", "nei.ball_and_chain", "nei.whip" };
+    const char* key = CustomItemRegistry_GetHeldKey();
+    if (key == NULL) {
+        return false;
+    }
+    const S2HCustomItemDefinition* item = S2H_MOD_API_HAS(sApi, FindCustomItem) ? sApi->FindCustomItem(key) : NULL;
+    if (item != NULL && item->firstPersonModelPath != NULL) {
+        return true;
+    }
+    for (u32 i = 0; i < ARRAY_COUNT(sAimableKeys); i++) {
+        if (strcmp(key, sAimableKeys[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// heldItemAction lags itemAction while the airborne hand-off runs; either side keeps the permission alive.
 static bool HoldsAimableItem(Player* player) {
-    return IsAimableAction(player->heldItemAction) || IsAimableAction(player->itemAction);
+    return IsAimableAction(player->heldItemAction) || IsAimableAction(player->itemAction) || IsAimableCustomItem();
+}
+
+static bool IsHighEnoughForBulletTime(Player* player) {
+    return !IsGrounded(player) && player->actor.world.pos.y - player->actor.floorHeight >= BULLET_MIN_HEIGHT;
+}
+
+static bool WasItemButtonReleased(PlayState* play) {
+    const u16 itemButtons = BTN_B | BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT | BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT;
+    return (play->state.input[0].rel.button & itemButtons) != 0;
 }
 
 static bool IsAiming(Player* player) {
@@ -292,7 +323,10 @@ static void CommitFlurry(Player* player, PlayState* play) {
     PlayAttentionSfx();
 }
 
+// The idle frame replaces the aiming pose's flailing legs while the world slows around Link.
 static void EnterBulletTime(Player* player, PlayState* play) {
+    AnimTaskQueue_AddLoadPlayerFrame(play, (PlayerAnimationHeader*)gPlayerAnim_link_normal_wait_free, 0,
+                                     player->skelAnime.limbCount, player->skelAnime.jointTable);
     sChampion.state = CHAMPION_BULLET_TIME;
     SlowWorld(true);
     player->actor.speed = 0.0f;
@@ -303,7 +337,7 @@ static void EnterBulletTime(Player* player, PlayState* play) {
 static void UpdateIdle(Player* player, PlayState* play) {
     bool isHopping = (player->stateFlags2 & PLAYER_STATE2_80000) != 0;
 
-    if (!IsGrounded(player) && HoldsAimableItem(player) && IsAiming(player)) {
+    if (IsHighEnoughForBulletTime(player) && HoldsAimableItem(player) && IsAiming(player)) {
         EnterBulletTime(player, play);
         return;
     }
@@ -338,7 +372,8 @@ static void UpdateRush(PlayState* play, bool tookDamage) {
 }
 
 static void UpdateBulletTime(Player* player, PlayState* play) {
-    if (IsGrounded(player) || !HoldsAimableItem(player) || !IsAiming(player)) {
+    if (!IsHighEnoughForBulletTime(player) || !HoldsAimableItem(player) || !IsAiming(player) ||
+        WasItemButtonReleased(play)) {
         ReturnToIdle(play);
         return;
     }
@@ -447,8 +482,9 @@ static void ReleaseTunic(const char* key) {
 static void DyeTunic(bool* should, va_list args) {
     va_arg(args, void*);
     Color_RGB8* color = va_arg(args, Color_RGB8*);
-    if (!IsWorn() || color == NULL)
+    if (!IsWorn() || color == NULL) {
         return;
+    }
     color->r = 0x38;
     color->g = 0xB6;
     color->b = 0xF1;

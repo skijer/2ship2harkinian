@@ -9,6 +9,7 @@
 #include "macros.h"
 #include "variables.h"
 #include "2s2h/ModApi/RandoInfCustom/RandoInfCustom.h"
+#include "2s2h/BenGui/HudEditor.h"
 
 #define MOD_NAME "golden_hearts"
 #define CONTAINER_POOL_OPTION "oot.golden_hearts"
@@ -129,18 +130,44 @@ static void ShieldWithGoldenHearts(s16 amount) {
     }
 }
 
-static void DrawHeart(PlayState* play, s32 index, const char* texture) {
-    const f32 posX = 30.0f + 10.0f * (index % 10);
-    const f32 posY = 26.0f + 10.0f * (index / 10);
-    const f32 halfSize = 8.0f * 0.68f;
-    const s32 step = (s32)((1.0f / 0.68f) * (1 << 10));
+#define HEARTS_PER_LINE 10
+#define HEART_SPACING 10.0f
+#define HEART_SCALE 0.68f
+#define HEART_EDITOR_TEXTURE_STEP 752
 
+// Same placement as z_lifemeter.c, HUD editor included, so each golden heart sits on its red one.
+static void DrawHeart(PlayState* play, s32 index, const char* texture) {
+    const f32 posX = 30.0f + HEART_SPACING * (index % HEARTS_PER_LINE);
+    const f32 posY = 26.0f + HEART_SPACING * (index / HEARTS_PER_LINE);
+    const f32 halfSize = 8.0f * HEART_SCALE;
+    const s32 step = (s32)((1.0f / HEART_SCALE) * (1 << 10));
+
+    HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_HEARTS);
+    if (HudEditor_IsActiveElementHidden()) {
+        HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_NONE);
+        return;
+    }
     OPEN_DISPS(play->state.gfxCtx);
     gDPLoadTextureBlock(OVERLAY_DISP++, texture, G_IM_FMT_IA, G_IM_SIZ_8b, 16, 16, 0, G_TX_NOMIRROR | G_TX_WRAP,
                         G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
-    gSPTextureRectangle(OVERLAY_DISP++, (s32)((posX - halfSize) * 4), (s32)((posY - halfSize) * 4),
-                        (s32)((posX + halfSize) * 4), (s32)((posY + halfSize) * 4), G_TX_RENDERTILE, 0, 0, step, step);
+    if (HudEditor_ShouldOverrideDraw()) {
+        s16 rectLeft = posX - halfSize;
+        s16 rectTop = posY - halfSize;
+        s16 rectWidth = halfSize * 2;
+        s16 rectHeight = halfSize * 2;
+        s16 dsdx = HEART_EDITOR_TEXTURE_STEP;
+        s16 dtdy = HEART_EDITOR_TEXTURE_STEP;
+
+        HudEditor_ModifyDrawValues(&rectLeft, &rectTop, &rectWidth, &rectHeight, &dsdx, &dtdy);
+        gSPWideTextureRectangle(OVERLAY_DISP++, rectLeft << 2, rectTop << 2, (rectLeft + rectWidth) << 2,
+                                (rectTop + rectHeight) << 2, G_TX_RENDERTILE, 0, 0, dsdx << 1, dtdy << 1);
+    } else {
+        gSPTextureRectangle(OVERLAY_DISP++, (s32)((posX - halfSize) * 4), (s32)((posY - halfSize) * 4),
+                            (s32)((posX + halfSize) * 4), (s32)((posY + halfSize) * 4), G_TX_RENDERTILE, 0, 0, step,
+                            step);
+    }
     CLOSE_DISPS(play->state.gfxCtx);
+    HudEditor_SetActiveElement(HUD_EDITOR_ELEMENT_NONE);
 }
 
 static void DrawGoldenHearts(PlayState* play) {

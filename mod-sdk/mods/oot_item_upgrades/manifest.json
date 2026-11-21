@@ -8,5 +8,28 @@
     "oot_assets"
   ],
   "description": "Progressive vanilla weapons: Gerudo Axe, Razor/Gilded Sword, Real Master Sword, Great Fairy's Sword and Ultrashot.",
+  "options": [
+    {
+      "id": "hammer",
+      "name": "Hammer / Gerudo Axe"
+    },
+    {
+      "id": "kokiri",
+      "name": "Kokiri / Razor / Gilded Sword"
+    },
+    {
+      "id": "master",
+      "name": "Master / Real Master Sword"
+    },
+    {
+      "id": "bgs",
+      "name": "Giant's Knife / Biggoron / Great Fairy Sword"
+    },
+    {
+      "id": "hookshot",
+      "name": "Hookshot / Longshot / Ultrashot"
+    }
+  ],
+  "display_name": "Progressive Weapon Upgrades",
   "game": "mm"
 }

@@ -21,6 +21,7 @@ int16_t OTRGetRectDimensionFromRightEdge(float v);
 extern HOST_DATA u32 sOcarinaAvailableSongFlags;
 extern HOST_DATA u8 sFirstOcarinaSongIndex;
 extern HOST_DATA u8 sLastOcarinaSongIndex;
+extern HOST_DATA u32 sOcarinaFlags;
 }
 
 namespace {
@@ -112,6 +113,11 @@ uint32_t sRingReadPos = 0;
 std::atomic<uint32_t> sAvailableSongFlags{ 0 };
 std::atomic<int> sFirstSongIndex{ 0 };
 std::atomic<int> sLastSongIndex{ 0 };
+// Mod songs from oot_songs, oot_items, command_melody and the rest live in MM's custom ocarina slots.
+std::atomic<uint32_t> sOwnedCustomSongFlags{ 0 };
+std::atomic<bool> sAreCustomSongsPlayable{ false };
+// The ocarina flag that opens free play to the custom slots.
+constexpr u32 kCustomSongsFreePlayFlag = 0x40000000;
 
 std::atomic<int> sMatchedSong{ -1 };
 std::atomic<uint32_t> sMatchSequence{ 0 };
@@ -127,9 +133,18 @@ float sDiff[kTauMax + 2];
 float sCmndf[kTauMax + 2];
 
 constexpr int kRecognisedSongs[] = {
-    OCARINA_SONG_SONATA, OCARINA_SONG_GORON_LULLABY, OCARINA_SONG_NEW_WAVE, OCARINA_SONG_ELEGY,   OCARINA_SONG_OATH,
-    OCARINA_SONG_TIME,   OCARINA_SONG_HEALING,       OCARINA_SONG_EPONAS,   OCARINA_SONG_SOARING, OCARINA_SONG_STORMS,
+    OCARINA_SONG_SONATA,  OCARINA_SONG_GORON_LULLABY, OCARINA_SONG_NEW_WAVE,      OCARINA_SONG_ELEGY,
+    OCARINA_SONG_OATH,    OCARINA_SONG_TIME,          OCARINA_SONG_HEALING,       OCARINA_SONG_EPONAS,
+    OCARINA_SONG_SOARING, OCARINA_SONG_STORMS,        OCARINA_SONG_INVERTED_TIME, OCARINA_SONG_DOUBLE_TIME,
 };
+
+bool IsCustomSong(int songIndex) {
+    return songIndex >= OCARINA_SONG_CUSTOM_FIRST && songIndex <= OCARINA_SONG_CUSTOM_LAST;
+}
+
+uint32_t CustomSongBit(int songIndex) {
+    return 1u << (songIndex - OCARINA_SONG_CUSTOM_FIRST);
+}
 
 float ComputeRms(const float* window, int count) {
     float sum = 0.0f;
@@ -268,6 +283,10 @@ bool IsSongAccepted(int songIndex) {
         (songIndex >= sLastSongIndex.load(std::memory_order_relaxed))) {
         return false;
     }
+    if (IsCustomSong(songIndex)) {
+        return sAreCustomSongsPlayable.load(std::memory_order_relaxed) &&
+               (sOwnedCustomSongFlags.load(std::memory_order_relaxed) & CustomSongBit(songIndex)) != 0;
+    }
     return (sAvailableSongFlags.load(std::memory_order_relaxed) & (1u << songIndex)) != 0;
 }
 
@@ -329,20 +348,27 @@ struct MatchCandidates {
     float runnerUpError;
 };
 
+void RankSong(MatchCandidates* ranked, int songIndex) {
+    if (!IsSongAccepted(songIndex)) {
+        return;
+    }
+    float error = SuffixError(songIndex, gOcarinaSongButtons[songIndex].numButtons);
+    if (error < ranked->bestError) {
+        ranked->runnerUpError = ranked->bestError;
+        ranked->bestError = error;
+        ranked->bestSong = songIndex;
+    } else if (error < ranked->runnerUpError) {
+        ranked->runnerUpError = error;
+    }
+}
+
 MatchCandidates RankSongs() {
     MatchCandidates ranked = { -1, kNoMatchError, kNoMatchError };
     for (int songIndex : kRecognisedSongs) {
-        if (!IsSongAccepted(songIndex)) {
-            continue;
-        }
-        float error = SuffixError(songIndex, gOcarinaSongButtons[songIndex].numButtons);
-        if (error < ranked.bestError) {
-            ranked.runnerUpError = ranked.bestError;
-            ranked.bestError = error;
-            ranked.bestSong = songIndex;
-        } else if (error < ranked.runnerUpError) {
-            ranked.runnerUpError = error;
-        }
+        RankSong(&ranked, songIndex);
+    }
+    for (int songIndex = OCARINA_SONG_CUSTOM_FIRST; songIndex <= OCARINA_SONG_CUSTOM_LAST; songIndex++) {
+        RankSong(&ranked, songIndex);
     }
     return ranked;
 }
@@ -573,7 +599,19 @@ int sOpenRetryFrames = 0;
 bool sOcarinaOut = false;
 uint32_t sLastSeenMatch = 0;
 
+// Ownership is read on the game thread; the audio thread only sees the resulting mask.
+void RefreshOwnedCustomSongs() {
+    uint32_t owned = 0;
+    for (int songIndex = OCARINA_SONG_CUSTOM_FIRST; songIndex <= OCARINA_SONG_CUSTOM_LAST; songIndex++) {
+        if (OcarinaSongRegistry_IsRegistered(songIndex) && OcarinaSongRegistry_IsOwned(songIndex)) {
+            owned |= CustomSongBit(songIndex);
+        }
+    }
+    sOwnedCustomSongFlags.store(owned, std::memory_order_relaxed);
+}
+
 void TickMicOcarina() {
+    RefreshOwnedCustomSongs();
     if (sRequested.exchange(false, std::memory_order_relaxed)) {
         sIdleFrames = 0;
     } else if (sIdleFrames < kMicGraceFrames) {
@@ -608,6 +646,7 @@ void ListenOnAudioThread() {
     sAvailableSongFlags.store(sOcarinaAvailableSongFlags, std::memory_order_relaxed);
     sFirstSongIndex.store(sFirstOcarinaSongIndex, std::memory_order_relaxed);
     sLastSongIndex.store(sLastOcarinaSongIndex, std::memory_order_relaxed);
+    sAreCustomSongsPlayable.store((sOcarinaFlags & kCustomSongsFreePlayFlag) != 0, std::memory_order_relaxed);
 
     uint32_t sequence = sMatchSequence.load(std::memory_order_acquire);
     if (sequence == sLastSeenMatch) {
@@ -616,8 +655,7 @@ void ListenOnAudioThread() {
     sLastSeenMatch = sequence;
 
     int song = sMatchedSong.load(std::memory_order_relaxed);
-    if ((song < sFirstOcarinaSongIndex) || (song >= sLastOcarinaSongIndex) ||
-        !(sOcarinaAvailableSongFlags & (1u << song))) {
+    if ((song < 0) || !IsSongAccepted(song)) {
         return;
     }
 

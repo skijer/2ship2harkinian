@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "z64items.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -126,8 +127,6 @@ static bool IsSomariaWeight(Actor* actor) {
 #define PACCI_UH_CUT_RADIUS 30.0f
 #define PACCI_UH_CUT_HEIGHT 80.0f
 #define PACCI_UH_CUT_FRAMES 6
-#define PACCI_UH_HEIGHT_STEP 40.0f
-#define PACCI_UH_HEIGHT_MAX 600.0f
 #define PACCI_UH_THROW_HOLD 4
 #define PACCI_UH_PULL_RATE 1.6f
 #define PACCI_UH_THROW_REACH 18.0f
@@ -389,9 +388,20 @@ static u8 Pacci_UhCondSwitchParams(Actor* actor) {
     return (actor->params < 0x40) ? 1 : 0;
 }
 
+// MM rows: rail lifts follow their own path, elevators move only vertically, push blocks slide on the floor.
 static const PacciUhTraitRow sPacciUhTraits[] = {
     { ACTOR_OBJ_LIFT, PACCI_UH_TRAIT_EXCLUDE, 0, 0, NULL },
+    { ACTOR_BG_IKANA_ROTARYROOM, PACCI_UH_TRAIT_EXCLUDE, 0, 0, NULL },
     { ACTOR_OBJ_ICEBLOCK, PACCI_UH_TRAIT_PLANE_XZ | PACCI_UH_TRAIT_NO_TURN, 0, 0, NULL },
+    { ACTOR_OBJ_SKATEBLOCK, PACCI_UH_TRAIT_PLANE_XZ | PACCI_UH_TRAIT_NO_TURN, 0, 0, NULL },
+    { ACTOR_OBJ_PZLBLOCK, PACCI_UH_TRAIT_PLANE_XZ | PACCI_UH_TRAIT_NO_TURN, 0, 0, NULL },
+    { ACTOR_BG_IKANA_BLOCK, PACCI_UH_TRAIT_PLANE_XZ | PACCI_UH_TRAIT_NO_TURN, 0, 0, NULL },
+
+    { ACTOR_OBJ_RAILLIFT, PACCI_UH_TRAIT_PATH | PACCI_UH_TRAIT_NO_TURN, 0, 0x7F, NULL },
+    { ACTOR_OBJ_LUPYGAMELIFT, PACCI_UH_TRAIT_PATH | PACCI_UH_TRAIT_NO_TURN, 0, 0x7F, NULL },
+    { ACTOR_OBJ_Y2LIFT, PACCI_UH_TRAIT_AXIS_Y | PACCI_UH_TRAIT_NO_TURN | PACCI_UH_TRAIT_DRIVE_HOME, 0, 0, NULL },
+    { ACTOR_BG_F40_FLIFT, PACCI_UH_TRAIT_AXIS_Y | PACCI_UH_TRAIT_NO_TURN | PACCI_UH_TRAIT_DRIVE_HOME, 0, 0, NULL },
+    { ACTOR_BG_DBLUE_ELEVATOR, PACCI_UH_TRAIT_AXIS_Y | PACCI_UH_TRAIT_NO_TURN, 0, 0, NULL },
 
     { ACTOR_EN_BOMBF, PACCI_UH_TRAIT_PROXY | PACCI_UH_TRAIT_EXPLODES, 0, 0, NULL, 0, ACTOR_EN_BOM, 0 },
     { ACTOR_OBJ_SYOKUDAI, PACCI_UH_TRAIT_BURNS, 0, 0, Pacci_UhCondTorchLit },
@@ -479,8 +489,17 @@ u8 Pacci_BehaviourFor(Actor* actor) {
     return PACCI_BEHAV_THROW;
 }
 
+typedef bool (*IsCryonisPillarFunc)(Actor* actor);
+
+static bool IsCryonisPillar(Actor* actor) {
+    IsCryonisPillarFunc isPillar =
+        S2H_MOD_API_HAS(sApi, FindService) ? (IsCryonisPillarFunc)sApi->FindService("nei.slate.is_cryonis_pillar") : NULL;
+
+    return (isPillar != NULL) && isPillar(actor);
+}
+
 u8 Pacci_IsLiftableEx(Actor* actor, u8 isDyna) {
-    if ((actor == NULL) || (actor->update == NULL)) {
+    if ((actor == NULL) || (actor->update == NULL) || IsCryonisPillar(actor)) {
         return 0;
     }
     if ((actor->id == ACTOR_PLAYER) || (actor->category == ACTORCAT_BOSS)) {
@@ -1411,7 +1430,7 @@ static void Pacci_UhConstrain(PlayState* play, Actor* actor) {
     }
     if ((traits & PACCI_UH_TRAIT_PATH) && (sUltrahand.pathCount >= 2)) {
         Path* path = &play->setupPathList[sUltrahand.pathId];
-        Vec3f* pts = path->points;
+        Vec3f* pts = Lib_SegmentedToVirtual(path->points);
         Vec3f want = actor->world.pos;
         Vec3f best = want;
         f32 bestD = 3.0e38f;
@@ -3559,11 +3578,14 @@ void Pacci_UhAbortTick(PlayState* play) {
 #define UH_DEFAULT_PIECES_INDEX 2
 #define UH_REACH_PITCH 0x1800
 #define UH_TEXT_SIZE 192
+#define UH_GIVE_SCALE 0.17f
+#define UH_PIECES_CVAR "gMods.Ultrahand.RequiredPieces"
 #define UH_MODE_BUTTONS (BTN_A | BTN_B | BTN_R | BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT)
 
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/gItemIconUltrahandTex";
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/gUltrahandNameTex";
 static const ALIGN_ASSET(2) char sGiveDL[] = "__OTR__objects/object_nei_ultrahand/gUltrahandGiveDL";
+static const ALIGN_ASSET(2) char sGiveXluDL[] = "__OTR__objects/object_nei_ultrahand/gUltrahandGiveXluDL";
 
 static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
@@ -3597,6 +3619,7 @@ static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sR
                                                   ARRAY_COUNT(sRequiredHooks) };
 
 static u8 sPieces;
+static bool sHasPiecesOption;
 static bool sIsInHand;
 static bool sIsWaitingForRelease;
 static bool sIsReachPoseHeld;
@@ -3615,8 +3638,10 @@ static u16 FindEquippedButtonMask(void) {
 }
 
 static u8 RequiredPieces(void) {
-    return (S2H_MOD_API_HAS(sApi, GetRandoOption) ? sApi->GetRandoOption(UH_PIECES_OPTION) : UH_DEFAULT_PIECES_INDEX) +
-           1;
+    if (sHasPiecesOption && (gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO)) {
+        return CLAMP(sApi->GetRandoOption(UH_PIECES_OPTION) + 1, 1, UH_MAX_PIECES);
+    }
+    return CLAMP(CVarGetInteger(UH_PIECES_CVAR, UH_DEFAULT_PIECES_INDEX + 1), 1, UH_MAX_PIECES);
 }
 
 static bool IsAssembled(void) {
@@ -3783,6 +3808,39 @@ static void DrawUltrahandEffects(Actor* actor, PlayState* play) {
     Pacci_FuseDrawPreview(play);
 }
 
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    Matrix_Scale(UH_GIVE_SCALE, UH_GIVE_SCALE, UH_GIVE_SCALE, MTXMODE_APPLY);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sGiveDL);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sGiveXluDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void RegisterPiecesSlider(void) {
+    S2HModMenuWidget widget = { 0 };
+
+    if (!S2H_MOD_API_HAS(sApi, RegisterMenuWidget) || !S2H_MOD_API_HAS(sApi, RegisterMenuSidebar)) {
+        return;
+    }
+    widget.structSize = sizeof(widget);
+    widget.section = "Rando";
+    widget.sidebar = "Mods";
+    widget.type = S2H_MOD_MENU_INT_SLIDER;
+    widget.label = "Ultrahand pieces required (gameplay)";
+    widget.cvar = UH_PIECES_CVAR;
+    widget.defaultInt = UH_DEFAULT_PIECES_INDEX + 1;
+    widget.minInt = 1;
+    widget.maxInt = UH_MAX_PIECES;
+    widget.tooltip = "Pieces required to activate Ultrahand outside a randomized seed.";
+    sApi->RegisterMenuSidebar(widget.section, widget.sidebar, "gSettings.Menu.RandoSidebarSection", 1);
+    sApi->RegisterMenuWidget(&widget);
+}
+
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
 }
@@ -3795,9 +3853,9 @@ S2H_MOD_EXPORT void ModInit(void) {
     if (!S2H_MOD_API_HAS(sApi, GetActorId) || !S2H_MOD_API_HAS(sApi, SetCustomItemText)) {
         return;
     }
-    if (S2H_MOD_API_HAS(sApi, RegisterRandoOption)) {
-        sApi->RegisterRandoOption(&sPiecesOption);
-    }
+    sHasPiecesOption = S2H_MOD_API_HAS(sApi, RegisterRandoOption) && S2H_MOD_API_HAS(sApi, GetRandoOption) &&
+                       sApi->RegisterRandoOption(&sPiecesOption);
+    RegisterPiecesSlider();
 
     S2HCustomItemDefinition hand = Z64Items_Define(UH_KEY, sIconTex, sNameTex);
 
@@ -3807,11 +3865,18 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetCanUse(&hand, CanUseUltrahand);
     Z64Items_SetAction(&hand, TakeOutUltrahand, HoldReachPose);
     Z64Items_SetHeldCallbacks(&hand, PressUltrahand, PutUltrahandAway, NULL);
-    Z64Items_SetLogic(&hand, &sUltrahandLogic);
+    S2HCustomItemRandomizer logic = sUltrahandLogic;
+
+    if (!sHasPiecesOption) {
+        logic.poolCount = UH_DEFAULT_PIECES_INDEX + 1;
+        logic.poolCountOption = NULL;
+    }
+    Z64Items_SetLogic(&hand, &logic);
     hand.modelGroup = PLAYER_MODELGROUP_DEFAULT;
     hand.onReceive = ReceivePiece;
     Z64Items_SetGetItemModel(&hand, sGiveDL);
-    hand.getItemScale = 0.6f;
+    hand.getItemScale = UH_GIVE_SCALE;
+    hand.getItemEntry.drawFunc = DrawGetItem;
     RefreshTexts();
     Z64Items_SetTextbox(&hand, sGetItemText);
     Z64Items_SetPauseText(&hand, sPauseText);

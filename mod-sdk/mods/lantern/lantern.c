@@ -16,7 +16,9 @@
 #define LANTERN_KEY "nei.lantern"
 // The lamp is modelled at 2842 units and hangs upside down, so it rides the hand at a hundredth of that.
 #define LANTERN_HELD_SCALE 0.004f
-#define LANTERN_GIVE_SCALE 0.013f
+#define LANTERN_GIVE_SCALE 0.025f
+#define LANTERN_VISUAL_CHANNEL "nei.lantern.visual"
+#define REMOTE_VISUAL_INTERVAL 5u
 #define LANTERN_FLAME_SCALE 0.0008f
 #define LANTERN_FLAME_DROP 7.0f
 #define LANTERN_LIGHT_RADIUS 200
@@ -544,6 +546,10 @@ static void PutLanternAway(Player* player, PlayState* play) {
     sIsTextboxPending = false;
 }
 
+static void GetLampPos(Player* player, Vec3f* pos) {
+    *pos = player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND];
+}
+
 static void HoldLight(PlayState* play, Player* player, u8 fire) {
     if (fire == LANTERN_OFF) {
         if (sLightNode != NULL) {
@@ -557,7 +563,7 @@ static void HoldLight(PlayState* play, Player* player, u8 fire) {
     Vec3f pos = player->actor.world.pos;
 
     if (IsLanternShowing(player, fire)) {
-        pos = player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND];
+        GetLampPos(player, &pos);
     } else {
         pos.y += LANTERN_STOWED_LIGHT_HEIGHT;
     }
@@ -637,14 +643,86 @@ static void DrawLampFlame(PlayState* play, Player* player, Vec3f* lampPos, u8 fi
     sFlameTexScroll++;
 }
 
-static void DrawLantern(Actor* actor, PlayState* play) {
-    Player* player = (Player*)actor;
-    u8 fire = CurrentFlame();
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
 
-    if (!IsLanternShowing(player, fire)) {
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, LANTERN_VISUAL_CHANNEL, visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    return visual->active == 1 && visual->scene == gPlayState->sceneId && visual->flags[0] < ARRAY_COUNT(sFires) &&
+           !(player->stateFlags2 & PLAYER_STATE2_20000000);
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
         return;
     }
-    Vec3f lampPos = player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND];
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+    visual.scene = -1;
+    if (play != NULL) {
+        u8 fire = CurrentFlame();
+        visual.scene = play->sceneId;
+        visual.active = IsLanternShowing(GET_PLAYER(play), fire);
+        if (visual.active) {
+            visual.flags[0] = fire;
+        }
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState(LANTERN_VISUAL_CHANNEL, &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static bool ResolveShownFlame(Player* player, PlayState* play, u8* fire) {
+    if (player != GET_PLAYER(play)) {
+        RemoteVisualState visual;
+        if (!ReadRemoteVisual(player, &visual)) {
+            return false;
+        }
+        *fire = visual.flags[0];
+        return true;
+    }
+    *fire = CurrentFlame();
+    return IsLanternShowing(player, *fire) && !(player->stateFlags2 & PLAYER_STATE2_20000000);
+}
+
+static void DrawLantern(Actor* actor, PlayState* play) {
+    Player* player = (Player*)actor;
+    u8 fire;
+    Vec3f lampPos;
+
+    if (!ResolveShownFlame(player, play, &fire)) {
+        return;
+    }
+    GetLampPos(player, &lampPos);
 
     OPEN_DISPS(play->state.gfxCtx);
     if (fire == LANTERN_OFF) {
@@ -673,6 +751,37 @@ static void DrawLantern(Actor* actor, PlayState* play) {
     if (fire != LANTERN_OFF) {
         DrawLampFlame(play, player, &lampPos, fire);
     }
+}
+
+static void DrawRemotePlayer(Actor* actor, PlayState* play) {
+    if (actor->id == ACTOR_PLAYER || !sRemoteVisualReady || sApi->GetNetPeerIdForActor(actor) == 0) {
+        return;
+    }
+    DrawLantern(actor, play);
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel(LANTERN_VISUAL_CHANNEL, 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+        S2H_REGISTER_HOOK(sApi, OnActorDrawEnd, DrawRemotePlayer);
+    }
+}
+
+// The lamp model is authored hanging down from its handle, so the get-item pose flips it upright.
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    Matrix_RotateXF(LANTERN_PI, MTXMODE_APPLY);
+    Matrix_Scale(LANTERN_GIVE_SCALE, LANTERN_GIVE_SCALE, LANTERN_GIVE_SCALE, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sLanternDL);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static void UpdateLantern(Player* player) {
@@ -736,6 +845,7 @@ static void GrantLanternLogic(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, StorageSet)) {
         return;
     }
@@ -756,6 +866,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetHeldCallbacks(&lantern, NULL, PutLanternAway, NULL);
     Z64Items_SetGetItemModel(&lantern, sLanternDL);
     lantern.getItemScale = LANTERN_GIVE_SCALE;
+    lantern.getItemEntry.drawFunc = DrawGetItem;
     lantern.modelGroup = PLAYER_MODELGROUP_DEFAULT;
 
     Z64Items_SetLogic(&lantern, &sRandomizerItem);

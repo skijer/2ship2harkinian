@@ -13,6 +13,7 @@
 #endif
 
 #define BOLT_KEY "nei.elemental_mirror.bolt"
+#define OOT_MIRROR_SHIELD_KEY "oot.equip.mirror_shield"
 typedef enum { COUNTER_NONE, COUNTER_BLUE_FIRE, COUNTER_ICE, COUNTER_THUNDER, COUNTER_LIGHT } Counter;
 typedef struct {
     Actor actor;
@@ -29,13 +30,16 @@ static const char* const sHooks[] = { "OnPlayerShieldBlocked", "OnCollisionResol
                                       "OnSceneInit" };
 static const SOHModRequirements sRequirements = { sizeof(SOHModRequirements), sHooks, ARRAY_COUNT(sHooks) };
 
+static bool IsOotMirrorShieldWorn(void) {
+    const char* shield = sApi->GetWornEquipment(SOH_EQUIP_SLOT_SHIELD);
+    return shield != NULL && strcmp(shield, OOT_MIRROR_SHIELD_KEY) == 0;
+}
+
+// Only OoT's Mirror Shield counters; the Shield of Ikana stands in for MM's mirror and drains souls instead.
 static bool Ready(PlayState* play, Player* p) {
-    // Custom shields such as the Shield of Ikana keep the vanilla slot on the mirror shield.
-    const char* custom = sApi->GetWornEquipment(SOH_EQUIP_SLOT_SHIELD);
     const char* form = SOH_MOD_API_HAS(sApi, GetActiveForm) ? sApi->GetActiveForm() : NULL;
-    return p->transformation == PLAYER_FORM_HUMAN && CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) == EQUIP_VALUE_SHIELD_MIRROR &&
-           (!custom || !custom[0]) && (!form || !form[0]) && play->pauseCtx.state == 0 &&
-           (p->stateFlags1 & PLAYER_STATE1_SHIELDING) &&
+    return p->transformation == PLAYER_FORM_HUMAN && IsOotMirrorShieldWorn() && (!form || !form[0]) &&
+           play->pauseCtx.state == 0 && (p->stateFlags1 & PLAYER_STATE1_SHIELDING) &&
            !(p->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_LOADING));
 }
 static Counter CounterFor(Actor* source, ColliderInfo* attack) {

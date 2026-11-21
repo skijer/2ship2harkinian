@@ -1,9 +1,8 @@
 Elemental Mirror Shield
 
-The vanilla OoT Mirror Shield returns blocked magic while Link is shielding.
-The existing shield and light-puzzle behavior remains available. Custom shields
-and transformation forms keep their own behavior. The power is disabled in the
-Spirit Temple boss scene and whenever a living Twinrova actor is present.
+OoT's Mirror Shield (oot_equipment) returns blocked magic while human Link is
+shielding. The Shield of Ikana, which replaces MM's mirror shield, keeps its
+soul drain and never counters. Transformation forms keep their own behavior.
 
 Counter list, in priority order:
 
@@ -18,7 +17,7 @@ Counter list, in priority order:
 
 Returned bolts aim at the attacker, its enemy parent or Link's current target.
 They collide with walls and enemy colliders; they do not directly change HP or
-kill an enemy. OoT has no thunder damage bit, so thunder uses the light-magic bit
+kill an enemy. MM has no thunder damage bit, so thunder uses the light-magic bit
 and supplies two collision damage when the enemy's light table would give zero.
 Its electrical effect is visual, without applying an ice damage reaction.
 

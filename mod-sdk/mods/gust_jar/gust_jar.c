@@ -13,6 +13,7 @@
 
 #define GUST_JAR_KEY "nei.gust_jar"
 #define GUST_JAR_HELD_SCALE 1.5f
+#define GUST_JAR_GIVE_SCALE 4.0f
 #define GUST_JAR_HAND_DROP 2.0f
 #define GUST_JAR_NOZZLE_REACH 28.0f
 #define GUST_JAR_NOZZLE_HEIGHT 28.0f
@@ -123,12 +124,25 @@ static ColliderCylinderInit sNozzleColliderInit = {
 static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnActorDrawEnd", "OnSceneInit", "OnInterfaceDrawEnd",
-                                              "OnSaveLoad" };
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate",  "OnPlayerUpdate", "OnActorDrawEnd", "OnSceneInit",
+                                              "OnInterfaceDrawEnd", "OnSaveLoad" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
 static const S2HModApi* sApi;
+
+#define REMOTE_VISUAL_INTERVAL 5u
+
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual);
+static void InitRemoteVisuals(void);
 static ColliderCylinder sNozzleCollider;
 static bool sIsColliderReady;
 static bool sIsJarOut;
@@ -600,10 +614,10 @@ static void PutJarAway(Player* player, PlayState* play) {
     sIsJarOut = false;
 }
 
-static void DrawJarInHand(Player* player, PlayState* play) {
+static void DrawJarInHand(Player* player, PlayState* play, u8 mode) {
     Vec3f* leftHand = &player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND];
     Vec3f* rightHand = &player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND];
-    Color_RGBA8 band = sElements[CurrentMode()].primary;
+    Color_RGBA8 band = sElements[mode].primary;
 
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
@@ -651,20 +665,39 @@ static void DrawTornado(Player* player, PlayState* play) {
 static void DrawGustJar(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
 
-    if (!sIsJarOut) {
+    if (player != GET_PLAYER(play)) {
+        RemoteVisualState visual;
+
+        if (ReadRemoteVisual(player, &visual)) {
+            DrawJarInHand(player, play, visual.flags[0]);
+        }
         return;
     }
+    if (!sIsJarOut || (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return;
+    }
+    u8 mode = CurrentMode();
+
     if (Z64Aiming_IsAiming()) {
-        u8 mode = CurrentMode();
         Z64AimingReticleTint tint = IsBlowMode(mode) ? Z64AIMING_TINT_LAUNCH : Z64AIMING_TINT_ATTRACT;
 
         Z64Aiming_DrawReticle(play, player, BreathReach(mode), (Z64AimingReticleStyle){ Z64AIMING_TOGGLE_BOW, tint });
     } else if (!func_800B7118(player)) {
-        DrawJarInHand(player, play);
+        DrawJarInHand(player, play, mode);
     }
     if (sUseTimer > 0) {
         DrawTornado(player, play);
     }
+}
+
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(GUST_JAR_GIVE_SCALE, GUST_JAR_GIVE_SCALE, GUST_JAR_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sJarDL);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static void UpdateUnlocks(Player* player) {
@@ -686,6 +719,83 @@ static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, GUST_JAR_KEY, GUST_JAR_KEY, "",
 };
 
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, "nei.gust_jar.visual", visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    if (visual->active != 1 || visual->adult > 1 || visual->scene != gPlayState->sceneId ||
+        visual->flags[0] >= ARRAY_COUNT(sElements) || (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return false;
+    }
+    for (uint32_t i = 0; i < ARRAY_COUNT(visual->values); i++) {
+        if (!isfinite(visual->values[i]) || fabsf(visual->values[i]) > 10000000.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = sIsJarOut;
+        if (visual.active) {
+            visual.flags[0] = CurrentMode();
+        }
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState("nei.gust_jar.visual", &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void DrawRemotePlayer(Actor* actor, PlayState* play) {
+    if (actor->id == ACTOR_PLAYER || !sRemoteVisualReady || sApi->GetNetPeerIdForActor(actor) == 0) {
+        return;
+    }
+    DrawGustJar(actor, play);
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel("nei.gust_jar.visual", 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+        S2H_REGISTER_HOOK(sApi, OnActorDrawEnd, DrawRemotePlayer);
+    }
+}
+
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
 }
@@ -695,6 +805,7 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, StorageSet)) {
         return;
     }
@@ -713,9 +824,8 @@ S2H_MOD_EXPORT void ModInit(void) {
                                 "%y\xB3%w picks the breath.");
     Z64Items_SetAction(&jar, TakeOutJar, UseJar);
     Z64Items_SetHeldCallbacks(&jar, NULL, PutJarAway, NULL);
-    Z64Items_SetGetItemModel(&jar, sJarDL);
-    jar.getItemScale = GUST_JAR_HELD_SCALE / (0.015f * 30.0f);
     jar.modelGroup = PLAYER_MODELGROUP_DEFAULT;
+    jar.getItemEntry.drawFunc = DrawGetItem;
 
     Z64Items_SetLogic(&jar, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &jar)) {

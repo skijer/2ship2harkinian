@@ -105,30 +105,10 @@ static inline void Matrix_MultZ(f32 scale, Vec3f* dst) {
 #define ACTOR_BG_ICE_SHELTER 0x7F60
 #endif
 
-#ifndef NA_SE_EN_GANON_DARKWAVE_M
-#define NA_SE_EN_GANON_DARKWAVE_M NA_SE_NONE
-#endif
-#ifndef NA_SE_EN_TWINROBA_MASIC_SET
-#define NA_SE_EN_TWINROBA_MASIC_SET NA_SE_NONE
-#endif
-#ifndef NA_SE_EV_ELEVATOR_STOP
-#define NA_SE_EV_ELEVATOR_STOP NA_SE_NONE
-#endif
-#ifndef NA_SE_EV_FANTOM_WARP_L
-#define NA_SE_EV_FANTOM_WARP_L NA_SE_NONE
-#endif
-#ifndef NA_SE_EV_FANTOM_WARP_S
-#define NA_SE_EV_FANTOM_WARP_S NA_SE_NONE
-#endif
-#ifndef NA_SE_EV_NABALL_VANISH
-#define NA_SE_EV_NABALL_VANISH NA_SE_NONE
-#endif
-#ifndef NA_SE_EV_SPIRIT_STONE
-#define NA_SE_EV_SPIRIT_STONE NA_SE_NONE
-#endif
-#ifndef NA_SE_EV_TRIFORCE_FLASH
-#define NA_SE_EV_TRIFORCE_FLASH NA_SE_NONE
-#endif
+// OoT sounds MM dropped, played through the closest MM sound: Koume's magic, the soul flash, Tatl's vanish.
+#define NA_SE_EN_TWINROBA_MASIC_SET NA_SE_EN_KOUME_MAGIC
+#define NA_SE_EV_TRIFORCE_FLASH NA_SE_PL_MAGIC_SOUL_FLASH
+#define NA_SE_EV_NABALL_VANISH NA_SE_EV_NAVY_VANISH
 
 #ifndef uncullZoneForward
 #define uncullZoneForward cullingVolumeDistance

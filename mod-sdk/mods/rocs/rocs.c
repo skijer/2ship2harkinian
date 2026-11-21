@@ -1,3 +1,4 @@
+#include <math.h>
 #include <string.h>
 
 #include "z64items.h"
@@ -10,9 +11,11 @@
 #define ROCS_FEATHER_KEY "nei.rocs_feather"
 #define ROCS_CAPE_KEY "nei.rocs_cape"
 #define ROCS_PROGRESSIVE_KEY "nei.progressive_rocs"
-#define ROCS_FEATHER_GIVE_SCALE 0.35f
 #define ROCS_JUMP_VELOCITY 11.0f
 #define ROCS_WATER_JUMP_VELOCITY 5.5f
+#define ROCS_PLAYER_SCALE 0.01f
+#define ROCS_FEATHER_GIVE_SCALE 0.5f
+#define ROCS_CAPE_GIVE_SCALE 0.6f
 
 #define ROCS_BLOCKING_STATES                                                                                  \
     (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_4 | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 | \
@@ -83,8 +86,14 @@ static void KeepLedgesGrabbable(Player* player) {
     player->stateFlags2 &= ~PLAYER_STATE2_80000;
 }
 
+// Gravity does not follow Link's size, so the launch scales with the square root to keep the height in proportion.
+static f32 ScaleToLinkSize(Player* player, f32 velocity) {
+    return velocity * sqrtf(player->actor.scale.y / ROCS_PLAYER_SCALE);
+}
+
 static void Jump(Player* player, PlayState* play, const char* animation) {
-    func_80834D50(play, player, (PlayerAnimationHeader*)animation, ROCS_JUMP_VELOCITY, NA_SE_VO_LI_AUTO_JUMP);
+    func_80834D50(play, player, (PlayerAnimationHeader*)animation, ScaleToLinkSize(player, ROCS_JUMP_VELOCITY),
+                  NA_SE_VO_LI_AUTO_JUMP);
     KeepLedgesGrabbable(player);
     SpawnSparkles(player, play);
 }
@@ -123,7 +132,7 @@ static void JumpFromAirOrWater(Player* player, PlayState* play) {
         return;
     }
     if (player->stateFlags1 & PLAYER_STATE1_8000000) {
-        player->actor.velocity.y = ROCS_WATER_JUMP_VELOCITY;
+        player->actor.velocity.y = ScaleToLinkSize(player, ROCS_WATER_JUMP_VELOCITY);
         Player_PlaySfx(player, NA_SE_PL_SKIP);
         SpawnSparkles(player, play);
         return;
@@ -182,6 +191,32 @@ static void ReceiveProgressive(const char* key) {
     sApi->SetCustomItemOwned(ROCS_PROGRESSIVE_KEY, false);
 }
 
+static void DrawSpinningModel(PlayState* play, const char* displayList, f32 scale) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)displayList);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawFeather(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    DrawSpinningModel(play, sFeatherDL, ROCS_FEATHER_GIVE_SCALE);
+}
+
+static void DrawCape(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    DrawSpinningModel(play, sCapeDL, ROCS_CAPE_GIVE_SCALE);
+}
+
+static void DrawProgressive(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    if (HasAnyTier()) {
+        DrawCape(play, getItemEntry);
+        return;
+    }
+    DrawFeather(play, getItemEntry);
+}
+
 static const S2HCustomItemRandomizer sProgressiveRandomizer = {
     sizeof(S2HCustomItemRandomizer),
     S2H_CUSTOM_ITEM_RANDO_PROGRESSIVE,
@@ -198,21 +233,20 @@ static bool RegisterProgressive(void) {
 
     progressive.displayName = "Progressive Roc's Feather";
     progressive.presentationFlags |= S2H_ITEM_HIDE_FROM_SAVE_EDITOR | S2H_ITEM_HIDE_FROM_KALEIDO;
-    progressive.getItemScale = ROCS_FEATHER_GIVE_SCALE;
+    progressive.getItemEntry.drawFunc = DrawProgressive;
     progressive.onReceive = ReceiveProgressive;
-    Z64Items_SetGetItemModel(&progressive, sFeatherDL);
     Z64Items_SetLogic(&progressive, &sProgressiveRandomizer);
     return Z64Items_Register(sApi, &progressive);
 }
 
-static bool RegisterTier(S2HCustomItemDefinition* tier, const char* getItemModel, int32_t wheelPriority) {
+static bool RegisterTier(S2HCustomItemDefinition* tier, S2HGetItemDrawFunc draw, int32_t wheelPriority) {
     Z64Items_SetButtons(tier, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(tier, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(tier, 0, 0, wheelPriority);
     Z64Items_SetCanUse(tier, CanJumpFromGround);
     Z64Items_SetAction(tier, JumpFromGround, NULL);
-    Z64Items_SetGetItemModel(tier, getItemModel);
     tier->flags |= S2H_CUSTOM_ITEM_INSTANT;
+    tier->getItemEntry.drawFunc = draw;
     return Z64Items_Register(sApi, tier);
 }
 
@@ -235,16 +269,14 @@ S2H_MOD_EXPORT void ModInit(void) {
                                   "Press %y\xB2%w to leap higher than&any run-up could carry you,&or to hop up out of "
                                   "the %bwater%w.");
     Z64Items_SetPauseText(&feather, "%rRoc's Feather&%wPress %y\xB2%w to jump, or to hop up&out of the water.");
-    feather.getItemScale = ROCS_FEATHER_GIVE_SCALE;
 
     S2HCustomItemDefinition cape = Z64Items_Define(ROCS_CAPE_KEY, sCapeIconTex, sCapeNameTex);
     Z64Items_SetTextbox(&cape, "You got %rRoc's Cape%w!&Roc's feathers woven whole, so&the wind carries you twice.^"
                                "Press %y\xB2%w to jump, then %y\xB2%w again&in midair to ride the wind a&%gsecond "
                                "time%w, even as you fall.");
     Z64Items_SetPauseText(&cape, "%rRoc's Cape&%wPress %y\xB2%w to jump, again in midair&for a second jump.");
-    cape.getItemScale = 0.77f;
 
-    if (!RegisterTier(&feather, sFeatherDL, 0) || !RegisterTier(&cape, sCapeDL, 1) || !RegisterProgressive()) {
+    if (!RegisterTier(&feather, DrawFeather, 0) || !RegisterTier(&cape, DrawCape, 1) || !RegisterProgressive()) {
         return;
     }
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, UpdateRocs);

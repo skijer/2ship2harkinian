@@ -26,8 +26,13 @@
 #define PEGASUS_CONE_FORWARD 80.0f
 #define PEGASUS_CONE_HEIGHT 40.0f
 #define PEGASUS_CONE_SCALE 0.015f
-#define WIND_TEXTURE_WIDTH 16
-#define WIND_TEXTURE_HEIGHT 32
+#define WIND_TEXTURE_WIDTH 64
+#define WIND_TEXTURE_HEIGHT 64
+#define WIND_TEXTURE_MASK 6
+#define PEGASUS_VISUAL_CHANNEL "nei.pegasus_boots.visual"
+#define REMOTE_VISUAL_INTERVAL 5u
+
+static const ALIGN_ASSET(2) char sWindTex[] = "__OTR__overlays/oot_ovl_Magic_Wind/sTex";
 
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__textures/icon_item_custom/gItemIconPegasusBootsTex";
 static const ALIGN_ASSET(2) char sName[] = "__OTR__textures/item_name_custom/gPegasusBootsNameTex";
@@ -382,12 +387,12 @@ static void DrawWindCone(Player* player, PlayState* play) {
     gDPPipeSync(POLY_XLU_DISP++);
     gDPSetTextureLUT(POLY_XLU_DISP++, G_TT_NONE);
     gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
-    gDPLoadTextureBlock(POLY_XLU_DISP++, gSoaringWarpCsWindCapsuleTex, G_IM_FMT_I, G_IM_SIZ_8b, WIND_TEXTURE_WIDTH,
-                        WIND_TEXTURE_HEIGHT, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 4, 5, G_TX_NOLOD,
-                        G_TX_NOLOD);
-    gDPLoadMultiBlock(POLY_XLU_DISP++, gSoaringWarpCsWindCapsuleTex, 0x0100, 1, G_IM_FMT_I, G_IM_SIZ_8b,
-                      WIND_TEXTURE_WIDTH, WIND_TEXTURE_HEIGHT, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP,
-                      4, 5, 14, 14);
+    gDPLoadTextureBlock(POLY_XLU_DISP++, sWindTex, G_IM_FMT_I, G_IM_SIZ_8b, WIND_TEXTURE_WIDTH, WIND_TEXTURE_HEIGHT, 0,
+                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, WIND_TEXTURE_MASK, WIND_TEXTURE_MASK,
+                        G_TX_NOLOD, G_TX_NOLOD);
+    gDPLoadMultiBlock(POLY_XLU_DISP++, sWindTex, 0x0100, 1, G_IM_FMT_I, G_IM_SIZ_8b, WIND_TEXTURE_WIDTH,
+                      WIND_TEXTURE_HEIGHT, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, WIND_TEXTURE_MASK,
+                      WIND_TEXTURE_MASK, 14, 14);
     gSPSegment(POLY_XLU_DISP++, 0x08,
                (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, -(s32)frames, (s32)(frames * 20), WIND_TEXTURE_WIDTH,
                                            WIND_TEXTURE_HEIGHT, 1, -(s32)(frames * 2), (s32)(frames * 10),
@@ -397,14 +402,96 @@ static void DrawWindCone(Player* player, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-static void DrawOnPlayer(Actor* actor, PlayState* play) {
-    Player* player = (Player*)actor;
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
 
-    if (!IsWorn()) {
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, PEGASUS_VISUAL_CHANNEL, visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    return visual->active == 1 && visual->scene == gPlayState->sceneId &&
+           !(player->stateFlags2 & PLAYER_STATE2_20000000);
+}
+
+static bool IsWindBlowing(void) {
+    return sPegasus.state == PEGASUS_RUNNING && gSaveContext.save.saveInfo.playerData.magic > 0;
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
         return;
     }
-    if (sPegasus.state == PEGASUS_RUNNING && gSaveContext.save.saveInfo.playerData.magic > 0) {
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = IsWorn();
+        if (visual.active) {
+            visual.flags[0] = IsWindBlowing();
+        }
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState(PEGASUS_VISUAL_CHANNEL, &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void DrawOnPlayer(Actor* actor, PlayState* play) {
+    Player* player = (Player*)actor;
+    bool isBlowing;
+    if (actor == &GET_PLAYER(play)->actor) {
+        isBlowing = IsWorn() && IsWindBlowing();
+    } else {
+        RemoteVisualState visual;
+        isBlowing = ReadRemoteVisual(player, &visual) && visual.flags[0];
+    }
+    if (isBlowing && !(player->stateFlags2 & PLAYER_STATE2_20000000)) {
         DrawWindCone(player, play);
+    }
+}
+
+static void DrawRemotePlayer(Actor* actor, PlayState* play) {
+    if (actor->id != ACTOR_PLAYER && sRemoteVisualReady && sApi->GetNetPeerIdForActor(actor) != 0) {
+        DrawOnPlayer(actor, play);
+    }
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel(PEGASUS_VISUAL_CHANNEL, 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+        S2H_REGISTER_HOOK(sApi, OnActorDrawEnd, DrawRemotePlayer);
     }
 }
 
@@ -501,6 +588,7 @@ static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     S2HCustomEquipDefinition definition = { 0 };
 
     for (s32 limb = PLAYER_LIMB_UPPER_ROOT; limb < PLAYER_LIMB_MAX; limb++) {

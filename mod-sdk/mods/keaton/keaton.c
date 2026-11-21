@@ -94,8 +94,14 @@
 #define STATE1_CLIMBING PLAYER_STATE1_200000
 #define STATE2_NO_ROTATION PLAYER_STATE2_40
 
+#define STATE3_MIDAIR PLAYER_STATE3_2
+
 #define ANIM_SS_DIR "__OTR__misc/link_animetion/gPlayerAnim_mhr_ss_"
 #define ANIM_FIELD_DIR "__OTR__misc/link_animetion/gPlayerAnim_mhr_field_"
+#define ANIM_GORON_DIR "__OTR__misc/link_animetion/gPlayerAnim_pg_"
+#define ANIM_VALUES_PER_FRAME 67
+#define ANIM_BASE_TRANSL_X (-57)
+#define PUNCH_CLIPS 2
 
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__icon_item_static_yar/gItemIconKeatonMaskTex";
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__item_name_static/gItemNameKeatonMaskENGTex";
@@ -111,6 +117,10 @@ static const ALIGN_ASSET(2) char sRightHandClosedDL[] = "__OTR__" KEATON_MODEL_P
 static const ALIGN_ASSET(2) char sRightHandOpenDL[] = "__OTR__" KEATON_MODEL_PATH
                                                       "/object_link_boy/gLinkAdultRightHandNearDL";
 
+static const char* const sPunchPaths[PUNCH_CLIPS] = {
+    ANIM_GORON_DIR "punchA_Data",
+    ANIM_GORON_DIR "punchB_Data",
+};
 static const ALIGN_ASSET(2) char sComboThirdPath[] = ANIM_SS_DIR "dash_attack09";
 static const f32 sComboHitStart[COMBO_STEPS] = { 4.0f, 6.0f, 14.0f };
 static const f32 sComboHitEnd[COMBO_STEPS] = { 9.0f, 13.0f, 26.0f };
@@ -142,6 +152,8 @@ typedef enum {
 
 static const S2HModApi* sApi;
 
+static PlayerAnimationHeader sPunchClips[PUNCH_CLIPS];
+static s16* sPunchClipFrames[PUNCH_CLIPS];
 static PlayerAnimationHeader* sCombo[COMBO_STEPS];
 static PlayerAnimationHeader* sCharge;
 static PlayerAnimationHeader* sLongJump;
@@ -247,13 +259,40 @@ static bool IsOnGround(Player* player) {
     return (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) != 0;
 }
 
+// The Goron punches drift their root forward; the human base translation is forced on a copy, since the resource is
+// shared by the whole game.
+static PlayerAnimationHeader* LoadPunchClip(s32 slot) {
+    PlayerAnimationHeader* source = ResourceMgr_LoadPlayerAnimAsHeader(sPunchPaths[slot]);
+
+    if (source == NULL || source->common.frameCount <= 0) {
+        return NULL;
+    }
+    size_t values = (size_t)source->common.frameCount * ANIM_VALUES_PER_FRAME;
+    s16* frames = (s16*)malloc(values * sizeof(s16));
+    if (frames == NULL) {
+        return NULL;
+    }
+    memcpy(frames, source->segmentVoid, values * sizeof(s16));
+    for (s32 frame = 0; frame < source->common.frameCount; frame++) {
+        s16* root = &frames[frame * ANIM_VALUES_PER_FRAME];
+
+        root[0] = ANIM_BASE_TRANSL_X;
+        root[2] = 0;
+    }
+    free(sPunchClipFrames[slot]);
+    sPunchClipFrames[slot] = frames;
+    sPunchClips[slot].common.frameCount = source->common.frameCount;
+    sPunchClips[slot].segmentVoid = frames;
+    return &sPunchClips[slot];
+}
+
 static void LoadAnims(void) {
     if (sAnimsLoaded) {
         return;
     }
     sAnimsLoaded = true;
-    sCombo[0] = (PlayerAnimationHeader*)gPlayerAnim_pg_punchA;
-    sCombo[1] = (PlayerAnimationHeader*)gPlayerAnim_pg_punchB;
+    sCombo[0] = LoadPunchClip(0);
+    sCombo[1] = LoadPunchClip(1);
     sCombo[2] = ResourceMgr_LoadPlayerAnimAsHeader(sComboThirdPath);
     sCharge = ResourceMgr_LoadPlayerAnimAsHeader(sChargePath);
     sLongJump = ResourceMgr_LoadPlayerAnimAsHeader(sLongJumpPath);
@@ -1020,6 +1059,8 @@ static void StartAirKick(PlayState* play, Player* player) {
     Player_SetAction(play, player, KeatonAction, 0);
     // Long jump and kick share an action, so SetAction can return before clearing old root motion.
     func_8082DC38(player);
+    // As vanilla's jump slash: without MIDAIR, func_8083827C pins a live weapon to prevPos.
+    player->stateFlags3 |= STATE3_MIDAIR;
     ArmFists(play, player);
     sAirKickYaw = player->actor.shape.rot.y;
     if (player->focusActor != NULL && player->focusActor->update != NULL) {
@@ -1136,7 +1177,7 @@ static void UpdateAirMoves(PlayState* play, Player* player) {
     if (!sKickBuffered && !CHECK_BTN_ALL(play->state.input[0].press.button, BTN_B)) {
         return;
     }
-    if (IsKeatonBusy(player) || IsOnGround(player) || sAirKick == NULL) {
+    if (IsKeatonBusy(player) || IsOnGround(player) || sAirKick == NULL || !CanAct(player)) {
         return;
     }
     StartAirKick(play, player);
@@ -1408,6 +1449,13 @@ static void ResolveKeatonStrength(bool* should, va_list args) {
     }
 }
 
+// oot_collectables decides lifts by strength after this when it is loaded; alone, Keaton lifts like a Deku.
+static void ResolveKeatonGrab(bool* should, va_list args) {
+    if (sApi->IsFormActive(KEATON_FORM_KEY) && Player_GetStrength() < PLAYER_STRENGTH_HUMAN) {
+        *should = false;
+    }
+}
+
 static bool sIsFluteOut;
 
 static bool IsHoldingOcarina(Player* player) {
@@ -1427,7 +1475,7 @@ static void UpdateFluteVoice(PlayState* play, Player* player) {
         sIsFluteOut = false;
     }
     if (sIsFluteOut && isSessionOpen) {
-        AudioOcarina_SetInstrument(OCARINA_INSTRUMENT_TATL);
+        AudioOcarina_SetInstrument(OCARINA_INSTRUMENT_DEKU_PIPES);
     }
 }
 
@@ -1622,4 +1670,5 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK(sApi, OnPlayerFilterInput, CaptureFistBlock);
     S2H_REGISTER_HOOK(sApi, OnBgCheckResolveWallFlags, AllowKeatonWall);
     sApi->RegisterVB(VB_USE_STRENGTH_UPGRADE, ResolveKeatonStrength);
+    sApi->RegisterVBByName("VB_PLAYER_LIFT_ACTOR", ResolveKeatonGrab);
 }

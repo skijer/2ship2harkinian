@@ -16,6 +16,8 @@
 
 #define FOUR_SWORD_KEY "nei.equip.four_sword"
 #define CLONE_KEY "nei.equip.four_sword_clone"
+#define BRACELET_KEY "oot.power_bracelet"
+#define SHUFFLE_GRAB_OPTION "oot.shuffle_grab"
 #define MOD_NAME "four_sword"
 #define CLONE_COUNT 3
 #define ALL_CLONES ((1 << CLONE_COUNT) - 1)
@@ -49,6 +51,13 @@
 #define CLONE_TINT_LERP 190
 // z_effect.c keeps its slot count private: 3 sparks, 25 blurs, 3 shield particles and 15 tire marks.
 #define NO_EFFECT_SLOT 46
+#define REMOTE_VISUAL_CHANNEL "nei.four_sword.visual"
+#define REMOTE_VISUAL_INTERVAL 5u
+
+typedef struct {
+    s16 scene;
+    u8 isHoldingSword;
+} RemoteVisualState;
 
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__textures/icon_item_custom/gItemIconFourSwordTex";
 static const ALIGN_ASSET(2) char sName[] = "__OTR__textures/item_name_custom/gFourSwordNameTex";
@@ -213,6 +222,14 @@ static struct {
 
 static bool IsWorn(void) {
     return CustomEquipRegistry_IsWorn(FOUR_SWORD_KEY);
+}
+
+// The grab is shuffled only by oot_collectables' option; without that mod the option reads 0.
+static bool IsTotemGrabAllowed(void) {
+    bool isGrabShuffled = gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO &&
+                          sApi->GetRandoOption(SHUFFLE_GRAB_OPTION) != 0;
+
+    return !isGrabShuffled || sApi->IsCustomItemOwned(BRACELET_KEY);
 }
 
 static Formation GetFormation(void) {
@@ -629,7 +646,7 @@ static void CloneUpdate(Actor* actor, PlayState* play) {
     if (clone->summonTimer > 0) {
         clone->summonTimer--;
     }
-    if (isTotemBase && !isCarried && player->heldActor == NULL) {
+    if (isTotemBase && !isCarried && player->heldActor == NULL && IsTotemGrabAllowed()) {
         OfferTotemCarry(clone, play, player);
     }
     if (formation != FORM_DISPERSE && !isCarried) {
@@ -761,7 +778,7 @@ static void RebuildClones(PlayState* play, Player* player) {
 }
 
 static void OpenFormationWheel(PlayState* play) {
-    if (CountClones() == 0 || !CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_L)) {
+    if (sSword.isCharging || CountClones() == 0 || !CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_L)) {
         sSword.wheelHold = 0;
         return;
     }
@@ -802,6 +819,7 @@ static void TrackWheel(PlayState* play) {
         sWheel.variant = sWheel.browsed[Z64Wheel_GetSelection() % ENTRY_MAX];
     }
     sWheel.wasOpen = isOpen;
+    Z64Wheel_SetEntryUnlocked(ENTRY_TOTEM, IsTotemGrabAllowed());
 }
 
 static void HoldChargePose(Player* player, PlayState* play) {
@@ -812,16 +830,16 @@ static void HoldChargePose(Player* player, PlayState* play) {
 }
 
 static void ChargeSummon(Player* player, PlayState* play) {
-    bool isShielding = (player->stateFlags1 & PLAYER_STATE1_400000) != 0;
+    bool isSwordOut = Player_GetMeleeWeaponHeld(player) != PLAYER_MELEEWEAPON_NONE;
 
-    if (!isShielding || !CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_B)) {
+    if (!isSwordOut || !CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_L)) {
         sSword.chargeHold = 0;
         sSword.isCharging = false;
         return;
     }
     if (!sSword.isCharging && ++sSword.chargeHold >= CHARGE_HOLD) {
         sSword.isCharging = true;
-        Audio_PlaySfx(NA_SE_SY_LOCK_ON);
+        Audio_PlaySfx(NA_SE_SY_ATTENTION_ON);
         for (u8 i = 0; i < CLONE_COUNT; i++) {
             SpawnClone(play, player, i);
         }
@@ -946,12 +964,75 @@ static void TickSword(Player* player) {
     MirrorShots(player, play);
 }
 
+static bool IsHoldingFourSword(Player* player) {
+    return IsWorn() && player->transformation == PLAYER_FORM_HUMAN && player->heldItemAction == PLAYER_IA_SWORD_KOKIRI &&
+           Player_GetMeleeWeaponHeld(player) != PLAYER_MELEEWEAPON_NONE;
+}
+
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static u32 sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool IsRemoteHoldingFourSword(Player* player) {
+    RemoteVisualState visual;
+
+    if (!sRemoteVisualReady || player->transformation != PLAYER_FORM_HUMAN ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return false;
+    }
+    u32 peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 || sApi->GetNetPeerState(peerId, REMOTE_VISUAL_CHANNEL, &visual, sizeof(visual)) != sizeof(visual)) {
+        return false;
+    }
+    return visual.isHoldingSword == 1 && visual.scene == gPlayState->sceneId;
+}
+
+static void PublishRemoteVisual(void) {
+    PlayState* play = gPlayState;
+    RemoteVisualState visual = { 0 };
+
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.isHoldingSword = IsHoldingFourSword(GET_PLAYER(play));
+        if (sRemoteVisualSent && (u32)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState(REMOTE_VISUAL_CHANNEL, &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel(REMOTE_VISUAL_CHANNEL, 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+    }
+}
+
 static void HoldFourSword(Player* player, int32_t limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
     Gfx* dl = sHeldSwordDL;
 
-    if (!IsWorn() || limbIndex != PLAYER_LIMB_LEFT_HAND || player->transformation != PLAYER_FORM_HUMAN ||
-        player->heldItemAction != PLAYER_IA_SWORD_KOKIRI ||
-        Player_GetMeleeWeaponHeld(player) == PLAYER_MELEEWEAPON_NONE) {
+    if (limbIndex != PLAYER_LIMB_LEFT_HAND || gPlayState == NULL) {
+        return;
+    }
+    bool isLocal = player == GET_PLAYER(gPlayState);
+    if (isLocal ? !IsHoldingFourSword(player) : !IsRemoteHoldingFourSword(player)) {
         return;
     }
     gSPDisplayList(dl++, (Gfx*)sBladeDL);
@@ -1029,7 +1110,7 @@ static void GlowOnClones(Actor* actor, PlayState* play) {
 
 static void UnlockAllFormations(int32_t fileNum) {
     for (u32 entry = 0; entry < ENTRY_MAX; entry++) {
-        Z64Wheel_SetEntryUnlocked(entry, true);
+        Z64Wheel_SetEntryUnlocked(entry, entry != ENTRY_TOTEM || IsTotemGrabAllowed());
     }
     sWheel.variant = 0;
 }
@@ -1076,6 +1157,7 @@ static const char* const sRequiredHooks[] = {
     "OnLoadFile",
     "OnInterfaceDrawEnd",
     "OnActorResolveGrayscale",
+    "OnGameFrameUpdate",
 };
 
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
@@ -1096,8 +1178,9 @@ static void BeginPickupDraw(Actor* actor) {
 }
 
 static void EndPickupDraw(Actor* actor, PlayState* play) {
-    if (sDrawingPickupActor == actor)
+    if (sDrawingPickupActor == actor) {
         sDrawingPickupActor = NULL;
+    }
 }
 
 static f32 PickupModelScale(void) {
@@ -1129,6 +1212,7 @@ static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
 S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomEquipDefinition definition = { 0 };
 
+    InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, RegisterActor) || !RegisterCloneActor()) {
         return;
     }
@@ -1141,11 +1225,10 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.key = FOUR_SWORD_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rFour Sword&%wHold %y\xB4%w and %y\xB1%w to split in four. Hold %y\xB3%w to choose "
-                           "the formation.";
-    definition.getItemText = "You got the %rFour Sword%w!&The blade that splits its bearer in four. Raise your shield "
-                             "and hold %y\xB1%w: three more of you fight at your side, and each formation has its "
-                             "own trick.";
+    definition.pauseText = "%rFour Sword&%wDraw it and hold %y\xB3%w to split in four.&Split, hold %y\xB3%w again to "
+                           "choose the formation.";
+    definition.getItemText = "You got the %rFour Sword%w!&The blade that splits its bearer in four. Draw it and hold "
+                             "%y\xB3%w: three more of you fight at your side, and each formation has its own trick.";
     definition.slot = S2H_EQUIP_SLOT_SWORD;
     definition.page = 0;
     definition.row = S2H_EQUIP_SLOT_SWORD;

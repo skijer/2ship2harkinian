@@ -1,7 +1,8 @@
 {
     "name": "gerudo",
-  "dependencies": ["oot_assets"],
+    "dependencies": ["oot_assets"],
     "author": "Skijer",
-    "version": "1.0",
-    "description": "The Gerudo Mask takes the place of OoT's: wearing it turns Link into a Gerudo warrior with a Monster Hunter dual-blade moveset, a blade guard, Urbosa's Fury, her own voice and free passage through the desert."
+    "version": "1.0.1",
+    "description": "The Gerudo Mask takes the place of OoT's: wearing it turns Link into a Gerudo warrior with a Monster Hunter dual-blade moveset, a blade guard, Urbosa's Fury and her own voice.",
+    "display_name": "Gerudo Mask"
 }

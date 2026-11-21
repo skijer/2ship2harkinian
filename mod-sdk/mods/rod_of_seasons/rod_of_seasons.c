@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "z64items.h"
 #include "z64wheel.h"
 
@@ -6,6 +8,7 @@
 #include "macros.h"
 #include "variables.h"
 #include "objects/object_link_child/object_link_child.h"
+#include "objects/gameplay_keep/gameplay_keep.h"
 
 #define SEASONS_KEY "nei.rod_of_seasons"
 #define SEASONS_HELD_SCALE 0.4f
@@ -13,6 +16,8 @@
 #define SEASONS_HELD_ROT_X 109.655f
 #define SEASONS_HELD_OFFSET_Y 5.977f
 #define SEASONS_HELD_OFFSET_Z (-3.218f)
+#define SEASONS_GIVE_SCALE 0.4f
+#define SEASONS_FLAME_SCALE 0.13333333f
 #define SEASONS_RAIN_DROPS 30
 #define SEASONS_SNOWFLAKES 64
 #define SEASONS_PETAL_RADIUS 120.0f
@@ -58,6 +63,10 @@ static const SeasonEntry sSeasons[SEASON_COUNT] = {
     { { -46, -34, -14 }, { -54, -42, -20 }, { 190, 220, 255 }, NA_SE_EV_ICE_FREEZE },
 };
 
+static const u8 sSeasonFlameColors[SEASON_COUNT][3] = {
+    { 160, 230, 255 }, { 40, 185, 55 }, { 255, 60, 50 }, { 225, 165, 0 }, { 0, 80, 180 },
+};
+
 static const Z64WheelEntry sWheelEntries[SEASON_COUNT] = {
     { sIconTex, "No Season", sIconTex },   { sSpringIcon, "Spring", sSpringRod }, { sSummerIcon, "Summer", sSummerRod },
     { sAutumnIcon, "Autumn", sAutumnRod }, { sWinterIcon, "Winter", sWinterRod },
@@ -89,7 +98,8 @@ static const S2HModApi* sApi;
 static bool sIsRodDrawn;
 static bool sOwnsRain;
 static bool sOwnsSnow;
-static u8 sWokenSeason;
+static bool sOwnsSky;
+static u8 sClearSkyboxConfig;
 static u8 sAppliedSeason;
 static MtxF sHandMatrix;
 static bool sHasHandMatrix;
@@ -136,6 +146,29 @@ static void ReleaseSnow(EnvironmentContext* env) {
     sOwnsSnow = false;
 }
 
+// MM has no gloomy sky; the open-air sky of days 1-3 (configs 0-2) is swapped for day 2's rain sky and lights.
+static void TakeSky(EnvironmentContext* env) {
+    if (sOwnsSky) {
+        return;
+    }
+    if (env->skyboxConfig > SKYBOX_CONFIG_2) {
+        return;
+    }
+    sClearSkyboxConfig = env->skyboxConfig;
+    env->skyboxConfig = SKYBOX_CONFIG_1;
+    env->changeSkyboxNextConfig = SKYBOX_CONFIG_1;
+    sOwnsSky = true;
+}
+
+static void ReleaseSky(EnvironmentContext* env) {
+    if (!sOwnsSky) {
+        return;
+    }
+    env->skyboxConfig = sClearSkyboxConfig;
+    env->changeSkyboxNextConfig = sClearSkyboxConfig;
+    sOwnsSky = false;
+}
+
 static void ShadeWorld(EnvironmentContext* env, u8 season) {
     const SeasonEntry* entry = &sSeasons[season];
 
@@ -148,6 +181,7 @@ static void ShadeWorld(EnvironmentContext* env, u8 season) {
 static void ClearWeather(PlayState* play) {
     ReleaseRain(&play->envCtx);
     ReleaseSnow(&play->envCtx);
+    ReleaseSky(&play->envCtx);
     ShadeWorld(&play->envCtx, SEASON_OFF);
 }
 
@@ -177,6 +211,7 @@ static void ApplySeason(PlayState* play, Player* player) {
         case SEASON_SPRING:
             ReleaseRain(env);
             ReleaseSnow(env);
+            ReleaseSky(env);
             if ((play->gameplayFrames % SEASONS_PETAL_EVERY) == 0) {
                 SpawnPetals(play, player);
             }
@@ -184,15 +219,18 @@ static void ApplySeason(PlayState* play, Player* player) {
         case SEASON_SUMMER:
             ReleaseRain(env);
             ReleaseSnow(env);
+            ReleaseSky(env);
             break;
         case SEASON_AUTUMN:
             ReleaseSnow(env);
             TakeRain(env, SEASONS_RAIN_DROPS);
+            TakeSky(env);
             Audio_PlaySfx(NA_SE_EV_RAIN - SFX_FLAG);
             break;
         case SEASON_WINTER:
             ReleaseRain(env);
             TakeSnow(env, SEASONS_SNOWFLAKES);
+            TakeSky(env);
             break;
         default:
             ClearWeather(play);
@@ -270,9 +308,6 @@ static u8 NextAvailableSeason(u8 from) {
 }
 
 static void TurnWorldToSeason(Player* player, PlayState* play, u8 season) {
-    if (player == NULL) {
-        return;
-    }
     RestoreWaterBoxes();
     ClearWeather(play);
     ApplySeason(play, player);
@@ -288,7 +323,9 @@ static void TurnSeason(Player* player, PlayState* play) {
     }
 }
 
+// A new scene rebuilds the environment, so the sky saved from the last one must not be restored into it.
 static void SyncSeasonOnSceneInit(s16 sceneId, s8 spawnNum) {
+    sOwnsSky = false;
     sAppliedSeason = CurrentSeason();
 }
 
@@ -358,48 +395,10 @@ static void CloseRodHand(Player* player, int32_t limbIndex, Gfx** dList, Gfx* li
     *dList = (Gfx*)gLinkHumanRightHandClosedDL;
 }
 
-static u8 CountLockedSeasons(void) {
-    u8 locked = 0;
-
-    for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++) {
-        locked += IsSeasonOwned(season) ? 0 : 1;
-    }
-    return locked;
-}
-
-static u8 PickMissingSeason(void) {
-    u8 locked = CountLockedSeasons();
-
-    if (locked == 0) {
-        return SEASON_OFF;
-    }
-    u8 wanted = (u8)(Rand_ZeroOne() * locked);
-
-    for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++) {
-        if (IsSeasonOwned(season)) {
-            continue;
-        }
-        if (wanted == 0) {
-            return season;
-        }
-        wanted--;
-    }
-    return SEASON_OFF;
-}
-
-static void GrantSeason(void) {
-    u8 season = PickMissingSeason();
-
-    if (season == SEASON_OFF) {
-        return;
-    }
-    Z64Wheel_SetEntryUnlocked(season, true);
-    sWokenSeason = season;
-}
-
 static const char* const sPickupKeys[SEASON_COUNT] = { "", "nei.seasons.spring", "nei.seasons.summer",
                                                        "nei.seasons.autumn", "nei.seasons.winter" };
 static const char* const sVariantNames[SEASON_COUNT] = { "", "spring", "summer", "autumn", "winter" };
+
 static void ReceiveSeason(const char* itemKey, const char* variantKey) {
     for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++) {
         if (strcmp(variantKey, sVariantNames[season]) == 0) {
@@ -410,49 +409,47 @@ static void ReceiveSeason(const char* itemKey, const char* variantKey) {
     }
 }
 
-static void WakeSeason(const char* key) {
-    for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++)
+static void WakeAllSeasons(const char* key) {
+    for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++) {
         Z64Wheel_SetEntryUnlocked(season, true);
+    }
+}
+
+static void SyncReceivedSeasons(void) {
+    for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++) {
+        if (sApi->IsCustomItemOwned(sPickupKeys[season])) {
+            Z64Wheel_SetEntryUnlocked(season, true);
+        }
+    }
 }
 
 static const char* WakeMessage(u8 season) {
     switch (season) {
         case SEASON_SPRING:
-            return "The rod wakes to %gSpring%w!\nFlowers open, and what sleeps\nthrough winter is awake.";
+            return "The rod wakes to %gSpring%w! Flowers&open, and what sleeps through&winter is awake.";
         case SEASON_SUMMER:
-            return "The rod wakes to %rSummer%w!\nThe heat dries shallow water and\nthaws what the cold held.";
+            return "The rod wakes to %rSummer%w! The&heat dries shallow water and&thaws what the cold held.";
         case SEASON_AUTUMN:
-            return "The rod wakes to %yAutumn%w!\nRain falls, and the wind carries\nleaves across the land.";
+            return "The rod wakes to %yAutumn%w! Rain&falls, and the wind carries leaves&across the land.";
         case SEASON_WINTER:
-            return "The rod wakes to %bWinter%w!\nSnow falls, and water freezes hard\nenough to walk on.";
+            return "The rod wakes to %bWinter%w! Snow&falls, and water freezes hard&enough to walk on.";
         default:
             return "The rod wakes to a new season!";
     }
 }
 
-static void AnnounceWokenSeason(PlayState* play, Player* player) {
-    if (Message_GetState(&play->msgCtx) != TEXT_STATE_NONE || Player_InCsMode(play)) {
-        return;
-    }
-    sApi->ShowTextbox(play, WakeMessage(sWokenSeason), true);
-    sWokenSeason = SEASON_OFF;
-}
-
 static void KeepSeasonRunning(Player* player) {
     PlayState* play = gPlayState;
-    u8 season;
 
-    if (play == NULL || player == NULL || !sApi->IsCustomItemOwned(SEASONS_KEY)) {
+    if (play == NULL || player != GET_PLAYER(play)) {
         return;
     }
-    for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++) {
-        if (sApi->IsCustomItemOwned(sPickupKeys[season]))
-            Z64Wheel_SetEntryUnlocked(season, true);
+    SyncReceivedSeasons();
+    if (!sApi->IsCustomItemOwned(SEASONS_KEY)) {
+        return;
     }
-    if (sWokenSeason != SEASON_OFF) {
-        AnnounceWokenSeason(play, player);
-    }
-    season = CurrentSeason();
+    u8 season = CurrentSeason();
+
     if (season != sAppliedSeason && !Z64Wheel_IsOpen()) {
         TurnWorldToSeason(player, play, season);
         return;
@@ -485,7 +482,8 @@ static void DrawRodInHand(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
     f32 unscale = player->actor.scale.x != 0.0f ? 1.0f / player->actor.scale.x : 1.0f;
 
-    if (!sIsRodDrawn || !sHasHandMatrix || player->actor.scale.y < 0.0f) {
+    if (!sIsRodDrawn || !sHasHandMatrix || player->actor.scale.y < 0.0f ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
         return;
     }
     OPEN_DISPS(play->state.gfxCtx);
@@ -499,6 +497,90 @@ static void DrawRodInHand(Actor* actor, PlayState* play) {
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sRodDL);
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// The soul flame of MM's En_Light, the same one the host draws for pickups, tinted by the season.
+static void DrawSeasonFlame(PlayState* play, const u8* color) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    gSPSegment(POLY_XLU_DISP++, 0x08,
+               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, 0, 0, 0x10, 0x20, 1, play->state.frames & 0x3F,
+                                           (-6 * play->state.frames) & 0x7F, 0x10, 0x20));
+    Matrix_Push();
+    Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(SEASONS_FLAME_SCALE, SEASONS_FLAME_SCALE, SEASONS_FLAME_SCALE, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0xC0, 0xC0, color[0], color[1], color[2], 0);
+    gDPSetEnvColor(POLY_XLU_DISP++, color[0], color[1], color[2], 0);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gameplay_keep_DL_01ACF0);
+    Matrix_Pop();
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawSpinningRod(PlayState* play) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(SEASONS_GIVE_SCALE, SEASONS_GIVE_SCALE, SEASONS_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sRodDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawRodForSeason(PlayState* play, u8 season) {
+    DrawSeasonFlame(play, sSeasonFlameColors[season]);
+    DrawSpinningRod(play);
+}
+
+static void DrawRodGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    DrawRodForSeason(play, SEASON_OFF);
+}
+
+static void DrawSpringGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    DrawRodForSeason(play, SEASON_SPRING);
+}
+
+static void DrawSummerGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    DrawRodForSeason(play, SEASON_SUMMER);
+}
+
+static void DrawAutumnGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    DrawRodForSeason(play, SEASON_AUTUMN);
+}
+
+static void DrawWinterGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    DrawRodForSeason(play, SEASON_WINTER);
+}
+
+static const S2HGetItemDrawFunc sSeasonGetItemDraws[SEASON_COUNT] = {
+    DrawRodGetItem, DrawSpringGetItem, DrawSummerGetItem, DrawAutumnGetItem, DrawWinterGetItem,
+};
+
+static bool RegisterSeasonPickups(void) {
+    for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++) {
+        S2HCustomPickupVariant pickup = Z64Items_DefinePickup(SEASONS_KEY, sVariantNames[season], sPickupKeys[season]);
+        S2HCustomItemRandomizer logic = sRodLogic;
+
+        logic.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
+        logic.poolCount = 1;
+        logic.logicKey = sPickupKeys[season];
+        logic.hintKey = sPickupKeys[season];
+        pickup.iconPath = sWheelEntries[season].itemIconPath;
+        pickup.getItemModelPath = sRodDL;
+        pickup.getItemScale = SEASONS_GIVE_SCALE;
+        pickup.getItemText = WakeMessage(season);
+        pickup.onReceive = ReceiveSeason;
+        pickup.randomizer = &logic;
+        pickup.drawSoulFlame = false;
+        pickup.flameRed = sSeasonFlameColors[season][0];
+        pickup.flameGreen = sSeasonFlameColors[season][1];
+        pickup.flameBlue = sSeasonFlameColors[season][2];
+        pickup.drawFunc = sSeasonGetItemDraws[season];
+        if (!Z64Items_RegisterPickup(sApi, &pickup)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
@@ -521,15 +603,13 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetPlacement(&rod, 0, 23, 0);
     Z64Items_SetTextbox(&rod, "You got the %rRod of Seasons%w!&A staff the old spirits&answer to.^"
                               "Press %y\xB2%w to turn the world&through the seasons it has&"
-                              "woken to, or hold %y\xB3%w to pick one.^"
-                              "It wakes to one more season&each time you find it again.");
+                              "woken to, or hold %y\xB3%w to pick one.");
     Z64Items_SetPauseText(&rod, "%rRod of Seasons&%wPress %y\xB2%w for the next season, %y\xB3%w to&pick one.");
     Z64Items_SetAction(&rod, TakeOutRod, HoldRod);
     Z64Items_SetHeldCallbacks(&rod, TurnSeason, StowRod, NULL);
-    Z64Items_SetGetItemModel(&rod, sRodDL);
-    rod.getItemScale = 0.7f;
     rod.modelGroup = PLAYER_MODELGROUP_DEFAULT;
-    rod.onReceive = WakeSeason;
+    rod.getItemEntry.drawFunc = DrawRodGetItem;
+    rod.onReceive = WakeAllSeasons;
     S2HCustomItemRandomizer rodLogic = sRodLogic;
     rodLogic.poolCount = 0;
     Z64Items_SetLogic(&rod, &rodLogic);
@@ -538,26 +618,8 @@ S2H_MOD_EXPORT void ModInit(void) {
         return;
     }
     Z64Wheel_Register(sApi, SEASONS_KEY, SEASONS_KEY, sWheelEntries, ARRAY_COUNT(sWheelEntries), true);
-    for (u8 season = SEASON_SPRING; season < SEASON_COUNT; season++) {
-        S2HCustomPickupVariant pickup = Z64Items_DefinePickup(SEASONS_KEY, sVariantNames[season], sPickupKeys[season]);
-        pickup.iconPath = sWheelEntries[season].itemIconPath;
-        pickup.getItemModelPath = sRodDL;
-        static const u8 flameColors[][3] = {
-            { 0, 0, 0 }, { 40, 185, 55 }, { 255, 60, 50 }, { 225, 165, 0 }, { 0, 80, 180 }
-        };
-        pickup.drawSoulFlame = true;
-        pickup.flameRed = flameColors[season][0];
-        pickup.flameGreen = flameColors[season][1];
-        pickup.flameBlue = flameColors[season][2];
-        pickup.getItemText = WakeMessage(season);
-        pickup.onReceive = ReceiveSeason;
-        S2HCustomItemRandomizer randomizer = sRodLogic;
-        randomizer.poolCount = 1;
-        randomizer.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
-        randomizer.logicKey = randomizer.hintKey = pickup.key;
-        pickup.randomizer = &randomizer;
-        if (!Z64Items_RegisterPickup(sApi, &pickup))
-            return;
+    if (!RegisterSeasonPickups()) {
+        return;
     }
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, KeepSeasonRunning);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, SyncSeasonOnSceneInit);

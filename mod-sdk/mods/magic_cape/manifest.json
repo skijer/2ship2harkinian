@@ -1,7 +1,11 @@
 {
     "name": "magic_cape",
-  "dependencies": ["oot_assets", "nei_equipment"],
+    "dependencies": ["oot_assets", "nei_equipment"],
     "author": "Skijer",
-    "version": "1.0",
-    "description": "Magic Cape: upgrade-column passive that halves every spell's cost, with Ganondorf's cloth on Link's shoulders."
+    "version": "1.0.1",
+    "description": "Magic Cape: upgrade-column passive that halves every spell's cost, with Ganondorf's cloth on Link's shoulders.",
+    "permissions": [
+        "network"
+    ],
+    "display_name": "Magic Cape"
 }

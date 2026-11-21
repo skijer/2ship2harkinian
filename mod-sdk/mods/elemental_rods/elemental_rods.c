@@ -9,6 +9,7 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
+#include "objects/object_link_child/object_link_child.h"
 #include "overlays/actors/ovl_Obj_Ice_Poly/z_obj_ice_poly.h"
 
 #define FIRE_ROD_KEY "nei.rod_fire"
@@ -36,12 +37,15 @@
 #define ROD_STUN_FRAMES 60
 #define ROD_BACKFIRE_INVINCIBILITY 20
 #define ROD_HELD_SCALE 0.05f
-#define ROD_HELD_SIDE_OFFSET 0.5f
+#define ROD_HELD_ROT_Z (-90.0f)
+#define ROD_GIVE_SCALE 0.2f
+#define ROD_ORB_BOLT_SCALE 5.5f
+#define ROD_ICEFLOE_PARAMS 300
+#define REMOTE_VISUAL_INTERVAL 5u
 #define ROD_RED_ICE_MARGIN 15.0f
 #define ROD_ICE_SHARD_SCALE 0.01f
 #define ROD_FLAME_BOLT_MIN 0.001f
 #define ROD_TRAIL_FRAMES 8
-#define ROD_RING_SCALE_PER_UNIT 0.00065f
 
 #define ROD_HIT_RESPONSE_FROZEN 3
 #define ROD_HIT_RESPONSE_SHOCKED 4
@@ -142,6 +146,8 @@ struct RodConfig {
     void (*onBoltsAlive)(PlayState* play, const RodConfig* cfg);
     f32 boltDrawScale;
     s16 boltScrollStep;
+    void (*onBoltsDrawBegin)(PlayState* play, const RodConfig* cfg);
+    void (*onBoltDraw)(PlayState* play, const RodConfig* cfg, Vec3f* pos, f32 scale, s32 index);
     void (*onBackfire)(PlayState* play, Player* player);
     const RodColors* (*chargeColors)(const RodState* state, const RodConfig* cfg);
     RodState* state;
@@ -160,18 +166,30 @@ static const ALIGN_ASSET(2) char sIceRodXluDL[] = "__OTR__objects/object_nei_ice
 static const ALIGN_ASSET(2) char sLightRodDL[] = "__OTR__objects/object_nei_light_rod/Cylinder_002_opaque_dl";
 static const ALIGN_ASSET(2) char sLightRodXluDL[] = "__OTR__objects/object_nei_light_rod/Cylinder_002_transparent_dl";
 static const ALIGN_ASSET(2) char sBoltDL[] = "__OTR__objects/gameplay_keep/gEffFire1DL";
-static const ALIGN_ASSET(2) char sRingDL[] = "__OTR__objects/gameplay_keep/gSpinAttackCylinderDL";
-static const ALIGN_ASSET(2) char sRingDiskDL[] = "__OTR__objects/gameplay_keep/gSpinAttackDiskDL";
+static const ALIGN_ASSET(2) char sOrbDL[] = "__OTR__objects/oot_object_fhg/gPhantomEnergyBallDL";
+static const ALIGN_ASSET(2) char sRingDL[] = "__OTR__objects/oot_gameplay_keep/gEffFireCircleDL";
 
 static const u16 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnPlayDrawEnd", "OnActorDrawEnd", "OnSceneInit" };
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate",       "OnPlayerUpdate", "OnPlayDrawEnd",
+                                              "OnPlayerResolveLimbDraw", "OnActorDrawEnd", "OnSceneInit",
+                                              "OnPlayerPostLimbDraw" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
 static const S2HModApi* sApi;
 static const RodConfig* sRodInHand;
+
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual);
 
 void func_80833864(PlayState* play, Player* player, s32 meleeWeaponAnim);
 s32 func_80833B18(PlayState* play, Player* player, s32 hitResponse, f32 speed, f32 velocityY, s16 yaw,
@@ -355,16 +373,20 @@ static const RodColors* ChargeColorsLight(const RodState* state, const RodConfig
     }
 
 static ColliderCylinderInit sFireBoltCollider = ROD_BOLT_COLLIDER_INIT(DMG_FIRE_ARROW);
-static ColliderCylinderInit sFireSpinCollider = ROD_SPIN_COLLIDER_INIT(DMG_FIRE_ARROW | DMG_SWORD);
+static ColliderCylinderInit sFireSpinCollider = ROD_SPIN_COLLIDER_INIT(DMG_SWORD);
 static ColliderCylinderInit sFireLineCollider = ROD_LINE_COLLIDER_INIT(DMG_FIRE_ARROW);
 static ColliderCylinderInit sIceBoltCollider = ROD_BOLT_COLLIDER_INIT(DMG_ICE_ARROW);
-static ColliderCylinderInit sIceSpinCollider = ROD_SPIN_COLLIDER_INIT(DMG_ICE_ARROW | DMG_SWORD);
+static ColliderCylinderInit sIceSpinCollider = ROD_SPIN_COLLIDER_INIT(DMG_SWORD);
 static ColliderCylinderInit sIceLineCollider = ROD_LINE_COLLIDER_INIT(DMG_ICE_ARROW);
 static ColliderCylinderInit sLightBoltCollider = ROD_BOLT_COLLIDER_INIT(DMG_LIGHT_ARROW);
-static ColliderCylinderInit sLightSpinCollider = ROD_SPIN_COLLIDER_INIT(DMG_LIGHT_ARROW | DMG_SWORD);
+static ColliderCylinderInit sLightSpinCollider = ROD_SPIN_COLLIDER_INIT(DMG_SWORD);
 static ColliderCylinderInit sLightLineCollider = ROD_LINE_COLLIDER_INIT(DMG_LIGHT_ARROW);
 
 static void MeltRedIce(PlayState* play, const RodConfig* cfg);
+static void BeginFlameBolts(PlayState* play, const RodConfig* cfg);
+static void DrawFlameBolt(PlayState* play, const RodConfig* cfg, Vec3f* pos, f32 scale, s32 index);
+static void BeginOrbBolts(PlayState* play, const RodConfig* cfg);
+static void DrawOrbBolt(PlayState* play, const RodConfig* cfg, Vec3f* pos, f32 scale, s32 index);
 
 static RodState sFireState;
 static RodState sIceState;
@@ -420,6 +442,8 @@ static const RodConfig sFireRod = {
     .onBoltsAlive = NULL,
     .boltDrawScale = 0.0015f,
     .boltScrollStep = 20,
+    .onBoltsDrawBegin = BeginFlameBolts,
+    .onBoltDraw = DrawFlameBolt,
     .onBackfire = BackfireFire,
     .chargeColors = NULL,
     .state = &sFireState,
@@ -475,6 +499,8 @@ static const RodConfig sIceRod = {
     .onBoltsAlive = MeltRedIce,
     .boltDrawScale = 0.002f,
     .boltScrollStep = 10,
+    .onBoltsDrawBegin = BeginFlameBolts,
+    .onBoltDraw = DrawFlameBolt,
     .onBackfire = BackfireIce,
     .chargeColors = NULL,
     .state = &sIceState,
@@ -528,8 +554,8 @@ static const RodConfig sLightRod = {
     .onHit = HitLight,
     .onLineSpawn = LineLight,
     .onBoltsAlive = NULL,
-    .boltDrawScale = 0.0018f,
-    .boltScrollStep = 20,
+    .onBoltsDrawBegin = BeginOrbBolts,
+    .onBoltDraw = DrawOrbBolt,
     .onBackfire = BackfireLight,
     .chargeColors = ChargeColorsLight,
     .state = &sLightState,
@@ -703,6 +729,20 @@ static bool ResolveHit(const RodConfig* cfg, ColliderCylinder* collider, Vec3f* 
     return true;
 }
 
+// A bolt crossing the water surface downward leaves the native ice floe an ice arrow would.
+static bool FreezeWaterUnderBolt(PlayState* play, Vec3f* previous, Vec3f* current) {
+    WaterBox* waterBox;
+    f32 surface;
+    if (current->y >= previous->y ||
+        !WaterBox_GetSurface1(play, &play->colCtx, current->x, current->z, &surface, &waterBox) ||
+        previous->y < surface || current->y >= surface) {
+        return false;
+    }
+    f32 t = (surface - previous->y) / (current->y - previous->y);
+    return Actor_Spawn(&play->actorCtx, play, ACTOR_BG_ICEFLOE, previous->x + t * (current->x - previous->x), surface,
+                       previous->z + t * (current->z - previous->z), 0, 0, 0, ROD_ICEFLOE_PARAMS) != NULL;
+}
+
 static void UpdateBoltSet(const RodConfig* cfg, RodBoltSet* set, Player* player, PlayState* play) {
     bool anyHit = false;
 
@@ -726,18 +766,9 @@ static void UpdateBoltSet(const RodConfig* cfg, RodBoltSet* set, Player* player,
         set->pos[i].x += set->vel[i].x;
         set->pos[i].y += set->vel[i].y;
         set->pos[i].z += set->vel[i].z;
-        if (cfg == &sIceRod) {
-            WaterBox* water;
-            f32 surface;
-            if (WaterBox_GetSurface1(play, &play->colCtx, set->pos[i].x, set->pos[i].z, &surface, &water) &&
-                previous.y >= surface && set->pos[i].y < surface) {
-                f32 t = (surface - previous.y) / (set->pos[i].y - previous.y);
-                Vec3f hit = { previous.x + t * (set->pos[i].x - previous.x), surface,
-                              previous.z + t * (set->pos[i].z - previous.z) };
-                Actor_Spawn(&play->actorCtx, play, ACTOR_BG_ICEFLOE, hit.x, hit.y, hit.z, 0, 0, 0, 300);
-                set->vel[i].x = set->vel[i].y = set->vel[i].z = 0.0f;
-                set->timer = 0;
-            }
+        if (cfg == &sIceRod && FreezeWaterUnderBolt(play, &previous, &set->pos[i])) {
+            set->vel[i] = (Vec3f){ 0.0f, 0.0f, 0.0f };
+            set->timer = 0;
         }
     }
     for (s32 i = ROD_TRAIL_POINTS - 2; i >= 0; i--) {
@@ -962,9 +993,7 @@ static void SpawnSwingSparks(const RodConfig* cfg, Player* player, PlayState* pl
 }
 
 static void ThrowSlash(const RodConfig* cfg, Player* player, PlayState* play) {
-    Vec3f center = player->actor.world.pos;
-    center.y += 35.0f;
-    Vec3f* tip = &center;
+    Vec3f* tip = &player->meleeWeaponInfo[0].tip;
     s16 yaw = player->actor.shape.rot.y;
     s16 pitch = 0;
 
@@ -1067,10 +1096,24 @@ static bool CanCharge(Player* player, PlayState* play) {
     if (player->meleeWeaponState != PLAYER_MELEE_WEAPON_STATE_0 || Player_InCsMode(play)) {
         return false;
     }
-    if (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING)) {
+    if (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_20000000 |
+                               PLAYER_STATE1_4000000 | PLAYER_STATE1_1)) {
+        return false;
+    }
+    if (player->stateFlags2 & PLAYER_STATE2_80000) {
         return false;
     }
     return (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) != 0;
+}
+
+// The engine owns Link in these states: the rod stops charging and falls silent until they end.
+static bool IsRodStolenByEngine(Player* player, PlayState* play) {
+    const u32 stolenByEngine = PLAYER_STATE1_DEAD | PLAYER_STATE1_20000000 | PLAYER_STATE1_1 |
+                               PLAYER_STATE1_10000000 | PLAYER_STATE1_TALKING | PLAYER_STATE1_400 |
+                               PLAYER_STATE1_4000000 | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 |
+                               PLAYER_STATE1_200000 | PLAYER_STATE1_800000;
+    return Player_InCsMode(play) || (player->stateFlags1 & stolenByEngine) ||
+           (player->stateFlags3 & PLAYER_STATE3_FLYING_WITH_HOOKSHOT);
 }
 
 static void ClearCharge(const RodConfig* cfg) {
@@ -1268,7 +1311,7 @@ static void RunRodInHand(const RodConfig* cfg, Player* player, PlayState* play) 
         UpdateAim(cfg, player, play);
         return;
     }
-    if (Player_InCsMode(play) || (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING))) {
+    if (IsRodStolenByEngine(player, play)) {
         ClearCharge(cfg);
         SilenceRod(cfg);
         return;
@@ -1346,36 +1389,93 @@ static void DropRodsOnSceneInit(s16 sceneId, s8 spawnNum) {
     Z64Aiming_Drop();
 }
 
-static void DrawRodInHand(Actor* actor, PlayState* play) {
-    Player* player = (Player*)actor;
-    const RodConfig* cfg = sRodInHand;
+static MtxF sWeaponHand;
+static bool sWeaponHandReady;
 
-    if (cfg == NULL || player->heldItemAction != PLAYER_IA_CUSTOM) {
+static bool IsRodInLocalHand(Player* player) {
+    return gPlayState != NULL && player == GET_PLAYER(gPlayState) && sRodInHand != NULL &&
+           player->heldItemAction == PLAYER_IA_CUSTOM;
+}
+
+// The sword model group would draw the vanilla blade in the left hand; a bare fist holds the rod instead.
+static void ReplaceSwordHand(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
+    RemoteVisualState visual;
+    if (limbIndex != PLAYER_LIMB_LEFT_HAND) {
         return;
     }
-    Vec3f forearm = player->bodyPartsPos[PLAYER_BODYPART_LEFT_FOREARM];
-    Vec3f hand = player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND];
-    f32 dx = hand.x - forearm.x;
-    f32 dy = hand.y - forearm.y;
-    f32 dz = hand.z - forearm.z;
+    if (IsRodInLocalHand(player) || ReadRemoteVisual(player, &visual)) {
+        *dList = (Gfx*)gLinkHumanLeftHandClosedDL;
+    }
+}
 
+static void CaptureSwordHand(Player* player, s32 limbIndex) {
+    if (limbIndex != PLAYER_LIMB_LEFT_HAND || !IsRodInLocalHand(player)) {
+        return;
+    }
+    Matrix_Get(&sWeaponHand);
+    sWeaponHandReady = true;
+}
+
+// Assumes the current matrix is the left hand bone's, which still carries Link's body scale.
+static void DrawRodAtHand(PlayState* play, Player* player, const RodConfig* cfg) {
+    f32 unscale = player->actor.scale.x != 0.0f ? 1.0f / player->actor.scale.x : 1.0f;
+    Matrix_Scale(unscale, unscale, unscale, MTXMODE_APPLY);
+    Matrix_RotateZF(DEG_TO_RAD(ROD_HELD_ROT_Z), MTXMODE_APPLY);
+    Matrix_Scale(ROD_HELD_SCALE, ROD_HELD_SCALE, ROD_HELD_SCALE, MTXMODE_APPLY);
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
-    Matrix_Translate(hand.x, hand.y, hand.z, MTXMODE_NEW);
-    Matrix_RotateYF(atan2f(dx, dz), MTXMODE_APPLY);
-    Matrix_RotateXF(-atan2f(dy, sqrtf(SQ(dx) + SQ(dz))), MTXMODE_APPLY);
-    Matrix_RotateYS(0x4000, MTXMODE_APPLY);
-    Matrix_Translate(-ROD_HELD_SIDE_OFFSET, 0.0f, ROD_HELD_SIDE_OFFSET, MTXMODE_APPLY);
-    Matrix_Scale(ROD_HELD_SCALE, ROD_HELD_SCALE, ROD_HELD_SCALE, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)cfg->opaqueDL);
-
     if (cfg->xluDL != NULL) {
         Gfx_SetupDL25_Xlu(play->state.gfxCtx);
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
         gSPDisplayList(POLY_XLU_DISP++, (Gfx*)cfg->xluDL);
     }
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void ForgetSwordHand(Actor* actor, bool* should) {
+    if (gPlayState != NULL && actor == &GET_PLAYER(gPlayState)->actor) {
+        sWeaponHandReady = false;
+    }
+}
+
+static void DrawSwordReplacement(Actor* actor, PlayState* play) {
+    Player* player = (Player*)actor;
+    if (!IsRodInLocalHand(player) || !sWeaponHandReady || (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return;
+    }
+    Matrix_Push();
+    Matrix_Put(&sWeaponHand);
+    DrawRodAtHand(play, player, sRodInHand);
+    Matrix_Pop();
+}
+
+static void DrawRodModel(PlayState* play, const RodConfig* cfg) {
+    Matrix_Scale(ROD_GIVE_SCALE, ROD_GIVE_SCALE, ROD_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)cfg->opaqueDL);
+    if (cfg->xluDL != NULL) {
+        Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)cfg->xluDL);
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawFireRodGive(PlayState* play, S2HGetItemEntry* entry) {
+    DrawRodModel(play, &sFireRod);
+}
+
+static void DrawIceRodGive(PlayState* play, S2HGetItemEntry* entry) {
+    DrawRodModel(play, &sIceRod);
+}
+
+static void DrawLightRodGive(PlayState* play, S2HGetItemEntry* entry) {
+    DrawRodModel(play, &sLightRod);
 }
 
 // Every function that emits commands opens its own OPEN_DISPS scope, or __gfxCtx is unresolved at link time.
@@ -1391,7 +1491,7 @@ static void BeginFlameBolts(PlayState* play, const RodConfig* cfg) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-static void DrawFlameBolt(PlayState* play, const RodConfig* cfg, Vec3f* pos, f32 scale) {
+static void DrawFlameBolt(PlayState* play, const RodConfig* cfg, Vec3f* pos, f32 scale, s32 index) {
     f32 drawScale = scale * cfg->boltDrawScale;
 
     if (drawScale < ROD_FLAME_BOLT_MIN) {
@@ -1416,7 +1516,7 @@ static void DrawBolts(const RodConfig* cfg, PlayState* play) {
     if (!anyAlive) {
         return;
     }
-    BeginFlameBolts(play, cfg);
+    cfg->onBoltsDrawBegin(play, cfg);
 
     for (s32 i = 0; i < ROD_MAX_SETS; i++) {
         RodBoltSet* set = &state->sets[i];
@@ -1425,29 +1525,52 @@ static void DrawBolts(const RodConfig* cfg, PlayState* play) {
             continue;
         }
         for (s32 bolt = 0; bolt < set->count; bolt++) {
-            DrawFlameBolt(play, cfg, &set->pos[bolt], set->scale);
+            cfg->onBoltDraw(play, cfg, &set->pos[bolt], set->scale, bolt);
         }
         for (s32 point = 1; point < 4; point++) {
-            DrawFlameBolt(play, cfg, &set->trail[point], set->scale * (1.0f - point * 0.25f));
+            cfg->onBoltDraw(play, cfg, &set->trail[point], set->scale * (1.0f - point * 0.25f), point);
         }
     }
 }
 
-static void DrawRing(PlayState* play, Player* player, const RodColors* colors, f32 radius, u8 alpha) {
-    f32 scale = radius * ROD_RING_SCALE_PER_UNIT;
-
+static void BeginOrbBolts(PlayState* play, const RodConfig* cfg) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 200);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 50, 0);
+    gDPPipeSync(POLY_XLU_DISP++);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawOrbBolt(PlayState* play, const RodConfig* cfg, Vec3f* pos, f32 scale, s32 index) {
+    s16 spin = (s16)(play->gameplayFrames * 0x1000 + index * 0x5555);
+    f32 drawScale = ROD_ORB_BOLT_SCALE * (scale / ROD_BOLT_TARGET_SCALE);
+    OPEN_DISPS(play->state.gfxCtx);
+    Matrix_Translate(pos->x, pos->y, pos->z, MTXMODE_NEW);
+    Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(drawScale, drawScale, drawScale, MTXMODE_APPLY);
+    Matrix_RotateZS(spin, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sOrbDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawRing(PlayState* play, Player* player, const RodColors* colors, Vec3f* scale, u8 alpha, bool faceLink) {
+    u32 scroll = play->gameplayFrames;
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    gSPSegment(POLY_XLU_DISP++, 0x08,
+               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, scroll & 0x7F, 0, 0x20, 0x40, 1, 0,
+                                           (scroll * -15) & 0xFF, 0x20, 0x40));
     gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, colors->prim.r, colors->prim.g, colors->prim.b, alpha);
     gDPSetEnvColor(POLY_XLU_DISP++, colors->env.r, colors->env.g, colors->env.b, 0);
     Matrix_Translate(player->actor.world.pos.x, player->actor.world.pos.y + 5.0f, player->actor.world.pos.z,
                      MTXMODE_NEW);
-    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+    if (faceLink) {
+        Matrix_RotateYS(player->actor.shape.rot.y, MTXMODE_APPLY);
+    }
+    Matrix_Scale(scale->x, scale->y, scale->z, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, 255 - ((play->gameplayFrames * 30) & 255), 0, 64, 32,
-                                           1, 255 - ((play->gameplayFrames * 20) & 255), 0, 8, 8));
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sRingDiskDL);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sRingDL);
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -1456,17 +1579,20 @@ static void DrawChargeAura(const RodConfig* cfg, Player* player, PlayState* play
     RodState* state = cfg->state;
     const RodColors* colors = cfg->chargeColors != NULL ? cfg->chargeColors(state, cfg) : cfg->colors;
     f32 pulse = 1.0f + 0.1f * Math_SinS((s16)(play->gameplayFrames * 0x800));
-    f32 radius = (30.0f + state->chargeLevel * 60.0f) * pulse;
+    f32 scaleXZ = (0.02f + state->chargeLevel * 0.04f) * pulse;
+    Vec3f scale = { scaleXZ, 0.025f + state->chargeLevel * 0.015f, scaleXZ };
     u8 alpha = state->chargeLevel < cfg->chargeBig ? (u8)(100 + state->chargeLevel / cfg->chargeBig * 100.0f) : 220;
 
-    DrawRing(play, player, colors, radius, alpha);
+    DrawRing(play, player, colors, &scale, alpha, true);
 }
 
 static void DrawSpinCylinder(const RodConfig* cfg, Player* player, PlayState* play) {
     RodState* state = cfg->state;
     f32 pulse = 1.0f + 0.05f * Math_SinS((s16)(play->gameplayFrames * 0x1000));
+    f32 scaleXZ = (state->spinRadius / 1000.0f) * pulse;
+    Vec3f scale = { scaleXZ, 0.08f, scaleXZ };
 
-    DrawRing(play, player, cfg->colors, state->spinRadius * pulse, state->spinIsBig ? 220 : 200);
+    DrawRing(play, player, cfg->colors, &scale, state->spinIsBig ? 220 : 200, false);
 }
 
 static void DrawRodEffects(void) {
@@ -1493,7 +1619,7 @@ static void DrawRodEffects(void) {
         }
         if (cfg->state->aiming) {
             Z64Aiming_DrawReticle(play, player, cfg->boltSpeed * cfg->boltLifetime,
-                                  (Z64AimingReticleStyle){ Z64AIMING_TOGGLE_BOW, Z64AIMING_TINT_LAUNCH });
+                                  (Z64AimingReticleStyle){ Z64AIMING_TOGGLE_HOOKSHOT, Z64AIMING_TINT_LAUNCH });
         }
     }
 }
@@ -1522,6 +1648,119 @@ static void StowLightRod(Player* player, PlayState* play) {
     StowRod(&sLightRod, player, play);
 }
 
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, "nei.elemental_rods.visual", visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    if (visual->active != 1 || visual->scene != gPlayState->sceneId || visual->flags[0] >= ARRAY_COUNT(sRods) ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return false;
+    }
+    for (uint32_t i = 0; i < ARRAY_COUNT(visual->values); i++) {
+        if (!isfinite(visual->values[i]) || fabsf(visual->values[i]) > 10000000.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static u8 GetRodIndex(const RodConfig* cfg) {
+    for (u8 i = 0; i < ARRAY_COUNT(sRods); i++) {
+        if (sRods[i] == cfg) {
+            return i;
+        }
+    }
+    return 0;
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = IsRodInLocalHand(GET_PLAYER(play));
+        if (visual.active) {
+            visual.flags[0] = GetRodIndex(sRodInHand);
+        }
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState("nei.elemental_rods.visual", &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static uint32_t CaptureRemoteLimbEnv(PlayState* play) {
+    Gfx* begin = play->state.gfxCtx->polyOpa.start;
+    Gfx* cursor = play->state.gfxCtx->polyOpa.p;
+    while (cursor > begin) {
+        cursor--;
+        if (((cursor->words.w0 >> 24) & 255) == G_SETENVCOLOR) {
+            return (uint32_t)cursor->words.w1;
+        }
+    }
+    return UINT32_MAX;
+}
+
+static void RestoreRemoteLimbEnv(PlayState* play, uint32_t color) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    gDPPipeSync(POLY_OPA_DISP++);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, color >> 24, (color >> 16) & 255, (color >> 8) & 255, color & 255);
+    gSPLoadGeometryMode(POLY_OPA_DISP++, G_ZBUFFER | G_SHADE | G_CULL_BACK | G_LIGHTING | G_SHADING_SMOOTH);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawRemoteLimb(Player* player, s32 limbIndex) {
+    PlayState* play = gPlayState;
+    RemoteVisualState visual;
+    if (limbIndex != PLAYER_LIMB_LEFT_HAND || !ReadRemoteVisual(player, &visual)) {
+        return;
+    }
+    uint32_t savedRemoteEnv = CaptureRemoteLimbEnv(play);
+    Matrix_Push();
+    DrawRodAtHand(play, player, sRods[visual.flags[0]]);
+    Matrix_Pop();
+    RestoreRemoteLimbEnv(play, savedRemoteEnv);
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel("nei.elemental_rods.visual", 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+        S2H_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, DrawRemoteLimb);
+    }
+}
+
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
 }
@@ -1531,7 +1770,7 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
 }
 
 static bool RegisterRod(const RodConfig* cfg, u8 slot, S2HCustomItemInitFunc takeOut, S2HCustomItemPlayerFunc stow,
-                        const char* getItemText, const char* pauseText) {
+                        S2HGetItemDrawFunc drawGive, const char* getItemText, const char* pauseText) {
     S2HCustomItemDefinition rod = Z64Items_Define(cfg->key, cfg->iconPath, cfg->namePath);
     const S2HCustomItemRandomizer randomizer = {
         sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, cfg->key, cfg->key, "",
@@ -1548,7 +1787,8 @@ static bool RegisterRod(const RodConfig* cfg, u8 slot, S2HCustomItemInitFunc tak
     Z64Items_SetMeleeWeapon(&rod, Z64ITEMS_MELEE_KOKIRI_SWORD);
     Z64Items_SetGetItemModel(&rod, cfg->opaqueDL);
     rod.getItemScale = 0.15f;
-    rod.modelGroup = PLAYER_MODELGROUP_DEKU_STICK;
+    rod.getItemEntry.drawFunc = drawGive;
+    rod.modelGroup = PLAYER_MODELGROUP_ONE_HAND_SWORD;
     Z64Items_SetLogic(&rod, &randomizer);
     return Z64Items_Register(sApi, &rod);
 }
@@ -1579,11 +1819,12 @@ static void GrantRodLogic(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, KeepCustomItemHeld)) {
         return;
     }
 
-    if (!RegisterRod(&sFireRod, 4, TakeOutFireRod, StowFireRod,
+    if (!RegisterRod(&sFireRod, 4, TakeOutFireRod, StowFireRod, DrawFireRodGive,
                      "You got the %rFire Rod%w! A magic&weapon that channels fire.^"
                      "%ySwing%w for three fireballs, %ystab%w&for one long shot, %yjump%w to lay&a flame trail.^"
                      "%rHold%w %y\xB2%w to charge a fire wave, %b\xB6%w&to aim in first person. Without&"
@@ -1591,7 +1832,7 @@ S2H_MOD_EXPORT void ModInit(void) {
                      "%rFire Rod&%wSwing to cast, hold %y\xB2%w to charge, %b\xB6%w&to aim.")) {
         return;
     }
-    if (!RegisterRod(&sIceRod, 10, TakeOutIceRod, StowIceRod,
+    if (!RegisterRod(&sIceRod, 10, TakeOutIceRod, StowIceRod, DrawIceRodGive,
                      "You got the %bIce Rod%w! A magic&weapon that channels ice.^"
                      "%ySwing%w for three iceballs, %ystab%w&for one long shot, %yjump%w to lay&an ice trail.^"
                      "%rHold%w %y\xB2%w to charge an ice wave, %b\xB6%w&to aim in first person. It&"
@@ -1599,7 +1840,7 @@ S2H_MOD_EXPORT void ModInit(void) {
                      "%bIce Rod&%wSwing to cast, hold %y\xB2%w to charge, %b\xB6%w&to aim.")) {
         return;
     }
-    if (!RegisterRod(&sLightRod, 16, TakeOutLightRod, StowLightRod,
+    if (!RegisterRod(&sLightRod, 16, TakeOutLightRod, StowLightRod, DrawLightRodGive,
                      "You got the %yLight Rod%w! A&magic weapon that channels&light.^"
                      "%ySwing%w for three light balls,&%ystab%w for one long shot, %yjump%w&"
                      "to lay a trail of light.^%rHold%w %y\xB2%w to charge a light wave,&"
@@ -1615,5 +1856,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, TickRods);
     S2H_REGISTER_HOOK(sApi, OnPlayDrawEnd, DrawRodEffects);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, DropRodsOnSceneInit);
-    S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorDrawEnd, ACTOR_PLAYER, DrawRodInHand);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldActorDraw, ACTOR_PLAYER, ForgetSwordHand);
+    S2H_REGISTER_HOOK(sApi, OnPlayerResolveLimbDraw, ReplaceSwordHand);
+    S2H_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, CaptureSwordHand);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorDrawEnd, ACTOR_PLAYER, DrawSwordReplacement);
 }

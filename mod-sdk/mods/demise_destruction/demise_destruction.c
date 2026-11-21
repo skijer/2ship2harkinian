@@ -18,6 +18,8 @@
 #define DEMISE_COLLISION_HEIGHT 200
 #define DEMISE_DAMAGE 40
 #define DEMISE_DAMAGE_FLAGS (DMG_GORON_POUND | DMG_EXPLOSIVES | DMG_ZORA_BOOMERANG)
+#define DEMISE_GIVE_SCALE 1.0f
+#define DEMISE_GROUND_STUN_FRAMES 4
 #define DEMISE_DARKNESS 0.8f
 #define DEMISE_DARKEN_FRAMES 20
 #define DEMISE_STORM_AFTERMATH 60
@@ -276,6 +278,12 @@ static void UpdateWindupEffects(Player* player, PlayState* play) {
     }
 }
 
+// The flag a Goron pound raises: nearby enemies that watch it are knocked off balance, as by OoT's hammer.
+static void ShakeGroundLikeGoronPound(PlayState* play) {
+    RequestQuake(play, 27767, 12, 30);
+    play->actorCtx.unk2 = DEMISE_GROUND_STUN_FRAMES;
+}
+
 static void Detonate(Player* player, PlayState* play) {
     Vec3f* pos = &player->actor.world.pos;
 
@@ -284,7 +292,7 @@ static void Detonate(Player* player, PlayState* play) {
     Audio_PlaySfx_AtPos(pos, NA_SE_IT_HAMMER_HIT);
     Audio_PlaySfx_AtPos(pos, NA_SE_IT_BOMB_EXPLOSION);
     Rumble_Request(800.0f, 0xFF, 0x28, 0xC8);
-    RequestQuake(play, 27767, 12, 30);
+    ShakeGroundLikeGoronPound(play);
 }
 
 static void UpdateWindup(Player* player, PlayState* play) {
@@ -364,6 +372,16 @@ static void UpdateSpell(Player* player) {
     }
 }
 
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(DEMISE_GIVE_SCALE, DEMISE_GIVE_SCALE, DEMISE_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sGiveDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, DEMISE_KEY, DEMISE_KEY, "",
 };
@@ -409,7 +427,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetAction(&demise, Cast, NULL);
     demise.flags |= S2H_CUSTOM_ITEM_INSTANT;
     Z64Items_SetGetItemModel(&demise, sGiveDL);
-    demise.getItemScale = 1.06666667f;
+    demise.getItemScale = DEMISE_GIVE_SCALE;
+    demise.getItemEntry.drawFunc = DrawGetItem;
 
     Z64Items_SetLogic(&demise, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &demise)) {

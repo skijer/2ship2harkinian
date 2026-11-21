@@ -11,6 +11,8 @@ void BgIcefloe_Destroy(Actor*, PlayState*);
 void BgIcefloe_Update(Actor*, PlayState*);
 void BgIcefloe_Draw(Actor*, PlayState*);
 static s16 sIcePlatformId = -1;
+#define ICE_PLATFORMS_PER_CAST 3
+#define ENEMY_FREEZE_FRAMES 120
 Actor* Sw97_SpawnIcePlatform(PlayState* play, f32 x, f32 y, f32 z) {
     // Native spawning fails outside scenes that preload OBJECT_ICEFLOE.
     // A mod-owned profile can run the same native callbacks with OTR resources.
@@ -43,8 +45,8 @@ typedef struct MagicIce {
     /*        */ s16 actionTimer;
     /*        */ SkelCurve skelCurve;
     /*        */ Vec3f colliderScale;
-    /*        */ u8 floeSpawned; // number of platforms created by this cast
-    u8 frozenSamples;
+    /*        */ u8 floeSpawned;
+    /*        */ u8 frozenSamples;
 } MagicIce;
 
 #define FLAGS 0x02000010
@@ -516,10 +518,35 @@ static SkelCurveLimbList sIceLimbList = {
     0x05,
 };
 
+static void Sw97_MagicIce_FreezeWater(MagicIce* this, PlayState* play) {
+    static const Vec3f sSamples[] = { { 0, 0, 0 }, { 80, 0, 0 }, { -80, 0, 0 }, { 0, 0, 80 }, { 0, 0, -80 } };
+    f32 bottom = this->collider.dim.pos.y + this->collider.dim.yShift;
+
+    for (u8 i = 0; i < ARRAY_COUNT(sSamples) && this->floeSpawned < ICE_PLATFORMS_PER_CAST; i++) {
+        if ((this->frozenSamples & (1 << i)) || SQ(sSamples[i].x) + SQ(sSamples[i].z) > SQ(this->collider.dim.radius)) {
+            continue;
+        }
+        f32 x = this->actor.world.pos.x + sSamples[i].x;
+        f32 z = this->actor.world.pos.z + sSamples[i].z;
+        f32 waterY = this->actor.world.pos.y;
+        WaterBox* waterBox;
+
+        if (!WaterBox_GetSurface1(play, &play->colCtx, x, z, &waterY, &waterBox) || waterY < bottom ||
+            waterY > bottom + this->collider.dim.height) {
+            continue;
+        }
+        if (Sw97_SpawnIcePlatform(play, x, waterY, z) != NULL) {
+            this->frozenSamples |= 1 << i;
+            this->floeSpawned++;
+        }
+    }
+}
+
 void Sw97_MagicIce_Init(Actor* thisx, PlayState* play) {
     MagicIce* this = THIS;
 
-    this->floeSpawned = this->frozenSamples = 0;
+    this->floeSpawned = 0;
+    this->frozenSamples = 0;
     this->action = 0;
     this->actionTimer = 0;
     Collider_InitCylinder(play, &this->collider);
@@ -576,21 +603,18 @@ void Sw97_MagicIce_Update(Actor* thisx, PlayState* play) {
     this->collider.dim.yShift = (this->colliderScale.y * -225.0f);
     CollisionCheck_SetAT(play, &play->colChkCtx, &this->collider.base);
 
-    if (this->action >= ACTION_GROW_SLOWLY && this->floeSpawned < 3) {
-        static const Vec3f samples[] = { { 0, 0, 0 }, { 80, 0, 0 }, { -80, 0, 0 }, { 0, 0, 80 }, { 0, 0, -80 } };
-        for (u8 i = 0; i < ARRAY_COUNT(samples) && this->floeSpawned < 3; ++i) {
-            if ((this->frozenSamples & (1 << i)) || SQ(samples[i].x) + SQ(samples[i].z) > SQ(this->collider.dim.radius))
-                continue;
-            f32 x = this->actor.world.pos.x + samples[i].x, z = this->actor.world.pos.z + samples[i].z;
-            f32 waterY = this->actor.world.pos.y;
-            WaterBox* waterBox;
-            f32 bottom = this->collider.dim.pos.y + this->collider.dim.yShift;
-            if (WaterBox_GetSurface1(play, &play->colCtx, x, z, &waterY, &waterBox) && waterY >= bottom &&
-                waterY <= bottom + this->collider.dim.height && Sw97_SpawnIcePlatform(play, x, waterY, z)) {
-                this->frozenSamples |= 1 << i;
-                this->floeSpawned++;
-            }
+    if (this->collider.base.atFlags & AT_HIT) {
+        Actor* hitActor = this->collider.base.at;
+        if (hitActor != NULL && hitActor->update != NULL) {
+            hitActor->freezeTimer = ENEMY_FREEZE_FRAMES;
+            Actor_SetColorFilter(hitActor, COLORFILTER_COLORFLAG_BLUE, 255, COLORFILTER_BUFFLAG_XLU,
+                                 ENEMY_FREEZE_FRAMES);
         }
+        this->collider.base.atFlags &= ~AT_HIT;
+    }
+
+    if (this->action >= ACTION_GROW_SLOWLY) {
+        Sw97_MagicIce_FreezeWater(this, play);
     }
 
     switch (this->action) {

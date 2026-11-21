@@ -38,6 +38,7 @@ void Player_AnimSfx_PlayVoice(Player* player, u16 sfxId);
 #define BEETLE_WING_BEAT 0.7f
 #define BEETLE_WING_MIN 0.3f
 #define BEETLE_WING_MAX 1.0f
+#define BEETLE_GIVE_SCALE (0.35f * 0.8f)
 
 typedef enum {
     BEETLE_STOWED,
@@ -54,8 +55,8 @@ static const ALIGN_ASSET(2) char sBodyDL[] = "__OTR__objects/object_nei_beetle/g
 static const ALIGN_ASSET(2) char sWingsDL[] = "__OTR__objects/object_nei_beetle/g_beetle_wings_dl";
 static const ALIGN_ASSET(2) char sWholeDL[] = "__OTR__objects/object_nei_beetle/g_beetle_dl";
 static const ALIGN_ASSET(2) char sWaitAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_boom_throw_waitR";
-static const ALIGN_ASSET(2) char sThrowAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_boom_throw_waitL";
-static const ALIGN_ASSET(2) char sCatchAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_boom_throw_waitL";
+static const ALIGN_ASSET(2) char sThrowAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_boom_throwR";
+static const ALIGN_ASSET(2) char sCatchAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_boom_catch";
 
 static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
@@ -80,14 +81,29 @@ static ColliderCylinderInit sColliderInit = {
     { BEETLE_COLLIDER_RADIUS, BEETLE_COLLIDER_HEIGHT, 0, { 0, 0, 0 } },
 };
 
-static const char* const sRequiredHooks[] = { "OnActorDestroy",      "OnActorUpdate",
-                                              "OnPlayDrawEnd",       "OnPlayerUpdate",
-                                              "OnActorDrawEnd",      "OnSceneInit",
-                                              "OnPlayerFilterInput", "OnPlayerResolveItemActionInit" };
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate",   "OnActorDestroy",
+                                              "OnActorUpdate",       "OnPlayDrawEnd",
+                                              "OnPlayerUpdate",      "OnActorDrawEnd",
+                                              "OnSceneInit",         "OnPlayerFilterInput",
+                                              "OnPlayerResolveItemActionInit" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
 static const S2HModApi* sApi;
+
+#define REMOTE_VISUAL_INTERVAL 5u
+
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual);
+static void InitRemoteVisuals(void);
+
 static ColliderCylinder sCollider;
 static bool sIsColliderReady;
 static bool sIsAimPending;
@@ -652,9 +668,43 @@ static void OfferCandidate(PlayState* play) {
     }
 }
 
+static bool IsBinang(f32 value) {
+    return value >= -32768.0f && value <= 32767.0f;
+}
+
+static void DrawRemoteBeetle(PlayState* play, Player* player) {
+    RemoteVisualState visual;
+
+    if (!ReadRemoteVisual(player, &visual)) {
+        return;
+    }
+    if (!IsBinang(visual.values[3]) || !IsBinang(visual.values[4]) || !IsBinang(visual.values[5]) ||
+        visual.values[6] < 0.0f || visual.values[6] > 4.0f) {
+        return;
+    }
+    Vec3f position = { visual.values[0], visual.values[1], visual.values[2] };
+    Vec3s rotation = { visual.values[3], visual.values[4], visual.values[5] };
+    f32 wingSpread = sWingSpread;
+
+    sWingSpread = visual.values[6];
+    if (!visual.flags[0]) {
+        rotation = (Vec3s){ 0, player->actor.shape.rot.y, 0 };
+        position = player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND];
+        position.x += Math_SinS(rotation.y) * BEETLE_HELD_REACH;
+        position.z += Math_CosS(rotation.y) * BEETLE_HELD_REACH;
+    }
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    DrawBeetleAt(play, &position, &rotation, visual.flags[0] ? BEETLE_MODEL_SCALE : BEETLE_HELD_SCALE);
+    sWingSpread = wingSpread;
+}
+
 static void DrawBeetle(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
 
+    if (player != GET_PLAYER(play)) {
+        DrawRemoteBeetle(play, player);
+        return;
+    }
     if (sPhase == BEETLE_STOWED || (player->stateFlags2 & PLAYER_STATE2_20000000)) {
         return;
     }
@@ -682,25 +732,121 @@ static void DrawAimReticle(void) {
 }
 
 static void KeepFairyCargo(Actor* actor) {
-    if (actor != sCargo || actor->id != ACTOR_EN_ELFORG)
+    if (actor != sCargo || actor->id != ACTOR_EN_ELFORG) {
         return;
+    }
     actor->world.pos = sBeetlePos;
     actor->velocity.y = 0.0f;
     actor->speed = 0.0f;
 }
 
 static void ForgetDestroyedActor(Actor* actor) {
-    if (sCargo == actor)
+    if (sCargo == actor) {
         sCargo = NULL;
-    if (sTarget == actor)
+    }
+    if (sTarget == actor) {
         sTarget = NULL;
-    if (sCandidate == actor)
+    }
+    if (sCandidate == actor) {
         sCandidate = NULL;
+    }
+}
+
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(BEETLE_GIVE_SCALE, BEETLE_GIVE_SCALE, BEETLE_GIVE_SCALE, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sWholeDL);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, BEETLE_KEY, BEETLE_KEY, "",
 };
+
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 || sApi->GetNetPeerState(peerId, "nei.beetle.visual", visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    if (visual->active != 1 || visual->adult > 1 || visual->scene != gPlayState->sceneId || visual->flags[0] > 1 ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return false;
+    }
+    for (uint32_t i = 0; i < ARRAY_COUNT(visual->values); i++) {
+        if (!isfinite(visual->values[i]) || fabsf(visual->values[i]) > 10000000.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = (sPhase != BEETLE_STOWED);
+        if (visual.active) {
+            visual.flags[0] = IsAway();
+            visual.values[0] = sBeetlePos.x;
+            visual.values[1] = sBeetlePos.y;
+            visual.values[2] = sBeetlePos.z;
+            visual.values[3] = sBeetleRot.x;
+            visual.values[4] = sBeetleRot.y;
+            visual.values[5] = sBeetleRot.z;
+            visual.values[6] = sWingSpread;
+        }
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState("nei.beetle.visual", &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void DrawRemotePlayer(Actor* actor, PlayState* play) {
+    if (actor->id == ACTOR_PLAYER || !sRemoteVisualReady || sApi->GetNetPeerIdForActor(actor) == 0) {
+        return;
+    }
+    DrawBeetle(actor, play);
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel("nei.beetle.visual", 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+        S2H_REGISTER_HOOK(sApi, OnActorDrawEnd, DrawRemotePlayer);
+    }
+}
 
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
@@ -722,6 +868,7 @@ static void GrantBeetleLogic(void) {
 
 S2H_MOD_EXPORT void ModInit(void) {
     GrantBeetleLogic();
+    InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, GetEquippedCustomItem)) {
         return;
     }
@@ -740,9 +887,8 @@ S2H_MOD_EXPORT void ModInit(void) {
                                    "Steer with the stick, %y\xB0%w to hurry, %g\xB5%w&to lock on.");
     Z64Items_SetAction(&beetle, TakeOutBeetle, UpdateBeetleInHand);
     Z64Items_SetHeldCallbacks(&beetle, RequestAim, PutBeetleAway, NULL);
-    Z64Items_SetGetItemModel(&beetle, sWholeDL);
-    beetle.getItemScale = 0.28f;
     beetle.modelGroup = PLAYER_MODELGROUP_DEFAULT;
+    beetle.getItemEntry.drawFunc = DrawGetItem;
 
     Z64Items_SetLogic(&beetle, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &beetle)) {

@@ -1,4 +1,4 @@
-
+#include <math.h>
 #include <string.h>
 
 #include "z64items.h"
@@ -10,7 +10,8 @@
 #include "variables.h"
 
 #define ROC_BOOTS_KEY "nei.equip.roc_boots"
-#define ADULT_BOOT_TO_CHILD_SCALE 0.75f
+// Ship's child boots went from 0.65 to 0.55; the same 0.85 ratio applied to MM's 0.75.
+#define ADULT_BOOT_TO_CHILD_SCALE 0.635f
 #define DEKU_LEAF_KEY "nei.deku_leaf"
 #define STATES_WITHOUT_GRAVITY                                                                                  \
     (PLAYER_STATE1_8000000 | PLAYER_STATE1_4 | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 | PLAYER_STATE1_200000 | \
@@ -25,6 +26,19 @@ s32 func_808340AC(FloorType floorType);
 bool func_808340D4(FloorType floorType);
 
 static const S2HModApi* sApi;
+
+#define REMOTE_VISUAL_INTERVAL 5u
+
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual);
+static void InitRemoteVisuals(void);
 
 static bool IsWorn(void) {
     return CustomEquipRegistry_IsWorn(ROC_BOOTS_KEY);
@@ -122,10 +136,20 @@ static void KeepBootsOnLoadedMatrix(void) {
     sIsPatched = true;
 }
 
+static bool AreBootsOn(Player* player, PlayState* play) {
+    RemoteVisualState visual;
+
+    if (player == GET_PLAYER(play)) {
+        return IsWorn();
+    }
+    return ReadRemoteVisual(player, &visual);
+}
+
 static void DrawGoldBootsOnFeet(Player* player, int32_t limbIndex) {
     PlayState* play = gPlayState;
-    if (play == NULL || player != GET_PLAYER(play) || player->transformation != PLAYER_FORM_HUMAN || !IsWorn() ||
-        (limbIndex != PLAYER_LIMB_LEFT_FOOT && limbIndex != PLAYER_LIMB_RIGHT_FOOT)) {
+
+    if (play == NULL || player->transformation != PLAYER_FORM_HUMAN ||
+        (limbIndex != PLAYER_LIMB_LEFT_FOOT && limbIndex != PLAYER_LIMB_RIGHT_FOOT) || !AreBootsOn(player, play)) {
         return;
     }
     const char* model = limbIndex == PLAYER_LIMB_LEFT_FOOT ? sLeftBootDL : sRightBootDL;
@@ -135,7 +159,7 @@ static void DrawGoldBootsOnFeet(Player* player, int32_t limbIndex) {
     KeepBootsOnLoadedMatrix();
     const u32 envColor = GetCurrentEnvColor(play);
     OPEN_DISPS(play->state.gfxCtx);
-    gDPPipeSync(POLY_OPA_DISP++);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
     gDPSetGrayscaleColor(POLY_OPA_DISP++, 255, 198, 65, 255);
     gSPGrayscale(POLY_OPA_DISP++, true);
     Matrix_Push();
@@ -148,10 +172,77 @@ static void DrawGoldBootsOnFeet(Player* player, int32_t limbIndex) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnBgCheckRaycastFloor", "OnPlayerPostLimbDraw" };
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate", "OnPlayerUpdate", "OnBgCheckRaycastFloor",
+                                              "OnPlayerPostLimbDraw" };
 
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
+
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, "nei.roc_boots.visual", visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    if (visual->active != 1 || visual->adult > 1 || visual->scene != gPlayState->sceneId ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return false;
+    }
+    for (uint32_t i = 0; i < ARRAY_COUNT(visual->values); i++) {
+        if (!isfinite(visual->values[i]) || fabsf(visual->values[i]) > 10000000.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = IsWorn();
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState("nei.roc_boots.visual", &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel("nei.roc_boots.visual", 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+    }
+}
 
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
@@ -228,6 +319,7 @@ static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     S2HCustomEquipDefinition definition = { 0 };
 
     definition.getItemEntry.drawFunc = DrawGetItem;
@@ -235,9 +327,9 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.key = ROC_BOOTS_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
-    definition.pauseText = "%rRoc's Boots&%wYou fall at half speed, and water, lava and quicksand hold you up.";
-    definition.getItemText = "You got the %rRoc's Boots%w!&Boots as light as the great bird's feathers. Every jump "
-                             "carries further, and you can walk across water and lava.";
+    definition.pauseText = "%rRoc's Boots&%wYou fall at half speed, and water,&lava and quicksand hold you up.";
+    definition.getItemText = "You got the %rRoc's Boots%w!&Boots as light as the great&bird's feathers.^"
+                             "Every jump carries further, and&you can walk across water and&lava.";
     definition.slot = S2H_EQUIP_SLOT_BOOTS;
     definition.page = 0;
     definition.row = S2H_EQUIP_SLOT_BOOTS;

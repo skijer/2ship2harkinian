@@ -18,10 +18,14 @@
 #define WHIP_EXTEND_SPEED 20.0f
 #define WHIP_RETRACT_SPEED 25.0f
 #define WHIP_LASH_FRAMES 26
+#define WHIP_REACH (WHIP_EXTEND_SPEED * WHIP_LASH_FRAMES)
+#define WHIP_SELECT_CONE 0x1800
+#define WHIP_SELECT_MIN_DISTANCE 30.0f
 #define WHIP_ARRIVE_DISTANCE 30.0f
 #define WHIP_TORCH_REACH 40.0f
 #define WHIP_TORCH_GRIP_HEIGHT 30.0f
 #define WHIP_ENEMY_REACH 25.0f
+#define WHIP_TARGET_REACH 30.0f
 #define WHIP_STUN_FRAMES 60
 #define WHIP_PULL_SPEED 15.0f
 #define WHIP_PULL_ARRIVE_DISTANCE 50.0f
@@ -58,12 +62,14 @@
 #define WHIP_LASH_SEGMENT_LENGTH 8.0f
 #define WHIP_LASH_MAX_SEGMENTS 72
 #define WHIP_TIP_SCALE 0.8f
+#define WHIP_LASH_THICKNESS 0.5f
 #define WHIP_HAND_ROT_X 109.655f
 #define WHIP_HAND_ROT_Y 72.414f
 #define WHIP_HAND_OFFSET_Y 5.0f
 #define WHIP_HAND_OFFSET_Z -3.0f
 #define WHIP_HELD_SCALE 0.2f
 #define WHIP_SWING_ROPE_SAG 15.0f
+#define WHIP_GIVE_SCALE 0.5f
 #define WHIP_DEGREES_TO_RADIANS 0.0174532925f
 
 typedef enum {
@@ -86,6 +92,7 @@ typedef struct {
     Vec3f origin;
     Vec3f target;
     f32 scale;
+    f32 thickness;
 } WhipPart;
 
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/gItemIconWhipTex";
@@ -95,6 +102,7 @@ static const ALIGN_ASSET(2) char sGripDL[] = "__OTR__objects/object_nei_whip/whi
 static const ALIGN_ASSET(2) char sLashDL[] = "__OTR__objects/object_nei_whip/whip_lash_opaque_dl";
 static const ALIGN_ASSET(2) char sTipDL[] = "__OTR__objects/object_nei_whip/whip_tip_opaque_dl";
 static const ALIGN_ASSET(2) char sSwingAnim[] = "__OTR__objects/object_nei_whip/gPlayerAnim_nei_whip_swing";
+static const ALIGN_ASSET(2) char sThrowAnim[] = "__OTR__objects/oot_gameplay_keep/gPlayerAnim_link_boom_throwR";
 
 static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
@@ -165,6 +173,8 @@ static s16 sCameraId = CAM_ID_NONE;
 static s16 sCameraYaw;
 static Actor* sPulledEnemy;
 static Actor* sEnragedEnemy;
+static Actor* sSelection;
+static Actor* sLashTarget;
 static s16 sRageTimer;
 static MtxF sHandMatrix;
 static bool sHasHandMatrix;
@@ -344,10 +354,77 @@ static void StartLash(Player* player, PlayState* play, s16 yaw, s16 pitch) {
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_IT_SWORD_SWING);
 }
 
-static void AdvanceTip(Player* player) {
-    Actor* target = player->focusActor;
+static bool IsWhipTarget(Actor* actor) {
+    if (actor->update == NULL) {
+        return false;
+    }
+    return actor->category == ACTORCAT_ENEMY || actor->id == ACTOR_OBJ_SYOKUDAI;
+}
 
-    if (Player_IsZTargeting(player) && target != NULL && target->update != NULL) {
+static Actor* ScanForSelection(Player* player, PlayState* play) {
+    static const u8 sTargetCategories[] = { ACTORCAT_ENEMY, ACTORCAT_PROP };
+    Actor* best = NULL;
+    s16 bestError = WHIP_SELECT_CONE;
+
+    for (u32 i = 0; i < ARRAY_COUNT(sTargetCategories); i++) {
+        for (Actor* actor = play->actorCtx.actorLists[sTargetCategories[i]].first; actor != NULL;
+             actor = actor->next) {
+            f32 distance = Math_Vec3f_DistXZ(&player->actor.world.pos, &actor->world.pos);
+
+            if (!IsWhipTarget(actor) || distance < WHIP_SELECT_MIN_DISTANCE || distance > WHIP_REACH) {
+                continue;
+            }
+            s16 error = ABS((s16)(Math_Vec3f_Yaw(&player->actor.world.pos, &actor->world.pos) -
+                                  player->actor.shape.rot.y));
+            if (error < bestError) {
+                bestError = error;
+                best = actor;
+            }
+        }
+    }
+    return best;
+}
+
+static void MarkSelection(Player* player, PlayState* play) {
+    if (sPhase != WHIP_COILED) {
+        sSelection = NULL;
+        return;
+    }
+    Actor* focus = player->focusActor;
+    bool isLockedOn = Player_IsZTargeting(player) && focus != NULL && focus->update != NULL;
+    sSelection = isLockedOn ? focus : ScanForSelection(player, play);
+    if (sSelection != NULL) {
+        Actor_SetColorFilter(sSelection, COLORFILTER_COLORFLAG_BLUE, 255, COLORFILTER_BUFFLAG_OPA, 4);
+    }
+}
+
+// Beams and bars are geometry, not actors, so the lash probes a few climbs ahead for one it can bite into.
+static bool FindGraspablePitch(Player* player, PlayState* play, s16* pitch) {
+    static const s16 sProbePitches[] = { -0x2000, -0x2C00, -0x1400, -0x3800 };
+    Vec3f hand = player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND];
+    s16 yaw = player->actor.shape.rot.y;
+
+    for (u32 i = 0; i < ARRAY_COUNT(sProbePitches); i++) {
+        Vec3f end = { hand.x + Math_SinS(yaw) * Math_CosS(sProbePitches[i]) * WHIP_REACH,
+                      hand.y - Math_SinS(sProbePitches[i]) * WHIP_REACH,
+                      hand.z + Math_CosS(yaw) * Math_CosS(sProbePitches[i]) * WHIP_REACH };
+        CollisionPoly* poly = NULL;
+        s32 bgId = BGCHECK_SCENE;
+        Vec3f hit;
+
+        if (BgCheck_EntityLineTest1(&play->colCtx, &hand, &end, &hit, &poly, true, true, true, true, &bgId) &&
+            IsGraspable(play, poly, bgId)) {
+            *pitch = sProbePitches[i];
+            return true;
+        }
+    }
+    return false;
+}
+
+static void AdvanceTip(Player* player) {
+    Actor* target = sLashTarget;
+
+    if (target != NULL && target->update != NULL) {
         f32 distance = Math_Vec3f_DistXYZ(&sTipPos, &target->focus.pos);
 
         if (distance > 1.0f) {
@@ -520,6 +597,24 @@ static bool CatchEnemy(PlayState* play) {
     return true;
 }
 
+// The tip homes on the target's focus, which sits well above the feet the generic catches measure from.
+static bool CatchLashTarget(Player* player, PlayState* play) {
+    if (sLashTarget == NULL || sLashTarget->update == NULL ||
+        Math_Vec3f_DistXYZ(&sTipPos, &sLashTarget->focus.pos) > WHIP_TARGET_REACH) {
+        return false;
+    }
+    if (sLashTarget->id != ACTOR_OBJ_SYOKUDAI) {
+        StrikeEnemy(sLashTarget);
+        return true;
+    }
+    Vec3f grip = { sLashTarget->world.pos.x, sLashTarget->world.pos.y + WHIP_TORCH_GRIP_HEIGHT,
+                   sLashTarget->world.pos.z };
+    if (!StartSwing(player, play, &grip)) {
+        sPhase = WHIP_RETRACTING;
+    }
+    return true;
+}
+
 static void UpdateLashing(Player* player, PlayState* play) {
     Vec3f previousTip = sTipPos;
 
@@ -530,7 +625,8 @@ static void UpdateLashing(Player* player, PlayState* play) {
     sLashCollider.dim.pos.y = (s16)(sTipPos.y - WHIP_COLLIDER_HEIGHT / 2);
     sLashCollider.dim.pos.z = (s16)sTipPos.z;
     sLashCollider.base.atFlags |= AT_ON | AT_TYPE_PLAYER;
-    if (CatchOnGeometry(player, play, &previousTip) || CatchOnTorchStand(player, play) || CatchEnemy(play)) {
+    if (CatchLashTarget(player, play) || CatchOnGeometry(player, play, &previousTip) ||
+        CatchOnTorchStand(player, play) || CatchEnemy(play)) {
         return;
     }
     CollisionCheck_SetAT(play, &play->colChkCtx, &sLashCollider.base);
@@ -596,8 +692,7 @@ static void AnimateArm(Player* player, PlayState* play) {
         PlayerAnimation_PlayOnce(play, &player->skelAnimeUpper,
                                  (PlayerAnimationHeader*)dgPlayerAnim_link_hook_shot_ready);
     } else if (sPhase == WHIP_LASHING) {
-        PlayerAnimation_PlayOnce(play, &player->skelAnimeUpper,
-                                 (PlayerAnimationHeader*)dgPlayerAnim_link_boom_throw_waitL);
+        PlayerAnimation_PlayOnce(play, &player->skelAnimeUpper, (PlayerAnimationHeader*)sThrowAnim);
     } else {
         PlayerAnimation_PlayLoop(play, &player->skelAnimeUpper,
                                  (PlayerAnimationHeader*)dgPlayerAnim_link_boom_throw_waitR);
@@ -810,31 +905,37 @@ static void TakeOutWhip(PlayState* play, Player* player) {
     Collider_SetCylinder(play, &sLashCollider, &player->actor, &sLashColliderInit);
     sPhase = WHIP_COILED;
     sAnimatedPhase = WHIP_IDLE;
-    sIsLashPending = true;
+    sIsLashPending = false;
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_PL_CHANGE_ARMS);
 }
 
-static void AimOrLash(Player* player, PlayState* play) {
-    Actor* target = player->focusActor;
+static void LashAtWill(Player* player, PlayState* play) {
+    s16 pitch = 0;
 
+    sLashTarget = (sSelection != NULL && sSelection->update != NULL) ? sSelection : NULL;
+    if (sLashTarget != NULL) {
+        StartLash(player, play, Math_Vec3f_Yaw(&player->actor.world.pos, &sLashTarget->world.pos), 0);
+        return;
+    }
+    FindGraspablePitch(player, play, &pitch);
+    StartLash(player, play, player->actor.shape.rot.y, pitch);
+}
+
+static void AimOrLash(Player* player, PlayState* play) {
     if (sPhase == WHIP_AIMING) {
         s16 yaw;
         s16 pitch;
 
         Z64Aiming_GetDirection(player, &yaw, &pitch);
         StopAiming(player, play);
+        sLashTarget = NULL;
         StartLash(player, play, yaw, pitch);
         func_8083B1A0(player, play);
         return;
     }
-    if (sPhase != WHIP_COILED) {
-        return;
+    if (sPhase == WHIP_COILED) {
+        LashAtWill(player, play);
     }
-    if (Player_IsZTargeting(player) && target != NULL) {
-        StartLash(player, play, Math_Vec3f_Yaw(&player->actor.world.pos, &target->world.pos), 0);
-        return;
-    }
-    StartAiming(player, play);
 }
 
 static void PutWhipAway(Player* player, PlayState* play) {
@@ -850,6 +951,8 @@ static void PutWhipAway(Player* player, PlayState* play) {
     DestroySwingCamera(play);
     sLashCollider.base.atFlags &= ~(AT_ON | AT_HIT);
     sPulledEnemy = NULL;
+    sSelection = NULL;
+    sLashTarget = NULL;
     sIsLashPending = false;
     sPhase = WHIP_IDLE;
     AudioSfx_StopById(NA_SE_IT_HOOKSHOT_CHAIN);
@@ -877,6 +980,14 @@ static void RunPendingWhipAction(Player* player, PlayState* play) {
 
 static void RequestWhipAction(Player* player, PlayState* play) {
     sIsLashPending = true;
+}
+
+static void AimOnCUp(Player* player, PlayState* play) {
+    if (sPhase != WHIP_COILED || player->heldItemAction != PLAYER_IA_CUSTOM || IsChangingHeldItem(player) ||
+        !(play->state.input[0].press.button & BTN_CUP)) {
+        return;
+    }
+    StartAiming(player, play);
 }
 
 static void RecoverFromInterruptedAim(Player* player, PlayState* play) {
@@ -915,7 +1026,9 @@ static void UpdateWhipWorld(Player* player) {
     }
     DriveEnragedEnemy();
     RunPendingWhipAction(player, play);
+    AimOnCUp(player, play);
     RecoverFromInterruptedAim(player, play);
+    MarkSelection(player, play);
     if (sPhase != WHIP_SWINGING) {
         return;
     }
@@ -935,6 +1048,8 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
     Z64Aiming_Drop();
     sCameraId = CAM_ID_NONE;
     sPulledEnemy = NULL;
+    sSelection = NULL;
+    sLashTarget = NULL;
     sEnragedEnemy = NULL;
     sIsLashPending = false;
     sHasHandMatrix = false;
@@ -958,7 +1073,7 @@ static void DrawPart(PlayState* play, WhipPart* part, Gfx* displayList) {
     Matrix_Translate(part->origin.x, part->origin.y, part->origin.z, MTXMODE_NEW);
     Matrix_RotateYF(Math_Atan2F_XY(dz, dx), MTXMODE_APPLY);
     Matrix_RotateXF(Math_Atan2F_XY(sqrtf(SQ(dx) + SQ(dz)), -dy), MTXMODE_APPLY);
-    Matrix_Scale(part->scale, part->scale, part->scale, MTXMODE_APPLY);
+    Matrix_Scale(part->thickness, part->thickness, part->scale, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, displayList);
     CLOSE_DISPS(play->state.gfxCtx);
@@ -969,7 +1084,7 @@ static void DrawLash(PlayState* play, Vec3f* from, Vec3f* to, f32 sag) {
     f32 dy = to->y - from->y;
     f32 dz = to->z - from->z;
     s32 segments = CLAMP((s32)(sqrtf(SQ(dx) + SQ(dy) + SQ(dz)) / WHIP_LASH_SEGMENT_LENGTH), 1, WHIP_LASH_MAX_SEGMENTS);
-    WhipPart part = { *from, *from, 1.0f };
+    WhipPart part = { *from, *from, 1.0f, WHIP_LASH_THICKNESS };
 
     for (s32 i = 1; i <= segments; i++) {
         f32 t = (f32)i / segments;
@@ -1013,7 +1128,10 @@ static void DrawWhip(Actor* actor, PlayState* play) {
     s32 bodyPart = sPhase == WHIP_SWINGING ? PLAYER_BODYPART_LEFT_HAND : PLAYER_BODYPART_RIGHT_HAND;
     Vec3f hand = player->bodyPartsPos[bodyPart];
 
-    if (sPhase == WHIP_IDLE) {
+    if (gPlayState == NULL || actor != &GET_PLAYER(gPlayState)->actor) {
+        return;
+    }
+    if (sPhase == WHIP_IDLE || (player->stateFlags2 & PLAYER_STATE2_20000000)) {
         return;
     }
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
@@ -1030,6 +1148,15 @@ static void DrawWhip(Actor* actor, PlayState* play) {
     if (sPhase != WHIP_COILED) {
         DrawLash(play, &hand, &sTipPos, 0.0f);
     }
+}
+
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(WHIP_GIVE_SCALE, WHIP_GIVE_SCALE, WHIP_GIVE_SCALE, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sItemDL);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static const S2HCustomItemRandomizer sRandomizerItem = {
@@ -1054,7 +1181,7 @@ static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
         return false;
     }
     if (visual->active != 1 || visual->adult > 1 || visual->scene != gPlayState->sceneId ||
-        visual->flags[0] > WHIP_SWINGING) {
+        visual->flags[0] > WHIP_SWINGING || (player->stateFlags2 & PLAYER_STATE2_20000000)) {
         return false;
     }
     for (uint32_t i = 0; i < ARRAY_COUNT(visual->values); i++) {
@@ -1203,18 +1330,17 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetPlacement(&whip, 0, 2, 0);
     Z64Items_SetTextbox(&whip, "You got the %rWhip%w! A&snake-headed lash from the&"
                                "land of spirit tracks, and its&fangs still bite.^"
-                               "Take aim with %y\xB2%w and press it&again to crack it, or let %g\xB5%w send&"
-                               "it straight at a foe.^"
+                               "Ready it with %y\xB2%w and the %yfoe%w&or %ytorch stand%w ahead glows&"
+                               "blue: press %y\xB2%w to crack it.&%y\xB6%w aims it by hand.^"
                                "It bites into %ybeams%w, %ybars%w and&%ytorch stands%w so you can swing&"
                                "where you cannot jump,^"
                                "and it drags %bKeese%w and %bBubbles%w&to your feet.");
-    Z64Items_SetPauseText(&whip, "%rWhip&%wAim with %y\xB2%w, press again to lash.&"
-                                 "Tilt the stick to swing, let go&with %y\xB0%w or %y\xB1%w.");
+    Z64Items_SetPauseText(&whip, "%rWhip&%wPress %y\xB2%w to lash the blue target.&"
+                                 "%y\xB6%w aims by hand. Tilt the stick&to swing, let go with %y\xB0%w or %y\xB1%w.");
     Z64Items_SetAction(&whip, TakeOutWhip, UpdateWhipInHand);
     Z64Items_SetHeldCallbacks(&whip, RequestWhipAction, PutWhipAway, NULL);
-    Z64Items_SetGetItemModel(&whip, sItemDL);
-    whip.getItemScale = 0.5f;
     whip.modelGroup = PLAYER_MODELGROUP_DEFAULT;
+    whip.getItemEntry.drawFunc = DrawGetItem;
     Z64Items_SetLogic(&whip, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &whip)) {
         return;

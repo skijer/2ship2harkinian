@@ -14,6 +14,8 @@
 #define SPELL_ITEM_PAGE (S2H_ITEM_PAGE_QUEST_VANILLA + 1)
 #define SPELL_ITEM_FIRST_SLOT 0
 #define CAST_BLOCKING_STATES (PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000)
+#define FIRE_CAST_CAMERA PLAYER_CS_ID_SONG_WARP
+#define SPELL_CAST_CAMERA PLAYER_CS_ID_ITEM_BOTTLE
 
 #define ANIMSFX_SHIFT_TYPE(type) ((type) << 11)
 #define ANIMSFX_DATA(type, frame) ((ANIMSFX_SHIFT_TYPE(type) | ((frame)&0x7FF)))
@@ -42,6 +44,8 @@ void Player_PlayAnimSfx(Player* player, SpellAnimSfx* entry);
 s32 Player_DecelerateToZero(Player* player);
 void func_8082DAD4(Player* player);
 void func_80836988(Player* player, PlayState* play);
+bool func_808323C0(Player* player, s16 csId);
+void Player_StopCutscene(Player* player);
 extern AnimationHeaderCommon* ResourceMgr_LoadAnimByName(const char* path);
 uint8_t ResourceMgr_FileExists(const char* resName);
 
@@ -123,8 +127,8 @@ static const MedallionInfo sMedallions[SW97_SPELL_COUNT] = {
       "You got the %rFire Medallion%w!&A column of flame that burns&harder the longer it stands.",
       "%rFire Medallion&%wFire spell, 12 MP. A column of flame&that burns harder the longer it stands." },
     { "nei.medallion.water", SW97_SPELL_ICE, sWaterIcon, sWaterName,
-      "You got the %bWater Medallion%w!&Freezes targets with Ice Arrow magic&and creates ice platforms on water.",
-      "%bWater Medallion&%wIce spell, 12 MP. Freezes targets&and water with Ice Arrow magic." },
+      "You got the %bWater Medallion%w!&Freezes enemies for 6 seconds&and creates ice platforms on water.",
+      "%bWater Medallion&%wIce spell, 12 MP. Freezes enemies&for 6 seconds and water into ice." },
     { "nei.medallion.spirit", SW97_SPELL_SOUL, sSpiritIcon, sSpiritName,
       "You got the %ySpirit Medallion%w!&Turns you into a fairy until&you cast it again.",
       "%ySpirit Medallion&%wSoul spell, 24 MP. Turns you into a&fairy until you cast it again." },
@@ -138,6 +142,7 @@ static const MedallionInfo sMedallions[SW97_SPELL_COUNT] = {
 };
 
 static s8 sPendingSpell = -1;
+static s16 sCastCameraId = CS_ID_NONE;
 static s16 sShadowHoldFrames;
 static bool sIsShadowExchanged;
 
@@ -184,12 +189,39 @@ static void PlayCastAnim(PlayState* play, Player* player, const char* animation,
                                      SPELL_ANIM_SPEED * (isFast ? 2 : 1));
 }
 
+// MM's stand-ins for OoT's casting cameras: Din's Fire one-point cutscene and the turn-around camera.
+static s16 GetCastCameraId(PlayState* play, Sw97Spell spell) {
+    if (IsFastFarores(spell)) {
+        return CS_ID_NONE;
+    }
+    return play->playerCsIds[spell == SW97_SPELL_FIRE ? FIRE_CAST_CAMERA : SPELL_CAST_CAMERA];
+}
+
+// MM's cutscene queue is rebuilt every frame, so the camera is requested until it starts.
+static void HoldCastCamera(Player* player) {
+    if (sCastCameraId != CS_ID_NONE) {
+        func_808323C0(player, sCastCameraId);
+    }
+}
+
+static void ReleaseCastCamera(Player* player) {
+    if (sCastCameraId == CS_ID_NONE) {
+        return;
+    }
+    if (player->csId == sCastCameraId) {
+        Player_StopCutscene(player);
+    }
+    sCastCameraId = CS_ID_NONE;
+}
+
 static void StartCast(PlayState* play, Player* player, Sw97Spell spell) {
     bool isFast = IsFastFarores(spell);
 
     if (!Magic_Consume(play, sSpellCosts[spell], MAGIC_CONSUME_WAIT_PREVIEW)) {
         return;
     }
+    sCastCameraId = GetCastCameraId(play, spell);
+    HoldCastCamera(player);
     Player_SetAction_PreserveItemAction(play, player, CastAction, 0);
     player->av1.actionVar1 = spell;
     player->av2.actionVar2 = 0;
@@ -203,6 +235,7 @@ static void LeaveCast(Player* player, PlayState* play) {
         Magic_Reset(play);
     }
     player->stateFlags1 &= ~CAST_BLOCKING_STATES;
+    ReleaseCastCamera(player);
     func_80836988(player, play);
     Camera_SetFinishedFlag(Play_GetCamera(play, CAM_ID_MAIN));
 }
@@ -246,6 +279,7 @@ static void CastAction(Player* player, PlayState* play) {
     s8 spell = (s8)player->av1.actionVar1;
     bool isFast = IsFastFarores(spell);
 
+    HoldCastCamera(player);
     if (PlayerAnimation_Update(play, &player->skelAnime)) {
         if (spell < 0) {
             LeaveCast(player, play);
@@ -359,8 +393,11 @@ static void TickShadowExchange(Player* player, PlayState* play) {
 static void TickSpells(Player* player) {
     PlayState* play = gPlayState;
 
-    if (play == NULL || player == NULL) {
+    if (play == NULL || player == NULL || player != GET_PLAYER(play)) {
         return;
+    }
+    if (player->actionFunc != CastAction) {
+        ReleaseCastCamera(player);
     }
     StartPendingCast(player, play);
     TickShadowExchange(player, play);
@@ -368,6 +405,7 @@ static void TickSpells(Player* player) {
 
 static void ForgetSpellState(s16 fileNum) {
     sPendingSpell = -1;
+    sCastCameraId = CS_ID_NONE;
     ResetShadowExchange();
 }
 

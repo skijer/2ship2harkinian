@@ -5,7 +5,7 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
-#include "objects/oot_gameplay_keep/gameplay_keep.h"
+#include "objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/effects/ovl_Effect_Ss_Hahen/z_eff_ss_hahen.h"
 #include "overlays/effects/ovl_Effect_Ss_Hitmark/z_eff_ss_hitmark.h"
 
@@ -245,39 +245,40 @@ static ColliderJntSphInit sProjectileInit = {
     sProjectileElementsInit,
 };
 
+// MM scales each attack's own damage: 0 none, 1 x1, 2 x2, 3 x0.5, 4 x0.25, 5 x3, 6 x4.
 static DamageTable sDamageTable = {
-    /* Deku nut      */ DMG_ENTRY(0, LYNEL_DMGEFF_STUN),
-    /* Deku stick    */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
-    /* Slingshot     */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
-    /* Explosive     */ DMG_ENTRY(4, LYNEL_DMGEFF_NONE),
-    /* Boomerang     */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
-    /* Normal arrow  */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
-    /* Hammer swing  */ DMG_ENTRY(4, LYNEL_DMGEFF_NONE),
-    /* Hookshot      */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
-    /* Kokiri sword  */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
-    /* Master sword  */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
-    /* Giant's Knife */ DMG_ENTRY(4, LYNEL_DMGEFF_NONE),
-    /* Fire arrow    */ DMG_ENTRY(1, LYNEL_DMGEFF_FIRE),
-    /* Ice arrow     */ DMG_ENTRY(4, LYNEL_DMGEFF_ICE),
-    /* Light arrow   */ DMG_ENTRY(6, LYNEL_DMGEFF_LIGHT),
-    /* Unk arrow 1   */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
-    /* Unk arrow 2   */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
-    /* Unk arrow 3   */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
-    /* Fire magic    */ DMG_ENTRY(1, LYNEL_DMGEFF_FIRE),
-    /* Ice magic     */ DMG_ENTRY(3, LYNEL_DMGEFF_ICE),
-    /* Light magic   */ DMG_ENTRY(6, LYNEL_DMGEFF_LIGHT),
-    /* Shield        */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
-    /* Mirror Ray    */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
-    /* Kokiri spin   */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
-    /* Giant spin    */ DMG_ENTRY(4, LYNEL_DMGEFF_NONE),
-    /* Master spin   */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
-    /* Kokiri jump   */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
-    /* Giant jump    */ DMG_ENTRY(8, LYNEL_DMGEFF_NONE),
-    /* Master jump   */ DMG_ENTRY(4, LYNEL_DMGEFF_NONE),
-    /* Unknown 1     */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
-    /* Unblockable   */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
-    /* Hammer jump   */ DMG_ENTRY(6, LYNEL_DMGEFF_NONE),
-    /* Unknown 2     */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
+    /* Deku Nut       */ DMG_ENTRY(0, LYNEL_DMGEFF_STUN),
+    /* Deku Stick     */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
+    /* Horse trample  */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
+    /* Explosives     */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
+    /* Zora boomerang */ DMG_ENTRY(3, LYNEL_DMGEFF_NONE),
+    /* Normal arrow   */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
+    /* UNK_DMG_0x06   */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
+    /* Hookshot       */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
+    /* Goron punch    */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
+    /* Sword          */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
+    /* Goron pound    */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
+    /* Fire arrow     */ DMG_ENTRY(3, LYNEL_DMGEFF_FIRE),
+    /* Ice arrow      */ DMG_ENTRY(2, LYNEL_DMGEFF_ICE),
+    /* Light arrow    */ DMG_ENTRY(5, LYNEL_DMGEFF_LIGHT),
+    /* Goron spikes   */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
+    /* Deku spin      */ DMG_ENTRY(0, LYNEL_DMGEFF_STUN),
+    /* Deku bubble    */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
+    /* Deku launch    */ DMG_ENTRY(2, LYNEL_DMGEFF_NONE),
+    /* UNK_DMG_0x12   */ DMG_ENTRY(0, LYNEL_DMGEFF_STUN),
+    /* Zora barrier   */ DMG_ENTRY(0, LYNEL_DMGEFF_STUN),
+    /* Normal shield  */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
+    /* Light ray      */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
+    /* Thrown object  */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
+    /* Zora punch     */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
+    /* Spin attack    */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
+    /* Sword beam     */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
+    /* Normal Roll    */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
+    /* UNK_DMG_0x1B   */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
+    /* UNK_DMG_0x1C   */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
+    /* Unblockable    */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
+    /* UNK_DMG_0x1E   */ DMG_ENTRY(0, LYNEL_DMGEFF_NONE),
+    /* Powder Keg     */ DMG_ENTRY(1, LYNEL_DMGEFF_NONE),
 };
 
 static CollisionCheckInfoInit2 sColChkInit = { LYNEL_HEALTH, 40, 100, 0, MASS_IMMOVABLE };
@@ -1169,7 +1170,7 @@ static bool EnLynel_CanPlayerMount(EnLynel* this, PlayState* play) {
 static void EnLynel_DrawSwordForRider(Player* player, PlayState* play) {
     u8 item = (*OotCompat_ButtonItem(0));
 
-    if (item >= ITEM_SWORD_KOKIRI && item <= ITEM_SWORD_BGS) {
+    if ((item >= ITEM_SWORD_KOKIRI && item <= ITEM_SWORD_GILDED) || item == ITEM_SWORD_GREAT_FAIRY) {
         Player_InitItemAction(play, player, Player_ItemToItemAction(item));
     }
 }
@@ -1425,7 +1426,7 @@ static bool EnLynel_WasHeadshot(EnLynel* this) {
     if (!(head->base.acElemFlags & ACELEM_HIT) || head->base.acHitElem == NULL) {
         return false;
     }
-    return (head->base.acHitElem->atDmgInfo.dmgFlags & (DMG_ARROW | DMG_SLINGSHOT | DMG_HOOKSHOT)) != 0;
+    return (head->base.acHitElem->atDmgInfo.dmgFlags & (DMG_ARROW | DMG_DEKU_BUBBLE | DMG_HOOKSHOT)) != 0;
 }
 
 static void EnLynel_EnterPhase(EnLynel* this, PlayState* play, u8 phase) {

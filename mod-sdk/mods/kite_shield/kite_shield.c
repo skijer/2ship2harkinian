@@ -1,5 +1,6 @@
 
 #include <math.h>
+#include <string.h>
 
 #include "z64items.h"
 #include "z64logic.h"
@@ -11,6 +12,8 @@
 #include "objects/object_link_child/object_link_child.h"
 
 #define KITE_SHIELD_KEY "nei.equip.kite_shield"
+#define REMOTE_VISUAL_CHANNEL "nei.kite_shield.visual"
+#define REMOTE_VISUAL_INTERVAL 5u
 #define DEG_TO_BINANG 182.04f
 #define SPEED_MODE_LINEAR 0.0f
 // MM gates the action function with state flag 4 where Ship has a named flag.
@@ -117,6 +120,21 @@ typedef enum {
 
 static const S2HModApi* sApi;
 
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static struct {
+    bool isReady;
+    bool isSent;
+    uint32_t frame;
+    RemoteVisualState last;
+} sRemote;
+
 static struct {
     SurfState state;
     s16 timer;
@@ -217,10 +235,15 @@ static void StartSurf(Player* player, PlayState* play) {
     Player_PlaySfx(player, NA_SE_IT_SHIELD_SWING);
 }
 
-static bool IsAllowed(Player* player) {
+// MM state1 bits: 4 ledge grab from a fall or hookshot, 20 input off, 400 getting item, 2000/4000 ledge hang/climb,
+// 200000 ladder, 800000 horse, 4000000 damaged, 8000000 swimming, 10000000 item cutscene.
+static bool IsAllowed(PlayState* play, Player* player) {
     return player->transformation == PLAYER_FORM_HUMAN &&
-           !(player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_CARRYING_ACTOR)) &&
-           player->csAction == PLAYER_CSACTION_NONE && !(player->actor.bgCheckFlags & BGCHECKFLAG_WATER);
+           !(player->stateFlags1 &
+             (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_4 |
+              PLAYER_STATE1_20 | PLAYER_STATE1_400 | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 | PLAYER_STATE1_200000 |
+              PLAYER_STATE1_800000 | PLAYER_STATE1_4000000 | PLAYER_STATE1_8000000 | PLAYER_STATE1_10000000)) &&
+           !Player_InBlockingCsMode(play, player) && !(player->actor.bgCheckFlags & BGCHECKFLAG_WATER);
 }
 
 static f32 FloorAt(PlayState* play, Player* player, f32 x, f32 z, CollisionPoly** outPoly) {
@@ -641,8 +664,7 @@ static void TryMount(Player* player, PlayState* play) {
         }
         return;
     }
-    if (CHECK_BTN_ALL(play->state.input[0].press.button, BTN_R) && !IsGrounded(player) &&
-        !Player_InBlockingCsMode(play, player)) {
+    if (CHECK_BTN_ALL(play->state.input[0].press.button, BTN_R) && !IsGrounded(player)) {
         StartSurf(player, play);
     }
 }
@@ -668,7 +690,7 @@ static void TickSurf(Player* player) {
         Abort(player);
         return;
     }
-    if (!IsAllowed(player)) {
+    if (!IsAllowed(play, player)) {
         Abort(player);
         return;
     }
@@ -725,12 +747,20 @@ static void AddStance(Vec3s* joints) {
     joints[PLAYER_LIMB_UPPER_ROOT].z += Degrees(UPPER_ROT_Z) + sSurf.upperLean;
 }
 
-static void PoseBeforeDraw(Actor* actor) {
-    Vec3s* joints = ((Player*)actor)->skelAnime.jointTable;
+static bool IsLocalPlayer(Actor* actor) {
+    return gPlayState != NULL && actor == &GET_PLAYER(gPlayState)->actor;
+}
 
-    if (!IsRiding() || sSurf.spinFrames != 0) {
+static bool TakesStance(Player* player) {
+    return IsRiding() && sSurf.spinFrames == 0 && !(player->stateFlags2 & PLAYER_STATE2_20000000);
+}
+
+static void PoseBeforeDraw(Actor* actor) {
+    if (!IsLocalPlayer(actor) || !TakesStance((Player*)actor)) {
         return;
     }
+    Vec3s* joints = ((Player*)actor)->skelAnime.jointTable;
+
     sSurf.poseBackup[0] = joints[PLAYER_LIMB_WAIST];
     sSurf.poseBackup[1] = joints[PLAYER_LIMB_LOWER_ROOT];
     sSurf.poseBackup[2] = joints[PLAYER_LIMB_UPPER_ROOT];
@@ -739,15 +769,105 @@ static void PoseBeforeDraw(Actor* actor) {
 }
 
 static void RestorePoseAfterDraw(Actor* actor, PlayState* play) {
-    Vec3s* joints = ((Player*)actor)->skelAnime.jointTable;
-
-    if (!sSurf.isPoseApplied) {
+    if (!IsLocalPlayer(actor) || !sSurf.isPoseApplied) {
         return;
     }
+    Vec3s* joints = ((Player*)actor)->skelAnime.jointTable;
+
     sSurf.isPoseApplied = false;
     joints[PLAYER_LIMB_WAIST] = sSurf.poseBackup[0];
     joints[PLAYER_LIMB_LOWER_ROOT] = sSurf.poseBackup[1];
     joints[PLAYER_LIMB_UPPER_ROOT] = sSurf.poseBackup[2];
+}
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool HasValidRemoteValues(const RemoteVisualState* visual) {
+    for (uint32_t i = 0; i < ARRAY_COUNT(visual->values); i++) {
+        if (!isfinite(visual->values[i]) || fabsf(visual->values[i]) > 10000000.0f) {
+            return false;
+        }
+    }
+    return visual->values[0] >= -32768.0f && visual->values[0] <= 32767.0f;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemote.isReady || gPlayState == NULL) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, REMOTE_VISUAL_CHANNEL, visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    if (visual->active != 1 || visual->adult > 1 || visual->scene != gPlayState->sceneId || visual->flags[0] > 1 ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return false;
+    }
+    return HasValidRemoteValues(visual);
+}
+
+static void PublishRemoteVisual(void) {
+    PlayState* play = gPlayState;
+    RemoteVisualState visual = { 0 };
+
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = IsWorn();
+        if (visual.active) {
+            visual.flags[0] = IsRiding();
+            visual.values[0] = sSurf.boardSpin;
+        }
+        if (sRemote.isSent && (uint32_t)(play->gameplayFrames - sRemote.frame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemote.isSent && memcmp(&visual, &sRemote.last, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState(REMOTE_VISUAL_CHANNEL, &visual, sizeof(visual))) {
+        sRemote.last = visual;
+        sRemote.isSent = true;
+        sRemote.frame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemote.isReady = sApi->RegisterNetChannel(REMOTE_VISUAL_CHANNEL, 1, ReceiveRemoteVisual);
+    if (sRemote.isReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+    }
+}
+
+typedef struct {
+    bool isRiding;
+    s16 boardSpin;
+} KiteLook;
+
+static bool GetKiteLook(Player* player, KiteLook* look) {
+    RemoteVisualState visual;
+
+    if (gPlayState == NULL || player->transformation != PLAYER_FORM_HUMAN) {
+        return false;
+    }
+    if (player == GET_PLAYER(gPlayState)) {
+        look->isRiding = IsRiding();
+        look->boardSpin = sSurf.boardSpin;
+        return IsWorn();
+    }
+    if (!ReadRemoteVisual(player, &visual)) {
+        return false;
+    }
+    look->isRiding = visual.flags[0] != 0;
+    look->boardSpin = (s16)visual.values[0];
+    return true;
 }
 
 static bool IsShieldOnBack(Player* player) {
@@ -761,7 +881,9 @@ static bool IsShieldInHand(Player* player) {
 // The hand model carries the shield, so it is swapped for the bare hand. The back shield is drawn by the sheath
 // limb's post draw from currentShield, so that is cleared until DrawOnLimb restores it.
 static void HideVanillaShield(Player* player, int32_t limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
-    if (!IsWorn() || player->transformation != PLAYER_FORM_HUMAN || player->currentShield == PLAYER_SHIELD_NONE) {
+    KiteLook look;
+
+    if (!GetKiteLook(player, &look) || player->currentShield == PLAYER_SHIELD_NONE) {
         return;
     }
     if (limbIndex == PLAYER_LIMB_RIGHT_HAND && IsShieldInHand(player)) {
@@ -794,12 +916,12 @@ static void DrawShieldModel(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-static void DrawBoard(PlayState* play) {
+static void DrawBoard(PlayState* play, s16 boardSpin) {
     OPEN_DISPS(play->state.gfxCtx);
     Matrix_Push();
     Matrix_Translate(BOARD_OFF_X, BOARD_OFF_Y, BOARD_OFF_Z, MTXMODE_APPLY);
-    if (sSurf.boardSpin != 0) {
-        Matrix_RotateYF(sSurf.boardSpin * (M_PIf / 32768.0f), MTXMODE_APPLY);
+    if (boardSpin != 0) {
+        Matrix_RotateYF(boardSpin * (M_PIf / 32768.0f), MTXMODE_APPLY);
     }
     Matrix_RotateZYX(Degrees(BOARD_ROT_X), Degrees(BOARD_ROT_Y), Degrees(BOARD_ROT_Z), MTXMODE_APPLY);
     Matrix_Scale(BOARD_SCALE, BOARD_SCALE, BOARD_SCALE, MTXMODE_APPLY);
@@ -811,22 +933,25 @@ static void DrawBoard(PlayState* play) {
 
 static void DrawOnLimb(Player* player, int32_t limbIndex) {
     PlayState* play = gPlayState;
+    KiteLook look;
 
     if (limbIndex == PLAYER_LIMB_SHEATH) {
         RestoreVanillaShield(player);
     }
-    if (play == NULL || !IsWorn() || player != GET_PLAYER(play) || player->transformation != PLAYER_FORM_HUMAN) {
+    if (!GetKiteLook(player, &look)) {
         return;
     }
-    if (limbIndex == PLAYER_LIMB_ROOT && IsRiding()) {
-        DrawBoard(play);
+    if (limbIndex == PLAYER_LIMB_ROOT && look.isRiding) {
+        DrawBoard(play, look.boardSpin);
         return;
     }
-    if (IsRiding() || player->currentShield == PLAYER_SHIELD_NONE) {
+    if (look.isRiding || player->currentShield == PLAYER_SHIELD_NONE) {
         return;
     }
     if (limbIndex == PLAYER_LIMB_RIGHT_HAND && IsShieldInHand(player)) {
-        player->shieldQuad.base.colMaterial = COL_MATERIAL_WOOD;
+        if (player == GET_PLAYER(play)) {
+            player->shieldQuad.base.colMaterial = COL_MATERIAL_WOOD;
+        }
         DrawShieldModel(play);
     } else if (limbIndex == PLAYER_LIMB_SHEATH && IsShieldOnBack(player) && !IsShieldInHand(player) &&
                player->rightHandType != PLAYER_MODELTYPE_RH_FF) {
@@ -850,8 +975,9 @@ static void HandBackPlayer(const char* key) {
     sSurf.remountLockout = 0;
 }
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw",
-                                              "OnActorDraw",    "OnActorDrawEnd",          "OnSceneInit" };
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate",    "OnPlayerUpdate", "OnPlayerResolveLimbDraw",
+                                              "OnPlayerPostLimbDraw", "OnActorDraw",    "OnActorDrawEnd",
+                                              "OnSceneInit" };
 
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -885,6 +1011,7 @@ static void GrantKiteShieldLogic(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     GrantKiteShieldLogic();
     S2HCustomEquipDefinition definition = { 0 };
 

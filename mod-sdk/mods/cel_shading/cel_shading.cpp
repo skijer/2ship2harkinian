@@ -6,6 +6,7 @@
 #include "2s2h/ModApi/ModApi.h"
 extern "C" {
 #include "global.h"
+#include "overlays/actors/ovl_En_Elf/z_en_elf.h"
 int32_t CVarGetInteger(const char* name, int32_t defaultValue);
 float CVarGetFloat(const char* name, float defaultValue);
 }
@@ -23,6 +24,8 @@ static std::unordered_map<Actor*, KeyState> sKeys;
 static bool sEnabled, sPoints, sItems, sDebug;
 static float sRange, sTransition;
 static u32 sFrame;
+static LightInfo* sTatlGlow;
+static LightInfo* sTatlNoGlow;
 
 static f32 ToonSmoothDamp(f32 current, f32 target, f32* vel, f32 smoothTime, f32 dt) {
     if (smoothTime < 0.0001f) {
@@ -105,7 +108,7 @@ static bool PointKey(Actor* actor, PlayState* play, float dir[3], float col[3]) 
         return false;
     for (LightNode* node = play->lightCtx.listHead; node; node = node->next) {
         LightInfo* light = node->info;
-        if (!light || light->type == LIGHT_DIRECTIONAL)
+        if (!light || light->type == LIGHT_DIRECTIONAL || light == sTatlGlow || light == sTatlNoGlow)
             continue;
         auto& p = light->params.point;
         float d[3] = { p.x - actor->world.pos.x, p.y - actor->world.pos.y, p.z - actor->world.pos.z };
@@ -179,7 +182,23 @@ static void ForgetActor(Actor* actor) {
 static void ForgetScene(s16, s8) {
     sKeys.clear();
 }
+static void FindIgnoredTatlLights() {
+    sTatlGlow = nullptr;
+    sTatlNoGlow = nullptr;
+    if (gPlayState == nullptr || CVarGetInteger(CVAR("UseTatlLight"), 1)) {
+        return;
+    }
+    Player* player = GET_PLAYER(gPlayState);
+    if (player == nullptr || player->tatlActor == nullptr || player->tatlActor->id != ACTOR_EN_ELF ||
+        FAIRY_GET_TYPE(player->tatlActor) != FAIRY_TYPE_0) {
+        return;
+    }
+    auto* tatl = reinterpret_cast<EnElf*>(player->tatlActor);
+    sTatlGlow = &tatl->lightInfoGlow;
+    sTatlNoGlow = &tatl->lightInfoNoGlow;
+}
 static void BeginFrame() {
+    FindIgnoredTatlLights();
     sEnabled = CVarGetInteger(CVAR("Enabled"), 1) != 0;
     sPoints = CVarGetInteger(CVAR("PointLights"), 1) != 0;
     sItems = CVarGetInteger(CVAR("Items"), 1) != 0;
@@ -199,7 +218,7 @@ static void BeginFrame() {
 static void Checkbox(const char* label, const char* cvar, int value) {
     S2HModMenuWidget w = {};
     w.structSize = sizeof(w);
-    w.section = "Enhancements";
+    w.section = "Mods";
     w.sidebar = "Cel Shading";
     w.type = S2H_MOD_MENU_CHECKBOX;
     w.label = label;
@@ -210,8 +229,9 @@ static void Checkbox(const char* label, const char* cvar, int value) {
 static void Slider(const char* label, const char* cvar, float value, float min, float max) {
     S2HModMenuWidget w = {};
     w.structSize = sizeof(w);
-    w.section = "Enhancements";
+    w.section = "Mods";
     w.sidebar = "Cel Shading";
+    w.column = 1;
     w.type = S2H_MOD_MENU_FLOAT_SLIDER;
     w.label = label;
     w.cvar = cvar;
@@ -229,9 +249,10 @@ extern "C" S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements() {
 extern "C" S2H_MOD_EXPORT void ModInit() {
     if (!S2H_MOD_API_HAS(sApi, SetCelShadingRamp) || !sApi->SetCelShadingRamp)
         return;
-    sApi->RegisterMenuSidebar("Enhancements", "Cel Shading", CVAR("Menu"), 1);
+    sApi->RegisterMenuSidebar("Mods", "Cel Shading", "gMods.Menu.Page", 2);
     Checkbox("Enable Cel Shading", CVAR("Enabled"), 1);
     Checkbox("Use Point Lights", CVAR("PointLights"), 1);
+    Checkbox("Use Tatl's Light", CVAR("UseTatlLight"), 1);
     Checkbox("Shade Items and Chests", CVAR("Items"), 1);
     Slider("Light / Shadow Boundary", CVAR("RampCenter"), .5f, 0, 1);
     Slider("Band Softness", CVAR("RampSoftness"), .02f, .001f, .5f);

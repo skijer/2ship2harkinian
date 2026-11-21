@@ -19,6 +19,7 @@
 #define ZONAI_RELEASE_PITCH_START 1.45f
 #define ZONAI_RELEASE_PITCH_END 0.55f
 #define ZONAI_RELEASE_PITCH_STEP 0.11f
+#define ZONAI_GIVE_SCALE 1.0f
 
 #define ZONAI_BLOCKING_STATES (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_20 | PLAYER_STATE1_20000000)
 
@@ -219,6 +220,16 @@ static bool CanToggleTime(Player* player, PlayState* play) {
     return !(player->stateFlags1 & ZONAI_BLOCKING_STATES);
 }
 
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(ZONAI_GIVE_SCALE, ZONAI_GIVE_SCALE, ZONAI_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sGiveDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, ZONAI_KEY, ZONAI_KEY, "",
 };
@@ -252,7 +263,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetAction(&zonai, ToggleTime, NULL);
     zonai.flags |= S2H_CUSTOM_ITEM_INSTANT;
     Z64Items_SetGetItemModel(&zonai, sGiveDL);
-    zonai.getItemScale = 0.8f;
+    zonai.getItemScale = ZONAI_GIVE_SCALE;
+    zonai.getItemEntry.drawFunc = DrawGetItem;
 
     Z64Items_SetLogic(&zonai, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &zonai)) {

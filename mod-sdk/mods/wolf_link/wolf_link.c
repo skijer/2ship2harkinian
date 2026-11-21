@@ -19,6 +19,7 @@
 #define WOLF_CRYSTAL_SLOT 20
 #define WOLF_CRYSTAL_WHEEL_PRIORITY (-2)
 #define WOLF_BLOB_PATH "objects/forms/wolf_link/gWolfLinkData"
+#define CRYSTAL_GET_ITEM_SCALE 0.35f
 
 #define MAX_BONES 64
 #define MAX_INFLUENCES 4
@@ -54,6 +55,7 @@
      PLAYER_STATE1_20000000 | PLAYER_STATE1_8000000 | PLAYER_STATE1_800000)
 #define STATE1_SWIMMING PLAYER_STATE1_8000000
 #define STATE1_FIRST_PERSON PLAYER_STATE1_100000
+#define STATE3_MIDAIR PLAYER_STATE3_2
 
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/gItemIconShadowCrystalTex";
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/gShadowCrystalNameTex";
@@ -1869,9 +1871,15 @@ static void UpdateWolf(PlayState* play, Player* player) {
 
     UpdateProc(play, player, &in);
 
-    if (sWolf.ownsPlayer && sWolf.proc != PROC_WOLF_SIDESTEP) {
-        player->actor.world.rot.y = player->actor.shape.rot.y;
-        player->yaw = player->actor.shape.rot.y;
+    if (sWolf.ownsPlayer) {
+        if (sWolf.proc != PROC_WOLF_SIDESTEP) {
+            player->actor.world.rot.y = player->actor.shape.rot.y;
+            player->yaw = player->actor.shape.rot.y;
+        }
+        // Without MIDAIR func_8083827C reads an airborne proc as walking off a ledge and installs a fall.
+        if (!IsOnGround(player)) {
+            player->stateFlags3 |= STATE3_MIDAIR;
+        }
     }
     SubmitAttackCollider(play, player);
     sWolf.wasOnGround = IsOnGround(player);
@@ -2038,7 +2046,7 @@ static void RegisterCrystal(void) {
     crystal.flags |= S2H_CUSTOM_ITEM_INSTANT;
     Z64Items_SetPlacement(&crystal, WOLF_CRYSTAL_PAGE, WOLF_CRYSTAL_SLOT, WOLF_CRYSTAL_WHEEL_PRIORITY);
     Z64Items_SetGetItemModel(&crystal, sCrystalDL);
-    crystal.getItemScale = 0.6f;
+    crystal.getItemScale = CRYSTAL_GET_ITEM_SCALE;
     Z64Items_SetTextbox(&crystal, "You got the %rShadow Crystal%w!&A shard of twilight that remembers&the shape of "
                                   "a beast.^"
                                   "Use it with %y\xB2%w to take the form of a&wolf, and again to be yourself.");

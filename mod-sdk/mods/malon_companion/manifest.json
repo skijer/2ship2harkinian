@@ -13,5 +13,6 @@
     "animations/nei_malon/child/run",
     "animations/nei_malon/adult/run"
   ],
-  "game": "mm"
+  "game": "mm",
+  "display_name": "Malon Companion"
 }

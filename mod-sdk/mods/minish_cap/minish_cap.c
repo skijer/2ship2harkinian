@@ -12,10 +12,10 @@
 #define PLAYER_SCALE_NORMAL 0.01f
 #define MINISH_SCALE 0.001f
 #define MINISH_SIZE_FACTOR (MINISH_SCALE / PLAYER_SCALE_NORMAL)
-#define MINISH_SPEED_FACTOR 0.2f
 #define SCALE_STEP 0.0005f
 #define MINISH_CAMERA_FLOOR 0.14f
 #define MINISH_BODY_EXTENT 2
+#define CRAWLSPACE_LINGER 8
 
 typedef enum {
     MINISH_SIZE_NORMAL,
@@ -31,6 +31,7 @@ static const ALIGN_ASSET(2) char sCapDL[] = "__OTR__objects/object_nei_minish_ca
 static const char* const sRequiredHooks[] = {
     "OnPlayerUpdate",
     "OnCameraResolveView",
+    "OnActorResolveBgCheckFlags",
     "OnPlayerResolveMotionScale",
 };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
@@ -41,6 +42,7 @@ static const S2HModApi* sApi;
 static MinishSizePhase sSizePhase;
 static f32 sPlayerScale = PLAYER_SCALE_NORMAL;
 static bool sIsUsePending;
+static s16 sCrawlspaceTimer;
 static s16 sLastScene = -1;
 static u32 sLastFrames;
 
@@ -56,6 +58,9 @@ static void ApplyTinyProperties(Player* player) {
     sVanillaAgeProperties = player->ageProperties;
     sTinyAgeProperties = *player->ageProperties;
     sTinyAgeProperties.wallCheckRadius *= MINISH_SIZE_FACTOR;
+    // The ledge probe starts this high above Link's feet; at floor level it never finds a ledge to climb, since
+    // at a tenth of his size every step would be one.
+    sTinyAgeProperties.unk_0C = 0.0f;
     player->ageProperties = &sTinyAgeProperties;
     sVanillaCylinderRadius = player->cylinder.dim.radius;
 }
@@ -66,6 +71,7 @@ static void RestoreTinyProperties(Player* player) {
         player->cylinder.dim.radius = sVanillaCylinderRadius;
         Collider_UpdateCylinder(&player->actor, &player->cylinder);
     }
+    sCrawlspaceTimer = 0;
 }
 
 static void EndMinishSize(Player* player) {
@@ -95,6 +101,36 @@ static void StartGrowing(Player* player, PlayState* play) {
     Audio_PlaySfx(NA_SE_SY_CAMERA_ZOOM_DOWN);
 }
 
+// A tunnel mouth is a crawlspace wall only the interact-wall probe sees. The window stays open while a
+// normal-height ceiling is still overhead, so wall and ceiling checks stay off through the tunnel.
+static void UpdateCrawlspaceWindow(Player* player, PlayState* play) {
+    Vec3f checkPos = player->actor.world.pos;
+    CollisionPoly* ceilingPoly;
+    s32 ceilingBgId;
+    f32 ceilingY;
+
+    if (sSizePhase != MINISH_SIZE_TINY) {
+        sCrawlspaceTimer = 0;
+        return;
+    }
+    if ((player->actor.bgCheckFlags & BGCHECKFLAG_PLAYER_WALL_INTERACT) &&
+        (SurfaceType_GetWallFlags(&play->colCtx, player->actor.wallPoly, player->actor.wallBgId) &
+         (WALL_FLAG_4 | WALL_FLAG_5))) {
+        sCrawlspaceTimer = CRAWLSPACE_LINGER;
+        return;
+    }
+    if (sCrawlspaceTimer <= 0) {
+        return;
+    }
+    checkPos.y += 2.0f;
+    if (BgCheck_EntityCheckCeiling(&play->colCtx, &ceilingY, &checkPos, sVanillaAgeProperties->ceilingCheckHeight,
+                                   &ceilingPoly, &ceilingBgId, &player->actor)) {
+        sCrawlspaceTimer = CRAWLSPACE_LINGER;
+        return;
+    }
+    sCrawlspaceTimer--;
+}
+
 // The per-frame code never recomputes the cylinder radius, so it is set here.
 static void ApplyTinyBody(Player* player) {
     player->cylinder.dim.radius = MINISH_BODY_EXTENT;
@@ -102,7 +138,7 @@ static void ApplyTinyBody(Player* player) {
     Collider_UpdateCylinder(&player->actor, &player->cylinder);
 }
 
-static void UpdateMinishSize(Player* player) {
+static void UpdateMinishSize(Player* player, PlayState* play) {
     if (sSizePhase == MINISH_SIZE_SHRINKING) {
         sPlayerScale -= SCALE_STEP;
         if (sPlayerScale <= MINISH_SCALE) {
@@ -120,18 +156,23 @@ static void UpdateMinishSize(Player* player) {
     Actor_SetScale(&player->actor, sPlayerScale);
     if (IsTiny()) {
         ApplyTinyBody(player);
+        UpdateCrawlspaceWindow(player, play);
     }
 }
 
+// The wall probe is sized for a full-size Link, so tiny Link reads as hugging a wall and vanilla throttles the cap.
 static void ResolveMotionScale(Player* player, s32 kind, f32* scale) {
-    if (sSizePhase != MINISH_SIZE_TINY) {
-        return;
-    }
-    if (kind == SOH_PLAYER_MOTION_STICK_SPEED) {
-        *scale *= MINISH_SPEED_FACTOR;
+    if (sSizePhase != MINISH_SIZE_TINY || kind != SOH_PLAYER_MOTION_SPEED_CAP) {
         return;
     }
     *scale = R_RUN_SPEED_LIMIT / 100.0f;
+}
+
+static void ResolveBgCheckFlags(Actor* actor, s32* flags) {
+    if (sCrawlspaceTimer <= 0) {
+        return;
+    }
+    *flags &= ~(UPDBGCHECKINFO_FLAG_1 | UPDBGCHECKINFO_FLAG_2);
 }
 
 static void ResolveCameraView(Camera* camera, Vec3f* eye, Vec3f* at, Vec3f* up) {
@@ -221,7 +262,7 @@ static void UpdateMinishCap(Player* player) {
 
     StartPendingUse(player, play);
     if (IsTiny()) {
-        UpdateMinishSize(player);
+        UpdateMinishSize(player, play);
     }
 }
 
@@ -263,5 +304,6 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, UpdateMinishCap);
     S2H_REGISTER_HOOK(sApi, OnCameraResolveView, ResolveCameraView);
     S2H_REGISTER_HOOK(sApi, OnPlayerResolveMotionScale, ResolveMotionScale);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorResolveBgCheckFlags, ACTOR_PLAYER, ResolveBgCheckFlags);
     sApi->RegisterVB(VB_PLAYER_ADJUST_LEGS_TO_FLOOR, BlockLegPlanting);
 }

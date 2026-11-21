@@ -168,7 +168,20 @@ static const Stage* StageForKey(const char* key) {
             return &sStages[i];
     return NULL;
 }
+// Disabled chains keep their save counters but publish no vanilla aliases or randomizer pickups.
+static bool sChainEnabled[CH_COUNT];
+static void ReadChainOptions(void) {
+    static const char* const ids[CH_COUNT] = { "hammer", "kokiri", "master", "bgs", "hookshot" };
+    for (int c = 0; c < CH_COUNT; c++) {
+        char option[128];
+        snprintf(option, sizeof(option), "gMods.Store." MOD_NAME ".%s", ids[c]);
+        sChainEnabled[c] = CVarGetInteger(option, 1) != 0;
+    }
+}
 static u16 Level(int c) {
+    if (!sChainEnabled[c]) {
+        return 0;
+    }
     return sApi->GetProgressiveLevel(sChain[c], SOH_RANDO_INF_SAVE);
 }
 static bool SaveBank(void) {
@@ -472,7 +485,7 @@ static const Stage* PreviewStage(const GetItemEntry* entry, bool receiving) {
                 break;
         }
     }
-    if (chain < 0)
+    if (chain < 0 || !sChainEnabled[chain])
         return NULL;
     const char* next = sApi->GetNextProgressiveItem(sChain[chain], SOH_RANDO_INF_SAVE);
     for (int i = sStart[chain]; i < sStart[chain] + sLength[chain]; i++) {
@@ -758,7 +771,7 @@ static bool RegisterItems(void) {
         d.displayName = sStages[sStart[c]].name;
         d.getItemEntry.drawFunc = DrawStage;
         d.getItemEntry.drawItemId = ARRAY_COUNT(sStages) + c;
-        d.randomizer = &sPools[c];
+        d.randomizer = sChainEnabled[c] ? &sPools[c] : NULL;
         if (c == CH_HAMMER && first) {
             d.getItemEntry = first->getItemEntry;
             d.getItemText = first->getItemText;
@@ -792,7 +805,7 @@ static void RegisterChains(void) {
         d.levelCount = sLength[c];
         d.firstLevel = 1;
         d.aliases = aliases[c];
-        d.aliasCount = aliasCount[c];
+        d.aliasCount = sChainEnabled[c] ? aliasCount[c] : 0;
         d.readLevel = reads[c];
         d.applyLevel = applies[c];
         if (!sApi->RegisterProgressiveChain(&d))
@@ -834,10 +847,12 @@ static void EasyGive(SaveContext* save) {
             stage = &sStages[i];
             break;
         }
-    bool maxed = Level(chain) >= sLength[chain];
+    bool maxed = !sChainEnabled[chain] || Level(chain) >= sLength[chain];
     char label[128];
     snprintf(label, sizeof(label), "Give %s##nei_upgrade_give", stage ? stage->name : "item");
-    if (maxed)
+    if (!sChainEnabled[chain])
+        ModUI_Text("This chain is disabled in the store configuration.");
+    else if (maxed)
         ModUI_Text("Fully upgraded.");
     ModUI_BeginDisabled(!gPlayState || !stage || maxed || sPendingGiveChain >= 0);
     if (ModUI_Button(label, 0, 0)) {
@@ -931,6 +946,7 @@ static void LoadHammerLook(s32 fileNum) {
 }
 
 SOH_MOD_EXPORT void ModInit(void) {
+    ReadChainOptions();
     if (!SOH_MOD_API_HAS(sApi, RegisterProgressiveChain) || !SOH_MOD_API_HAS(sApi, GetProgressiveLevel) ||
         !SOH_MOD_API_HAS(sApi, GetNextProgressiveItem) || !SOH_MOD_API_HAS(sApi, HasResource))
         return;

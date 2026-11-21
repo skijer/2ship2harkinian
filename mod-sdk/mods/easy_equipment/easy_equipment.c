@@ -6,7 +6,6 @@
 #include "easy_equipment_input.h"
 #include "soh/ModApi/CustomEquipRegistry/CustomEquipRegistry.h"
 #include <libultraship/bridge/consolevariablebridge.h>
-#include "textures/oot_icon_item_static/icon_item_static.h"
 #include "z64oot_names.h"
 
 #define EASY_OWNER "nei.easy_equipment"

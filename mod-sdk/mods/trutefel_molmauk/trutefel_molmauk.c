@@ -840,7 +840,7 @@ void EnHammergeist_SetupStunned(EnHammergeist* self, PlayState* play) {
 
 void EnHammergeist_Stunned(EnHammergeist* self, PlayState* play) {
     EnHammergeist_CheckDamage(self, play);
-    if (self->actor.colorFilterTimer == 0) {
+    if (self->actionFunc == EnHammergeist_Stunned && self->actor.colorFilterTimer == 0) {
         EnHammergeist_SetupDoNothing(self, play);
     }
 }
@@ -998,11 +998,15 @@ void EnHammergeist_HeavySlam(EnHammergeist* self, PlayState* play) {
         self->heavySlamCooldown = 600;
         if (DECR(self->genericAnimationTimer) == 0) {
             EnHammergeist_SetupFlex(self, play);
+            return;
         }
     }
 
     if (self->skelAnime.curFrame >= 38.0f && self->skelAnime.curFrame <= 45.0f) {
         EnHammergeist_CheckDamage(self, play);
+        if (self->actionFunc != EnHammergeist_HeavySlam) {
+            return;
+        }
     }
 
     if (self->skelAnime.curFrame == 50.0f) {
@@ -1129,6 +1133,9 @@ void EnHammergeist_SetupFlex(EnHammergeist* self, PlayState* play) {
 
 void EnHammergeist_Flex(EnHammergeist* self, PlayState* play) {
     EnHammergeist_CheckDamage(self, play);
+    if (self->actionFunc != EnHammergeist_Flex) {
+        return;
+    }
     if (SkelAnime_Update(&self->skelAnime)) {
         if (DECR(self->genericAnimationTimer) == 0) {
             EnHammergeist_ChangeFace(self, HAMMERGEIST_FACE_NORMAL);
@@ -1158,6 +1165,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.destroy = EnHammergeist_Destroy;
     definition.update = EnHammergeist_Update;
     definition.draw = EnHammergeist_Draw;
+    definition.enemyFlags = S2H_ACTOR_ENEMY | S2H_ACTOR_ENEMY_NOT_IN_TIMED_ROOMS;
+    definition.naviHint = "Molmauk&Watch out for its %rhammers%w!&Strike when it drops its guard!";
 
     if (sApi->RegisterActor(&definition) < 0) {
         sApi->Log("Could not register " MOLMAUK_KEY);

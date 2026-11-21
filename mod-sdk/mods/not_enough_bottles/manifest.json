@@ -9,5 +9,6 @@
   "permissions": [
     "network"
   ],
+  "display_name": "Not Enough Bottles",
   "game": "mm"
 }

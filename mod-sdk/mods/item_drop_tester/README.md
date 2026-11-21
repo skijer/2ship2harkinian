@@ -1,19 +1,28 @@
 # Item Drop Tester (2Ship)
 
-Independent local test mod. Open **Mods > Item Drop Tester** with a save loaded.
-Filter by acquisition key; click **Drop** to queue a real pickup 80 units above Link.
-Close the menu and unpause: it spawns on the game thread, then falls into pickup range.
-The standard cutscene, model, text and receive callbacks run when collected.
+Standalone local test mod. Enable `item_drop_tester`, then open **Mods > Item Drop Tester**
+with a save loaded.
 
-The list reads the live custom item registry, including registered pickup subtypes,
-equipment holder items and progressive rewards. Both unowned and already owned items
-can be dropped. Repeated pickups retain each mod's own duplicate/progression behavior.
-It does not reset ownership, progression or the save. Vanilla items and arbitrary
-actor parameters are not part of this catalog.
+- **Custom items and variants**: one row per parent item, a Drop button for the item
+  and separate buttons for its registered pickup variants. A click queues a physical
+  pickup 80 units above Link; close the menu and unpause. Ownership is granted only
+  when collected, through the item's own acquisition message, model and receive callback.
+- **Vanilla / built-in rando rewards**: 238 named rewards from the 2Ship rando catalog
+  with their RandoItemId. Needs a randomizer save. The reward is lent to the carrier
+  check `RC_CLOCK_TOWN_SOUTH_CHEST_UPPER` and paid out by the randomizer's own give
+  queue, so progressives, conversions, messages and get-item cutscenes behave as in a
+  seed. Once paid out, the carrier check gets its original contents back.
+- The filter is case-insensitive and matches names, keys and variant names.
 
-The selected entry shows its parent/subtype, icon and acquisition/held model source.
-Mark the manual checklist for pickup, icon, acquisition model, held model, use, save/load
-and Anchor. Results persist in local configuration; **Copy full checklist (Markdown)**
-copies every registered key, including pending entries, for a fresh audit.
+Select an entry without dropping it to inspect its identity and checklist. For custom
+entries the panel also shows the parent/subtype, icon and acquisition/held model source.
+The checklist covers pickup, icon, acquisition model, held model, use, save/load and
+Anchor. Results persist locally. **Copy full checklist (Markdown)** exports pending and
+tested entries for both catalogs.
 
-Local Release build compiled and installed on 2026-10-24. Package/import verification: 71 packages, 0 failures. In-game tests remain manual. Enable item_drop_tester in the mod manager, then restart if requested.
+Tests use the current inventory, mods and rando settings: duplicate/progressive rewards
+keep their normal effects. The tester does not reset ownership or fake an unowned
+inventory. While a built-in reward is paid out, Anchor receives the carrier check status.
+
+Native display names and RI constants in `rando_catalog.inc.h` come from
+`mm/2s2h/Rando/StaticData/Items.cpp`. The custom catalog is read live from loaded mods.

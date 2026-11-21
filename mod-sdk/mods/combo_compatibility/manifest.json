@@ -1,13 +1,32 @@
 {
     "name": "combo_compatibility",
     "author": "Skijer",
-    "version": "1.0",
+    "version": "1.1",
     "display_name": "Combo Compatibility",
     "game": "mm",
     "fleet_only": true,
     "dependency_only": true,
     "dependencies": [
         "oot_assets"
+    ],
+    "requires": [
+        "textures/oot_icon_item_static/gItemIconWeirdEggTex",
+        "textures/oot_icon_item_static/gItemIconFishingPoleTex",
+        "textures/oot_item_name_static/gWeirdEggItemNameENGTex",
+        "objects/oot_object_gi_egg/gGiEggDL",
+        "objects/oot_object_gi_niwatori/gGiChickenDL",
+        "objects/oot_object_gi_letter/gGiLetterDL",
+        "objects/oot_object_gi_skj_mask/gGiSkullMaskDL",
+        "objects/oot_object_gi_redead_mask/gGiSpookyMaskDL",
+        "objects/oot_object_gi_gerudomask/gGiGerudoMaskDL",
+        "objects/oot_object_gi_mushroom/gGiOddMushroomDL",
+        "objects/oot_object_gi_powder/gGiOddPotionDL",
+        "objects/oot_object_gi_saw/gGiSawDL",
+        "objects/oot_object_gi_brokensword/gGiBrokenGoronSwordDL",
+        "objects/oot_object_gi_prescription/gGiPrescriptionDL",
+        "objects/oot_object_gi_frog/gGiFrogDL",
+        "objects/oot_object_gi_eye_lotion/gGiEyeDropsCapDL",
+        "objects/oot_object_gi_ticketstone/gGiClaimCheckDL"
     ],
     "description": "Presentation-only rewards from the other world, shown with Ocarina of Time's own icons, names and models. No duplicate pool copies."
 }

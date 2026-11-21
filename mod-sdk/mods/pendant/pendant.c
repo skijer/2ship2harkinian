@@ -1,16 +1,21 @@
-
 #include <math.h>
+#include <string.h>
 
 #include "z64items.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
 #include "macros.h"
+#include "regs.h"
 #include "variables.h"
 #include "z64quake.h"
 #include "z64rumble.h"
+#include "2s2h/ModApi/Player/PlayerHookTypes.h"
+#include "objects/gameplay_keep/gameplay_keep.h"
 
 #define PENDANT_KEY "nei.equip.pendant"
+#define PENDANT_VISUAL_CHANNEL "nei.pendant.visual"
+#define PENDANT_REMOTE_INTERVAL 5u
 #define MORTAL_DRAW_RANGE 200.0f
 #define MORTAL_DRAW_MIN_RANGE 20.0f
 #define MORTAL_DRAW_HITSTOP 10
@@ -20,31 +25,36 @@
 #define GPOUND_STALL_FRAMES 4
 #define GPOUND_FALL_VELOCITY (-18.0f)
 #define GPOUND_FALL_GRAVITY (-2.5f)
-#define GPOUND_LANDING_FRAMES 25
+#define GPOUND_LANDING_FRAMES 25.0f
+#define GPOUND_POSE_FRAME 89.0f
 #define GPOUND_SHOCKWAVE_FRAMES 6
 #define GPOUND_BOUNCE_VELOCITY 8.0f
 #define GPOUND_TIMEOUT 60
 #define PARRY_ARC_FRAMES 22
-#define PARRY_ARC_HEIGHT 80.0f
 #define PARRY_LAND_DIST 120.0f
-#define PARRY_LANDING_FRAMES 12
-#define PARRY_HOPS_TO_ARM 3
+#define PARRY_TIMING_FRAMES 6
 #define PARRY_HOP_WINDOW 60
-#define DEFAULT_GRAVITY (-1.2f)
 
-// Set by the Z-target side hop and backflip, the same bit Ship names PLAYER_STATE2_HOPPING.
+// The bit OoT names PLAYER_STATE2_HOPPING: set by the Z-target side hop and backflip.
 #define PLAYER_STATE2_HOPPING PLAYER_STATE2_80000
+#define PLAYER_STATE3_MIDAIR PLAYER_STATE3_2
+#define PLAYER_STATE1_JUMPING PLAYER_STATE1_40000
+#define PENDANT_BUSY_STATES                                                                                  \
+    (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING | PLAYER_STATE1_1 | PLAYER_STATE1_400 | PLAYER_STATE1_800000 | \
+     PLAYER_STATE1_4000000 | PLAYER_STATE1_8000000 | PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000)
 
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__icon_item_static_yar/gItemIconPendantOfMemoriesTex";
 static const ALIGN_ASSET(2) char sName[] = "__OTR__item_name_static/gItemNamePendantOfMemoriesENGTex";
-
+static const ALIGN_ASSET(2) char sGetItemDL[] = "__OTR__objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL";
+static const ALIGN_ASSET(2) char sGroundPoundAnim[] = "__OTR__misc/link_animetion/nei_pendant_ground_pound";
 static const ALIGN_ASSET(2) char sDrawAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_fighter_power_kiru_start";
-static const ALIGN_ASSET(2) char sPlantAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_fighter_power_kiru_wait";
 static const ALIGN_ASSET(2) char sLandingAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_normal_landing";
 static const ALIGN_ASSET(2) char sRollAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_normal_landing_roll";
+static const ALIGN_ASSET(2) char sRunJumpAnim[] = "__OTR__objects/gameplay_keep/gPlayerAnim_link_normal_run_jump";
 
-extern PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeader(const char* animPath);
-extern void func_80833864(PlayState* play, Player* player, s32 meleeWeaponAnim);
+PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeader(const char* animPath);
+void func_80833864(PlayState* play, Player* player, s32 meleeWeaponAnim);
+bool Player_IsZTargeting(Player* player);
 
 typedef enum {
     PENDANT_IDLE,
@@ -58,9 +68,42 @@ typedef enum {
     PENDANT_PARRY_LANDING,
 } PendantState;
 
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
 static const S2HModApi* sApi;
 
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual);
+
 static ColliderCylinder sStrikeCollider;
+static ColliderJntSph sParryCollider;
+static ColliderJntSphElement sParryElement;
+static bool sParryReady;
+static bool sSecondHopPending;
+static bool sComboLandingPending;
+static bool sComboWasAirborne;
+static f32 sSavedGravity;
+
+static ColliderJntSphElementInit sParryElementInit = {
+    { ELEM_MATERIAL_UNK2,
+      { DMG_SWORD, 0x00, 0x08 },
+      { 0, 0, 0 },
+      ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL,
+      ACELEM_NONE,
+      OCELEM_NONE },
+    { 0, { { 0, 0, 0 }, 36 }, 100 },
+};
+
+static ColliderJntSphInit sParryInit = {
+    { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_JNTSPH },
+    1,
+    &sParryElementInit,
+};
 
 static ColliderCylinderInit sStrikeColliderInit = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_NONE, COLSHAPE_CYLINDER },
@@ -84,11 +127,11 @@ static struct {
     u8 hops;
     s16 hopTimer;
     bool isLeapArmed;
-    bool wasHopping;
 } sPendant;
 
 static bool IsActive(void) {
-    return sApi->IsEquipmentOwned(PENDANT_KEY) && sApi->IsEquipmentToggleOn(PENDANT_KEY);
+    return sApi->IsEquipmentOwned(PENDANT_KEY) && sApi->IsEquipmentToggleOn(PENDANT_KEY) &&
+           !sApi->IsEquipmentWorn("nei.equip.trident") && !sApi->IsEquipmentWorn("nei.equip.byrna");
 }
 
 static bool IsGrounded(Player* player) {
@@ -96,11 +139,11 @@ static bool IsGrounded(Player* player) {
 }
 
 static bool IsPlayerBusy(PlayState* play, Player* player) {
-    return Player_InCsMode(play) || (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_TALKING)) != 0;
+    return Player_InCsMode(play) || (player->stateFlags1 & PENDANT_BUSY_STATES) != 0;
 }
 
-static bool IsZTargeting(Player* player) {
-    return player->focusActor != NULL && player->focusActor->update != NULL;
+static bool IsSwordOut(Player* player) {
+    return Player_GetMeleeWeaponHeld(player) != PLAYER_MELEEWEAPON_NONE;
 }
 
 static bool IsBPressed(PlayState* play) {
@@ -108,7 +151,7 @@ static bool IsBPressed(PlayState* play) {
 }
 
 static void PlaySfx(Player* player, u16 sfxId) {
-    Audio_PlaySfx_AtPos(&player->actor.world.pos, sfxId);
+    Audio_PlaySfx_AtPos(&player->actor.projectedPos, sfxId);
 }
 
 static void ChangeAnim(PlayState* play, Player* player, const char* path, f32 playSpeed, f32 startFrame, f32 endFrame,
@@ -124,10 +167,6 @@ static f32 GetLastFrame(const char* path) {
     PlayerAnimationHeader* anim = ResourceMgr_LoadPlayerAnimAsHeader(path);
 
     return anim == NULL ? 0.0f : Animation_GetLastFrame(anim);
-}
-
-static bool IsPlayingAnim(Player* player, const char* path) {
-    return player->skelAnime.animation == ResourceMgr_LoadPlayerAnimAsHeader(path);
 }
 
 static bool IsActorAlive(PlayState* play, Actor* actor) {
@@ -151,11 +190,13 @@ static void ReturnToIdle(void) {
 }
 
 static void ResetMoves(void) {
+    sSecondHopPending = false;
+    sComboLandingPending = false;
+    sComboWasAirborne = false;
     ReturnToIdle();
     sPendant.hops = 0;
     sPendant.hopTimer = 0;
     sPendant.isLeapArmed = false;
-    sPendant.wasHopping = false;
 }
 
 static void EnsureStrikeCollider(PlayState* play, Player* player) {
@@ -165,6 +206,15 @@ static void EnsureStrikeCollider(PlayState* play, Player* player) {
     Collider_InitCylinder(play, &sStrikeCollider);
     Collider_SetCylinder(play, &sStrikeCollider, &player->actor, &sStrikeColliderInit);
     sPendant.isColliderReady = true;
+}
+
+static void EnsureParryCollider(PlayState* play, Player* player) {
+    if (sParryReady) {
+        return;
+    }
+    Collider_InitJntSph(play, &sParryCollider);
+    Collider_SetJntSph(play, &sParryCollider, &player->actor, &sParryInit, &sParryElement);
+    sParryReady = true;
 }
 
 static void StrikeAround(PlayState* play, Player* player, Vec3f* center) {
@@ -207,8 +257,8 @@ static Actor* FindMortalDrawTarget(Player* player, PlayState* play) {
 }
 
 static bool CanMortalDraw(Player* player, PlayState* play) {
-    return IsBPressed(play) && Player_GetMeleeWeaponHeld(player) == PLAYER_MELEEWEAPON_NONE && !IsZTargeting(player) &&
-           IsGrounded(player) && player->speedXZ <= 1.0f;
+    return IsBPressed(play) && !IsSwordOut(player) && !Player_IsZTargeting(player) && IsGrounded(player) &&
+           player->speedXZ <= 1.0f;
 }
 
 static void StartMortalDraw(Player* player, PlayState* play, Actor* target) {
@@ -269,7 +319,7 @@ static void UpdateDrawRecovery(Player* player) {
 }
 
 static bool CanGroundPound(Player* player, PlayState* play) {
-    return !IsGrounded(player) && Player_GetMeleeWeaponHeld(player) != PLAYER_MELEEWEAPON_NONE && IsBPressed(play);
+    return !IsGrounded(player) && IsSwordOut(player) && IsBPressed(play);
 }
 
 static void HoldStill(Player* player) {
@@ -280,13 +330,18 @@ static void HoldStill(Player* player) {
     player->speedXZ = 0.0f;
 }
 
+// A negative speed plays the clip back from the planted pose to its first frame.
 static void PlantSwordPose(Player* player, PlayState* play, f32 playSpeed, f32 morph) {
-    ChangeAnim(play, player, sPlantAnim, playSpeed, GetLastFrame(sPlantAnim), 0.0f, ANIMMODE_ONCE, morph);
+    bool isRising = playSpeed < 0.0f;
+
+    ChangeAnim(play, player, sGroundPoundAnim, playSpeed, GPOUND_POSE_FRAME, isRising ? 0.0f : GPOUND_POSE_FRAME,
+               isRising ? ANIMMODE_ONCE : ANIMMODE_LOOP, morph);
 }
 
 static void StartGroundPound(Player* player, PlayState* play) {
     sPendant.state = PENDANT_GPOUND_STALL;
     sPendant.timer = 0;
+    sSavedGravity = player->actor.gravity;
     HoldStill(player);
     PlantSwordPose(player, play, 0.0f, -3.0f);
     EnsureStrikeCollider(play, player);
@@ -295,6 +350,7 @@ static void StartGroundPound(Player* player, PlayState* play) {
 
 static void UpdateGroundPoundStall(Player* player, PlayState* play) {
     HoldStill(player);
+    PlayerAnimation_Update(play, &player->skelAnime);
     if (++sPendant.timer < GPOUND_STALL_FRAMES) {
         return;
     }
@@ -302,8 +358,7 @@ static void UpdateGroundPoundStall(Player* player, PlayState* play) {
     sPendant.timer = 0;
     player->actor.velocity.y = GPOUND_FALL_VELOCITY;
     player->actor.gravity = GPOUND_FALL_GRAVITY;
-    func_80833864(play, player, PLAYER_MWA_JUMPSLASH_START);
-    PlantSwordPose(player, play, -2.0f, 0.0f);
+    PlantSwordPose(player, play, 0.0f, 0.0f);
 }
 
 static void LandGroundPound(Player* player, PlayState* play) {
@@ -313,20 +368,21 @@ static void LandGroundPound(Player* player, PlayState* play) {
     Rumble_Request(0.0f, 255, 20, 150);
     ShakeCamera(play, 28000, 14, 2, 100, 16);
     PlaySfx(player, NA_SE_IT_HAMMER_HIT);
-    ChangeAnim(play, player, sLandingAnim, 1.0f, 0.0f, GetLastFrame(sLandingAnim), ANIMMODE_ONCE, -6.0f);
-    player->actor.gravity = -1.0f;
+    PlantSwordPose(player, play, -GPOUND_POSE_FRAME / GPOUND_LANDING_FRAMES, -3.0f);
+    player->actor.gravity = sSavedGravity;
+    player->stateFlags3 &= ~PLAYER_STATE3_MIDAIR;
+    player->stateFlags1 &= ~PLAYER_STATE1_JUMPING;
 }
 
 static void UpdateGroundPoundFall(Player* player, PlayState* play) {
     sPendant.timer++;
     player->actor.gravity = GPOUND_FALL_GRAVITY;
     player->speedXZ = 0.0f;
-    if (!IsPlayingAnim(player, sPlantAnim)) {
-        PlantSwordPose(player, play, -2.0f, 0.0f);
-    }
+    PlantSwordPose(player, play, 0.0f, 0.0f);
+    PlayerAnimation_Update(play, &player->skelAnime);
     if (ConsumeStrikeHit()) {
         player->actor.velocity.y = GPOUND_BOUNCE_VELOCITY;
-        player->actor.gravity = DEFAULT_GRAVITY;
+        player->actor.gravity = sSavedGravity;
         sStrikeCollider.base.atFlags &= ~AT_ON;
         PlaySfx(player, NA_SE_IT_SWORD_STRIKE);
         ReturnToIdle();
@@ -337,7 +393,7 @@ static void UpdateGroundPoundFall(Player* player, PlayState* play) {
         LandGroundPound(player, play);
     }
     if (sPendant.timer > GPOUND_TIMEOUT) {
-        player->actor.gravity = DEFAULT_GRAVITY;
+        player->actor.gravity = sSavedGravity;
         ReturnToIdle();
     }
 }
@@ -350,173 +406,67 @@ static void UpdateGroundPoundLanding(Player* player, PlayState* play) {
             PlaySfx(player, NA_SE_IT_SWORD_STRIKE);
         }
     }
-    if (sPendant.timer > GPOUND_LANDING_FRAMES) {
+    if (PlayerAnimation_Update(play, &player->skelAnime) || sPendant.timer >= GPOUND_LANDING_FRAMES) {
+        player->actor.gravity = sSavedGravity;
         ReturnToIdle();
     }
 }
 
-static void TrackSideHops(Player* player) {
-    bool isHopping = (player->stateFlags2 & PLAYER_STATE2_HOPPING) != 0;
-
-    if (!IsZTargeting(player)) {
-        sPendant.hops = 0;
-        sPendant.isLeapArmed = false;
-        sPendant.wasHopping = false;
-        return;
-    }
-    if (isHopping && !sPendant.wasHopping) {
-        sPendant.hops++;
-        sPendant.hopTimer = 0;
-        if (sPendant.hops >= PARRY_HOPS_TO_ARM && !sPendant.isLeapArmed) {
-            sPendant.isLeapArmed = true;
-            Audio_PlaySfx(NA_SE_SY_LOCK_ON);
-        }
-    }
-    sPendant.wasHopping = isHopping;
-    if (++sPendant.hopTimer > PARRY_HOP_WINDOW) {
-        sPendant.hops = 0;
-        sPendant.isLeapArmed = false;
-    }
-}
-
-static bool CanParryLeap(Player* player, PlayState* play) {
-    if (!sPendant.isLeapArmed || !IsBPressed(play)) {
-        return false;
-    }
-    sPendant.isLeapArmed = false;
-    sPendant.hops = 0;
-    return IsZTargeting(player);
-}
-
-static void PlayRollLoop(Player* player, PlayState* play) {
-    ChangeAnim(play, player, sRollAnim, 3.0f, 0.0f, GetLastFrame(sRollAnim), ANIMMODE_LOOP, -3.0f);
-}
-
-// A negative invincibility timer is intangibility without the red flash.
-static void StartParryLeap(Player* player, PlayState* play) {
-    Actor* target = player->focusActor;
-    f32 dx = target->world.pos.x - player->actor.world.pos.x;
-    f32 dz = target->world.pos.z - player->actor.world.pos.z;
-    f32 distXZ = MAX(sqrtf(SQ(dx) + SQ(dz)), 1.0f);
-    s16 yaw = Actor_WorldYawTowardActor(&player->actor, target);
-
-    sPendant.state = PENDANT_PARRY_ARC;
-    sPendant.timer = 0;
-    sPendant.target = target;
-    sPendant.hasParryHit = false;
-    sPendant.arcStart = player->actor.world.pos;
-    sPendant.arcEnd.x = target->world.pos.x + (dx / distXZ) * PARRY_LAND_DIST;
-    sPendant.arcEnd.y = sPendant.arcStart.y;
-    sPendant.arcEnd.z = target->world.pos.z + (dz / distXZ) * PARRY_LAND_DIST;
-    HoldStill(player);
-    player->actor.bgCheckFlags &= ~BGCHECKFLAG_GROUND;
-    player->invincibilityTimer = -(PARRY_ARC_FRAMES + 5);
-    func_80833864(play, player, PLAYER_MWA_JUMPSLASH_START);
-    player->actor.shape.rot.y = yaw;
-    player->yaw = yaw;
-    PlayRollLoop(player, play);
-    EnsureStrikeCollider(play, player);
-    PlaySfx(player, NA_SE_IT_SWORD_SWING_HARD);
-}
-
-static void SilenceSwordQuads(Player* player) {
-    player->meleeWeaponQuads[0].base.atFlags &= ~AT_ON;
-    player->meleeWeaponQuads[1].base.atFlags &= ~AT_ON;
-    player->meleeWeaponState = PLAYER_MELEE_WEAPON_STATE_0;
-}
-
-static void StrikeParryTarget(Player* player, PlayState* play) {
-    if (sPendant.hasParryHit) {
-        SilenceSwordQuads(player);
-        return;
-    }
-    StrikeAround(play, player, &sPendant.target->world.pos);
-    if (!ConsumeStrikeHit()) {
-        return;
-    }
-    sPendant.hasParryHit = true;
-    sStrikeCollider.base.atFlags &= ~AT_ON;
-    SilenceSwordQuads(player);
-    PlaySfx(player, NA_SE_IT_SWORD_STRIKE);
-}
-
-static void EndParryArc(Player* player, PlayState* play) {
-    sPendant.state = PENDANT_PARRY_LANDING;
-    sPendant.timer = 0;
-    player->actor.gravity = DEFAULT_GRAVITY;
-}
-
-static void UpdateParryArc(Player* player, PlayState* play) {
-    f32 t;
-
-    if (!IsActorAlive(play, sPendant.target)) {
-        EndParryArc(player, play);
-        return;
-    }
-    t = MIN((f32)++sPendant.timer / PARRY_ARC_FRAMES, 1.0f);
-    if (!IsPlayingAnim(player, sRollAnim)) {
-        PlayRollLoop(player, play);
-    }
-    player->actor.world.pos.x = sPendant.arcStart.x + (sPendant.arcEnd.x - sPendant.arcStart.x) * t;
-    player->actor.world.pos.z = sPendant.arcStart.z + (sPendant.arcEnd.z - sPendant.arcStart.z) * t;
-    player->actor.world.pos.y =
-        sPendant.arcStart.y + (sPendant.arcEnd.y - sPendant.arcStart.y) * t + PARRY_ARC_HEIGHT * 4.0f * t * (1.0f - t);
-    HoldStill(player);
-    player->cylinder.base.ocFlags1 &= ~OC1_ON;
-    StrikeParryTarget(player, play);
-    player->actor.shape.rot.y = Actor_WorldYawTowardActor(&player->actor, sPendant.target);
-    player->yaw = player->actor.shape.rot.y;
-
-    if (sPendant.timer >= PARRY_ARC_FRAMES) {
-        EndParryArc(player, play);
-        ChangeAnim(play, player, sLandingAnim, 1.5f, 0.0f, GetLastFrame(sLandingAnim), ANIMMODE_ONCE, -3.0f);
-        PlaySfx(player, NA_SE_PL_WALK_GROUND);
-    } else if (player->actor.bgCheckFlags & BGCHECKFLAG_CEILING) {
-        EndParryArc(player, play);
-    }
-}
-
-static void UpdateParryLanding(Player* player) {
-    if (!IsGrounded(player) && ++sPendant.timer <= PARRY_LANDING_FRAMES) {
-        return;
-    }
-    player->speedXZ = 0.0f;
-    player->actor.velocity.x = 0.0f;
-    player->actor.velocity.y = 0.0f;
-    player->actor.velocity.z = 0.0f;
-    player->cylinder.base.ocFlags1 |= OC1_ON;
-    ReturnToIdle();
-}
+#include "pendant_combo.inc.c"
 
 static void StartMoveFromIdle(Player* player, PlayState* play) {
-    Actor* drawTarget = NULL;
-
     TrackSideHops(player);
     if (CanMortalDraw(player, play)) {
-        drawTarget = FindMortalDrawTarget(player, play);
+        Actor* drawTarget = FindMortalDrawTarget(player, play);
+
+        if (drawTarget != NULL) {
+            StartMortalDraw(player, play, drawTarget);
+            return;
+        }
     }
-    if (drawTarget != NULL) {
-        StartMortalDraw(player, play, drawTarget);
-    } else if (CanGroundPound(player, play)) {
+    if (CanGroundPound(player, play)) {
         StartGroundPound(player, play);
-    } else if (CanParryLeap(player, play)) {
-        StartParryLeap(player, play);
+    }
+}
+
+static bool OwnsPendantAction(void) {
+    return sPendant.state >= PENDANT_GPOUND_STALL;
+}
+
+static void ReleasePendantAction(Player* player) {
+    if (!OwnsPendantAction()) {
+        return;
+    }
+    player->actor.gravity = sSavedGravity;
+    player->stateFlags3 &= ~PLAYER_STATE3_MIDAIR;
+    player->stateFlags2 &= ~PLAYER_STATE2_HOPPING;
+    player->cylinder.base.ocFlags1 |= OC1_ON;
+    player->skelAnime.playSpeed = 1.0f;
+    if (sParryReady) {
+        sParryCollider.base.atFlags &= ~(AT_ON | AT_HIT);
+    }
+    if (sPendant.isColliderReady) {
+        sStrikeCollider.base.atFlags &= ~(AT_ON | AT_HIT);
     }
 }
 
 static void TickPendant(Player* player) {
     PlayState* play = gPlayState;
 
-    if (play == NULL || player == NULL) {
+    if (play == NULL || player == NULL || player != GET_PLAYER(play)) {
         return;
     }
     if (!IsActive() || IsPlayerBusy(play, player)) {
+        ReleasePendantAction(player);
         if (sPendant.state != PENDANT_IDLE) {
             player->cylinder.base.ocFlags1 |= OC1_ON;
             player->skelAnime.playSpeed = 1.0f;
         }
         ResetMoves();
         return;
+    }
+    if (sSecondHopPending && sPendant.state == PENDANT_IDLE) {
+        ConfigureSecondHopAnimation(player);
     }
     switch (sPendant.state) {
         case PENDANT_IDLE:
@@ -532,6 +482,34 @@ static void TickPendant(Player* player) {
             UpdateDrawRecovery(player);
             break;
         case PENDANT_GPOUND_STALL:
+        case PENDANT_GPOUND_FALLING:
+        case PENDANT_GPOUND_LANDING:
+        case PENDANT_PARRY_ARC:
+        case PENDANT_PARRY_LANDING:
+            break;
+        default:
+            ReturnToIdle();
+            break;
+    }
+}
+
+// Replaces the vanilla action function while a pendant move owns Link's body.
+static void DrivePendantAction(bool* should, va_list args) {
+    Player* player = va_arg(args, Player*);
+    PlayState* play = gPlayState;
+
+    if (play == NULL || player != GET_PLAYER(play) || !OwnsPendantAction()) {
+        return;
+    }
+    if (!IsActive() || IsPlayerBusy(play, player)) {
+        ReleasePendantAction(player);
+        ResetMoves();
+        return;
+    }
+    *should = false;
+    SilenceSwordQuads(player);
+    switch (sPendant.state) {
+        case PENDANT_GPOUND_STALL:
             UpdateGroundPoundStall(player, play);
             break;
         case PENDANT_GPOUND_FALLING:
@@ -544,6 +522,7 @@ static void TickPendant(Player* player) {
             UpdateParryArc(player, play);
             break;
         case PENDANT_PARRY_LANDING:
+            PlayerAnimation_Update(play, &player->skelAnime);
             UpdateParryLanding(player);
             break;
         default:
@@ -552,30 +531,8 @@ static void TickPendant(Player* player) {
     }
 }
 
-static void ForgetSceneState(s16 sceneId, s8 spawnNum) {
-    ResetMoves();
-    sPendant.isColliderReady = false;
-}
-
-static void TurnOff(const char* key) {
-    ResetMoves();
-}
-
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnSceneInit" };
-
-static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
-                                                  ARRAY_COUNT(sRequiredHooks) };
-
-S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
-    sApi = api;
-}
-
-S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
-    return &sRequirements;
-}
-
-static const ALIGN_ASSET(2) char sGetItemDL[] = "__OTR__objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL";
 static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    (void)entry;
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
     Matrix_Scale(0.9f, 0.9f, 0.9f, MTXMODE_APPLY);
@@ -585,18 +542,106 @@ static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static void ForgetSceneState(s16 sceneId, s8 spawnNum) {
+    ResetMoves();
+    sPendant.isColliderReady = false;
+    sParryReady = false;
+    sBoundsActor = NULL;
+}
+
+static void TurnOff(const char* key) {
+    if (gPlayState != NULL) {
+        ReleasePendantAction(GET_PLAYER(gPlayState));
+    }
+    ResetMoves();
+}
+
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate",       "OnPlayerUpdate",       "OnSceneInit",
+                                              "OnPlayerResolveAnimSite", "OnPlayerFilterInput",  "OnActorUpdate",
+                                              "OnPlayerPostLimbDraw",    "OnActorResolveMotionScale" };
+
+static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
+                                                  ARRAY_COUNT(sRequiredHooks) };
+
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, PENDANT_VISUAL_CHANNEL, visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    return visual->active == 1 && visual->scene == gPlayState->sceneId &&
+           !(player->stateFlags2 & PLAYER_STATE2_20000000);
+}
+
+static void PublishRemoteVisual(void) {
+    PlayState* play = gPlayState;
+    RemoteVisualState visual = { 0 };
+
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = IsParryCueShown(GET_PLAYER(play));
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < PENDANT_REMOTE_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState(PENDANT_VISUAL_CHANNEL, &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel(PENDANT_VISUAL_CHANNEL, 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+    }
+}
+
+S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
+    sApi = api;
+}
+
+S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
+    return &sRequirements;
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomEquipDefinition definition = { 0 };
 
-    definition.getItemEntry.drawFunc = DrawGetItem;
+    InitRemoteVisuals();
     definition.structSize = sizeof(definition);
     definition.key = PENDANT_KEY;
     definition.iconPath = sIcon;
     definition.namePath = sName;
     definition.pauseText = "%rPendant of Memories&%w%y\xB1%w near an enemy with your sword&"
                            "sheathed draws and strikes. %y\xB1%w in&mid air slams down.^"
-                           "Locked on, three side hops and&then %y\xB1%w leap over the foe.^"
-                           "%y\xB0%w on this slot in the pause&menu turns it on or off.";
+                           "Locked on: %y\xB0%w, %y\xB0%w, %y\xB0%w.&Hop, roll, hop. At the Hey and&"
+                           "sword glow, tap %y\xB1%w. No bosses.^"
+                           "The timing window is brief.&%y\xB0%w on this slot turns it off.";
     definition.getItemText = "You got the %rPendant of&Memories%w! A keepsake from&Kafei, proof of his promise.^"
                              "It remembers the moves of&heroes from other tales, and&they answer to %y\xB1%w.";
     definition.slot = S2H_EQUIP_SLOT_UPGRADE;
@@ -605,6 +650,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.column = 0;
     definition.toggles = 1;
     definition.onUnequip = TurnOff;
+    definition.getItemEntry.drawFunc = DrawGetItem;
     definition.getItemModelPath = sGetItemDL;
     static const S2HCustomItemRandomizer randomizer = {
         .structSize = sizeof(S2HCustomItemRandomizer),
@@ -620,4 +666,10 @@ S2H_MOD_EXPORT void ModInit(void) {
 
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, TickPendant);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetSceneState);
+    S2H_REGISTER_HOOK(sApi, OnPlayerResolveAnimSite, ResolveComboHop);
+    S2H_REGISTER_HOOK(sApi, OnActorResolveMotionScale, ExtendComboHopTravel);
+    S2H_REGISTER_HOOK(sApi, OnPlayerFilterInput, ReadParryInput);
+    S2H_REGISTER_HOOK(sApi, OnActorUpdate, SampleTargetBounds);
+    S2H_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, DrawParryCue);
+    sApi->RegisterVB(VB_EXECUTE_PLAYER_ACTION_FUNC, DrivePendantAction);
 }

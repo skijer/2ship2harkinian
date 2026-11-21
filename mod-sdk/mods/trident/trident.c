@@ -129,35 +129,39 @@ static void SpawnLightBall(PlayState* play, Vec3f* pos, Vec3f* velocity, Vec3f* 
 #define GET_ITEM_SCALE 0.012f
 #define DEG_TO_BINANG 182.04f
 
+#define FLIGHT_STARTUP_FRAMES 4
+#define FLIGHT_STARTUP_LIFT 20.0f
+#define FLIGHT_STARTUP_VY 6.0f
+#define STATE2_NO_Z_TARGET_ROTATION PLAYER_STATE2_20
+#define STATE2_NO_ROTATION PLAYER_STATE2_40
+#define STATE3_MIDAIR PLAYER_STATE3_2
+#define REMOTE_VISUAL_CHANNEL "nei.trident.visual"
+#define REMOTE_VISUAL_INTERVAL 5u
+
 #define GUNLANCE(name) "__OTR__misc/link_animetion/gMonsterHunterRise_Gunlance_" name
 
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__textures/icon_item_custom/gItemIconTridentTex";
 static const ALIGN_ASSET(2) char sName[] = "__OTR__textures/item_name_custom/gTridentNameTex";
-static const ALIGN_ASSET(2) char sLanceDL[] = "__OTR__objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298";
-static const ALIGN_ASSET(2) char sEnergyBallDL[] = "__OTR__objects/object_fhg/gPhantomEnergyBallDL";
-static const ALIGN_ASSET(2) char sBigMagicMaterialDL[] = "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightBallMaterialDL";
-static const ALIGN_ASSET(2) char sBigMagicBallDL[] = "__OTR__overlays/ovl_Boss_Ganon/gGanondorfSquareDL";
-static const ALIGN_ASSET(2) char sBigMagicFlecksDL[] = "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightFlecksDL";
-static const ALIGN_ASSET(2) char sBigMagicCircleDL[] = "__OTR__overlays/ovl_Boss_Ganon/gGanondorfBigMagicBGCircleDL";
-static const ALIGN_ASSET(2) char sBigMagicDotDL[] = "__OTR__overlays/ovl_Boss_Ganon/gGanondorfDotDL";
-static const ALIGN_ASSET(2) char sBigMagicRayDL[] = "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightRayTriDL";
-static const ALIGN_ASSET(2) char sDomeTex[] = "__OTR__overlays/ovl_Magic_Fire/sTex";
-static const ALIGN_ASSET(2) char sDomeMaterialDL[] = "__OTR__overlays/ovl_Magic_Fire/sMaterialDL";
-static const ALIGN_ASSET(2) char sDomeModelDL[] = "__OTR__overlays/ovl_Magic_Fire/sModelDL";
+#define GANON "__OTR__overlays/oot_ovl_Boss_Ganon/"
+#define MAGIC_FIRE "__OTR__overlays/oot_ovl_Magic_Fire/"
+static const ALIGN_ASSET(2) char sLanceDL[] =
+    "__OTR__objects/oot_object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298";
+static const ALIGN_ASSET(2) char sEnergyBallDL[] = "__OTR__objects/oot_object_fhg/gPhantomEnergyBallDL";
+static const ALIGN_ASSET(2) char sBigMagicMaterialDL[] = GANON "gGanondorfLightBallMaterialDL";
+static const ALIGN_ASSET(2) char sBigMagicBallDL[] = GANON "gGanondorfSquareDL";
+static const ALIGN_ASSET(2) char sBigMagicFlecksDL[] = GANON "gGanondorfLightFlecksDL";
+static const ALIGN_ASSET(2) char sBigMagicCircleDL[] = GANON "gGanondorfBigMagicBGCircleDL";
+static const ALIGN_ASSET(2) char sBigMagicDotDL[] = GANON "gGanondorfDotDL";
+static const ALIGN_ASSET(2) char sBigMagicRayDL[] = GANON "gGanondorfLightRayTriDL";
+static const ALIGN_ASSET(2) char sDomeTex[] = MAGIC_FIRE "sTex";
+static const ALIGN_ASSET(2) char sDomeMaterialDL[] = MAGIC_FIRE "sMaterialDL";
+static const ALIGN_ASSET(2) char sDomeModelDL[] = MAGIC_FIRE "sModelDL";
 
 static const char* const sStreakDLs[TRAIL_DRAWN] = {
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak12DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak11DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak10DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak9DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak8DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak7DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak6DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak5DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak4DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak3DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak2DL",
-    "__OTR__overlays/ovl_Boss_Ganon/gGanondorfLightStreak1DL",
+    GANON "gGanondorfLightStreak12DL", GANON "gGanondorfLightStreak11DL", GANON "gGanondorfLightStreak10DL",
+    GANON "gGanondorfLightStreak9DL",  GANON "gGanondorfLightStreak8DL",  GANON "gGanondorfLightStreak7DL",
+    GANON "gGanondorfLightStreak6DL",  GANON "gGanondorfLightStreak5DL",  GANON "gGanondorfLightStreak4DL",
+    GANON "gGanondorfLightStreak3DL",  GANON "gGanondorfLightStreak2DL",  GANON "gGanondorfLightStreak1DL",
 };
 
 // The lance branches to segment 8 twice for Phantom Ganon's per-limb glow; unset, it jumps into garbage.
@@ -168,6 +172,7 @@ extern HOST_DATA void Player_Action_29(Player* player, PlayState* play);
 extern HOST_DATA Vec3f D_801C0994[];
 PlayerAnimationHeader* ResourceMgr_LoadPlayerAnimAsHeader(const char* animPath);
 s32 Player_SetAction(PlayState* play, Player* player, PlayerActionFunc actionFunc, s32 flags);
+void Player_SetAction_PreserveItemAction(PlayState* play, Player* player, PlayerActionFunc actionFunc, s32 flags);
 void func_8083B1A0(Player* player, PlayState* play);
 s32 func_808401F4(PlayState* play, Player* player);
 void func_8083375C(Player* player, PlayerMeleeWeaponAnimation meleeWeaponAnim);
@@ -610,7 +615,7 @@ static void StartSwing(PlayState* play, Player* player, const Swing* swing, bool
         return;
     }
     if (!IsInLanceAction(player)) {
-        Player_SetAction(play, player, LanceAction, 0);
+        Player_SetAction_PreserveItemAction(play, player, LanceAction, 0);
     }
     sLance.state = LANCE_SWING;
     sLance.swing = swing;
@@ -674,6 +679,7 @@ static void UpdateSwing(PlayState* play, Player* player, Input* input) {
 
 static void ResetFlight(Player* player) {
     player->meleeWeaponState = 0;
+    player->stateFlags3 &= ~STATE3_MIDAIR;
     player->actor.gravity = LAND_GRAVITY;
     sLance.state = LANCE_SWING;
     sLance.launchTarget = NULL;
@@ -965,7 +971,8 @@ static void UpdateFlight(PlayState* play, Player* player, Input* input) {
         func_8083B1A0(player, play);
         return;
     }
-    player->stateFlags2 |= PLAYER_STATE2_20;
+    player->stateFlags3 |= STATE3_MIDAIR;
+    player->stateFlags2 |= STATE2_NO_ROTATION;
     player->actor.gravity = 0.0f;
     player->actor.terminalVelocity = POUND_FALL;
     player->fallStartHeight = (s16)player->actor.world.pos.y;
@@ -1016,11 +1023,19 @@ static void UpdateFlight(PlayState* play, Player* player, Input* input) {
     TouchDown(play, player, vy);
 }
 
+static s32 sFlightStartupFrames;
+
+// Lifted clear of the floor so the first frames of the climb are not read as a landing.
 static void TakeOff(PlayState* play, Player* player) {
     if (LoadClip(CLIP_FLY_START) == NULL) {
         return;
     }
-    Player_SetAction(play, player, LanceAction, 0);
+    player->itemAction = player->heldItemAction;
+    Player_SetAction_PreserveItemAction(play, player, LanceAction, 0);
+    player->actor.world.pos.y += FLIGHT_STARTUP_LIFT;
+    player->actor.prevPos = player->actor.world.pos;
+    player->stateFlags3 |= STATE3_MIDAIR;
+    sFlightStartupFrames = FLIGHT_STARTUP_FRAMES;
     sLance.swing = NULL;
     sLance.flyMagicTick = 0;
     sLance.launchTarget = NULL;
@@ -1068,7 +1083,7 @@ static void StartDash(PlayState* play, Player* player) {
     if (LoadClip(CLIP_DASH_START) == NULL) {
         return;
     }
-    Player_SetAction(play, player, LanceAction, 0);
+    Player_SetAction_PreserveItemAction(play, player, LanceAction, 0);
     sLance.swing = NULL;
     sLance.state = LANCE_DASH_START;
     player->speedXZ = 0.0f;
@@ -1080,7 +1095,7 @@ static void StartDash(PlayState* play, Player* player) {
 static void LanceAction(Player* player, PlayState* play) {
     Input* input = &play->state.input[0];
 
-    player->stateFlags2 |= PLAYER_STATE2_20;
+    player->stateFlags2 |= STATE2_NO_Z_TARGET_ROTATION;
     if (IsFlightState(sLance.state)) {
         UpdateFlight(play, player, input);
         return;
@@ -1794,11 +1809,36 @@ static void TickTrident(Player* player) {
     if (sProjectileGrace > 0) {
         sProjectileGrace--;
     }
+    bool isFlying = IsFlightState(sLance.state);
+    // Vanilla can pick its fall on leaving a ledge; the flight keeps its action until a real interrupt.
+    if (isFlying && !IsInLanceAction(player) && CanAct(player)) {
+        player->itemAction = player->heldItemAction;
+        Player_SetAction_PreserveItemAction(play, player, LanceAction, 0);
+        PlayClip(play, player, (ClipId)(CLIP_FLY_START + sLance.state - LANCE_FLY_START),
+                 sLance.state == LANCE_FLY_IDLE, 0.0f);
+    }
+    if (sFlightStartupFrames > 0 && isFlying) {
+        sFlightStartupFrames--;
+        player->itemAction = player->heldItemAction;
+        Player_SetAction_PreserveItemAction(play, player, LanceAction, 0);
+        player->stateFlags3 |= STATE3_MIDAIR;
+        player->actor.gravity = 0.0f;
+        player->actor.bgCheckFlags &= ~BGCHECKFLAG_GROUND;
+        player->actor.velocity.y = FLIGHT_STARTUP_VY;
+        return;
+    }
     if (!IsInLanceAction(player) && sLance.state != LANCE_SWING) {
         ResetFlight(player);
     }
     isDrawn = CanAct(player) && IsWielding(player);
+    bool isRHeld = CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_R);
     SheatheInWater(play, player);
+    if (isDrawn && !IsFlightState(sLance.state) && isRHeld) {
+        ReadGuardButtons(play, player);
+        if (IsFlightState(sLance.state)) {
+            return;
+        }
+    }
     TickBHold(play);
     TickComboIdle(player);
     TickCharge(play, player);
@@ -1806,9 +1846,7 @@ static void TickTrident(Player* player) {
         return;
     }
     ReskinVanillaStrikes(play, player);
-    if (isDrawn) {
-        ReadGuardButtons(play, player);
-    } else {
+    if (!isDrawn || !isRHeld) {
         sLance.flyHold = 0;
     }
 }
@@ -1862,8 +1900,74 @@ static void RunWithLance(int32_t group, int32_t animType, PlayerAnimationHeader*
     }
 }
 
+typedef struct {
+    s16 scene;
+    u8 isWielding;
+} RemoteVisualState;
+
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static u32 sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool IsRemoteWielding(Player* player) {
+    RemoteVisualState visual;
+
+    if (!sRemoteVisualReady || player->transformation != PLAYER_FORM_HUMAN ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return false;
+    }
+    u32 peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 || sApi->GetNetPeerState(peerId, REMOTE_VISUAL_CHANNEL, &visual, sizeof(visual)) != sizeof(visual)) {
+        return false;
+    }
+    return visual.isWielding == 1 && visual.scene == gPlayState->sceneId;
+}
+
+static void PublishRemoteVisual(void) {
+    PlayState* play = gPlayState;
+    RemoteVisualState visual = { 0 };
+
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.isWielding = IsWielding(GET_PLAYER(play));
+        if (sRemoteVisualSent && (u32)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState(REMOTE_VISUAL_CHANNEL, &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel(REMOTE_VISUAL_CHANNEL, 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+    }
+}
+
+// Remote players are drawn with the local player's hooks; their own state comes over the network.
+static bool IsDrawnWielding(PlayState* play, Player* player) {
+    return player == GET_PLAYER(play) ? IsWielding(player) : IsRemoteWielding(player);
+}
+
 static void GripLance(Player* player, int32_t limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
-    if (limbIndex == PLAYER_LIMB_LEFT_HAND && IsWielding(player)) {
+    if (gPlayState != NULL && limbIndex == PLAYER_LIMB_LEFT_HAND && IsDrawnWielding(gPlayState, player)) {
         *dList = (Gfx*)gLinkHumanLeftHandClosedDL;
     }
 }
@@ -1876,6 +1980,19 @@ static void ApplyLanceMatrix(void) {
                      (s16)(LANCE_ROT_Z * DEG_TO_BINANG), MTXMODE_APPLY);
     Matrix_Scale(LANCE_HELD_SCALE, LANCE_HELD_SCALE, LANCE_HELD_SCALE, MTXMODE_APPLY);
     Matrix_Translate(LANCE_OFF_X, LANCE_OFF_Y, LANCE_OFF_Z, MTXMODE_APPLY);
+}
+
+// The spin charge glow follows the lance tip while it is wielded, as Phantom Ganon's lance gathers its magic.
+static void MoveThunderToLance(bool* should, va_list args) {
+    if (gPlayState == NULL || !IsWielding(GET_PLAYER(gPlayState))) {
+        return;
+    }
+    *should = false;
+    ApplyLanceMatrix();
+    Matrix_RotateYF(-M_PIf / 2.0f, MTXMODE_APPLY);
+    Matrix_Translate(2000.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+    Matrix_Scale(-2.4f, -2.0f, -1.4f, MTXMODE_APPLY);
+    Matrix_RotateXS(0x4000, MTXMODE_APPLY);
 }
 
 static void ApplyLanceTrailMatrix(void) {
@@ -1906,10 +2023,12 @@ static void TraceLanceSwing(PlayState* play, Player* player) {
 static void DrawLance(Player* player, int32_t limbIndex) {
     PlayState* play = gPlayState;
 
-    if (play == NULL || limbIndex != PLAYER_LIMB_LEFT_HAND || player != GET_PLAYER(play) || !IsWielding(player)) {
+    if (play == NULL || limbIndex != PLAYER_LIMB_LEFT_HAND || !IsDrawnWielding(play, player)) {
         return;
     }
-    TraceLanceSwing(play, player);
+    if (player == GET_PLAYER(play)) {
+        TraceLanceSwing(play, player);
+    }
     if (!HasOotAssets()) {
         return;
     }
@@ -2002,6 +2121,14 @@ static void GildLink(Actor* actor, PlayState* play, Color_RGBA8* grayscale) {
     }
 }
 
+static void StrikeHeavily(PlayState* play, s32 dmgFlags, u8* damage) {
+    if (IsWorn() && sProjectileGrace > 0 && *damage < MAX_BALL_DAMAGE) {
+        *damage = MAX_BALL_DAMAGE;
+    }
+}
+
+// MM keeps one shield value with no separate ownership, so only a custom shield is taken off; the vanilla one in the
+// slot is the Mirror Shield once Link owns it.
 static void TakeUpVanillaShield(const char* key) {
     if (CustomEquipRegistry_GetWorn(S2H_EQUIP_SLOT_SHIELD) != NULL) {
         CustomEquipRegistry_TakeOff(S2H_EQUIP_SLOT_SHIELD);
@@ -2057,7 +2184,8 @@ static bool RegisterProjectileActor(void) {
 static const char* const sRequiredHooks[] = {
     "OnPlayerUpdate",          "OnPlayerActionHandler",    "OnPlayerFilterInput", "OnPlayerResolveAnim",
     "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw",     "ShouldActorDraw",     "OnActorDrawEnd",
-    "OnActorResolveGrayscale", "OnCollisionResolveDamage", "OnSceneInit",
+    "OnActorResolveGrayscale", "OnCollisionResolveDamage", "OnSceneInit",         "OnResolveSwordDamage",
+    "OnGameFrameUpdate",
 };
 
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
@@ -2085,6 +2213,7 @@ static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
 S2H_MOD_EXPORT void ModInit(void) {
     S2HCustomEquipDefinition definition = { 0 };
 
+    InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, RegisterActor) || !RegisterProjectileActor()) {
         return;
     }
@@ -2133,6 +2262,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldActorDraw, ACTOR_PLAYER, HideSwingFromSwordHand);
     S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorDrawEnd, ACTOR_PLAYER, DrawChargeEffects);
     S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorResolveGrayscale, ACTOR_PLAYER, GildLink);
+    S2H_REGISTER_HOOK(sApi, OnResolveSwordDamage, StrikeHeavily);
     S2H_REGISTER_HOOK(sApi, OnCollisionResolveDamage, KeepFixedDamage);
+    sApi->RegisterVB(VB_TRANSFORM_THUNDER_MATRIX, MoveThunderToLance);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetSceneState);
 }

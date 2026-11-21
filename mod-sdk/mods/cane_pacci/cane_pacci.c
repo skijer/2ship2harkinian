@@ -10,6 +10,12 @@
 #include "overlays/actors/ovl_En_Ishi/z_en_ishi.h"
 
 #define PACCI_KEY "nei.cane_pacci"
+#define PACCI_VISUAL_CHANNEL "nei.cane_pacci.visual"
+#define PACCI_GIVE_SCALE 0.25f
+#define PACCI_TIP_REACH 30.0f
+#define PACCI_FLIP_SFX NA_SE_EN_PAMET_REVERSE
+#define PACCI_LAND_SFX NA_SE_EN_DODO_M_DOWN
+#define REMOTE_VISUAL_INTERVAL 5u
 #define PACCI_POOL_SIZE 8
 #define PACCI_HOLD_FRAMES 10
 #define PACCI_CAST_SPEED 2.0f
@@ -327,9 +333,9 @@ static void GetHandPos(Player* player, Vec3f* pos) {
 
     *pos = hand;
     if (length > 0.001f) {
-        pos->x += (hand.x - forearm.x) / length * 16.0f;
-        pos->y += (hand.y - forearm.y) / length * 16.0f;
-        pos->z += (hand.z - forearm.z) / length * 16.0f;
+        pos->x += (hand.x - forearm.x) / length * PACCI_TIP_REACH;
+        pos->y += (hand.y - forearm.y) / length * PACCI_TIP_REACH;
+        pos->z += (hand.z - forearm.z) / length * PACCI_TIP_REACH;
     }
 }
 
@@ -629,7 +635,7 @@ static bool TakeDownedHit(PacciFlip* flip, Actor* actor) {
     actor->colChkInfo.health -= actor->colChkInfo.damage;
     actor->colChkInfo.damage = 0;
     Actor_SetColorFilter(actor, COLORFILTER_COLORFLAG_GRAY, 255, 0, PACCI_HURT_TINT_FRAMES);
-    Actor_PlaySfx(actor, NA_SE_EN_STAL_DAMAGE);
+    Actor_PlaySfx(actor, PACCI_LAND_SFX);
     return false;
 }
 
@@ -643,7 +649,7 @@ static void UpdateAirborne(PacciFlip* flip, Actor* actor, PlayState* play) {
     }
     if (actor->bgCheckFlags & BGCHECKFLAG_GROUND_TOUCH) {
         Actor_SpawnFloorDustRing(play, actor, &actor->world.pos, 20.0f, 11, 4.0f, 0, 0, false);
-        Actor_PlaySfx(actor, NA_SE_EN_STAL_DAMAGE);
+        Actor_PlaySfx(actor, PACCI_LAND_SFX);
     }
     if (actor->category != ACTORCAT_ENEMY) {
         Vec3f impact = actor->world.pos;
@@ -670,7 +676,7 @@ static void UpdateDowned(PacciFlip* flip, Actor* actor, PlayState* play) {
     }
     flip->phase = PACCI_FLIP_RIGHTING;
     actor->velocity.y = PACCI_FLIP_RIGHT_VEL_Y;
-    Actor_PlaySfx(actor, NA_SE_EN_STAL_DAMAGE);
+    Actor_PlaySfx(actor, PACCI_FLIP_SFX);
 }
 
 static void UpdateRighting(PacciFlip* flip, Actor* actor, PlayState* play) {
@@ -679,7 +685,7 @@ static void UpdateRighting(PacciFlip* flip, Actor* actor, PlayState* play) {
     Actor_UpdateBgCheckInfo(play, actor, 5.0f, 15.0f, 0.0f, PACCI_BG_CHECK_FLAGS);
     SubmitFlipColliders(flip, actor, play, false);
     if (actor->bgCheckFlags & BGCHECKFLAG_GROUND_TOUCH) {
-        Actor_PlaySfx(actor, NA_SE_EN_STAL_DAMAGE);
+        Actor_PlaySfx(actor, PACCI_LAND_SFX);
         actor->world.pos.y = actor->floorHeight;
         RestoreFlipped(flip);
     }
@@ -741,7 +747,7 @@ static bool CastFlip(PlayState* play, Player* player) {
     target->colChkInfo.mass = PACCI_FLIP_THROWN_MASS;
     target->bgCheckFlags &= ~(BGCHECKFLAG_GROUND | BGCHECKFLAG_GROUND_TOUCH);
     target->flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
-    Actor_PlaySfx(target, NA_SE_EN_STAL_DAMAGE);
+    Actor_PlaySfx(target, PACCI_FLIP_SFX);
     StartVfx(play, player, target, false);
     return true;
 }
@@ -799,7 +805,7 @@ static bool TryGrab(PlayState* play, Player* player) {
         target->flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED;
     }
     target->room = -1;
-    Actor_PlaySfx(target, NA_SE_EN_STAL_DAMAGE);
+    Actor_PlaySfx(target, PACCI_FLIP_SFX);
     StartVfx(play, player, target, true);
     return true;
 }
@@ -828,7 +834,7 @@ static void Throw(Player* player) {
     sLift.isThrown = true;
     sLift.flightTimer = PACCI_LIFT_FLIGHT_FRAMES;
     ReleaseVfx();
-    Actor_PlaySfx(actor, NA_SE_EN_STAL_DAMAGE);
+    Actor_PlaySfx(actor, PACCI_FLIP_SFX);
 }
 
 static void HoldAloft(Player* player, Actor* actor) {
@@ -863,7 +869,7 @@ static void FlyThrown(PlayState* play, Player* player, Actor* actor) {
     Vec3f impact = actor->world.pos;
     bool isHeavy = IsBigRock(actor);
 
-    Actor_PlaySfx(actor, NA_SE_EN_STAL_DAMAGE);
+    Actor_PlaySfx(actor, PACCI_LAND_SFX);
     LetGo();
     SpawnBurst(play, player, &impact, isHeavy);
 }
@@ -1049,9 +1055,72 @@ static void UpdatePacciWorld(Player* player) {
     TrackButton(play, player);
 }
 
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, PACCI_VISUAL_CHANNEL, visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    return visual->active == 1 && visual->scene == gPlayState->sceneId &&
+           !(player->stateFlags2 & PLAYER_STATE2_20000000);
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = sPhase != PACCI_STOWED;
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState(PACCI_VISUAL_CHANNEL, &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static bool IsCaneVisible(Player* player, PlayState* play) {
+    RemoteVisualState visual;
+    if (player == GET_PLAYER(play)) {
+        return sPhase != PACCI_STOWED && !(player->stateFlags2 & PLAYER_STATE2_20000000);
+    }
+    return ReadRemoteVisual(player, &visual);
+}
+
+// The host draws generic held models on the left hand. Pacci explicitly owns the right-hand limb.
 static void DrawPacciInRightHand(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
-    if (player != GET_PLAYER(play) || sPhase == PACCI_STOWED) {
+    if (!IsCaneVisible(player, play)) {
         return;
     }
     Vec3f hand = player->bodyPartsPos[PLAYER_BODYPART_RIGHT_HAND];
@@ -1095,6 +1164,35 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
     sIsTrackingPress = false;
 }
 
+static void DrawRemotePlayer(Actor* actor, PlayState* play) {
+    if (actor->id == ACTOR_PLAYER || !sRemoteVisualReady || sApi->GetNetPeerIdForActor(actor) == 0) {
+        return;
+    }
+    DrawPacciInRightHand(actor, play);
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel(PACCI_VISUAL_CHANNEL, 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+        S2H_REGISTER_HOOK(sApi, OnActorDrawEnd, DrawRemotePlayer);
+    }
+}
+
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    Matrix_Scale(PACCI_GIVE_SCALE, PACCI_GIVE_SCALE, PACCI_GIVE_SCALE, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sCaneGiveDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, PACCI_KEY, PACCI_KEY, "",
 };
@@ -1108,6 +1206,7 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, GetEquippedCustomItem)) {
         return;
     }
@@ -1124,7 +1223,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetAction(&cane, TakeOutCane, UpdateCane);
     Z64Items_SetHeldCallbacks(&cane, PressCane, PutCaneAway, NULL);
     Z64Items_SetGetItemModel(&cane, sCaneGiveDL);
-    cane.getItemScale = 0.18f;
+    cane.getItemScale = PACCI_GIVE_SCALE;
+    cane.getItemEntry.drawFunc = DrawGetItem;
 
     Z64Items_SetLogic(&cane, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &cane)) {

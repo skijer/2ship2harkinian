@@ -14,6 +14,8 @@
 #define HIT_EFFECT_BURN 9
 #define KNOCKBACK_SHOCK 4
 #define KNOCKBACK_LARGE 3
+#define FLASH_HOLD_FRAMES 20
+#define FLASH_FADE_FRAMES 30
 
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__textures/icon_item_custom/gItemIconSagesTunicTex";
 static const ALIGN_ASSET(2) char sName[] = "__OTR__textures/item_name_custom/gSagesTunicNameTex";
@@ -35,15 +37,37 @@ static const char* const sResistanceMedallions[SAGES_RESIST_MAX] = {
     "nei.medallion.shadow", "nei.medallion.spirit", "nei.medallion.forest",
 };
 
+static const Color_RGB8 sResistanceColors[SAGES_RESIST_MAX] = {
+    { 60, 130, 235 }, { 235, 60, 30 }, { 245, 225, 80 }, { 155, 70, 220 }, { 240, 140, 40 }, { 70, 195, 90 },
+};
+
+static const Color_RGB8 sClothColor = { 235, 240, 245 };
+
 static const S2HModApi* sApi;
 static s32 (*sVanillaGrabPlayer)(PlayState* play, Player* player);
+static s16 sFlashTimer;
+static SagesResistance sFlashResistance;
 
 static bool IsWorn(void) {
     return CustomEquipRegistry_IsWorn(SAGES_TUNIC_KEY);
 }
 
-static bool Resists(SagesResistance resistance) {
+static bool HasResistance(SagesResistance resistance) {
     return IsWorn() && sApi->IsCustomItemOwned(sResistanceMedallions[resistance]);
+}
+
+static void Flash(SagesResistance resistance) {
+    sFlashResistance = resistance;
+    sFlashTimer = FLASH_HOLD_FRAMES + FLASH_FADE_FRAMES;
+}
+
+// Every resistance that saves Link lights the cloth in its medallion's colour.
+static bool Resists(SagesResistance resistance) {
+    if (!HasResistance(resistance)) {
+        return false;
+    }
+    Flash(resistance);
+    return true;
 }
 
 static bool IsLocalPlayer(Actor* actor) {
@@ -61,12 +85,13 @@ static void ResistBurningFloors(bool* should, va_list args) {
     PlayState* play = gPlayState;
     FloorType floorType;
 
-    if (play == NULL || !Resists(SAGES_RESIST_FIRE) || !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) ||
+    if (play == NULL || !HasResistance(SAGES_RESIST_FIRE) || !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) ||
         player->actor.floorPoly == NULL) {
         return;
     }
     floorType = SurfaceType_GetFloorType(&play->colCtx, player->actor.floorPoly, player->actor.floorBgId);
     if (floorType == FLOOR_TYPE_9 || func_808340AC(floorType) >= 0) {
+        Flash(SAGES_RESIST_FIRE);
         *should = false;
     }
 }
@@ -139,16 +164,35 @@ static void TickTunic(Player* player) {
         return;
     }
     WrapGrabPlayer(play);
+    if (sFlashTimer > 0) {
+        sFlashTimer--;
+    }
 }
 
+static u8 BlendChannel(u8 cloth, u8 medallion, s32 weight) {
+    return (u8)(cloth + ((s32)medallion - cloth) * weight / FLASH_FADE_FRAMES);
+}
+
+// The host hands a per-frame copy of the tunic colour, so writing through it never repaints a shared table.
 static void DyeTunic(bool* should, va_list args) {
     va_arg(args, void*);
     Color_RGB8* color = va_arg(args, Color_RGB8*);
-    if (!IsWorn() || color == NULL)
+    if (!IsWorn() || color == NULL) {
         return;
-    color->r = 235;
-    color->g = 240;
-    color->b = 245;
+    }
+    *color = sClothColor;
+    if (sFlashTimer <= 0) {
+        return;
+    }
+    Color_RGB8 medallion = sResistanceColors[sFlashResistance];
+    s32 weight = MIN(sFlashTimer, FLASH_FADE_FRAMES);
+    color->r = BlendChannel(sClothColor.r, medallion.r, weight);
+    color->g = BlendChannel(sClothColor.g, medallion.g, weight);
+    color->b = BlendChannel(sClothColor.b, medallion.b, weight);
+}
+
+static void ClearFlash(const char* key) {
+    sFlashTimer = 0;
 }
 
 static const char* const sRequiredHooks[] = {
@@ -258,6 +302,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.column = 3;
     definition.formMask = S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN);
     definition.toggles = 1;
+    definition.onUnequip = ClearFlash;
     static const S2HCustomItemRandomizer randomizer = {
         .structSize = sizeof(S2HCustomItemRandomizer),
         .type = S2H_CUSTOM_ITEM_TYPE_EQUIP,

@@ -1,7 +1,8 @@
 {
     "name": "champion_tunic",
-  "dependencies": ["oot_assets", "nei_equipment"],
+    "dependencies": ["oot_assets", "nei_equipment"],
     "author": "Skijer",
-    "version": "1.0",
-    "description": "Champion's Tunic: tunic-slot equipment with Flurry Rush on a perfect dodge and bullet time when aiming in mid air."
+    "version": "1.0.1",
+    "description": "Champion's Tunic: tunic-slot equipment with Flurry Rush on a perfect dodge and bullet time when aiming in mid air.",
+    "display_name": "Champion's Tunic"
 }

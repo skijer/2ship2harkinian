@@ -1,4 +1,5 @@
 #include <math.h>
+#include <string.h>
 
 #include "z64items.h"
 
@@ -24,9 +25,23 @@ static const ALIGN_ASSET(2) char sShovelDL[] = "__OTR__objects/object_nei_shovel
 
 static Color_RGBA8 sDustColor = { 139, 90, 43, 255 };
 
-static const char* const sRequiredHooks[] = { "OnActorDrawEnd", "OnPlayerUpdate", "OnPlayerResolveItemActionInit" };
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate", "OnActorDrawEnd", "OnPlayerUpdate",
+                                              "OnPlayerResolveItemActionInit" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
+
+#define REMOTE_VISUAL_INTERVAL 5u
+
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual);
+static void InitRemoteVisuals(void);
 
 #define SHOVEL_HELD_SCALE 0.11f
 #define SHOVEL_HELD_OFFSET_X 5.56f
@@ -53,7 +68,7 @@ static void SpawnDust(PlayState* play, Vec3f* pos, u8 count) {
     for (u8 i = 0; i < count; i++) {
         Vec3f dustPos = { pos->x + Rand_CenteredFloat(20.0f), pos->y + 3.0f, pos->z + Rand_CenteredFloat(20.0f) };
         Vec3f velocity = { Rand_CenteredFloat(6.0f), 6.0f + Rand_ZeroOne() * 4.0f, Rand_CenteredFloat(6.0f) };
-        EffectSsKirakira_SpawnDispersed(play, &dustPos, &velocity, &accel, &sDustColor, &sDustColor, 250, 30);
+        func_800B0EB0(play, &dustPos, &velocity, &accel, &sDustColor, &sDustColor, 250, 30, 10);
     }
 }
 
@@ -211,8 +226,17 @@ static void ApplyHeldTransform(void) {
     Matrix_Scale(SHOVEL_HELD_SCALE, SHOVEL_HELD_SCALE, SHOVEL_HELD_SCALE, MTXMODE_APPLY);
 }
 
+static bool IsShovelInHands(Player* player, PlayState* play) {
+    RemoteVisualState visual;
+
+    if (player == GET_PLAYER(play)) {
+        return IsDigging(player);
+    }
+    return ReadRemoteVisual(player, &visual);
+}
+
 static void DrawShovelInHands(Player* player, PlayState* play) {
-    if (!IsDigging(player)) {
+    if (!IsShovelInHands(player, play)) {
         return;
     }
     Vec3f leftHand = player->bodyPartsPos[PLAYER_BODYPART_LEFT_HAND];
@@ -236,7 +260,22 @@ static void DrawShovelInHands(Player* player, PlayState* play) {
 }
 
 static void DrawAfterPlayer(Actor* actor, PlayState* play) {
-    DrawShovelInHands((Player*)actor, play);
+    Player* player = (Player*)actor;
+
+    if (player->stateFlags2 & PLAYER_STATE2_20000000) {
+        return;
+    }
+    DrawShovelInHands(player, play);
+}
+
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(SHOVEL_GIVE_SCALE, SHOVEL_GIVE_SCALE, SHOVEL_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sShovelDL);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static void UseShovel(Player* player, PlayState* play) {
@@ -247,6 +286,79 @@ static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, SHOVEL_KEY, SHOVEL_KEY, "",
 };
 
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 || sApi->GetNetPeerState(peerId, "nei.shovel.visual", visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    if (visual->active != 1 || visual->adult > 1 || visual->scene != gPlayState->sceneId ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return false;
+    }
+    for (uint32_t i = 0; i < ARRAY_COUNT(visual->values); i++) {
+        if (!isfinite(visual->values[i]) || fabsf(visual->values[i]) > 10000000.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = IsDigging(GET_PLAYER(play));
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState("nei.shovel.visual", &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void DrawRemotePlayer(Actor* actor, PlayState* play) {
+    if (actor->id == ACTOR_PLAYER || !sRemoteVisualReady || sApi->GetNetPeerIdForActor(actor) == 0) {
+        return;
+    }
+    DrawAfterPlayer(actor, play);
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel("nei.shovel.visual", 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+        S2H_REGISTER_HOOK(sApi, OnActorDrawEnd, DrawRemotePlayer);
+    }
+}
+
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
 }
@@ -256,11 +368,13 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     S2HCustomItemDefinition shovel = Z64Items_Define(SHOVEL_KEY, sIconTex, sNameTex);
 
     Z64Items_SetButtons(&shovel, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     Z64Items_SetForms(&shovel, S2H_CUSTOM_ITEM_FORM_BIT(PLAYER_FORM_HUMAN));
     Z64Items_SetPlacement(&shovel, 0, 22, 0);
+    shovel.displayName = "Dampe's Shovel";
     Z64Items_SetTextbox(&shovel, "You got %rDampe's Shovel%w! The&old gravekeeper's tool, worn&"
                                  "smooth by years of work.^"
                                  "Press %y\xB2%w to dig. A %yhidden&grotto%w opens where the&"
@@ -271,8 +385,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetCanUse(&shovel, CanDig);
     Z64Items_SetAction(&shovel, TakeOutShovel, NULL);
     Z64Items_SetHeldCallbacks(&shovel, UseShovel, StopDigging, NULL);
-    Z64Items_SetGetItemModel(&shovel, sShovelDL);
     shovel.modelGroup = PLAYER_MODELGROUP_DEFAULT;
+    shovel.getItemEntry.drawFunc = DrawGetItem;
 
     Z64Items_SetLogic(&shovel, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &shovel)) {

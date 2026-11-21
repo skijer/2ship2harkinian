@@ -6,17 +6,19 @@
 #include "variables.h"
 
 #define TIME_GATE_KEY "nei.time_gate"
-#define TIME_GATE_MAGIC_COST 48
+#define TIME_GATE_MAGIC_COST 24
 #define TIME_GATE_ANIM_SPEED 0.83f
 #define TIME_GATE_PROMPT_DELAY 10
 #define TIME_GATE_ITEM_FRAME 10.0f
 #define TIME_GATE_HELD_SCALE 0.008f
+#define TIME_GATE_GIVE_SCALE 0.5f
 #define TIME_GATE_FLASH_ALPHA 255.0f
 #define TIME_GATE_FLASH_FADE 17.0f
 
 // MM's textbox needs this set while a prompt is up, like the picto box does.
 #define TIME_GATE_FREEZE_FLAG PLAYER_STATE1_20000000
 #define TIME_GATE_NO_ITEM_FLAGS (PLAYER_STATE1_8000000 | PLAYER_STATE1_100000)
+#define TIME_GATE_DISABLE_DRAW_FLAG PLAYER_STATE2_20000000
 
 typedef enum {
     TIME_GATE_IDLE,
@@ -51,6 +53,8 @@ static f32 sPortalAlpha;
 static f32 sPortalScale;
 static f32 sPortalScroll;
 static f32 sFlashAlpha;
+static s16 sCameraCsId = CS_ID_NONE;
+static bool sIsCameraTurned;
 
 s32 Player_SetAction(PlayState* play, Player* this, PlayerActionFunc actionFunc, s32 arg3);
 void Player_StopHorizontalMovement(Player* this);
@@ -97,6 +101,27 @@ static void SpawnTimeSparkle(Player* player, PlayState* play, f32 height) {
     EffectSsKirakira_SpawnFocused(play, &pos, &velocity, &accel, &prim, &env, 500, 18);
 }
 
+// MM has no spell camera: the ocarina cutscene is the one that turns around to face Link.
+static void TurnCameraToLink(Player* player) {
+    if (sIsCameraTurned || sCameraCsId <= CS_ID_NONE) {
+        return;
+    }
+    if (!CutsceneManager_IsNext(sCameraCsId)) {
+        CutsceneManager_Queue(sCameraCsId);
+        return;
+    }
+    CutsceneManager_Start(sCameraCsId, &player->actor);
+    sIsCameraTurned = true;
+}
+
+static void RestoreCamera(void) {
+    if (sIsCameraTurned) {
+        CutsceneManager_Stop(sCameraCsId);
+    }
+    sIsCameraTurned = false;
+    sCameraCsId = CS_ID_NONE;
+}
+
 static void ResetGate(void) {
     sIsCastPending = false;
     sPhase = TIME_GATE_IDLE;
@@ -119,6 +144,7 @@ static void CloseOpenPrompt(PlayState* play) {
 
 static void ReleasePlayer(Player* player, PlayState* play) {
     CloseOpenPrompt(play);
+    RestoreCamera();
     player->stateFlags1 &= ~TIME_GATE_FREEZE_FLAG;
     if (IsCasting(player)) {
         func_8083B1A0(player, play);
@@ -141,6 +167,8 @@ static void BeginCasting(PlayState* play, Player* player) {
     Player_StopHorizontalMovement(player);
     ResetGate();
     sPhase = TIME_GATE_CASTING;
+    sCameraCsId = play->playerCsIds[PLAYER_CS_ID_ITEM_OCARINA];
+    TurnCameraToLink(player);
     PlayOnce(play, player, sCastAnims[0], -8.0f);
     Player_PlaySfx(player, NA_SE_VO_LI_MAGIC_NALE);
 }
@@ -149,7 +177,7 @@ static void BeginCasting(PlayState* play, Player* player) {
 // action func the same frame: the cast waits for the next one.
 static void OpenGate(PlayState* play, Player* player) {
     if (!HasMagicForGate()) {
-        Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_SY_ERROR);
+        Audio_PlaySfx_AtPos(&player->actor.projectedPos, NA_SE_SY_ERROR);
         return;
     }
     sIsCastPending = true;
@@ -169,13 +197,13 @@ static void StartHovering(Player* player, PlayState* play) {
     sPhase = TIME_GATE_HOVERING;
     sTimer = 0;
     PlayOnce(play, player, sHoverAnim, -8.0f);
-    Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_PL_MAGIC_WIND_WARP);
+    Audio_PlaySfx_AtPos(&player->actor.projectedPos, NA_SE_PL_MAGIC_WIND_WARP);
 }
 
 static void UpdateCasting(Player* player, PlayState* play, bool isAnimDone) {
     if (sCastStep == 0 && !sIsGateInHand && player->skelAnime.curFrame >= TIME_GATE_ITEM_FRAME) {
         sIsGateInHand = true;
-        Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_EV_WARP_HOLE);
+        Audio_PlaySfx_AtPos(&player->actor.projectedPos, NA_SE_EV_WARP_HOLE);
     }
     if (sIsGateInHand) {
         GrowPortal();
@@ -204,7 +232,7 @@ static void HoldLastHoverFrames(Player* player) {
 static void TravelThroughTime(Player* player, PlayState* play) {
     Magic_Consume(play, TIME_GATE_MAGIC_COST, MAGIC_CONSUME_NOW);
     Rumble_Request(400.0f, 200, 30, 100);
-    Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_SY_WHITE_OUT_T);
+    Audio_PlaySfx_AtPos(&player->actor.projectedPos, NA_SE_SY_WHITE_OUT_T);
     SwitchAge();
     sFlashAlpha = TIME_GATE_FLASH_ALPHA;
     ReleasePlayer(player, play);
@@ -246,6 +274,7 @@ static void TimeGateAction(Player* player, PlayState* play) {
     bool isAnimDone = PlayerAnimation_Update(play, &player->skelAnime);
 
     Player_StopHorizontalMovement(player);
+    TurnCameraToLink(player);
     if (sPhase == TIME_GATE_HOVERING) {
         player->stateFlags1 |= TIME_GATE_FREEZE_FLAG;
     }
@@ -347,7 +376,7 @@ static void DrawPortal(Player* player, PlayState* play) {
 static void DrawGate(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
 
-    if (sPhase == TIME_GATE_IDLE) {
+    if (sPhase == TIME_GATE_IDLE || (player->stateFlags2 & TIME_GATE_DISABLE_DRAW_FLAG)) {
         return;
     }
     if (sIsGateInHand) {
@@ -356,6 +385,17 @@ static void DrawGate(Actor* actor, PlayState* play) {
     if (sPortalAlpha > 0.0f) {
         DrawPortal(player, play);
     }
+}
+
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* entry) {
+    (void)entry;
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(TIME_GATE_GIVE_SCALE, TIME_GATE_GIVE_SCALE, TIME_GATE_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sGateDL);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static const S2HCustomItemRandomizer sRandomizerItem = {
@@ -386,7 +426,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetCanUse(&gate, CanOpenGate);
     Z64Items_SetAction(&gate, OpenGate, NULL);
     Z64Items_SetGetItemModel(&gate, sGateDL);
-    gate.getItemScale = 0.3f;
+    gate.getItemEntry.drawFunc = DrawGetItem;
     gate.flags |= S2H_CUSTOM_ITEM_INSTANT;
 
     Z64Items_SetLogic(&gate, &sRandomizerItem);

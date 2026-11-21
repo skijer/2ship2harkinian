@@ -33,6 +33,7 @@ static bool sEmoteRequested = false;
 static pak::ChoiceList sVoiceChoices("Default voice");
 static pak::ChoiceList sEmoteChoices("No emote");
 static std::vector<pak::EquipSlot> sEquipSlots;
+static Gfx* sSheathAfterLimb = nullptr;
 static pak::VoicePack* sVoices[APPEARANCE_COUNT] = {};
 static pak::Emote* sEmote = nullptr;
 static const char* const sCVars[] = { "gMods.PakLoader.Human", "gMods.PakLoader.Adult", "gMods.PakLoader.Deity" };
@@ -201,6 +202,139 @@ static Gfx* ComposeHand(pak::Model* model, int limb, const std::string& original
     return sComposer.Compose({ { hand }, { piece->main } });
 }
 
+static bool IsSwordSheathed(Player* player) {
+    return player->sheathType == PLAYER_MODELTYPE_SHEATH_12 || player->sheathType == PLAYER_MODELTYPE_SHEATH_14;
+}
+
+static bool IsShieldOnBack(Player* player) {
+    return player->sheathType == PLAYER_MODELTYPE_SHEATH_14 || player->sheathType == PLAYER_MODELTYPE_SHEATH_15;
+}
+
+// MM's three B swords take OoT's three sword variants; Hero's and Mirror take the Hylian and Mirror variants.
+static int SheathSwordVariant() {
+    int sword = GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD);
+    return sword >= EQUIP_VALUE_SWORD_KOKIRI && sword <= EQUIP_VALUE_SWORD_GILDED ? sword - 1 : -1;
+}
+
+static int BackShieldVariant(Player* player) {
+    bool hasShield =
+        player->currentShield == PLAYER_SHIELD_HEROS_SHIELD || player->currentShield == PLAYER_SHIELD_MIRROR_SHIELD;
+    return IsShieldOnBack(player) && hasShield ? player->currentShield : -1;
+}
+
+static Gfx* SheathEquipment(pak::Model& model, Player* player) {
+    int sword = SheathSwordVariant();
+    int shield = BackShieldVariant(player);
+    bool sheathed = IsSwordSheathed(player);
+    if (shield >= 0 && sheathed && sword >= 0) {
+        Gfx* combined = pak::FindAlias(model, 0x55C0 + sword * 24 + shield * 8);
+        return combined != nullptr ? combined : pak::FindAlias(model, 0x5400 + sword * 24 + shield * 8);
+    }
+    if (shield >= 0) {
+        return pak::FindAlias(model, 0x53E8 + shield * 8);
+    }
+    if (sword >= 0) {
+        return pak::FindAlias(model, (sheathed ? 0x53D0 : 0x50C0) + sword * 8);
+    }
+    return nullptr;
+}
+
+static Gfx* LoadVanillaSheath(Appearance slot, int sword, bool withSword) {
+    static const char* const kSwords[] = { "Kokiri", "Razor", "Gilded" };
+    if (slot == APPEARANCE_ADULT) {
+        return LoadVanilla(std::string("objects/oot_object_link_boy/gLinkAdult") +
+                           (withSword ? "MasterSwordAndSheathNearDL" : "SheathNearDL"));
+    }
+    std::string path = "objects/object_link_child/gLinkHuman";
+    if (sword < 0) {
+        return LoadVanilla(path + "SheathEmptyDL");
+    }
+    return LoadVanilla(withSword ? path + "Sheathed" + kSwords[sword] + "SwordDL"
+                                 : path + kSwords[sword] + "SwordSheathDL");
+}
+
+static Gfx* LoadVanillaBackShield(Appearance slot, int shield) {
+    if (slot == APPEARANCE_ADULT) {
+        return LoadVanilla(std::string("objects/oot_object_link_boy/gLinkAdult") +
+                           (shield == PLAYER_SHIELD_MIRROR_SHIELD ? "Mirror" : "Hylian") + "ShieldAndSheathNearDL");
+    }
+    return LoadVanilla(std::string("objects/object_link_child/gLinkHuman") +
+                       (shield == PLAYER_SHIELD_MIRROR_SHIELD ? "Mirror" : "Heros") + "ShieldWithMtxDL");
+}
+
+static const Mtx* ShieldBackMatrix(const pak::Model* body, bool child, int variant) {
+    bool ownBackShield = body != nullptr ? pak::IsBackShield(*body, variant) : child && variant == 1;
+    int slot = ownBackShield ? 0 : variant;
+    if (body != nullptr && body->shieldBack[slot] != nullptr) {
+        return body->shieldBack[slot];
+    }
+    return pak::DefaultShieldBack(child);
+}
+
+static Gfx* ComposeSheath(pak::Model* model, Player* player, Appearance slot) {
+    int sword = SheathSwordVariant();
+    int shield = BackShieldVariant(player);
+    pak::Piece* swordPiece = sword >= 0 ? pak::FindEquipped(sEquipSlots, { pak::PieceKind::Sword, sword }) : nullptr;
+    pak::Piece* shieldPiece = shield >= 0 ? pak::FindEquipped(sEquipSlots, { pak::PieceKind::Shield, shield }) : nullptr;
+    if (swordPiece == nullptr && shieldPiece == nullptr) {
+        return nullptr;
+    }
+    bool child = slot == APPEARANCE_HUMAN;
+    bool sheathed = IsSwordSheathed(player);
+    const pak::Model* body = model != nullptr && !model->native ? model : nullptr;
+    Gfx* sheath = swordPiece != nullptr ? swordPiece->sheath : nullptr;
+    Gfx* hilt = swordPiece != nullptr ? swordPiece->hilt : nullptr;
+    Gfx* backShield = shieldPiece != nullptr ? shieldPiece->main : nullptr;
+    bool backSpace = shieldPiece != nullptr && shieldPiece->backSpace;
+    if (body != nullptr && sword >= 0) {
+        sheath = sheath != nullptr ? sheath : pak::FindAlias(*body, 0x50C0 + sword * 8);
+        hilt = hilt != nullptr ? hilt : pak::FindAlias(*body, 0x50D8 + sword * 8);
+    }
+    if (body != nullptr && shield >= 0 && backShield == nullptr) {
+        backShield = pak::FindAlias(*body, 0x5108 + shield * 8);
+        backSpace = pak::IsBackShield(*body, shield);
+    }
+    bool vanillaSword = sword >= 0 && sheathed && hilt == nullptr;
+    std::vector<pak::Part> parts;
+    // OoT's adult back shield only exists merged with the sheath.
+    if (shield >= 0 && backShield == nullptr && slot == APPEARANCE_ADULT) {
+        parts.push_back({ LoadVanillaBackShield(slot, shield) });
+    } else {
+        parts.push_back({ sheath != nullptr ? sheath : LoadVanillaSheath(slot, sword, vanillaSword) });
+        if (shield >= 0 && backShield != nullptr) {
+            parts.push_back({ backShield, backSpace ? nullptr : ShieldBackMatrix(body, child, shield) });
+        } else if (shield >= 0) {
+            parts.push_back({ LoadVanillaBackShield(slot, shield) });
+        }
+    }
+    if (sword >= 0 && sheathed && hilt != nullptr) {
+        const Mtx* matrix = body != nullptr && body->swordBack[sword] != nullptr ? body->swordBack[sword]
+                                                                                 : pak::DefaultSwordBack(child);
+        parts.push_back({ hilt, matrix });
+    }
+    return sComposer.Compose(parts);
+}
+
+// MM draws the back shield after the sheath limb whenever that limb has a list, so the pack's sheath, which
+// already carries its shield, is drawn from the post-limb hook with the vanilla list cleared.
+static void DrawSheathAfterLimb(Gfx** dList, Gfx* sheath) {
+    sSheathAfterLimb = sheath;
+    *dList = nullptr;
+}
+
+static void DrawPendingSheath(Player* player, s32 limb) {
+    if (limb != PLAYER_LIMB_SHEATH || sSheathAfterLimb == nullptr || gPlayState == nullptr ||
+        player != GET_PLAYER(gPlayState)) {
+        return;
+    }
+    GraphicsContext* gfxCtx = gPlayState->state.gfxCtx;
+    Gfx* opa = gfxCtx->polyOpa.p;
+    MATRIX_FINALIZE_AND_LOAD(opa++, gfxCtx);
+    gSPDisplayList(opa++, sSheathAfterLimb);
+    gfxCtx->polyOpa.p = opa;
+    sSheathAfterLimb = nullptr;
+}
+
 static float DestinationLegLength(Appearance slot) {
     static float lengths[APPEARANCE_COUNT];
     if (lengths[slot] == 0.f) {
@@ -232,6 +366,9 @@ static void ResolveBody(Player* player, s32 limb, Gfx** dList, Gfx*, Vec3f* pos)
     if (player != GET_PLAYER(gPlayState) || dList == nullptr || limb <= 0 || limb > s32(pak::kLimbCount)) {
         return;
     }
+    if (limb == PLAYER_LIMB_ROOT) {
+        sSheathAfterLimb = nullptr;
+    }
     Appearance slot = ActiveAppearance(player);
     pak::Model* model = Selected(slot);
     bool equipment = (slot == APPEARANCE_HUMAN || slot == APPEARANCE_ADULT) && pak::HasEquipped(sEquipSlots);
@@ -249,6 +386,13 @@ static void ResolveBody(Player* player, s32 limb, Gfx** dList, Gfx*, Vec3f* pos)
         original = reinterpret_cast<const char*>(*dList);
     }
     bool hand = limb == PLAYER_LIMB_LEFT_HAND || limb == PLAYER_LIMB_RIGHT_HAND;
+    bool humanSheath = limb == PLAYER_LIMB_SHEATH && player->transformation == PLAYER_FORM_HUMAN;
+    if (equipment && humanSheath) {
+        if (Gfx* composed = ComposeSheath(model, player, slot)) {
+            DrawSheathAfterLimb(dList, composed);
+            return;
+        }
+    }
     if (equipment && hand && !original.empty()) {
         if (Gfx* composed = ComposeHand(model, limb, original, slot)) {
             *dList = composed;
@@ -266,6 +410,10 @@ static void ResolveBody(Player* player, s32 limb, Gfx** dList, Gfx*, Vec3f* pos)
         }
     }
     if (limb == PLAYER_LIMB_SHEATH) {
+        Gfx* sheath = humanSheath ? SheathEquipment(*model, player) : nullptr;
+        if (sheath != nullptr) {
+            DrawSheathAfterLimb(dList, sheath);
+        }
         return;
     }
     if (hand) {
@@ -616,8 +764,9 @@ static void Tick(Player* player) {
 }
 
 static const char* const sHooks[] = { "OnPlayerResolveLimbDraw", "OnPlayerResolveFaceTextures",
-                                      "OnActorDrawBegin",        "OnActorDrawEnd",
-                                      "OnPlayerUpdate",          "OnActorPlaySfx" };
+                                      "OnPlayerPostLimbDraw",    "OnActorDrawBegin",
+                                      "OnActorDrawEnd",          "OnPlayerUpdate",
+                                      "OnActorPlaySfx" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sHooks, ARRAY_COUNT(sHooks) };
 
 extern "C" S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
@@ -635,6 +784,7 @@ extern "C" S2H_MOD_EXPORT void ModInit() {
         return;
     }
     S2H_REGISTER_HOOK(sApi, OnPlayerResolveLimbDraw, ResolveBody);
+    S2H_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, DrawPendingSheath);
     S2H_REGISTER_HOOK(sApi, OnPlayerResolveFaceTextures, ResolveFace);
     S2H_REGISTER_HOOK(sApi, OnActorDrawBegin, DrawBegin);
     S2H_REGISTER_HOOK(sApi, OnActorDrawEnd, DrawEnd);

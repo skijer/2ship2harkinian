@@ -10,6 +10,7 @@
 #include "variables.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "z64sound_source.h"
+#include "overlays/actors/ovl_En_Ishi/z_en_ishi.h"
 
 #define SPINNER_KEY "nei.spinner"
 #define SPINNER_CHARGE_MAX 60
@@ -30,6 +31,7 @@
 #define SPINNER_HOMING_DAMAGE 4
 #define SPINNER_ROCK_REACH 40.0f
 #define SPINNER_MODEL_SCALE 0.2f
+#define SPINNER_GIVE_SCALE 0.3f
 #define SPINNER_PLAYER_GRAVITY -1.2f
 
 typedef enum {
@@ -71,11 +73,26 @@ static ColliderCylinderInit sAttackColliderInit = {
     { SPINNER_ATTACK_RADIUS, SPINNER_COLLIDER_HEIGHT, 0, { 0, 0, 0 } },
 };
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnActorDrawEnd", "OnPassPlayerInputs", "OnSceneInit" };
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate", "OnPlayerUpdate", "OnActorDrawEnd",
+                                              "OnPassPlayerInputs", "OnSceneInit" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
 static const S2HModApi* sApi;
+
+#define REMOTE_VISUAL_INTERVAL 5u
+
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual);
+static void InitRemoteVisuals(void);
+
 static ColliderCylinder sAttackCollider;
 static bool sIsColliderReady;
 static bool sIsMountPending;
@@ -119,11 +136,13 @@ static void SilenceSpinner(void) {
     AudioSfx_StopById(NA_SE_EV_ROCK_SLIDE);
     AudioSfx_StopById(NA_SE_IT_SHIELD_BOUND);
     AudioSfx_StopById(NA_SE_IT_SWORD_SWING);
+    AudioSfx_StopById(NA_SE_IT_HAMMER_SWING);
 }
 
 // Riding borrows the spin-attack flag, the one vanilla uses to keep the camera and turning off Link's back.
 static void HoldRidingFlags(Player* player) {
     player->stateFlags1 |= PLAYER_STATE1_CHARGING_SPIN_ATTACK;
+    player->stateFlags2 |= PLAYER_STATE2_20;
 }
 
 static void RestoreIdleAnimation(Player* player, PlayState* play) {
@@ -140,6 +159,7 @@ static void Dismount(Player* player, PlayState* play) {
     player->actor.shape.rot.x = 0;
     player->actor.shape.rot.z = 0;
     player->stateFlags1 &= ~PLAYER_STATE1_CHARGING_SPIN_ATTACK;
+    player->stateFlags2 &= ~PLAYER_STATE2_20;
     SilenceSpinner();
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_PL_LAND_GRASS);
 }
@@ -250,6 +270,42 @@ static void ShatterRollingBoulders(Player* player, PlayState* play) {
     }
 }
 
+#ifdef _WIN32
+// Compare the engine's function address, not this DLL's import trampoline.
+__declspec(dllimport) void EnIshi_Idle(EnIshi* rock, PlayState* play);
+#else
+void EnIshi_Idle(EnIshi* rock, PlayState* play);
+#endif
+void EnIshi_SpawnDebrisBoulder(Actor* rock, PlayState* play);
+void EnIshi_SpawnDustBoulder(Actor* rock, PlayState* play);
+
+static bool IsSilverBoulderInReach(Player* player, EnIshi* rock) {
+    f32 bottom = rock->actor.world.pos.y + rock->collider.dim.yShift;
+    f32 attackBottom = sAttackCollider.dim.pos.y;
+
+    return rock->actionFunc == EnIshi_Idle && !(rock->flags & ISHI_FLAG_CUTSCENE_ROCK) &&
+           IsWithinXZ(&rock->actor, player, sAttackCollider.dim.radius + rock->collider.dim.radius) &&
+           attackBottom + sAttackCollider.dim.height >= bottom && attackBottom <= bottom + rock->collider.dim.height;
+}
+
+// Breaks the way a Goron's throw does: the boulder's switch flag keeps it gone.
+static void ShatterSilverBoulders(Player* player, PlayState* play) {
+    Actor* next;
+
+    for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_PROP].first; actor != NULL; actor = next) {
+        next = actor->next;
+        if (actor->update == NULL || actor->id != ACTOR_EN_ISHI || actor->parent != NULL ||
+            ENISHI_GET_SIZE_FLAG(actor) != ISHI_SIZE_SILVER_BOULDER || !IsSilverBoulderInReach(player, (EnIshi*)actor)) {
+            continue;
+        }
+        Flags_SetSwitch(play, ENISHI_GET_SWITCH_FLAG(actor));
+        EnIshi_SpawnDebrisBoulder(actor, play);
+        EnIshi_SpawnDustBoulder(actor, play);
+        SoundSource_PlaySfxAtFixedWorldPos(play, &actor->world.pos, 40, NA_SE_EV_WALL_BROKEN);
+        Actor_Kill(actor);
+    }
+}
+
 static bool StrikeAround(Player* player, PlayState* play, u8 damage) {
     sAttackCollider.dim.pos.x = player->actor.world.pos.x;
     sAttackCollider.dim.pos.y = player->actor.world.pos.y - 25.0f + SPINNER_HOVER_HEIGHT;
@@ -262,6 +318,7 @@ static bool StrikeAround(Player* player, PlayState* play, u8 damage) {
     }
     CollisionCheck_SetAT(play, &play->colChkCtx, &sAttackCollider.base);
     ShatterRollingBoulders(player, play);
+    ShatterSilverBoulders(player, play);
     return KnockedOffByCucco(player, play);
 }
 
@@ -520,10 +577,20 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
     sPhase = SPINNER_STOWED;
 }
 
+static bool IsSpinnerUnder(Player* player, PlayState* play) {
+    RemoteVisualState visual;
+
+    if (player == GET_PLAYER(play)) {
+        return IsRiding();
+    }
+    return ReadRemoteVisual(player, &visual);
+}
+
 static void DrawSpinner(Actor* actor, PlayState* play) {
     Player* player = (Player*)actor;
 
-    if (!IsRiding() || player->actor.scale.y < 0.0f) {
+    if (!IsSpinnerUnder(player, play) || player->actor.scale.y < 0.0f ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
         return;
     }
     OPEN_DISPS(play->state.gfxCtx);
@@ -536,9 +603,93 @@ static void DrawSpinner(Actor* actor, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(SPINNER_GIVE_SCALE, SPINNER_GIVE_SCALE, SPINNER_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sSpinnerDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, SPINNER_KEY, SPINNER_KEY, "",
 };
+
+static bool sRemoteVisualReady;
+static bool sRemoteVisualSent;
+static uint32_t sRemoteVisualFrame;
+static RemoteVisualState sLastRemoteVisual;
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool ReadRemoteVisual(Player* player, RemoteVisualState* visual) {
+    if (!sRemoteVisualReady || gPlayState == NULL || player == GET_PLAYER(gPlayState)) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, "nei.spinner.visual", visual, sizeof(*visual)) != sizeof(*visual)) {
+        return false;
+    }
+    if (visual->active != 1 || visual->adult > 1 || visual->scene != gPlayState->sceneId ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return false;
+    }
+    for (uint32_t i = 0; i < ARRAY_COUNT(visual->values); i++) {
+        if (!isfinite(visual->values[i]) || fabsf(visual->values[i]) > 10000000.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void PublishRemoteVisual(void) {
+    if (!sRemoteVisualReady) {
+        return;
+    }
+    RemoteVisualState visual = { 0 };
+    PlayState* play = gPlayState;
+
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = IsRiding();
+        if (sRemoteVisualSent && (uint32_t)(play->gameplayFrames - sRemoteVisualFrame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemoteVisualSent && memcmp(&visual, &sLastRemoteVisual, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState("nei.spinner.visual", &visual, sizeof(visual))) {
+        sLastRemoteVisual = visual;
+        sRemoteVisualSent = true;
+        sRemoteVisualFrame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void DrawRemotePlayer(Actor* actor, PlayState* play) {
+    if (actor->id == ACTOR_PLAYER || !sRemoteVisualReady || sApi->GetNetPeerIdForActor(actor) == 0) {
+        return;
+    }
+    DrawSpinner(actor, play);
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemoteVisualReady = sApi->RegisterNetChannel("nei.spinner.visual", 1, ReceiveRemoteVisual);
+    if (sRemoteVisualReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+        S2H_REGISTER_HOOK(sApi, OnActorDrawEnd, DrawRemotePlayer);
+    }
+}
 
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
@@ -560,6 +711,7 @@ static void GrantSpinnerLogic(void) {
 
 S2H_MOD_EXPORT void ModInit(void) {
     GrantSpinnerLogic();
+    InitRemoteVisuals();
     if (!S2H_MOD_API_HAS(sApi, RegisterCustomItem)) {
         return;
     }
@@ -579,9 +731,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetCanUse(&spinner, CanUseSpinner);
     Z64Items_SetAction(&spinner, TakeOutSpinner, UpdateSpinnerInHand);
     Z64Items_SetHeldCallbacks(&spinner, RideOrAttack, PutSpinnerAway, NULL);
-    Z64Items_SetGetItemModel(&spinner, sSpinnerDL);
-    spinner.getItemScale = 0.21f;
     spinner.modelGroup = PLAYER_MODELGROUP_DEFAULT;
+    spinner.getItemEntry.drawFunc = DrawGetItem;
 
     Z64Items_SetLogic(&spinner, &sRandomizerItem);
     if (!Z64Items_Register(sApi, &spinner)) {

@@ -69,6 +69,8 @@ static const ALIGN_ASSET(2) char sEntryMusic[] = "custom/music/Cucui-Ganon-Entry
 static const ALIGN_ASSET(2) char sMutedMusic[] = "custom/music/Cucui-Ganon-Loop-Muted_bgm";
 static const ALIGN_ASSET(2) char sFullMusic[] = "custom/music/Cucui-Ganon-Loop-Full_bgm";
 static const ALIGN_ASSET(2) char sBossTitleTex[] = "__OTR__textures/cucui_ganon/gCucuiGanonTitleCardENGTex";
+// OoT's Ganondorf overlay carries the same triforce glow as Ganon's, which oot.o2r does not extract.
+static const ALIGN_ASSET(2) char sTriforceDL[] = "__OTR__overlays/oot_ovl_Boss_Ganon/gGanondorfTriforceDL";
 
 typedef struct {
     Vec3f root;
@@ -104,6 +106,7 @@ typedef struct CucuiBoss {
     s16 subCamId;
     Vec3f subCamEye;
     Vec3f subCamAt;
+    Vec3f triforcePos;
 } CucuiBoss;
 
 static s16 sBossActorId = -1;
@@ -2308,15 +2311,59 @@ static void CucuiDestroy(Actor* actor, PlayState* play) {
     ResourceMgr_UnregisterSkeleton(&boss->skelAnime);
 }
 
+static void CucuiPostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dl, Vec3s* rot, void* data) {
+    static Vec3f sTriforceOffset = { 800.0f, 420.0f, 100.0f };
+    CucuiBoss* boss = data;
+
+    if (limbIndex == 11) {
+        OPEN_DISPS(play->state.gfxCtx);
+        gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gGanondorfEyesDL);
+        CLOSE_DISPS(play->state.gfxCtx);
+    } else if (limbIndex == 10) {
+        Matrix_MultVec3f(&sTriforceOffset, &boss->triforcePos);
+    }
+}
+
+// Full glow while he lands, then a fade over the next 20 frames.
+static f32 GetTriforceAlpha(void) {
+    if (!sPlaying || sFrame >= 44) {
+        return 0.0f;
+    }
+    return sFrame < 24 ? 255.0f : (44 - sFrame) * 12.0f;
+}
+
+static void DrawTriforce(CucuiBoss* boss, PlayState* play) {
+    f32 alpha = GetTriforceAlpha();
+
+    if (alpha <= 0.0f) {
+        return;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    Matrix_Push();
+    gDPPipeSync(POLY_XLU_DISP++);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 170, (u8)alpha);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 200, 0, 128);
+    Matrix_Translate(boss->triforcePos.x, boss->triforcePos.y, boss->triforcePos.z, MTXMODE_NEW);
+    Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_RotateZ(-0.2f, MTXMODE_APPLY);
+    Matrix_Scale(0.6f, 0.6f, 1.0f, MTXMODE_APPLY);
+    gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sTriforceDL);
+    Matrix_Pop();
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static void CucuiDraw(Actor* actor, PlayState* play) {
     CucuiBoss* boss = (CucuiBoss*)actor;
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-    gSPSegment(POLY_XLU_DISP++, 0x08, (uintptr_t)gGanondorfNormalEyeTex);
-    gSPSegment(POLY_XLU_DISP++, 0x09, (uintptr_t)gGanondorfNormalEyeTex);
-    SkelAnime_DrawSkeletonOpa(play, &boss->skelAnime, NULL, NULL, boss);
+    gSPSegment(POLY_XLU_DISP++, 0x08, (uintptr_t)gGanondorfEmptyEyeTex);
+    gSPSegment(POLY_XLU_DISP++, 0x09, (uintptr_t)gGanondorfEmptyEyeTex);
+    SkelAnime_DrawSkeletonOpa(play, &boss->skelAnime, NULL, CucuiPostLimbDraw, boss);
     CLOSE_DISPS(play->state.gfxCtx);
+    DrawTriforce(boss, play);
     DrawSpotlights(actor, play);
 }
 

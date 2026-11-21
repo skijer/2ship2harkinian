@@ -87,15 +87,10 @@
 #define ROD_BALL_CIRCLE_MAX 0.08f
 #define ROD_BALL_SCALE_MAX 7.0f
 #define ROD_BALL_AHEAD 55.0f
-#define RETICLE_DIST 320.0f
-#define RETICLE_SPREAD 26.0f
-#define RETICLE_DOT_SCALE 0.55f
 
-#define ORB_BALL_UNIT 0.01f
-#define ORB_DOT_UNIT 0.05f
 #define ORB_SHADOW_UNIT 0.0125f
-#define ORB_SEEKER_DRAW_SCALE 0.03f
-#define ORB_STREAK_DRAWN 6
+#define ORB_TRAIL_DRAWN 12
+#define ORB_STREAK_SCALE 0.008f
 
 #define ORB_POOL_MAX 12
 #define ORB_SEEKERS 4
@@ -148,6 +143,7 @@
 #define STATE2_NO_Z_TARGET_ROTATION PLAYER_STATE2_20
 #define STATE2_NO_ROTATION PLAYER_STATE2_40
 #define STATE2_DISABLE_DRAW PLAYER_STATE2_20000000
+#define STATE3_MIDAIR PLAYER_STATE3_2
 
 #define GARO_ANIM_PATH(name) "__OTR__objects/forms/garo/gPlayerAnim_garo_" name
 static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__icon_item_static_yar/gItemIconGaroMaskTex";
@@ -155,6 +151,20 @@ static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__item_name_static/gItemName
 static const ALIGN_ASSET(2) char sMaskDL[] = "__OTR__objects/object_mask_json/object_mask_json_DL_0004C0";
 static const ALIGN_ASSET(2) char sHybridSkelPath[] = "__OTR__objects/object_jso/gGaroSkel";
 static const ALIGN_ASSET(2) char sHybridIdlePath[] = "__OTR__objects/object_jso/gGaroIdleAnim";
+
+#define GANON "__OTR__overlays/oot_ovl_Boss_Ganon/"
+static const ALIGN_ASSET(2) char sBigMagicMaterialDL[] = GANON "gGanondorfLightBallMaterialDL";
+static const ALIGN_ASSET(2) char sBigMagicBallDL[] = GANON "gGanondorfSquareDL";
+static const ALIGN_ASSET(2) char sBigMagicFlecksDL[] = GANON "gGanondorfLightFlecksDL";
+static const ALIGN_ASSET(2) char sBigMagicCircleDL[] = GANON "gGanondorfBigMagicBGCircleDL";
+static const ALIGN_ASSET(2) char sBigMagicDotDL[] = GANON "gGanondorfDotDL";
+static const ALIGN_ASSET(2) char sBigMagicRayDL[] = GANON "gGanondorfLightRayTriDL";
+static const char* const sStreakDL[ORB_TRAIL_DRAWN] = {
+    GANON "gGanondorfLightStreak12DL", GANON "gGanondorfLightStreak11DL", GANON "gGanondorfLightStreak10DL",
+    GANON "gGanondorfLightStreak9DL",  GANON "gGanondorfLightStreak8DL",  GANON "gGanondorfLightStreak7DL",
+    GANON "gGanondorfLightStreak6DL",  GANON "gGanondorfLightStreak5DL",  GANON "gGanondorfLightStreak4DL",
+    GANON "gGanondorfLightStreak3DL",  GANON "gGanondorfLightStreak2DL",  GANON "gGanondorfLightStreak1DL",
+};
 
 typedef enum {
     ANIM_GUARD,
@@ -213,6 +223,7 @@ typedef struct {
     f32 ballCircle;
     f32 ballScale;
     Vec3f trailPos[ORB_TRAIL_LEN];
+    Vec3f trailRot[ORB_TRAIL_LEN];
     s16 trailIndex;
 } RodOrb;
 
@@ -236,10 +247,13 @@ static const u16 sGaroVoiceByAction[0x20] = {
 };
 
 static const u8 sOrbPrim[ELEMENT_COUNT][3] = {
-    { 255, 200, 0 }, { 170, 255, 255 }, { 255, 255, 255 }, { 200, 120, 255 }, { 255, 255, 170 }, { 170, 255, 255 },
+    { 255, 200, 0 }, { 170, 255, 255 }, { 255, 255, 255 }, { 0, 0, 0 }, { 255, 255, 170 }, { 170, 255, 255 },
 };
 static const u8 sOrbEnv[ELEMENT_COUNT][3] = {
-    { 255, 0, 0 }, { 0, 0, 255 }, { 170, 170, 170 }, { 100, 0, 255 }, { 255, 255, 0 }, { 0, 255, 0 },
+    { 255, 0, 0 }, { 0, 0, 255 }, { 170, 170, 170 }, { 0, 0, 0 }, { 255, 255, 0 }, { 0, 255, 0 },
+};
+static const u8 sOrbCore[ELEMENT_COUNT][3] = {
+    { 150, 25, 0 }, { 0, 70, 150 }, { 200, 200, 200 }, { 10, 0, 20 }, { 165, 150, 0 }, { 0, 120, 40 },
 };
 static const f32 sRodLevelScale[ROD_LEVELS] = { 0.35f, 0.7f, 1.0f };
 static const s16 sRodLevelRays[ROD_LEVELS] = { 0, BIG_MAGIC_RAYS_MAX / 2, BIG_MAGIC_RAYS_MAX };
@@ -255,7 +269,7 @@ static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sR
 
 static ColliderQuadInit sEscortQuadInit = {
     { COL_MATERIAL_NONE, AT_ON | AT_TYPE_PLAYER, AC_NONE, OC1_NONE, OC2_TYPE_PLAYER, COLSHAPE_QUAD },
-    { ELEM_MATERIAL_UNK2,
+    { ELEM_MATERIAL_UNK0,
       { 0xFFCFFFFF, 0x00, 0x10 },
       { 0x00000000, 0x00, 0x00 },
       ATELEM_ON | ATELEM_NEAREST | ATELEM_SFX_NORMAL,
@@ -416,11 +430,20 @@ static bool IsActorAlive(PlayState* play, Actor* actor) {
     return false;
 }
 
+// MM's Fhg flash has no light ball, so the wake sparkles in the colours Ship's light balls use.
 static void SpawnOrbWake(PlayState* play, Vec3f* pos, Vec3f* velocity, s16 scale, u8 element) {
+    static const Color_RGBA8 sWakePrim[ELEMENT_COUNT] = {
+        { 255, 120, 80, 255 },  { 170, 255, 255, 255 }, { 255, 255, 255, 255 },
+        { 200, 120, 255, 255 }, { 255, 255, 170, 255 }, { 170, 255, 170, 255 },
+    };
+    static const Color_RGBA8 sWakeEnv[ELEMENT_COUNT] = {
+        { 255, 0, 0, 0 }, { 0, 100, 255, 0 }, { 170, 170, 170, 0 },
+        { 100, 0, 255, 0 }, { 255, 255, 0, 0 }, { 0, 255, 0, 0 },
+    };
     Vec3f accel = { 0.0f, 0.0f, 0.0f };
     u8 e = element % ELEMENT_COUNT;
-    Color_RGBA8 prim = { sOrbPrim[e][0], sOrbPrim[e][1], sOrbPrim[e][2], 255 };
-    Color_RGBA8 env = { sOrbEnv[e][0], sOrbEnv[e][1], sOrbEnv[e][2], 0 };
+    Color_RGBA8 prim = sWakePrim[e];
+    Color_RGBA8 env = sWakeEnv[e];
 
     EffectSsKirakira_SpawnDispersed(play, pos, velocity, &accel, &prim, &env, scale * 4, 14);
 }
@@ -733,8 +756,11 @@ static void BurstOrb(PlayState* play, RodOrb* source) {
         fragment.timer = ORB_SEEKER_LIFETIME;
         fragment.isSeeker = true;
         fragment.target = target;
+        f32 cosPitch = Math_CosS(fragment.pitch);
         for (s32 t = 0; t < ORB_TRAIL_LEN; t++) {
             fragment.trailPos[t] = source->pos;
+            fragment.trailRot[t].x = atan2f(-Math_SinS(fragment.pitch), cosPitch);
+            fragment.trailRot[t].y = atan2f(Math_SinS(fragment.yaw) * cosPitch, Math_CosS(fragment.yaw) * cosPitch);
         }
         AddOrb(&fragment);
         if (target != NULL) {
@@ -810,9 +836,11 @@ static void StampEscortQuad(PlayState* play, ColliderQuad* quad, Vec3f* center, 
     CollisionCheck_SetAT(play, &play->colChkCtx, &quad->base);
 }
 
-static void RecordOrbTrail(RodOrb* orb) {
+static void RecordOrbTrail(RodOrb* orb, f32 velX, f32 velY, f32 velZ) {
     orb->trailIndex = (orb->trailIndex + 1) % ORB_TRAIL_LEN;
     orb->trailPos[orb->trailIndex] = orb->pos;
+    orb->trailRot[orb->trailIndex].y = atan2f(velX, velZ);
+    orb->trailRot[orb->trailIndex].x = atan2f(velY, sqrtf(SQ(velX) + SQ(velZ)));
 }
 
 static void UpdateOrbs(PlayState* play, Player* player) {
@@ -833,11 +861,14 @@ static void UpdateOrbs(PlayState* play, Player* player) {
         HomeOrb(play, orb);
         f32 speed = orb->isSeeker ? ORB_SEEKER_SPEED : ROD_ORB_SPEED;
         f32 cosPitch = Math_CosS(orb->pitch);
-        orb->pos.x += Math_SinS(orb->yaw) * cosPitch * speed;
-        orb->pos.y += -Math_SinS(orb->pitch) * speed;
-        orb->pos.z += Math_CosS(orb->yaw) * cosPitch * speed;
+        f32 velX = Math_SinS(orb->yaw) * cosPitch * speed;
+        f32 velY = -Math_SinS(orb->pitch) * speed;
+        f32 velZ = Math_CosS(orb->yaw) * cosPitch * speed;
+        orb->pos.x += velX;
+        orb->pos.y += velY;
+        orb->pos.z += velZ;
         if (orb->isSeeker) {
-            RecordOrbTrail(orb);
+            RecordOrbTrail(orb, velX, velY, velZ);
         }
         if ((orb->timer & 3) == 0) {
             Vec3f zero = { 0.0f, 0.0f, 0.0f };
@@ -976,8 +1007,9 @@ static void Freeze(Player* player) {
     player->actor.velocity.z = 0.0f;
 }
 
-// Airborne moves keep their heading: `yaw` is what the player copies into world.rot.y each frame.
+// Airborne moves keep MIDAIR set: without it func_8083827C reads the leap as stepping off an edge.
 static void KeepAirborne(Player* player) {
+    player->stateFlags3 |= STATE3_MIDAIR;
     player->actor.gravity = JUMP_GRAVITY;
     player->yaw = sHopYaw;
 }
@@ -1324,6 +1356,7 @@ static void StartLeap(PlayState* play, Player* player, u8 move, s32 anim, s16 ya
     player->speedXZ = xzSpeed;
     player->actor.velocity.y = ySpeed;
     player->actor.bgCheckFlags &= ~BGCHECKFLAG_GROUND;
+    player->stateFlags3 |= STATE3_MIDAIR;
     Player_PlaySfx(player, NA_SE_VO_LI_AUTO_JUMP);
 }
 
@@ -1342,6 +1375,7 @@ static void StartAirSlash(PlayState* play, Player* player) {
         sHopAirFrames = 0;
     }
     StartMove(play, player, GARO_MOVE_AIR_SLASH);
+    player->stateFlags3 |= STATE3_MIDAIR;
     PlayGaroAnim(play, player, ANIM_SLASH_LOOP, 0.0f, -1.0f, 1.0f);
     Player_PlaySfx(player, NA_SE_IT_SWORD_SWING);
 }
@@ -1799,8 +1833,13 @@ static void HideLinkBody(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDL
     }
 }
 
-static void DrawBillboardOrb(PlayState* play, Vec3f pos, f32 scale, const u8* prim, const u8* env) {
+// Ganon2's light orb is not in oot.o2r; the shadow ball uses MM's own light orb.
+static void DrawShadowBall(PlayState* play, Vec3f pos, f32 scale) {
+    static const u8 prim[3] = { 140, 80, 220 };
+    static const u8 env[3] = { 40, 10, 100 };
+
     OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
     Matrix_Translate(pos.x, pos.y, pos.z, MTXMODE_NEW);
     Matrix_ReplaceRotation(&play->billboardMtxF);
     Matrix_RotateZS((s16)(play->gameplayFrames * 0x400), MTXMODE_APPLY);
@@ -1813,39 +1852,108 @@ static void DrawBillboardOrb(PlayState* play, Vec3f pos, f32 scale, const u8* pr
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-static void DrawElementOrb(PlayState* play, Vec3f pos, f32 scale, u8 element) {
-    u8 e = element % ELEMENT_COUNT;
+static void DrawRayFan(PlayState* play, Vec3f pos, f32 ballScale, s32 rays, const u8* prim, const u8* env) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Matrix_Translate(pos.x, pos.y, pos.z, MTXMODE_NEW);
+    Matrix_RotateYF((play->gameplayFrames * 10.0f) / 1000.0f, MTXMODE_APPLY);
+    gDPSetEnvColor(POLY_XLU_DISP++, env[0], env[1], env[2], 0);
+    for (s32 i = 0; i < MIN(rays, BIG_MAGIC_RAYS_MAX); i++) {
+        f32 angle = (f32)i * (M_PIf * 2.0f / (f32)BIG_MAGIC_RAYS_MAX);
 
-    DrawBillboardOrb(play, pos, scale, sOrbPrim[e], sOrbEnv[e]);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, prim[0], prim[1], prim[2], 200);
+        Matrix_Push();
+        Matrix_RotateYF(angle, MTXMODE_APPLY);
+        Matrix_RotateXF(0.6f * ((i & 1) ? 1.0f : -1.0f), MTXMODE_APPLY);
+        Matrix_RotateZF(angle * 0.5f, MTXMODE_APPLY);
+        Matrix_Translate(0.0f, 0.0f, ballScale * 1.6f, MTXMODE_APPLY);
+        Matrix_Scale(ballScale * 0.115f, ballScale * 0.115f, ballScale * 0.032f, MTXMODE_APPLY);
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sBigMagicRayDL);
+        Matrix_Pop();
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
-static void DrawShadowBall(PlayState* play, Vec3f pos, f32 scale) {
-    static const u8 sShadowPrim[3] = { 140, 80, 220 };
-    static const u8 sShadowEnv[3] = { 40, 10, 100 };
-
-    DrawBillboardOrb(play, pos, scale, sShadowPrim, sShadowEnv);
-}
-
+// Those DLs read their scrolls from segments 0x08 to 0x0A, so the order and the segment loads are verbatim.
 static void DrawRodBall(PlayState* play, Vec3f pos, f32 circleScale, f32 ballScale, s32 rays, u8 element) {
+    u8 e = element % ELEMENT_COUNT;
+    GraphicsContext* gfxCtx = play->state.gfxCtx;
+    u32 frame = play->gameplayFrames;
+
     if (circleScale <= 0.001f) {
         return;
     }
-    DrawElementOrb(play, pos, ballScale * ORB_BALL_UNIT, element);
-    for (s32 i = 0; i < MIN(rays, BIG_MAGIC_RAYS_MAX); i++) {
-        f32 angle = ((f32)i * (M_PIf * 2.0f / (f32)BIG_MAGIC_RAYS_MAX)) + ((f32)play->gameplayFrames * 0.1f);
-        Vec3f ray = { pos.x + cosf(angle) * ballScale * 2.2f, pos.y + sinf(angle) * ballScale * 2.2f, pos.z };
-
-        DrawElementOrb(play, ray, ballScale * ORB_BALL_UNIT * 0.3f, element);
+    OPEN_DISPS(gfxCtx);
+    Gfx_SetupDL25_Xlu(gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, sOrbPrim[e][0], sOrbPrim[e][1], sOrbPrim[e][2], 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, sOrbEnv[e][0], sOrbEnv[e][1], sOrbEnv[e][2], 128);
+    Gfx* flecks =
+        Gfx_TwoTexScrollEx(gfxCtx, 0, frame * -2, 0, 0x40, 0x40, 1, 0, frame * 0xA, 0x40, 0x40, -2, 0, 0, 0xA);
+    gSPSegment(POLY_XLU_DISP++, 0x08, (uintptr_t)flecks);
+    Matrix_Translate(pos.x, pos.y, pos.z, MTXMODE_NEW);
+    Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(circleScale, circleScale, circleScale, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sBigMagicFlecksDL);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, sOrbCore[e][0], sOrbCore[e][1], sOrbCore[e][2], 255);
+    Gfx* circle = Gfx_TwoTexScrollEx(gfxCtx, 0, 0, 0, 0x20, 0x20, 1, 0, frame * -4, 0x20, 0x20, 0, 0, 0, -4);
+    gSPSegment(POLY_XLU_DISP++, 0x09, (uintptr_t)circle);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sBigMagicCircleDL);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, sOrbEnv[e][0], sOrbEnv[e][1], sOrbEnv[e][2], 255);
+    Gfx* dot = Gfx_TwoTexScrollEx(gfxCtx, 0, 0, 0, 0x20, 0x20, 1, frame * 2, frame * -0x14, 0x40, 0x40, 0, 0, 2, -0x14);
+    gSPSegment(POLY_XLU_DISP++, 0x0A, (uintptr_t)dot);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sBigMagicDotDL);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, sOrbEnv[e][0], sOrbEnv[e][1], sOrbEnv[e][2], 0);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sBigMagicMaterialDL);
+    Matrix_Translate(pos.x, pos.y, pos.z, MTXMODE_NEW);
+    Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(ballScale, ballScale, ballScale, MTXMODE_APPLY);
+    Matrix_RotateZF((f32)frame * 0.14f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sBigMagicBallDL);
+    CLOSE_DISPS(gfxCtx);
+    if (rays > 0) {
+        DrawRayFan(play, pos, ballScale, rays, sOrbPrim[e], sOrbEnv[e]);
     }
 }
 
+// The streak lists read their matrices from segment 0x0D.
 static void DrawOrbStreak(PlayState* play, RodOrb* orb) {
-    for (s32 i = 0; i < ORB_STREAK_DRAWN; i++) {
-        s32 t = ((orb->trailIndex - i) + ORB_TRAIL_LEN) % ORB_TRAIL_LEN;
-        f32 taper = 1.0f - ((f32)i / (f32)ORB_STREAK_DRAWN);
+    GraphicsContext* gfxCtx = play->state.gfxCtx;
+    Mtx* mtx = GRAPH_ALLOC(gfxCtx, ORB_TRAIL_DRAWN * sizeof(Mtx));
+    const u8* env = sOrbEnv[orb->element % ELEMENT_COUNT];
+    u8 alpha = orb->timer >= 8 ? 255 : (u8)((orb->timer * 255) / 8);
 
-        DrawElementOrb(play, orb->trailPos[t], ORB_SEEKER_DRAW_SCALE * taper, orb->element);
+    if (mtx == NULL) {
+        return;
     }
+    OPEN_DISPS(gfxCtx);
+    Gfx_SetupDL25_Xlu(gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, 255, 255, 255, alpha);
+    gDPSetEnvColor(POLY_XLU_DISP++, env[0], env[1], env[2], 128);
+    gSPSegment(POLY_XLU_DISP++, 0x0D, (uintptr_t)mtx);
+    for (s32 i = 0; i < ORB_TRAIL_DRAWN; i++) {
+        s32 t = ((orb->trailIndex - i) + ORB_TRAIL_LEN) % ORB_TRAIL_LEN;
+
+        Matrix_Translate(orb->trailPos[t].x, orb->trailPos[t].y, orb->trailPos[t].z, MTXMODE_NEW);
+        Matrix_RotateYF(orb->trailRot[t].y, MTXMODE_APPLY);
+        Matrix_RotateXF(-orb->trailRot[t].x, MTXMODE_APPLY);
+        Matrix_Scale(ORB_STREAK_SCALE, ORB_STREAK_SCALE, ORB_STREAK_SCALE, MTXMODE_APPLY);
+        Matrix_RotateYF(M_PIf / 2.0f, MTXMODE_APPLY);
+        Matrix_ToMtx(mtx);
+        gSPMatrix(POLY_XLU_DISP++, mtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sStreakDL[i]);
+        mtx++;
+    }
+    Matrix_Translate(orb->pos.x, orb->pos.y, orb->pos.z, MTXMODE_NEW);
+    Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(6.0f, 6.0f, 6.0f, MTXMODE_APPLY);
+    Matrix_RotateZF((f32)play->gameplayFrames * 0.2f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sBigMagicMaterialDL);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sBigMagicBallDL);
+    CLOSE_DISPS(gfxCtx);
 }
 
 static void DrawChargeAndReticle(PlayState* play, Player* player) {
@@ -1860,27 +1968,11 @@ static void DrawChargeAndReticle(PlayState* play, Player* player) {
                    head.z + forward.z * ROD_BALL_AHEAD };
     f32 pulse = 1.0f + 0.06f * Math_SinS(play->gameplayFrames * 0x1000);
     DrawRodBall(play, ball, sRodBallCircle * pulse, sRodBallScale * pulse, sRodBallRays, sRodElement);
-
-    Vec3f center = { head.x + forward.x * RETICLE_DIST, head.y + forward.y * RETICLE_DIST,
-                     head.z + forward.z * RETICLE_DIST };
-    Vec3f right = { Math_SinS(yaw + 0x4000), 0.0f, Math_CosS(yaw + 0x4000) };
-    Vec3f up = { right.y * forward.z - right.z * forward.y, right.z * forward.x - right.x * forward.z,
-                 right.x * forward.y - right.y * forward.x };
-    f32 spread = RETICLE_SPREAD * (1.0f + MIN((f32)sRodCharge / ROD_CHARGE_MAX, 1.0f) * 0.6f);
-    DrawElementOrb(play, center, RETICLE_DOT_SCALE * 0.7f * ORB_DOT_UNIT, sRodElement);
-    for (s32 i = 0; i < 4; i++) {
-        f32 offsetX = i == 0 ? spread : (i == 1 ? -spread : 0.0f);
-        f32 offsetY = i == 2 ? spread : (i == 3 ? -spread : 0.0f);
-        Vec3f dot = { center.x + right.x * offsetX + up.x * offsetY, center.y + right.y * offsetX + up.y * offsetY,
-                      center.z + right.z * offsetX + up.z * offsetY };
-        DrawElementOrb(play, dot, RETICLE_DOT_SCALE * ORB_DOT_UNIT, sRodElement);
-    }
+    Z64Aiming_DrawReticle(play, player, ROD_ORB_SPEED * ROD_ORB_LIFETIME,
+                          (Z64AimingReticleStyle){ Z64AIMING_TOGGLE_BOW, Z64AIMING_TINT_LAUNCH });
 }
 
 static void DrawProjectiles(PlayState* play, Player* player) {
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    CLOSE_DISPS(play->state.gfxCtx);
     if (sMove == GARO_MOVE_ROD_AIM) {
         DrawChargeAndReticle(play, player);
     }

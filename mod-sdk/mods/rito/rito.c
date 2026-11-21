@@ -45,6 +45,8 @@
 #define STATE1_SWIMMING PLAYER_STATE1_8000000
 #define STATE1_FIRST_PERSON PLAYER_STATE1_100000
 #define STATE1_DEAD_OR_CUTSCENE (PLAYER_STATE1_DEAD | PLAYER_STATE1_20000000)
+#define STATE2_HOPPING PLAYER_STATE2_80000
+#define STATE3_MIDAIR PLAYER_STATE3_2
 
 #define A_HOLD_FRAMES 6
 #define CHARGE_MIN 6
@@ -109,6 +111,11 @@
 static const Vec3f sShieldInHand = { -20.0f, 115.5f, -145.5f };
 static const Vec3f sShieldOnBack = { 608.0f, 10.0f, -142.5f };
 
+#define HARP_SCALE 0.83f
+static const Vec3f sHarpOffset = { -47.62f, 107.14f, 0.0f };
+static const Vec3s sHarpRot = { -26527, -25356, -18205 };
+#define BOW_STRING_Y (-360.4f)
+
 // Tornado_GetAxis: axis.y = -sin(pitch), so straight up is -0x4000.
 #define WIND_PITCH_UP (-0x4000)
 #define WIND_HEIGHT 82.0f
@@ -152,6 +159,9 @@ static const ALIGN_ASSET(2) char sIconTex[] = "__OTR__textures/icon_item_custom/
 static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/gRitoMaskNameTex";
 static const ALIGN_ASSET(2) char sShieldDL[] = "__OTR__objects/object_nei_rito_shield/gRitoShieldDL";
 static const ALIGN_ASSET(2) char sBowDL[] = "__OTR__objects/object_nei_rito_bow/gRitoBowDL";
+static const ALIGN_ASSET(2) char sBowStringDL[] = "__OTR__objects/oot_object_link_boy/gLinkAdultBowStringDL";
+// oot_assets does not export object_xc yet: until it does, the harp and the hand it replaces stay as they are.
+static const ALIGN_ASSET(2) char sHarpDL[] = "__OTR__objects/oot_object_xc/gSheikHarpDL";
 static const ALIGN_ASSET(2) char sTornadoMatDL[] = "__OTR__objects/object_nei_tornado/mat_tornado_f3dlite_tornado";
 static const ALIGN_ASSET(2) char sTornadoTriDL[] = "__OTR__objects/object_nei_tornado/tornado_mesh_tri_0";
 static const ALIGN_ASSET(2) char sOpenHandDL[] = "__OTR__" RITO_MODEL_PATH "/object_link_boy/gLinkAdultRightHandNearDL";
@@ -329,6 +339,13 @@ static void ResolveRitoStrength(bool* should, va_list args) {
 
     if (IsRito()) {
         *strength = PLAYER_STRENGTH_DEKU;
+    }
+}
+
+// oot_collectables decides lifts by strength after this when it is loaded; alone, a Rito lifts like a Deku.
+static void ResolveRitoGrab(bool* should, va_list args) {
+    if (IsRito() && Player_GetStrength() < PLAYER_STRENGTH_HUMAN) {
+        *should = false;
     }
 }
 
@@ -637,9 +654,15 @@ static void EndMove(PlayState* play, Player* player) {
     func_8083B1A0(player, play);
 }
 
+// Player_SetAction clears MIDAIR, and without it func_8083827C swaps an airborne move for the fall.
+static void KeepAirborne(Player* player) {
+    player->stateFlags3 |= STATE3_MIDAIR;
+}
+
 static void TakeOff(PlayState* play, Player* player, u8 move) {
     StartMove(play, player, move);
     player->actor.bgCheckFlags &= ~BGCHECKFLAG_GROUND;
+    KeepAirborne(player);
     Camera_ChangeMode(GET_ACTIVE_CAM(play), CAM_MODE_JUMP);
     sGlideYaw = player->actor.shape.rot.y;
 }
@@ -701,6 +724,7 @@ static void RunLaunch(PlayState* play, Player* player) {
     if (TryAirBow(play, player)) {
         return;
     }
+    KeepAirborne(player);
     Player_UpdateUpperBody(player, play);
     PlayerAnimation_Update(play, &player->skelAnime);
     player->actor.velocity.y -= LAUNCH_DECAY;
@@ -749,6 +773,7 @@ static void RunGlide(PlayState* play, Player* player) {
     if (TryAirBow(play, player)) {
         return;
     }
+    KeepAirborne(player);
     SteerGlide(play, player);
     if (sBoostFrames > 0) {
         RiseOnBoost(play, player);
@@ -796,6 +821,7 @@ static void RunHop(PlayState* play, Player* player) {
     if (TryAirBow(play, player)) {
         return;
     }
+    KeepAirborne(player);
     player->yaw = sGlideYaw;
     Player_UpdateUpperBody(player, play);
     bool isStrikeDone = PlayerAnimation_Update(play, &player->skelAnime);
@@ -891,6 +917,7 @@ static void StartThrow(PlayState* play, Player* player) {
     }
     sBoostFrames = 0;
     StartMove(play, player, RITO_MOVE_THROW);
+    KeepAirborne(player);
     player->actor.gravity = JUMP_GRAVITY;
     PlayClip(play, player, CLIP_THROW, ANIMMODE_ONCE, -4.0f);
 }
@@ -900,6 +927,7 @@ static void RunThrow(PlayState* play, Player* player) {
         EndMove(play, player);
         return;
     }
+    KeepAirborne(player);
     Player_UpdateUpperBody(player, play);
     if (!PlayerAnimation_Update(play, &player->skelAnime)) {
         return;
@@ -1123,6 +1151,7 @@ static void StartBow(PlayState* play, Player* player) {
 
 static void StartBowAir(PlayState* play, Player* player) {
     StartMove(play, player, RITO_MOVE_BOW_AIR);
+    KeepAirborne(player);
     sCharge = 0;
     sHasLoosed = false;
     PlayClip(play, player, CLIP_BOW_AIR, ANIMMODE_ONCE, -4.0f);
@@ -1229,6 +1258,7 @@ static void LooseAirVolley(PlayState* play, Player* player) {
 static void RunBowAir(PlayState* play, Player* player) {
     bool isBHeld = IsHeld(play, BTN_B);
 
+    KeepAirborne(player);
     player->actor.velocity.y = 0.0f;
     player->actor.gravity = 0.0f;
     player->speedXZ = 0.0f;
@@ -1397,7 +1427,7 @@ static int32_t HandleB(PlayState* play, Player* player) {
 }
 
 static void TryFreeMoves(PlayState* play, Player* player) {
-    if (IsRitoBusy(player) || !CanAct(player)) {
+    if (IsRitoBusy(player) || !CanAct(player) || (player->stateFlags2 & STATE2_HOPPING)) {
         return;
     }
     if (IsGrounded(player)) {
@@ -1524,6 +1554,10 @@ static bool IsHarpOut(void) {
     return sIsOcarinaOut && sHarpPhase != HARP_IDLE;
 }
 
+static bool IsHarpShown(void) {
+    return IsHarpOut() && sApi->HasResource(sHarpDL);
+}
+
 static void ResolveRitoBody(Player* player, s32 limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
     if (!IsRito()) {
         return;
@@ -1549,6 +1583,10 @@ static void ResolveRitoBody(Player* player, s32 limbIndex, Gfx** dList, Gfx* lim
         }
         return;
     }
+    if (IsHarpShown()) {
+        *dList = NULL;
+        return;
+    }
     bool isChildHand = IsPathNamed(*dList, "object_link_child") && !IsPathNamed(*dList, "Holding");
     if (!IsPathNamed(*dList, "Shield") && !isChildHand) {
         return;
@@ -1570,11 +1608,28 @@ static void DrawShield(PlayState* play, Player* player, const Vec3f* offset) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static void DrawHarp(PlayState* play) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Matrix_Push();
+    Matrix_Translate(sHarpOffset.x, sHarpOffset.y, sHarpOffset.z, MTXMODE_APPLY);
+    Matrix_RotateZYX(sHarpRot.x, sHarpRot.y, sHarpRot.z, MTXMODE_APPLY);
+    Matrix_Scale(HARP_SCALE, HARP_SCALE, HARP_SCALE, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sHarpDL);
+    Matrix_Pop();
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static void DrawBow(PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     Matrix_Push();
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sBowDL);
+    if (sApi->HasResource(sBowStringDL)) {
+        Matrix_Translate(0.0f, BOW_STRING_Y, 0.0f, MTXMODE_APPLY);
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sBowStringDL);
+    }
     Matrix_Pop();
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -1594,7 +1649,12 @@ static void DrawRitoParts(Player* player, s32 limbIndex) {
             DrawShield(play, player, &sShieldOnBack);
         }
     }
-    if (limbIndex == PLAYER_LIMB_LEFT_HAND && IsBowOut() && sApi->HasResource(sBowDL)) {
+    if (limbIndex != PLAYER_LIMB_LEFT_HAND) {
+        return;
+    }
+    if (IsHarpShown()) {
+        DrawHarp(play);
+    } else if (IsBowOut() && sApi->HasResource(sBowDL)) {
         DrawBow(play);
     }
 }
@@ -1783,6 +1843,7 @@ static void DrawMaskPickup(PlayState* play, S2HGetItemEntry* entry) {
 
 static void RegisterMask(void) {
     S2HCustomItemDefinition mask = Z64Items_Define(RITO_MASK_KEY, sIconTex, sNameTex);
+    mask.displayName = "Rito Mask";
 
     Z64Items_SetButtons(&mask, S2H_CUSTOM_ITEM_C_BUTTON | S2H_CUSTOM_ITEM_DPAD);
     mask.flags |= S2H_CUSTOM_ITEM_INSTANT | S2H_CUSTOM_ITEM_WEARABLE;
@@ -1830,4 +1891,5 @@ S2H_MOD_EXPORT void ModInit(void) {
     sApi->RegisterVB(VB_EXECUTE_PLAYER_ACTION_FUNC, DriveSink);
     sApi->RegisterVB(VB_CHANGE_HELD_ITEM_AND_USE_ITEM, NoteAirThrow);
     sApi->RegisterVB(VB_USE_STRENGTH_UPGRADE, ResolveRitoStrength);
+    sApi->RegisterVBByName("VB_PLAYER_LIFT_ACTOR", ResolveRitoGrab);
 }

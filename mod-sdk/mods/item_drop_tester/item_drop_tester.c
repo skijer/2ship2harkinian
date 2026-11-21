@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,6 +45,11 @@ static bool sChecklistDirty;
 static char sPending[KEY_SIZE];
 static char sSelected[KEY_SIZE];
 static char sFilter[128];
+static int32_t sCatalog;
+static int32_t sPendingNative = RI_UNKNOWN;
+static int32_t sSelectedNative = RI_UNKNOWN;
+static RandoSaveCheck sCarrierBackup;
+static bool sIsCarrierBorrowed;
 static const char* sStatus = "Click an item to queue a pickup above Link. Resume gameplay to spawn it.";
 static const char* const sHooks[] = { "OnGameFrameUpdate", "OnGameStateMainStart" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sHooks, ARRAY_COUNT(sHooks) };
@@ -426,6 +432,38 @@ static void AdvanceSongTest(void) {
     }
 }
 
+static bool IsRandoSave(void) {
+    return gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO;
+}
+
+static bool HasPendingDrop(void) {
+    return sPending[0] != '\0' || sPendingNative != RI_UNKNOWN;
+}
+
+// The carrier check is lent to the randomizer's give queue and handed back once it has paid out.
+static void ReturnCarrierCheck(void) {
+    if (!sIsCarrierBorrowed || GetCarrierCheck()->eligible) {
+        return;
+    }
+    *GetCarrierCheck() = sCarrierBackup;
+    sIsCarrierBorrowed = false;
+}
+
+static void GivePendingNative(PlayState* play) {
+    if (sPendingNative == RI_UNKNOWN || sIsCarrierBorrowed || sAutoPhase != AUTO_IDLE || !CanStartPickup(play)) {
+        return;
+    }
+    RandoSaveCheck* carrier = GetCarrierCheck();
+    sCarrierBackup = *carrier;
+    sIsCarrierBorrowed = true;
+    carrier->randoItemId = (RandoItemId)sPendingNative;
+    carrier->eligible = true;
+    carrier->obtained = false;
+    carrier->cycleObtained = false;
+    sPendingNative = RI_UNKNOWN;
+    sStatus = "Reward handed to the randomizer's give queue through the carrier check.";
+}
+
 static void Tick(void) {
     if (sChecklistDirty) {
         CVarSave();
@@ -435,8 +473,10 @@ static void Tick(void) {
     if (play == NULL) {
         return;
     }
-    if (gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO) {
+    if (IsRandoSave()) {
         AdvanceAuto(play);
+        ReturnCarrierCheck();
+        GivePendingNative(play);
     }
     if (sPending[0] == '\0' || !CanStartPickup(play)) {
         return;
@@ -459,80 +499,183 @@ static void DrawChecklist(const char* key) {
         }
     }
 }
+static void AppendChecklistRow(char* text, size_t capacity, size_t* used, const char* label, const char* key) {
+    static const char* const fields[] = { "pickup", "icon", "acquisition", "held", "use", "save", "anchor" };
+    *used += snprintf(text + *used, capacity - *used, "| %s |", label);
+    for (int f = 0; f < 7; ++f) {
+        char cvar[KEY_SIZE + 64];
+        snprintf(cvar, sizeof(cvar), "gMods.ItemDropTester.Check.%s.%s", key, fields[f]);
+        *used += snprintf(text + *used, capacity - *used, " %s |", CVarGetInteger(cvar, 0) ? "OK" : "pending");
+    }
+    *used += snprintf(text + *used, capacity - *used, "\n");
+}
 static void CopyChecklist(void) {
     const uint32_t count = sApi->GetCustomItemCount();
     if (count > 10000)
         return;
-    const size_t capacity = (size_t)count * (KEY_SIZE + 160) + 256;
+    const size_t capacity = ((size_t)count + ARRAY_COUNT(sNative)) * (KEY_SIZE + 160) + 256;
     char* text = malloc(capacity);
     if (text == NULL)
         return;
     size_t used = snprintf(text, capacity,
-                           "# 2Ship custom item checklist\n\n| Item / subtype | Pickup | Icon | Acquisition | Held | "
+                           "# 2Ship rando item checklist\n\n| Item / subtype | Pickup | Icon | Acquisition | Held | "
                            "Use | Save/load | Anchor |\n|---|---|---|---|---|---|---|---|\n");
-    static const char* const fields[] = { "pickup", "icon", "acquisition", "held", "use", "save", "anchor" };
     for (uint32_t i = 0; i < count; ++i) {
         const S2HCustomItemDefinition* item = sApi->GetCustomItemAt(i);
         if (item == NULL || item->key == NULL || strlen(item->key) >= KEY_SIZE)
             continue;
-        used += snprintf(text + used, capacity - used, "| %s |", item->key);
-        for (int f = 0; f < 7; ++f) {
-            char cvar[KEY_SIZE + 64];
-            snprintf(cvar, sizeof(cvar), "gMods.ItemDropTester.Check.%s.%s", item->key, fields[f]);
-            used += snprintf(text + used, capacity - used, " %s |", CVarGetInteger(cvar, 0) ? "OK" : "pending");
-        }
-        used += snprintf(text + used, capacity - used, "\n");
+        AppendChecklistRow(text, capacity, &used, item->key, item->key);
+    }
+    for (size_t i = 0; i < ARRAY_COUNT(sNative); ++i) {
+        AppendChecklistRow(text, capacity, &used, sNative[i].name, sNative[i].token);
     }
     ModUI_SetClipboardText(text);
     free(text);
     sStatus = "Markdown checklist copied to clipboard.";
 }
+static bool Matches(const char* text) {
+    if (!sFilter[0])
+        return true;
+    if (text == NULL)
+        return false;
+    for (; *text; ++text) {
+        const char* a = text;
+        const char* b = sFilter;
+        while (*a && *b && tolower((unsigned char)*a) == tolower((unsigned char)*b)) {
+            ++a;
+            ++b;
+        }
+        if (!*b)
+            return true;
+    }
+    return false;
+}
+static const S2HCustomPickupVariant* GetVariantOf(const char* parentKey, uint32_t index) {
+    const S2HCustomItemDefinition* child = sApi->GetCustomItemAt(index);
+    const S2HCustomPickupVariant* variant = child ? sApi->GetPickupVariant(child->key) : NULL;
+    return variant != NULL && !strcmp(variant->itemKey, parentKey) ? variant : NULL;
+}
+static bool IsCustomRowShown(const char* key) {
+    if (Matches(key))
+        return true;
+    for (uint32_t i = 0; i < sApi->GetCustomItemCount(); ++i) {
+        const S2HCustomPickupVariant* variant = GetVariantOf(key, i);
+        if (variant != NULL && (Matches(variant->variantKey) || Matches(variant->key)))
+            return true;
+    }
+    return false;
+}
+static void QueueCustom(const char* key) {
+    snprintf(sPending, sizeof(sPending), "%s", key);
+    snprintf(sSelected, sizeof(sSelected), "%s", key);
+    sSelectedNative = RI_UNKNOWN;
+    sStatus = "Queued. Close the menu and resume gameplay.";
+}
+static void CustomRow(const S2HCustomItemDefinition* item) {
+    if (item == NULL || item->key == NULL || strlen(item->key) >= KEY_SIZE || sApi->GetPickupVariant(item->key))
+        return;
+    if (!IsCustomRowShown(item->key))
+        return;
+    bool hasVariants = false;
+    ModUI_PushID(item->key);
+    if (ModUI_Selectable(item->key, !strcmp(sSelected, item->key), 0, 0, 0)) {
+        snprintf(sSelected, sizeof(sSelected), "%s", item->key);
+        sSelectedNative = RI_UNKNOWN;
+    }
+    if (ModUI_Button("Drop", 0, 0))
+        QueueCustom(item->key);
+    for (uint32_t i = 0; i < sApi->GetCustomItemCount(); ++i) {
+        const S2HCustomPickupVariant* variant = GetVariantOf(item->key, i);
+        if (variant == NULL || strlen(variant->key) >= KEY_SIZE)
+            continue;
+        hasVariants = true;
+        ModUI_PushID(variant->key);
+        if (ModUI_Button(variant->variantKey, 0, 0))
+            QueueCustom(variant->key);
+        ModUI_PopID();
+        ModUI_SameLine(0, -1);
+    }
+    if (hasVariants)
+        ModUI_NewLine();
+    ModUI_Separator();
+    ModUI_PopID();
+}
+static void NativeRow(const NativeItem* item) {
+    if (item->randoItem == RI_UNKNOWN || (!Matches(item->name) && !Matches(item->token)))
+        return;
+    ModUI_PushID(item->token);
+    if (ModUI_Selectable(item->name, sSelectedNative == item->randoItem, 0, 0, 0)) {
+        sSelectedNative = item->randoItem;
+        snprintf(sSelected, sizeof(sSelected), "%s", item->token);
+    }
+    if (ModUI_Button("Drop", 0, 0)) {
+        sPendingNative = item->randoItem;
+        sSelectedNative = item->randoItem;
+        snprintf(sSelected, sizeof(sSelected), "%s", item->token);
+        sStatus = "Queued. Close the menu and resume gameplay.";
+    }
+    const char* replacement = VanillaItems_GetCustomKeyForRandoItem(item->randoItem);
+    if (replacement != NULL) {
+        ModUI_Text("Active mod replacement:");
+        ModUI_Text(replacement);
+    }
+    ModUI_PopID();
+}
+static void DrawSelectedCustom(void) {
+    const S2HCustomItemDefinition* selected = sSelectedNative == RI_UNKNOWN ? sApi->FindCustomItem(sSelected) : NULL;
+    if (selected == NULL)
+        return;
+    const S2HCustomPickupVariant* subtype = sApi->GetPickupVariant(selected->key);
+    if (subtype != NULL) {
+        ModUI_Text("Parent item:");
+        ModUI_Text(subtype->itemKey);
+        ModUI_Text("Subtype:");
+        ModUI_Text(subtype->variantKey);
+    }
+    ModUI_Text("Icon:");
+    ModUI_Text(selected->iconPath ? selected->iconPath : "(none)");
+    ModUI_Text("Acquisition model:");
+    ModUI_Text(selected->getItemModelPath        ? selected->getItemModelPath
+               : selected->getItemEntry.drawFunc ? "Custom draw callback"
+                                                 : "Native draw ID / icon fallback");
+    ModUI_Text("Held model:");
+    ModUI_Text(selected->heldModelPath ? selected->heldModelPath : "(custom drawing or none)");
+}
 static void DrawMenu(void) {
-    ModUI_TextWrapped("Click Drop for an actual collectible above Link. This does not grant ownership until pickup. "
-                      "Registered subtypes are separate rows.");
+    static const char* const modes[] = { "Custom items and variants", "Vanilla / built-in rando rewards" };
+    ModUI_TextWrapped("Custom items drop as a real pickup above Link and are owned only once collected. Built-in rando "
+                      "rewards go through the randomizer's own give queue and need a randomizer save.");
     ModUI_TextWrapped(sStatus);
     if (ModUI_Button("Copy full checklist (Markdown)", 0, 0))
         CopyChecklist();
-    ModUI_InputTextWithHint("Filter", "Item key or subtype", sFilter, sizeof(sFilter), 0);
-    if (ModUI_Button("Cancel queued drop", 0, 0))
+    ModUI_Combo("Catalog", &sCatalog, modes, 2);
+    ModUI_InputTextWithHint("Filter", "Name, key or subtype", sFilter, sizeof(sFilter), 0);
+    if (ModUI_Button("Cancel queued drop", 0, 0)) {
         sPending[0] = '\0';
-    bool visible = ModUI_BeginChild("DropCatalog", 0, 280, true, 0);
-    if (visible)
-        for (uint32_t i = 0; i < sApi->GetCustomItemCount(); ++i) {
-            const S2HCustomItemDefinition* item = sApi->GetCustomItemAt(i);
-            if (item == NULL || item->key == NULL || (sFilter[0] && strstr(item->key, sFilter) == NULL))
-                continue;
-            char label[KEY_SIZE + 32];
-            snprintf(label, sizeof(label), "Drop %s", item->key);
-            ModUI_BeginDisabled(gPlayState == NULL || sPending[0] != '\0' || strlen(item->key) >= KEY_SIZE);
-            if (ModUI_Button(label, 0, 0)) {
-                snprintf(sPending, sizeof(sPending), "%s", item->key);
-                snprintf(sSelected, sizeof(sSelected), "%s", item->key);
-                sStatus = "Queued. Close the menu and resume gameplay.";
-            }
-            ModUI_EndDisabled();
-        }
-    ModUI_EndChild();
-    const S2HCustomItemDefinition* selected = sApi->FindCustomItem(sSelected);
-    if (selected != NULL) {
-        ModUI_Text(selected->key);
-        DrawChecklist(selected->key);
-        const S2HCustomPickupVariant* subtype = sApi->GetPickupVariant(selected->key);
-        if (subtype != NULL) {
-            ModUI_Text("Parent item:");
-            ModUI_Text(subtype->itemKey);
-            ModUI_Text("Subtype:");
-            ModUI_Text(subtype->variantKey);
-        }
-        ModUI_Text("Icon:");
-        ModUI_Text(selected->iconPath ? selected->iconPath : "(none)");
-        ModUI_Text("Acquisition model:");
-        ModUI_Text(selected->getItemModelPath        ? selected->getItemModelPath
-                   : selected->getItemEntry.drawFunc ? "Custom draw callback"
-                                                     : "Native draw ID / icon fallback");
-        ModUI_Text("Held model:");
-        ModUI_Text(selected->heldModelPath ? selected->heldModelPath : "(custom drawing or none)");
+        sPendingNative = RI_UNKNOWN;
     }
+    const bool isNative = sCatalog == 1;
+    const bool canDropNative = gPlayState != NULL && IsRandoSave();
+    if (isNative && !canDropNative)
+        ModUI_TextWrapped("Load a randomizer save to test built-in rando rewards.");
+    bool visible = ModUI_BeginChild("DropCatalog", 0, 320, true, 0);
+    if (visible) {
+        ModUI_BeginDisabled(gPlayState == NULL || HasPendingDrop() || (isNative && !canDropNative));
+        if (isNative) {
+            for (size_t i = 0; i < ARRAY_COUNT(sNative); ++i)
+                NativeRow(&sNative[i]);
+        } else {
+            for (uint32_t i = 0; i < sApi->GetCustomItemCount(); ++i)
+                CustomRow(sApi->GetCustomItemAt(i));
+        }
+        ModUI_EndDisabled();
+    }
+    ModUI_EndChild();
+    if (sSelected[0]) {
+        ModUI_Text(sSelected);
+        DrawChecklist(sSelected);
+    }
+    DrawSelectedCustom();
 }
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;

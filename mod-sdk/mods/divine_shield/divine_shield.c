@@ -1,3 +1,6 @@
+#include <math.h>
+#include <string.h>
+
 #include "z64items.h"
 #include "z64logic.h"
 
@@ -18,12 +21,29 @@
 #define SHIELD_OFF_X (-508.0f)
 #define SHIELD_OFF_Y (-372.0f)
 #define SHIELD_OFF_Z (-5.0f)
+#define REMOTE_VISUAL_CHANNEL "nei.divine_shield.visual"
+#define REMOTE_VISUAL_INTERVAL 5u
 
 static const ALIGN_ASSET(2) char sIcon[] = "__OTR__textures/icon_item_custom/gItemIconGoddessShieldTex";
 static const ALIGN_ASSET(2) char sName[] = "__OTR__textures/item_name_custom/gGoddessShieldNameTex";
 static const ALIGN_ASSET(2) char sShieldDL[] = "__OTR__objects/object_nei_divine_shield/g_divine_shield_dl";
 
 static const S2HModApi* sApi;
+
+typedef struct {
+    int16_t scene;
+    uint8_t active;
+    uint8_t adult;
+    uint8_t flags[8];
+    float values[12];
+} RemoteVisualState;
+
+static struct {
+    bool isReady;
+    bool isSent;
+    uint32_t frame;
+    RemoteVisualState last;
+} sRemote;
 
 static struct {
     s16 raiseTimer;
@@ -33,6 +53,78 @@ static struct {
 
 static bool IsWorn(void) {
     return CustomEquipRegistry_IsWorn(DIVINE_SHIELD_KEY);
+}
+
+static void ReceiveRemoteVisual(const S2HNetMessage* message) {
+    (void)message;
+}
+
+static bool HasValidRemoteValues(const RemoteVisualState* visual) {
+    for (uint32_t i = 0; i < ARRAY_COUNT(visual->values); i++) {
+        if (!isfinite(visual->values[i]) || fabsf(visual->values[i]) > 10000000.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool IsRemoteShieldWorn(Player* player) {
+    RemoteVisualState visual;
+
+    if (!sRemote.isReady || gPlayState == NULL) {
+        return false;
+    }
+    uint32_t peerId = sApi->GetNetPeerIdForActor(&player->actor);
+    if (peerId == 0 ||
+        sApi->GetNetPeerState(peerId, REMOTE_VISUAL_CHANNEL, &visual, sizeof(visual)) != sizeof(visual)) {
+        return false;
+    }
+    if (visual.active != 1 || visual.adult > 1 || visual.scene != gPlayState->sceneId ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000)) {
+        return false;
+    }
+    return HasValidRemoteValues(&visual);
+}
+
+static bool IsShieldVisible(Player* player) {
+    if (gPlayState == NULL || player->transformation != PLAYER_FORM_HUMAN ||
+        player->currentShield == PLAYER_SHIELD_NONE) {
+        return false;
+    }
+    return player == GET_PLAYER(gPlayState) ? IsWorn() : IsRemoteShieldWorn(player);
+}
+
+static void PublishRemoteVisual(void) {
+    PlayState* play = gPlayState;
+    RemoteVisualState visual = { 0 };
+
+    visual.scene = -1;
+    if (play != NULL) {
+        visual.scene = play->sceneId;
+        visual.active = IsWorn();
+        if (sRemote.isSent && (uint32_t)(play->gameplayFrames - sRemote.frame) < REMOTE_VISUAL_INTERVAL) {
+            return;
+        }
+    }
+    if (sRemote.isSent && memcmp(&visual, &sRemote.last, sizeof(visual)) == 0) {
+        return;
+    }
+    if (sApi->SetNetPeerState(REMOTE_VISUAL_CHANNEL, &visual, sizeof(visual))) {
+        sRemote.last = visual;
+        sRemote.isSent = true;
+        sRemote.frame = play != NULL ? play->gameplayFrames : 0;
+    }
+}
+
+static void InitRemoteVisuals(void) {
+    if (!S2H_MOD_API_HAS(sApi, RegisterNetChannel) || !S2H_MOD_API_HAS(sApi, SetNetPeerState) ||
+        !S2H_MOD_API_HAS(sApi, GetNetPeerState) || !S2H_MOD_API_HAS(sApi, GetNetPeerIdForActor)) {
+        return;
+    }
+    sRemote.isReady = sApi->RegisterNetChannel(REMOTE_VISUAL_CHANNEL, 1, ReceiveRemoteVisual);
+    if (sRemote.isReady) {
+        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, PublishRemoteVisual);
+    }
 }
 
 static bool IsShieldOnBack(Player* player) {
@@ -87,11 +179,11 @@ static void ParryOnBlock(PlayState* play, Player* player, Actor* attacker) {
 }
 
 static void HideVanillaShield(Player* player, int32_t limbIndex, Gfx** dList, Gfx* limbDList, Vec3f* pos) {
-    if (!IsWorn() || player->transformation != PLAYER_FORM_HUMAN || player->currentShield == PLAYER_SHIELD_NONE) {
+    if (!IsShieldVisible(player)) {
         return;
     }
     if (limbIndex == PLAYER_LIMB_RIGHT_HAND && IsShieldInHand(player)) {
-        *dList = (Gfx*)gLinkHumanRightHandClosedDL;
+        *dList = (Gfx*)gLinkHumanRightHandOpenDL;
     } else if (limbIndex == PLAYER_LIMB_SHEATH && IsShieldOnBack(player)) {
         sDivine.hiddenVanillaShield = player->currentShield;
         player->currentShield = PLAYER_SHIELD_NONE;
@@ -126,12 +218,13 @@ static void DrawOnLimb(Player* player, int32_t limbIndex) {
     if (limbIndex == PLAYER_LIMB_SHEATH) {
         RestoreVanillaShield(player);
     }
-    if (play == NULL || !IsWorn() || player != GET_PLAYER(play) || player->transformation != PLAYER_FORM_HUMAN ||
-        player->currentShield == PLAYER_SHIELD_NONE) {
+    if (!IsShieldVisible(player)) {
         return;
     }
     if (limbIndex == PLAYER_LIMB_RIGHT_HAND && IsShieldInHand(player)) {
-        player->shieldQuad.base.colMaterial = COL_MATERIAL_WOOD;
+        if (player == GET_PLAYER(play)) {
+            player->shieldQuad.base.colMaterial = COL_MATERIAL_WOOD;
+        }
         DrawShield(play);
     } else if (limbIndex == PLAYER_LIMB_SHEATH && IsShieldOnBack(player) && !IsShieldInHand(player) &&
                player->rightHandType != PLAYER_MODELTYPE_RH_FF) {
@@ -144,8 +237,8 @@ static void ForgetRaise(const char* key) {
     sDivine.wasShielding = false;
 }
 
-static const char* const sRequiredHooks[] = { "OnPlayerUpdate", "OnPlayerShieldBlocked", "OnPlayerResolveLimbDraw",
-                                              "OnPlayerPostLimbDraw" };
+static const char* const sRequiredHooks[] = { "OnGameFrameUpdate", "OnPlayerUpdate", "OnPlayerShieldBlocked",
+                                              "OnPlayerResolveLimbDraw", "OnPlayerPostLimbDraw" };
 
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -179,6 +272,7 @@ static void GrantDivineShieldLogic(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    InitRemoteVisuals();
     GrantDivineShieldLogic();
     S2HCustomEquipDefinition definition = { 0 };
 

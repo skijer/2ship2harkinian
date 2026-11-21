@@ -19,6 +19,7 @@
 #include "variables.h"
 #include "textures/oot_item_name_static/item_name_static.h"
 #include "z64oot_names.h"
+#include "2s2h/Rando/Types.h"
 
 #define NEB_MOD_NAME "not_enough_bottles"
 #define NEB_SAVE_FIELD "custom_bottles"
@@ -31,6 +32,7 @@
 #define NEB_BOTTLE_COUNT (NEB_EXTRA_COUNT + 1)
 #define NEB_NONE (-1)
 #define NEB_VANILLA_COUNT 4
+#define NEB_NATIVE_OVERFLOW_EXTRAS 2
 #define NEB_BUTTON_COUNT 9
 #define NEB_CONTENT_COUNT (ITEM_OBABA_DRINK - ITEM_BOTTLE + 1)
 #define NEB_DIGIT_SIZE 8
@@ -509,11 +511,10 @@ static void ResolveBottleAction(int32_t item, int8_t* itemAction) {
     }
 }
 
-static void SayTimeAndPlace(void) {
-    if (gPlayState == NULL) {
+static void SayTimeAndPlace(Player* player) {
+    if (gPlayState == NULL || player != GET_PLAYER(gPlayState)) {
         return;
     }
-    Player* player = GET_PLAYER(gPlayState);
     const bool isShowingForeign =
         player->heldItemAction == PLAYER_IA_BOTTLE_BIG_POE && IsForeignOnButton(player->heldItemButton);
     if (!isShowingForeign) {
@@ -1303,6 +1304,16 @@ static bool RegisterBottomless(void) {
     return Z64Items_Register(sApi, &bottomless);
 }
 
+// Each seeded extra bottle is one of MM's own bottle items; GiveIntoBottles routes it past the vanilla slots.
+static const int32_t sBottlePoolSources[] = {
+    RI_BOTTLE_EMPTY, RI_BOTTLE_MILK, RI_BOTTLE_RED_POTION, RI_BOTTLE_GOLD_DUST, RI_BOTTLE_CHATEAU_ROMANI,
+};
+
+// MM's fifth and sixth native bottles already fill the first two extras, so only the rest add to the pool.
+static uint16_t GetExtraBottlePoolCount(int8_t bottle) {
+    return bottle >= NEB_NATIVE_OVERFLOW_EXTRAS ? 1 : 0;
+}
+
 static bool RegisterExtraBottle(int8_t bottle) {
     SOHCustomItemDefinition extra =
         Z64Items_Define(sBottleKeys[bottle], (const char*)gItemIcons[ITEM_BOTTLE], gEmptyBottleItemNameENGTex);
@@ -1322,10 +1333,16 @@ static bool RegisterExtraBottle(int8_t bottle) {
         0,
         SOH_CUSTOM_ITEM_TYPE_ITEM,
         0,
-        bottle >= 2 ? 1 : 0,
+        GetExtraBottlePoolCount(bottle),
         sBottleKeys[bottle],
         sBottleKeys[bottle],
         "",
+        NULL,
+        NULL,
+        0,
+        false,
+        sBottlePoolSources,
+        ARRAY_COUNT(sBottlePoolSources),
     };
     Z64Items_SetLogic(&extra, &randomizer);
     return Z64Items_Register(sApi, &extra);
@@ -1355,12 +1372,6 @@ static void RegisterSharedBottles(void) {
     }
     RegisterSharedBottle(NEB_RUTOS_LETTER_KEY, sRutosLetterIcon, sRutosLetterName,
                          "You got a %rBottle with Ruto's Letter%w!&It smells of Zora's Domain.");
-}
-
-static void GroupVanillaBottles(void) {
-    if (!SOH_MOD_API_HAS(sApi, PlaceLayoutItem)) {
-        return;
-    }
 }
 
 static void TickBottles(void) {
@@ -1407,7 +1418,6 @@ SOH_MOD_EXPORT void ModInit(void) {
     SOH_REGISTER_HOOK(sApi, OnKaleidoItemDraw, ForeignPauseIcon);
     SOH_REGISTER_HOOK_FOR_ID(sApi, ShouldActorUpdate, ACTOR_EN_ZORAEGG, LendRoomForZoraEgg);
     SOH_REGISTER_HOOK_FOR_ID(sApi, OnActorUpdate, ACTOR_EN_ZORAEGG, CloseActorWindow);
-    GroupVanillaBottles();
     SOH_REGISTER_HOOK(sApi, OnPlayerResolveLimbDraw, NetSwordHand);
     SOH_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, DrawNetInHand_Mm);
     sApi->RegisterVB(VB_UPDATE_BOTTLE_ITEM, CatchBottleWrite);

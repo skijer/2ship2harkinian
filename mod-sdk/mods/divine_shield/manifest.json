@@ -1,7 +1,11 @@
 {
     "name": "divine_shield",
-  "dependencies": ["nei_equipment"],
+    "dependencies": ["nei_equipment"],
     "author": "Skijer",
-    "version": "1.0",
-    "description": "Divine Shield: shield-slot equipment that fire cannot burn, and whose early guard freezes the room."
+    "version": "1.0.1",
+    "description": "Divine Shield: shield-slot equipment that fire cannot burn, and whose early guard freezes the room.",
+    "permissions": [
+        "network"
+    ],
+    "display_name": "Divine Shield"
 }

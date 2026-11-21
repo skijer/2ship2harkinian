@@ -448,13 +448,10 @@ void EnMiniblin_SetupTailAttack(EnMiniblin* self, PlayState* play) {
 void EnMiniblin_TailAttack(EnMiniblin* self, PlayState* play) {
     if (self->quad.base.atFlags & AT_HIT) {
         Actor_PlaySfx(&self->actor, NA_SE_EN_KOUME_MAGIC);
-        if (gSaveContext.save.saveInfo.playerData.rupees >= 20 && self->rupeeStolen == false) {
-
-            if (Rand_ZeroOne() < 0.4f) {
-
-                Rupees_ChangeBy(-20);
-                self->aboutToSteal = true;
-            }
+        if (gSaveContext.save.saveInfo.playerData.rupees >= 20 && !self->rupeeStolen && !self->aboutToSteal &&
+            Rand_ZeroOne() < 0.4f) {
+            Rupees_ChangeBy(-20);
+            self->aboutToSteal = true;
         }
     }
     if (SkelAnime_Update(&self->skelAnime)) {
@@ -626,6 +623,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.destroy = EnMiniblin_Destroy;
     definition.update = EnMiniblin_Update;
     definition.draw = EnMiniblin_Draw;
+    definition.enemyFlags = S2H_ACTOR_ENEMY;
+    definition.naviHint = "Miniblin&It steals %rRupees%w with its tail!&Beat it quickly to get them back!";
 
     if (sApi->RegisterActor(&definition) < 0) {
         sApi->Log("Could not register " MINIBLIN_KEY);

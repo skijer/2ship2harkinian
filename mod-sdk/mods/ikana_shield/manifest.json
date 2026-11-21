@@ -1,7 +1,8 @@
 {
     "name": "ikana_shield",
-  "dependencies": ["nei_equipment"],
+    "dependencies": ["nei_equipment"],
     "author": "Skijer",
-    "version": "1.0",
-    "description": "Shield of Ikana: shield-slot equipment whose early guard drains souls and that holds death off once per area. Wears Majora's Mask's own mirror shield."
+    "version": "1.0.1",
+    "description": "Shield of Ikana: shield-slot equipment whose early guard drains souls and that holds death off once per area. Wears Majora's Mask's own mirror shield.",
+    "display_name": "Shield of Ikana"
 }

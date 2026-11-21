@@ -14,7 +14,8 @@
 #include "variables.h"
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h"
 #include "overlays/actors/ovl_Obj_Syokudai/z_obj_syokudai.h"
-#include "overlays/actors/ovl_Bg_Icefloe/z_bg_icefloe.h"
+#include "overlays/actors/ovl_Obj_Iceblock/z_obj_iceblock.h"
+#include "objects/object_ice_block/object_ice_block.h"
 #include "z64rumble.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -27,6 +28,8 @@
 #define SLATE_HELD_ROT_Y 180.0f
 #define SLATE_HELD_ROT_X 180.0f
 #define SLATE_HELD_OFFSET_Y -8.276f
+#define SLATE_GIVE_SCALE 0.62f
+#define SLATE_GIVE_FLAME_SCALE 0.13333333f
 #define SLATE_TEXT_LENGTH 512
 #define SLATE_WHEEL_HOLD_FRAMES 8
 
@@ -39,11 +42,15 @@
 #define CRYONIS_DIST_MAX 420.0f
 #define CRYONIS_DIST_START 170.0f
 #define CRYONIS_DIST_RATE 7.0f
-#define CRYONIS_LIFETIME 4000
-#define CRYONIS_HALF_EXTENT 60.0f
-#define CRYONIS_GHOST_HEIGHT 40.0f
+#define CRYONIS_HEIGHT_MUL 1.8f
+#define CRYONIS_WIDTH_MUL 0.6f
+#define CRYONIS_SCALE 0.1f
+#define CRYONIS_DEPTH 200.0f
 #define CRYONIS_BREAK_SLACK 20.0f
 #define CRYONIS_SHARDS 12
+#define CRYONIS_GROW_TICKS 11
+#define CRYONIS_GROW_START 0.06f
+#define CRYONIS_FREEZE_DAMAGE 0
 #define WALL_FLAG_CLIMBABLE (1 << 3)
 
 typedef enum {
@@ -100,6 +107,7 @@ static const u32 sItemButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, 
                                                          BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 
 static const char* const sRequiredHooks[] = { "OnPlayerUpdate",
+                                              "OnPlayerFilterInput",
                                               "OnActorDrawEnd",
                                               "OnSceneInit",
                                               "OnPlayerPostLimbDraw",
@@ -127,9 +135,7 @@ static bool sIsSlateDrawn;
 static MtxF sHandMatrix;
 static bool sHasHandMatrix;
 static s16 sWheelHoldTimer;
-static u8 sPendingRune;
 static u8 sShownRune = SLATE_RUNE_COUNT;
-static char sPickupText[SLATE_TEXT_LENGTH];
 static char sPauseText[SLATE_TEXT_LENGTH];
 static Actor* sRemoteBomb;
 static u32 sCastFrame;
@@ -160,35 +166,6 @@ static u8 CurrentRune(void) {
 
 static bool IsRuneOwned(u8 rune) {
     return rune != SLATE_RUNE_NONE && Z64Wheel_IsEntryUnlocked(rune);
-}
-
-static u8 CountLockedRunes(void) {
-    u8 locked = 0;
-
-    for (u8 rune = SLATE_RUNE_BOMB; rune < SLATE_RUNE_COUNT; rune++) {
-        locked += IsRuneOwned(rune) ? 0 : 1;
-    }
-    return locked;
-}
-
-static u8 PickMissingRune(void) {
-    u8 locked = CountLockedRunes();
-
-    if (locked == 0) {
-        return SLATE_RUNE_NONE;
-    }
-    u8 wanted = (u8)(Rand_ZeroOne() * locked);
-
-    for (u8 rune = SLATE_RUNE_BOMB; rune < SLATE_RUNE_COUNT; rune++) {
-        if (IsRuneOwned(rune)) {
-            continue;
-        }
-        if (wanted == 0) {
-            return rune;
-        }
-        wanted--;
-    }
-    return SLATE_RUNE_NONE;
 }
 
 static u8 NextAvailableRune(u8 from) {
@@ -231,39 +208,14 @@ static void DescribeRune(u8 rune) {
     sShownRune = rune;
 }
 
-static void AnnounceRune(u8 rune, bool isFirstSlate) {
-    const SlateRuneText* text = &sRuneTexts[rune];
-
-    if (rune == SLATE_RUNE_NONE) {
-        snprintf(
-            sPickupText, sizeof(sPickupText),
-            "You got the %%rSheikah Slate%%w!&An ancient tablet of the Sheikah,&and every rune it holds is awake.");
-    } else if (isFirstSlate) {
-        snprintf(sPickupText, sizeof(sPickupText),
-                 "You got the %%rSheikah Slate%%w!&An ancient tablet of the Sheikah, and&the %s rune wakes on its "
-                 "face.^%s^%s",
-                 text->name, text->loreLine, text->castLine);
-    } else {
-        snprintf(sPickupText, sizeof(sPickupText), "Your %%rSheikah Slate%%w learned the&%s rune!^%s^%s", text->name,
-                 text->loreLine, text->castLine);
-    }
-    Z64Items_UpdateText(sApi, SLATE_KEY, S2H_ITEM_TEXT_GET_ITEM, sPickupText);
-}
-
-static void PrepareNextRune(void) {
-    if (IsRuneOwned(sPendingRune)) {
-        sPendingRune = SLATE_RUNE_NONE;
-    }
-    if (sPendingRune != SLATE_RUNE_NONE || CountLockedRunes() == 0) {
-        return;
-    }
-    sPendingRune = PickMissingRune();
-    AnnounceRune(sPendingRune, !sApi->IsCustomItemOwned(SLATE_KEY));
-}
-
-static const char* const sPickupKeys[SLATE_RUNE_COUNT] = { "", "nei.slate.bomb", "nei.slate.stasis",
-                                                           "nei.slate.cryonis", "nei.slate.master_cycle" };
+static const char* const sPickupKeys[SLATE_RUNE_COUNT] = {
+    "", "nei.slate.bomb", "nei.slate.stasis", "nei.slate.cryonis", "nei.slate.master_cycle",
+};
 static const char* const sVariantNames[SLATE_RUNE_COUNT] = { "", "bomb", "stasis", "cryonis", "master_cycle" };
+static const u8 sRuneFlameColors[SLATE_RUNE_COUNT][3] = {
+    { 160, 230, 255 }, { 100, 235, 220 }, { 255, 220, 40 }, { 175, 205, 220 }, { 255, 135, 35 },
+};
+
 static void ReceiveSlateRune(const char* itemKey, const char* variantKey) {
     for (u8 rune = SLATE_RUNE_BOMB; rune < SLATE_RUNE_COUNT; rune++) {
         if (strcmp(variantKey, sVariantNames[rune]) == 0) {
@@ -275,10 +227,50 @@ static void ReceiveSlateRune(const char* itemKey, const char* variantKey) {
     }
 }
 
-static void GrantRune(const char* key) {
-    for (u8 rune = SLATE_RUNE_BOMB; rune < SLATE_RUNE_COUNT; rune++)
+static void GrantAllRunes(const char* key) {
+    for (u8 rune = SLATE_RUNE_BOMB; rune < SLATE_RUNE_COUNT; rune++) {
         Z64Wheel_SetEntryUnlocked(rune, true);
-    sPendingRune = SLATE_RUNE_NONE;
+    }
+}
+
+static void SyncReceivedRunes(void) {
+    for (u8 rune = SLATE_RUNE_BOMB; rune < SLATE_RUNE_COUNT; rune++) {
+        if (sApi->IsCustomItemOwned(sPickupKeys[rune])) {
+            Z64Wheel_SetEntryUnlocked(rune, true);
+        }
+    }
+}
+
+// MM pickup variants draw either a soul flame or a model, never a draw callback, so each rune keeps its tinted flame.
+static void DrawSpinningSlate(PlayState* play, S2HGetItemEntry* getItemEntry);
+
+static bool RegisterRunePickups(void) {
+    for (u8 rune = SLATE_RUNE_BOMB; rune < SLATE_RUNE_COUNT; rune++) {
+        S2HCustomPickupVariant pickup = Z64Items_DefinePickup(SLATE_KEY, sVariantNames[rune], sPickupKeys[rune]);
+        S2HCustomItemRandomizer logic = sSlateLogic;
+        char text[SLATE_TEXT_LENGTH];
+
+        snprintf(text, sizeof(text), "You unlocked %s for&the %%rSheikah Slate%%w!^%s^%s", sRuneTexts[rune].name,
+                 sRuneTexts[rune].loreLine, sRuneTexts[rune].castLine);
+        logic.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
+        logic.poolCount = 1;
+        logic.logicKey = sPickupKeys[rune];
+        logic.hintKey = sPickupKeys[rune];
+        pickup.iconPath = sWheelEntries[rune].itemIconPath;
+        pickup.getItemModelPath = sSlateDL;
+        pickup.getItemText = text;
+        pickup.onReceive = ReceiveSlateRune;
+        pickup.randomizer = &logic;
+        pickup.drawSoulFlame = true;
+        pickup.flameRed = sRuneFlameColors[rune][0];
+        pickup.flameGreen = sRuneFlameColors[rune][1];
+        pickup.flameBlue = sRuneFlameColors[rune][2];
+        pickup.drawFunc = DrawSpinningSlate;
+        if (!Z64Items_RegisterPickup(sApi, &pickup)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 static void ForgetRemoteBomb(void) {
@@ -371,7 +363,50 @@ static void RunRemoteBomb(PlayState* play, Player* player) {
 typedef struct {
     Actor* pillar;
     s32 bgId;
+    u8 growTick;
+    f32 waterY;
 } CryonisState;
+
+static ColliderCylinderInit sPillarColliderInit = {
+    {
+        COL_MATERIAL_NONE,
+        AT_NONE,
+        AC_ON | AC_TYPE_ALL,
+        OC1_NONE,
+        OC2_NONE,
+        COLSHAPE_CYLINDER,
+    },
+    {
+        ELEM_MATERIAL_UNK0,
+        { 0x00000000, 0x00, 0x00 },
+        { DMG_EXPLOSIVES | DMG_GORON_POUND, 0x00, 0x00 },
+        ATELEM_NONE,
+        ACELEM_ON,
+        OCELEM_NONE,
+    },
+    { 20, 40, 0, { 0, 0, 0 } },
+};
+
+// The rising pillar hits like an ice arrow, so each actor's own damage table decides whether it freezes.
+static ColliderCylinderInit sPillarFreezeInit = {
+    {
+        COL_MATERIAL_NONE,
+        AT_ON | AT_TYPE_PLAYER,
+        AC_NONE,
+        OC1_NONE,
+        OC2_NONE,
+        COLSHAPE_CYLINDER,
+    },
+    {
+        ELEM_MATERIAL_UNK0,
+        { DMG_ICE_ARROW, 0x00, CRYONIS_FREEZE_DAMAGE },
+        { 0x00000000, 0x00, 0x00 },
+        ATELEM_ON | ATELEM_SFX_NONE,
+        ACELEM_NONE,
+        OCELEM_NONE,
+    },
+    { 20, 40, 0, { 0, 0, 0 } },
+};
 
 static Vtx sGhostVtx[] = {
     VTX(-1, 0, -1, 0, 0, 0, 0, 0, 255), VTX(1, 0, -1, 0, 0, 0, 0, 0, 255),  VTX(1, 0, 1, 0, 0, 0, 0, 0, 255),
@@ -390,12 +425,61 @@ static Gfx sGhostDL[] = {
     gsSPEndDisplayList(),
 };
 
-static CryonisState sCryonis = { NULL, BGCHECK_SCENE };
+static CryonisState sCryonis = { NULL, BGCHECK_SCENE, 0, 0.0f };
+static ColliderCylinder sPillarCollider;
+static ColliderCylinder sPillarFreezeCollider;
+static bool sArePillarCollidersReady;
 static bool sIsAiming;
 static f32 sAimDistance = CRYONIS_DIST_START;
 static Vec3f sAimPos;
 static bool sAimIsValid;
 static bool sAimBreaks;
+
+static f32 sBlockHalfX;
+static f32 sBlockHalfZ;
+static f32 sBlockHeight;
+static f32 sBlockLocalHeight;
+static f32 sBlockMinY;
+static f32 sBlockBaseOffset;
+static bool sIsBlockMeasured;
+
+static void MeasureIceBlock(void) {
+    CollisionHeader* header = NULL;
+
+    if (sIsBlockMeasured) {
+        return;
+    }
+    CollisionHeader_GetVirtual((CollisionHeader*)gIceBlockCol, &header);
+    if (header == NULL) {
+        return;
+    }
+    sBlockHalfX = (header->maxBounds.x - header->minBounds.x) * 0.5f * CRYONIS_SCALE * CRYONIS_WIDTH_MUL;
+    sBlockHalfZ = (header->maxBounds.z - header->minBounds.z) * 0.5f * CRYONIS_SCALE * CRYONIS_WIDTH_MUL;
+    sBlockLocalHeight = (f32)(header->maxBounds.y - header->minBounds.y);
+    sBlockHeight = sBlockLocalHeight * CRYONIS_SCALE * CRYONIS_HEIGHT_MUL;
+    sBlockMinY = (f32)header->minBounds.y;
+    sBlockBaseOffset = -sBlockMinY * CRYONIS_SCALE * CRYONIS_HEIGHT_MUL;
+    sIsBlockMeasured = true;
+}
+
+static f32 GrowProgress(u8 tick) {
+    f32 t = (f32)tick / (f32)CRYONIS_GROW_TICKS;
+
+    return CRYONIS_GROW_START + ((1.0f - CRYONIS_GROW_START) * (1.0f - SQ(1.0f - t)));
+}
+
+static void ApplyGrowth(Actor* actor, f32 progress) {
+    f32 total = CRYONIS_DEPTH + (sBlockHeight * progress);
+    f32 scaleY = (sBlockLocalHeight > 0.0f) ? (total / sBlockLocalHeight) : CRYONIS_SCALE;
+
+    actor->scale.y = scaleY;
+    actor->world.pos.y = sCryonis.waterY - CRYONIS_DEPTH - (sBlockMinY * scaleY);
+    sPillarCollider.dim.height = (s16)total;
+    sPillarCollider.dim.yShift = (s16)(sBlockMinY * scaleY);
+    sPillarFreezeCollider.dim.height = sPillarCollider.dim.height;
+    sPillarFreezeCollider.dim.yShift = sPillarCollider.dim.yShift;
+}
+
 static void ForgetPillar(void) {
     sCryonis.pillar = NULL;
     sCryonis.bgId = BGCHECK_SCENE;
@@ -416,18 +500,49 @@ static void ShatterPillar(PlayState* play) {
         return;
     }
     pos = sCryonis.pillar->world.pos;
+    pos.y = sCryonis.waterY;
     PlaySfxAt(NA_SE_EV_ICE_BROKEN, &pos);
     for (s32 i = 0; i < CRYONIS_SHARDS; i++) {
         Vec3f burst = pos;
         Vec3f velocity = { Rand_CenteredFloat(4.0f), 1.0f + (Rand_ZeroOne() * 2.0f), Rand_CenteredFloat(4.0f) };
 
-        burst.x += Rand_CenteredFloat(CRYONIS_HALF_EXTENT);
-        burst.y += Rand_ZeroOne() * CRYONIS_GHOST_HEIGHT;
-        burst.z += Rand_CenteredFloat(CRYONIS_HALF_EXTENT);
+        burst.x += Rand_CenteredFloat(sBlockHalfX * 2.0f);
+        burst.y += Rand_ZeroOne() * sBlockHeight;
+        burst.z += Rand_CenteredFloat(sBlockHalfZ * 2.0f);
         EffectSsIceBlock_Spawn(play, &burst, &velocity, &sShardAccel, Rand_S16Offset(10, 10));
     }
     Actor_Kill(sCryonis.pillar);
     ForgetPillar();
+}
+
+static void PillarUpdate(Actor* thisx, PlayState* play) {
+    DynaPolyActor* dyna = (DynaPolyActor*)thisx;
+    bool isGrowing = sCryonis.growTick < CRYONIS_GROW_TICKS;
+
+    if (isGrowing) {
+        sCryonis.growTick++;
+        ApplyGrowth(thisx, GrowProgress(sCryonis.growTick));
+    }
+    if (dyna->pushForce != 0.0f) {
+        GET_PLAYER(play)->stateFlags2 &= ~PLAYER_STATE2_10;
+        dyna->pushForce = 0.0f;
+    }
+    if (sPillarCollider.base.acFlags & AC_HIT) {
+        sPillarCollider.base.acFlags &= ~AC_HIT;
+        ShatterPillar(play);
+        return;
+    }
+    Collider_UpdateCylinder(thisx, &sPillarCollider);
+    CollisionCheck_SetAC(play, &play->colChkCtx, &sPillarCollider.base);
+    if (isGrowing) {
+        Collider_UpdateCylinder(thisx, &sPillarFreezeCollider);
+        CollisionCheck_SetAT(play, &play->colChkCtx, &sPillarFreezeCollider.base);
+    }
+}
+
+static void PillarDraw(Actor* thisx, PlayState* play) {
+    AnimatedMat_Draw(play, Lib_SegmentedToVirtual((void*)gIceBlockCubeSublimatingAirTexAnim));
+    Gfx_DrawDListXlu(play, (Gfx*)gIceBlockCubeDL);
 }
 
 static void MakePillarClimbable(CollisionContext* colCtx, CollisionPoly* poly, int32_t bgId, uint32_t* flags) {
@@ -448,7 +563,7 @@ static s16 AimYaw(PlayState* play, Player* player) {
 }
 
 static bool AimIsOnPillar(Vec3f* pos) {
-    f32 reach = CRYONIS_HALF_EXTENT + CRYONIS_BREAK_SLACK;
+    f32 reach = fmaxf(sBlockHalfX, sBlockHalfZ) + CRYONIS_BREAK_SLACK;
     f32 dx;
     f32 dz;
 
@@ -507,15 +622,49 @@ static void LeaveAiming(bool isCancelled) {
     }
 }
 
-static bool RaisePillar(PlayState* play, Vec3f* pos) {
-    Actor* actor =
-        Actor_Spawn(&play->actorCtx, play, ACTOR_BG_ICEFLOE, pos->x, pos->y, pos->z, 0, 0, 0, CRYONIS_LIFETIME);
+static void SetUpPillarColliders(PlayState* play, Actor* actor) {
+    s16 radius = (s16)fmaxf(sBlockHalfX, sBlockHalfZ);
 
-    if (actor == NULL) {
+    if (!sArePillarCollidersReady) {
+        Collider_InitCylinder(play, &sPillarCollider);
+        Collider_InitCylinder(play, &sPillarFreezeCollider);
+        sArePillarCollidersReady = true;
+    }
+    Collider_SetCylinder(play, &sPillarCollider, actor, &sPillarColliderInit);
+    Collider_SetCylinder(play, &sPillarFreezeCollider, actor, &sPillarFreezeInit);
+    sPillarCollider.dim.radius = radius;
+    sPillarFreezeCollider.dim.radius = radius;
+}
+
+// MM's own ice block (Obj_Iceblock) is the carrier: its body and collision are kept, its update and draw are ours.
+static bool RaisePillar(PlayState* play, Vec3f* pos) {
+    MeasureIceBlock();
+    if (!sIsBlockMeasured) {
         return false;
     }
+    if (Object_GetSlot(&play->objectCtx, OBJECT_ICE_BLOCK) <= OBJECT_SLOT_NONE) {
+        Object_SpawnPersistent(&play->objectCtx, OBJECT_ICE_BLOCK);
+    }
+    Actor* actor = Actor_Spawn(&play->actorCtx, play, ACTOR_OBJ_ICEBLOCK, pos->x, pos->y + sBlockBaseOffset, pos->z,
+                               0, 0, 0, 0);
+
+    if ((actor == NULL) || (actor->update == NULL)) {
+        return false;
+    }
+    DynaPolyActor* dyna = (DynaPolyActor*)actor;
+
+    actor->update = PillarUpdate;
+    actor->draw = PillarDraw;
+    actor->scale.x *= CRYONIS_WIDTH_MUL;
+    actor->scale.z *= CRYONIS_WIDTH_MUL;
+    DynaPoly_EnableCollision(play, &play->colCtx.dyna, dyna->bgId);
+    SetUpPillarColliders(play, actor);
+
+    sCryonis.waterY = pos->y;
+    sCryonis.growTick = 0;
+    ApplyGrowth(actor, GrowProgress(0));
     sCryonis.pillar = actor;
-    sCryonis.bgId = ((DynaPolyActor*)actor)->bgId;
+    sCryonis.bgId = dyna->bgId;
     return true;
 }
 
@@ -524,6 +673,7 @@ static bool CastCryonis(PlayState* play, Player* player) {
         LeaveAiming(true);
         return true;
     }
+    MeasureIceBlock();
     sIsAiming = true;
     sAimDistance = CRYONIS_DIST_START;
     UpdateAim(play, player);
@@ -594,7 +744,7 @@ static void DrawAimGhost(void) {
     PlayState* play = gPlayState;
     f32 pulse;
 
-    if (!sIsAiming || play == NULL) {
+    if (!sIsAiming || !sIsBlockMeasured || play == NULL) {
         return;
     }
     pulse = 0.94f + (0.06f * Math_SinS((s16)(play->gameplayFrames * 1500)));
@@ -602,7 +752,7 @@ static void DrawAimGhost(void) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
     Matrix_Translate(sAimPos.x, sAimPos.y, sAimPos.z, MTXMODE_NEW);
-    Matrix_Scale(CRYONIS_HALF_EXTENT * pulse, CRYONIS_GHOST_HEIGHT * pulse, CRYONIS_HALF_EXTENT * pulse, MTXMODE_APPLY);
+    Matrix_Scale(sBlockHalfX * pulse, sBlockHeight * pulse, sBlockHalfZ * pulse, MTXMODE_APPLY);
     if (sAimBreaks) {
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 150, 90, 120);
         gDPSetEnvColor(POLY_XLU_DISP++, 180, 60, 0, 120);
@@ -1204,7 +1354,7 @@ static u8 ClassifyBody(PlayState* play, Actor* actor, s32* bgIdOut) {
     if (bgIdOut != NULL) {
         *bgIdOut = -1;
     }
-    if ((actor == NULL) || (actor->update == NULL) || (actor->id == ACTOR_PLAYER)) {
+    if ((actor == NULL) || (actor->update == NULL) || (actor->id == ACTOR_PLAYER) || (actor == sCryonis.pillar)) {
         return STASIS_KIND_NONE;
     }
     if (actor->category == ACTORCAT_BOSS) {
@@ -2530,6 +2680,8 @@ static void StowSlate(Player* player, PlayState* play) {
     LeaveAiming(true);
 }
 
+#include "master_cycle.inc.c"
+
 static void CastRune(Player* player, PlayState* play) {
     u8 rune = CurrentRune();
     bool cast = false;
@@ -2548,6 +2700,9 @@ static void CastRune(Player* player, PlayState* play) {
             break;
         case SLATE_RUNE_CRYONIS:
             cast = CastCryonis(play, player);
+            break;
+        case SLATE_RUNE_MASTER_CYCLE:
+            cast = MasterCycle_Cast(play, player);
             break;
         default:
             break;
@@ -2582,10 +2737,8 @@ static void RunSlate(Player* player) {
     if (play == NULL || player == NULL) {
         return;
     }
-    for (u8 rune = SLATE_RUNE_BOMB; rune < SLATE_RUNE_COUNT; rune++) {
-        if (sApi->IsCustomItemOwned(sPickupKeys[rune]))
-            Z64Wheel_SetEntryUnlocked(rune, true);
-    }
+    MasterCycle_Tick(play, player);
+    SyncReceivedRunes();
     if (!sApi->IsCustomItemOwned(SLATE_KEY)) {
         return;
     }
@@ -2606,6 +2759,8 @@ static void RunSlate(Player* player) {
 }
 
 static void ForgetRunes(s16 sceneId, s8 spawnNum) {
+    sMcSceneChanged = 1;
+    MasterCycle_Forget();
     ForgetRemoteBomb();
     LeaveAiming(false);
     ForgetPillar();
@@ -2645,6 +2800,41 @@ static void DrawSlateInHand(Actor* actor, PlayState* play) {
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sSlateDL);
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawGetItemFlame(PlayState* play) {
+    const u8* color = sRuneFlameColors[SLATE_RUNE_NONE];
+    u32 frames = play->state.frames;
+
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    gSPSegment(POLY_XLU_DISP++, 0x08,
+               (uintptr_t)Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 0, 0, 0x10, 0x20, 1, (frames * 2) & 0x3F,
+                                             (frames * -6) & 0x7F, 0x10, 0x20, 0, 0, 2, -6));
+    Matrix_Push();
+    Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(SLATE_GIVE_FLAME_SCALE, SLATE_GIVE_FLAME_SCALE, SLATE_GIVE_FLAME_SCALE, MTXMODE_APPLY);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0xC0, 0xC0, color[0], color[1], color[2], 0);
+    gDPSetEnvColor(POLY_XLU_DISP++, color[0], color[1], color[2], 0);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gameplay_keep_DL_01ACF0);
+    Matrix_Pop();
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawSpinningSlate(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Scale(SLATE_GIVE_SCALE, SLATE_GIVE_SCALE, SLATE_GIVE_SCALE, MTXMODE_APPLY);
+    Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sSlateDL);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawGetItem(PlayState* play, S2HGetItemEntry* getItemEntry) {
+    DrawGetItemFlame(play);
+    DrawSpinningSlate(play, getItemEntry);
 }
 
 // One-voice PCM player run from the audio-thread mix. The game thread only writes the request fields and the
@@ -2742,6 +2932,10 @@ S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements(void) {
     return &sRequirements;
 }
 
+static bool IsCryonisPillar(Actor* actor) {
+    return (actor != NULL) && (actor == sCryonis.pillar);
+}
+
 static void GrantSlateLogic(void) {
     static const Z64LogicSource sBombRune = { "nei.slate.bomb" };
     static const char* const sBombing[] = { "HasExplosives", "BlastOrSmash", "CanHitSwitch",
@@ -2754,6 +2948,9 @@ static void GrantSlateLogic(void) {
 }
 
 S2H_MOD_EXPORT void ModInit(void) {
+    if (S2H_MOD_API_HAS(sApi, PublishService)) {
+        sApi->PublishService("nei.slate.is_cryonis_pillar", (void*)IsCryonisPillar);
+    }
     if (!S2H_MOD_API_HAS(sApi, SetCustomItemText)) {
         return;
     }
@@ -2769,9 +2966,16 @@ S2H_MOD_EXPORT void ModInit(void) {
     Z64Items_SetAction(&slate, TakeOutSlate, HoldSlate);
     Z64Items_SetHeldCallbacks(&slate, CastRune, StowSlate, NULL);
     slate.modelGroup = PLAYER_MODELGROUP_DEFAULT;
+    slate.appearance.modelPath = sSlateDL;
+    slate.appearance.limb = PLAYER_LIMB_RIGHT_HAND;
+    slate.appearance.rotation[0] = SLATE_HELD_ROT_X;
+    slate.appearance.rotation[1] = SLATE_HELD_ROT_Y;
+    slate.appearance.offset[1] = SLATE_HELD_OFFSET_Y;
+    slate.appearance.scale = SLATE_HELD_SCALE;
     Z64Items_SetGetItemModel(&slate, sSlateDL);
-    slate.getItemScale = 0.62f;
-    slate.onReceive = GrantRune;
+    slate.getItemScale = SLATE_GIVE_SCALE;
+    slate.getItemEntry.drawFunc = DrawGetItem;
+    slate.onReceive = GrantAllRunes;
     S2HCustomItemRandomizer slateLogic = sSlateLogic;
     slateLogic.poolCount = 0;
     Z64Items_SetLogic(&slate, &slateLogic);
@@ -2780,33 +2984,17 @@ S2H_MOD_EXPORT void ModInit(void) {
         return;
     }
     Z64Wheel_Register(sApi, SLATE_KEY, SLATE_KEY, sWheelEntries, ARRAY_COUNT(sWheelEntries), true);
-    for (u8 rune = SLATE_RUNE_BOMB; rune < SLATE_RUNE_COUNT; rune++) {
-        S2HCustomPickupVariant pickup = Z64Items_DefinePickup(SLATE_KEY, sVariantNames[rune], sPickupKeys[rune]);
-        char text[1024];
-        snprintf(text, sizeof(text), "You unlocked %s for the %%rSheikah Slate%%w!^%s^%s", sRuneTexts[rune].name,
-                 sRuneTexts[rune].loreLine, sRuneTexts[rune].castLine);
-        pickup.iconPath = sWheelEntries[rune].itemIconPath;
-        pickup.getItemModelPath = sSlateDL;
-        static const u8 flameColors[][3] = {
-            { 0, 0, 0 }, { 100, 235, 220 }, { 255, 220, 40 }, { 175, 205, 220 }, { 255, 135, 35 }
-        };
-        pickup.drawSoulFlame = true;
-        pickup.flameRed = flameColors[rune][0];
-        pickup.flameGreen = flameColors[rune][1];
-        pickup.flameBlue = flameColors[rune][2];
-        pickup.getItemText = text;
-        pickup.onReceive = ReceiveSlateRune;
-        S2HCustomItemRandomizer randomizer = sSlateLogic;
-        randomizer.poolCount = 1;
-        randomizer.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
-        randomizer.logicKey = randomizer.hintKey = pickup.key;
-        pickup.randomizer = &randomizer;
-        if (!Z64Items_RegisterPickup(sApi, &pickup))
-            return;
+    if (!RegisterRunePickups()) {
+        return;
     }
     GrantSlateLogic();
     sApi->RegisterVB(VB_THROW_OR_PUT_DOWN_HELD_ITEM, HoldOntoRemoteBomb);
+    sApi->RegisterVB(VB_CONSUME_EPONA_CARROT, MasterCycle_HideCarrots);
+    if (S2H_MOD_API_HAS(sApi, PublishService)) {
+        sApi->PublishService("nei.master_cycle.place_beside_rider", (void*)MasterCycle_PlaceBesideRider);
+    }
     S2H_REGISTER_HOOK(sApi, OnPlayerUpdate, RunSlate);
+    S2H_REGISTER_HOOK(sApi, OnPlayerFilterInput, MasterCycle_FilterInput);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetRunes);
     S2H_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, CaptureHandMatrix);
     S2H_REGISTER_HOOK(sApi, OnBgCheckResolveWallFlags, ResolveRuneWallFlags);
