@@ -144,6 +144,8 @@ typedef struct {
     uint8_t flameRed;
     uint8_t flameGreen;
     uint8_t flameBlue;
+    // Draws the acquisition model; with drawSoulFlame, after the flame.
+    S2HGetItemDrawFunc drawFunc;
 } S2HCustomPickupVariant;
 
 #define S2H_CUSTOM_PICKUP_VARIANT_MIN_SIZE offsetof(S2HCustomPickupVariant, drawSoulFlame)

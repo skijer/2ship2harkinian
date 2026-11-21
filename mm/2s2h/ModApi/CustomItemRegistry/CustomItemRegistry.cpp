@@ -410,7 +410,9 @@ void CustomItemRegistry_DrawAcquisition(const char* key, PlayState* play) {
         // The acquisition caller already applies its 30x scale; match the soul flame's 0.06 world scale.
         DrawEnLight({ pickup->flameRed, pickup->flameGreen, pickup->flameBlue },
                     { 0.13333333f, 0.13333333f, 0.13333333f });
-        return;
+        if (definition->getItemEntry.drawFunc == nullptr) {
+            return;
+        }
     }
     S2HGetItemEntry entry = definition->getItemEntry;
     if (entry.drawFunc != nullptr) {
@@ -623,7 +625,8 @@ bool StoreRandomizer(RegisteredCustomItem& item, const S2HCustomItemRandomizer* 
     item.poolSources.clear();
     for (uint16_t i = 0; item.randomizer.poolSources != nullptr && i < item.randomizer.poolSourceCount; i++) {
         const int32_t source = item.randomizer.poolSources[i];
-        if (source <= RI_NONE || source >= RI_MAX) {
+        // MM's RandoItemId puts RI_NONE after most items; RI_UNKNOWN is the first entry.
+        if (source <= RI_UNKNOWN || source == RI_NONE || source >= RI_MAX) {
             SPDLOG_ERROR("[CustomItemRegistry] Invalid native pool source for '{}'", item.key);
             return false;
         }
@@ -750,6 +753,9 @@ bool CustomItemRegistry_RegisterPickupVariant(const S2HCustomPickupVariant* vari
     definition.getItemScale = variant->getItemScale > 0 ? variant->getItemScale : parent->getItemScale;
     definition.randomizer = variant->randomizer;
     definition.onReceive = ReceivePickupVariant;
+    if (variant->structSize >= offsetof(S2HCustomPickupVariant, drawFunc) + sizeof(variant->drawFunc)) {
+        definition.getItemEntry.drawFunc = variant->drawFunc;
+    }
     if (!CustomItemRegistry_Register(&definition)) {
         return false;
     }
