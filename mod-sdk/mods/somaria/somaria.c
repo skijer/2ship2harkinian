@@ -116,7 +116,12 @@ static const ALIGN_ASSET(2) char sNameTex[] = "__OTR__textures/item_name_custom/
 static const ALIGN_ASSET(2) char sCaneGiveDL[] = "__OTR__objects/object_somaria/g_somaria_cane_give_dl";
 static const ALIGN_ASSET(2) char sCaneDL[] = "__OTR__objects/object_somaria/g_somaria_cane_dl";
 static const ALIGN_ASSET(2) char sCastAnim[] = "__OTR__misc/link_animetion/gPlayerAnim_nei_somaria";
-static const ALIGN_ASSET(2) char sElegyShellDL[] = "__OTR__objects/gameplay_keep/gElegyShellHumanDL";
+// En_Torch2's shells, indexed like its params: human, Goron, Zora, Deku, then Fierce Deity in the human shell.
+static const char* const sElegyShellDLs[] = {
+    "__OTR__objects/gameplay_keep/gElegyShellHumanDL", "__OTR__objects/gameplay_keep/gElegyShellGoronDL",
+    "__OTR__objects/gameplay_keep/gElegyShellZoraDL",  "__OTR__objects/gameplay_keep/gElegyShellDekuDL",
+    "__OTR__objects/gameplay_keep/gElegyShellHumanDL",
+};
 static const ALIGN_ASSET(2) char sCrateDL[] = "__OTR__objects/gameplay_dangeon_keep/gameplay_dangeon_keep_DL_007890";
 static const ALIGN_ASSET(2) char sBirdSkel[] = "__OTR__objects/object_crow/gGuaySkel";
 static const ALIGN_ASSET(2) char sBirdAnim[] = "__OTR__objects/object_crow/gGuayFlyAnim";
@@ -131,10 +136,23 @@ static const ALIGN_ASSET(2) char sModeIcons[SOMARIA_MODE_MAX][64] = {
     "__OTR__textures/icon_item_custom/gSomariaIconObjLiftTex",
 };
 
+static const ALIGN_ASSET(2) char sCaneIcon[] = "__OTR__textures/icon_item_custom/gItemIconCaneOfSomariaTex";
+
+// The cane with what it will summon in the corner, as the button shows it.
+static const ALIGN_ASSET(2) char sModeItemIcons[SOMARIA_MODE_MAX][64] = {
+    "__OTR__textures/icon_item_custom/gItemIconSomariaStatueTex",
+    "__OTR__textures/icon_item_custom/gItemIconSomariaCrateTex",
+    "__OTR__textures/icon_item_custom/gItemIconSomariaBirdTex",
+    "__OTR__textures/icon_item_custom/gItemIconSomariaBlockTex",
+    "__OTR__textures/icon_item_custom/gItemIconSomariaPlatformTex",
+};
+
 static const Z64WheelEntry sWheelEntries[SOMARIA_MODE_MAX] = {
-    { sModeIcons[SOMARIA_STATUE], "Statue (1 point)" },      { sModeIcons[SOMARIA_CRATE], "Crate (2 points)" },
-    { sModeIcons[SOMARIA_BIRD], "Bird (1 point)" },          { sModeIcons[SOMARIA_BLOCK], "Block (3 points)" },
-    { sModeIcons[SOMARIA_PLATFORM], "Platform (2 points)" },
+    { sModeIcons[SOMARIA_STATUE], "Statue (1 point)", sModeItemIcons[SOMARIA_STATUE] },
+    { sModeIcons[SOMARIA_CRATE], "Crate (2 points)", sModeItemIcons[SOMARIA_CRATE] },
+    { sModeIcons[SOMARIA_BIRD], "Bird (1 point)", sModeItemIcons[SOMARIA_BIRD] },
+    { sModeIcons[SOMARIA_BLOCK], "Block (3 points)", sModeItemIcons[SOMARIA_BLOCK] },
+    { sModeIcons[SOMARIA_PLATFORM], "Platform (2 points)", sModeItemIcons[SOMARIA_PLATFORM] },
 };
 
 static const char* const sSummonVariants[SOMARIA_MODE_MAX] = { "statue", "crate", "bird", "block", "platform" };
@@ -197,6 +215,7 @@ static bool sIsCaneOut;
 static bool sIsCastPending;
 static bool sIsCasting;
 static s16 sCastTimer;
+static bool sCastHasFired;
 static s16 sBirdCooldown;
 static Vec3f sGhostPos;
 static s16 sGhostYaw;
@@ -332,9 +351,33 @@ static void GrowIntoPlace(Actor* actor, s16* growTimer, f32 fullScale) {
     Actor_SetScale(actor, fullScale * (1.0f - (f32)*growTimer / SOMARIA_GROW_FRAMES));
 }
 
+// MM's forms run Fierce Deity, Goron, Zora, Deku, human; En_Torch2's shells put the human first.
+static s16 ElegyShellForForm(u8 form) {
+    switch (form) {
+        case PLAYER_FORM_HUMAN:
+            return 0;
+        case PLAYER_FORM_FIERCE_DEITY:
+            return 4;
+        case PLAYER_FORM_GORON:
+        case PLAYER_FORM_ZORA:
+        case PLAYER_FORM_DEKU:
+            return form;
+        default:
+            return 0;
+    }
+}
+
 static void StatueInit(Actor* thisx, PlayState* play) {
     SomariaStatueActor* this = (SomariaStatueActor*)thisx;
 
+    thisx->params = ElegyShellForForm(GET_PLAYER_FORM);
+    thisx->flags &= ~(ACTOR_FLAG_CAN_PRESS_SWITCHES | ACTOR_FLAG_CAN_PRESS_HEAVY_SWITCHES);
+    if (thisx->params != ElegyShellForForm(PLAYER_FORM_DEKU)) {
+        thisx->flags |= ACTOR_FLAG_CAN_PRESS_SWITCHES;
+    }
+    if (thisx->params == ElegyShellForForm(PLAYER_FORM_GORON)) {
+        thisx->flags |= ACTOR_FLAG_CAN_PRESS_HEAVY_SWITCHES;
+    }
     Collider_InitCylinder(play, &this->collider);
     Collider_SetCylinder(play, &this->collider, thisx, &sStatueColliderInit);
     thisx->gravity = SOMARIA_GRAVITY;
@@ -382,7 +425,7 @@ static void StatueDraw(Actor* thisx, PlayState* play) {
     gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);
 
-    Gfx_DrawDListOpa(play, (Gfx*)sElegyShellDL);
+    Gfx_DrawDListOpa(play, (Gfx*)sElegyShellDLs[thisx->params]);
 }
 
 static void CrateInit(Actor* thisx, PlayState* play) {
@@ -925,6 +968,7 @@ static void StartCast(Player* player, PlayState* play) {
     }
     PlayerAnimation_PlayOnceSetSpeed(play, &player->skelAnimeUpper, anim, SOMARIA_CAST_ANIM_SPEED);
     sIsCasting = true;
+    sCastHasFired = false;
     sCastTimer = 0;
 }
 
@@ -936,10 +980,14 @@ static int32_t UpdateCane(Player* player, PlayState* play) {
         sIsCasting = false;
         return 0;
     }
-    if (sCastTimer == SOMARIA_CAST_FIRE_FRAME) {
+    bool isDone = PlayerAnimation_Update(play, &player->skelAnimeUpper);
+    bool hasReachedFireFrame =
+        player->skelAnimeUpper.curFrame >= MIN(SOMARIA_CAST_FIRE_FRAME, player->skelAnimeUpper.endFrame);
+    if (!sCastHasFired && (hasReachedFireFrame || isDone)) {
+        sCastHasFired = true;
         FireCast(player, play);
     }
-    if (PlayerAnimation_Update(play, &player->skelAnimeUpper)) {
+    if (isDone) {
         sIsCasting = false;
     }
     return 1;
@@ -977,6 +1025,8 @@ static void UpdateSomaria(Player* player) {
     if (play == NULL) {
         return;
     }
+    // Ownership can change without the cane's onReceive, as the save editor's Give All does.
+    SyncWheelUnlocks();
     UpdatePlatformPrompt(play);
     ForgetDeadSummons();
     if (sBirdCooldown > 0) {
@@ -1094,7 +1144,7 @@ static bool RegisterSummonPickups(void) {
         randomizer.hintKey = pickup.key;
         randomizer.poolModeOption = SOMARIA_SHUFFLE_OPTION;
         randomizer.poolModeValue = SOMARIA_SHUFFLE_SUMMONS;
-        pickup.iconPath = sModeIcons[mode];
+        pickup.iconPath = sModeItemIcons[mode];
         pickup.getItemModelPath = sCaneGiveDL;
         pickup.getItemScale = SOMARIA_GIVE_SCALE;
         pickup.getItemText = sSummonTexts[mode];
@@ -1125,7 +1175,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     }
     RegisterShuffleOption();
 
-    S2HCustomItemDefinition cane = Z64Items_Define(SOMARIA_KEY, sModeIcons[SOMARIA_STATUE], sNameTex);
+    S2HCustomItemDefinition cane = Z64Items_Define(SOMARIA_KEY, sCaneIcon, sNameTex);
     S2HCustomItemRandomizer caneLogic = sRandomizerItem;
 
     caneLogic.poolModeOption = SOMARIA_SHUFFLE_OPTION;

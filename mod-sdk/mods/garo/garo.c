@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "z64items.h"
-#include "z64formmasks.h"
 #include "z64aiming.h"
 
 #include "align_asset_macro.h"
@@ -16,7 +15,7 @@
 
 #define GARO_MASK_KEY "nei.garo_form_mask"
 #define GARO_FORM_KEY "nei.garo"
-#define GARO_MASK_PAGE 1
+#define GARO_MASK_PAGE S2H_ITEM_PAGE_MASK_VANILLA
 #define GARO_MASK_SLOT 20
 
 #define STICK_FULL 80.0f
@@ -2123,10 +2122,6 @@ static void DrawMaskPickup(PlayState* play, S2HGetItemEntry* entry) {
     GetItem_Draw(play, GID_MASK_GARO);
 }
 
-static void AssignMaskFromPause(const char* key) {
-    Z64FormMasks_AssignToPressedButton(sApi, key);
-}
-
 static void RegisterMask(void) {
     S2HCustomItemDefinition mask = Z64Items_Define(GARO_MASK_KEY, sIconTex, sNameTex);
 
@@ -2145,9 +2140,7 @@ static void RegisterMask(void) {
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);
     mask.onAcquire = KeepMaskOutOfSaveDuringSimulation;
-    mask.onPauseToggle = AssignMaskFromPause;
     Z64Items_Register(sApi, &mask);
-    Z64FormMasks_PlaceMask(sApi, GARO_MASK_KEY, GARO_MASK_SLOT);
 }
 
 static uint16_t ResolveGaroEquipment(int32_t equipType, uint16_t value) {

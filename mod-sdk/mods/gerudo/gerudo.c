@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include "z64items.h"
-#include "z64formmasks.h"
 #include "z64logic.h"
 
 #include "align_asset_macro.h"
@@ -18,7 +17,7 @@
 #define GERUDO_MASK_KEY "nei.gerudo_form_mask"
 #define GERUDO_FORM_KEY "nei.gerudo"
 #define GERUDO_MODEL_PATH "objects/forms/gerudo"
-#define GERUDO_MASK_PAGE 1
+#define GERUDO_MASK_PAGE S2H_ITEM_PAGE_MASK_VANILLA
 #define GERUDO_MASK_SLOT 21
 #define GERUDO_MASK_WHEEL_PRIORITY (-1)
 
@@ -134,6 +133,7 @@
 static const ALIGN_ASSET(2) char sMaskDL[] = "__OTR__objects/oot_object_link_child/gLinkChildGerudoMaskDL";
 static const ALIGN_ASSET(2) char sEmptyHandDL[] = "__OTR__" GERUDO_MODEL_PATH
                                                   "/object_link_child/gLinkChildRightHandNearDL";
+// The adult rig's sword hand is the scimitar mesh; the child rig only carries a Master Sword.
 static const ALIGN_ASSET(2) char sScimitarDL[] = "__OTR__" GERUDO_MODEL_PATH
                                                  "/object_link_boy/gLinkAdultLeftHandHoldingMasterSwordNearDL";
 // The mask keeps the Captain's Hat slot, but it looks and reads as OoT's Gerudo Mask.
@@ -2093,10 +2093,6 @@ static void DrawMaskPickup(PlayState* play, S2HGetItemEntry* entry) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-static void AssignMaskFromPause(const char* key) {
-    Z64FormMasks_AssignToPressedButton(sApi, key);
-}
-
 static void RegisterMask(void) {
     S2HCustomItemDefinition mask = Z64Items_Define(GERUDO_MASK_KEY, sIconTex, sNameTex);
 
@@ -2111,9 +2107,7 @@ static void RegisterMask(void) {
     Z64Items_SetCanUse(&mask, CanWearMask);
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);
-    mask.onPauseToggle = AssignMaskFromPause;
     Z64Items_Register(sApi, &mask);
-    Z64FormMasks_PlaceMask(sApi, GERUDO_MASK_KEY, GERUDO_MASK_SLOT);
 }
 
 static void ResolveGerudoStrength(bool* should, va_list args) {

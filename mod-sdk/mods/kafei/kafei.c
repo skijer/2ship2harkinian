@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "z64items.h"
-#include "z64formmasks.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -19,7 +18,7 @@
 #define KAFEI_MASK_KEY "nei.mask_kafei"
 #define KAFEI_FORM_KEY "nei.kafei"
 #define KAFEI_MODEL_PATH "objects/forms/kafei"
-#define KAFEI_MASK_PAGE 1
+#define KAFEI_MASK_PAGE S2H_ITEM_PAGE_MASK_VANILLA
 #define KAFEI_MASK_SLOT 14
 
 #define STICK_MAX 60.0f
@@ -858,10 +857,6 @@ static void DrawMaskPickup(PlayState* play, S2HGetItemEntry* entry) {
     GetItem_Draw(play, GID_MASK_KAFEIS_MASK);
 }
 
-static void AssignMaskFromPause(const char* key) {
-    Z64FormMasks_AssignToPressedButton(sApi, key);
-}
-
 static void RegisterMask(void) {
     S2HCustomItemDefinition mask = Z64Items_Define(KAFEI_MASK_KEY, sIconTex, sNameTex);
 
@@ -883,9 +878,7 @@ static void RegisterMask(void) {
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);
     mask.onAcquire = KeepMaskOutOfSaveDuringSimulation;
-    mask.onPauseToggle = AssignMaskFromPause;
     Z64Items_Register(sApi, &mask);
-    Z64FormMasks_PlaceMask(sApi, KAFEI_MASK_KEY, KAFEI_MASK_SLOT);
 }
 
 static void RegisterForm(void) {

@@ -24,7 +24,7 @@
 #define SLING_PROGRESSIVE "oot.slingshot.progressive"
 #define SLING_CONDENSED "oot.slingshot.condensed"
 #define SLING_INFINITY_OPTION "oot.slingshot.infinite_upgrades"
-#define SLING_SHOW_KEG "gMods.OotItems.ShowPowderKeg"
+#define SLING_SHOW_KEG_LEGACY "gMods.OotItems.ShowPowderKeg"
 #define SLING_FIRST_PERSON_LIFT 4.0f
 #define OOT_BAG_MODEL(name) "__OTR__objects/oot_object_gi_dekupouch/" name
 #define SLINGSHOT_RETICLE_RANGE 3410.0f
@@ -181,8 +181,6 @@ static s16 sFaroreArrivalTimer;
 static ActorFunc sFaroreHiddenDraw;
 static bool sWaiveVoid, sSlingOut;
 static bool sSlingLoading, sSlingAimPending;
-static bool sWheelPrompt;
-static u16 sPreviousAAction;
 static s16 sSlingCooldown;
 // OoT gSaveContext.nayrusLoveTimer; kept apart because useful_medallions reads that field as Shadow stealth.
 static s16 sNayruTimer;
@@ -193,19 +191,12 @@ static s32 sFaroreFlyTimer;
 static f32 sFaroreFlyProgress;
 static LightInfo sFaroreLightInfo;
 static LightNode* sFaroreLightNode;
-static struct {
-    const char* key;
-    const char* icon;
-    u32 startFrame;
-    s16 x, y;
-    u8 button;
-} sEquipFlight;
 static const u32 sButtons[S2H_ITEM_BUTTON_COUNT] = { BTN_B,      BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, 0,
                                                      BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
 static const char* const sHooks[] = { "OnPlayerUpdate",       "OnSceneInit",          "OnLoadFile",
                                       "OnActorDestroy",       "OnPlayDrawEnd",        "OnPlayerResolveLimbDraw",
                                       "OnPlayerPostLimbDraw", "OnKaleidoItemDraw",    "OnInterfaceDrawEnd",
-                                      "OnKaleidoItemEquip",   "OnKaleidoInput",       "OnResolveCustomGetItem",
+                                      "OnResolveCustomGetItem",
                                       "OnPlayerResolveAnim",  "OnPlayerActionHandler" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sHooks, ARRAY_COUNT(sHooks) };
 static const ALIGN_ASSET(2) char sBoomDL[] = "__OTR__objects/oot_object_gi_boomerang/gGiBoomerangDL";
@@ -269,8 +260,6 @@ static const char* const sAmmoDigits[] = {
     gAmmoDigit5Tex, gAmmoDigit6Tex, gAmmoDigit7Tex, gAmmoDigit8Tex, gAmmoDigit9Tex,
 };
 static const ALIGN_ASSET(2) char sInfinityTex[] = "__OTR__kanji/gMsgKanji8187InfinityTex";
-static const ALIGN_ASSET(2) char sKegIcon[] = "__OTR__icon_item_static_yar/gItemIconPowderKegTex";
-static const ALIGN_ASSET(2) char sSlingIcon[] = OOT_ICON("gItemIconSlingshotTex");
 static const ALIGN_ASSET(2) char sDinFireModel[] = "__OTR__overlays/oot_ovl_Magic_Fire/sModelDL";
 static const ALIGN_ASSET(2) char sDinFireMaterial[] = "__OTR__overlays/oot_ovl_Magic_Fire/sMaterialDL";
 static const ALIGN_ASSET(2) char sDinFireTexture[] = "__OTR__overlays/oot_ovl_Magic_Fire/sTex";
@@ -2393,97 +2382,13 @@ static void ResolveSlingshotPickup(Actor* actor, PlayState* play, S2HGetItemEntr
         *entry = stage->getItemEntry;
 }
 
-static void StartEquipFlight(PlayState* play, u8 button, u16 item, bool* handled) {
-    static const char* const keys[] = { SLING, BOOM, HAMMER, DIN, FARORE, NAYRU };
-    PauseContext* pause = &play->pauseCtx;
-    if (*handled || item != ITEM_CUSTOM || pause->pageIndex != PAUSE_ITEM || button < S2H_ITEM_BUTTON_C_FIRST ||
-        button >= S2H_ITEM_BUTTON_C_FIRST + 3)
-        return;
-    s16 slot = pause->cursorSlot[PAUSE_ITEM];
-    if (slot < 0 || slot >= ITEM_NUM_SLOTS || pause->itemVtx == NULL)
-        return;
-    const char* icon = KaleidoItemManager_GetSlotIcon(slot);
-    for (u8 i = 0; icon != NULL && i < ARRAY_COUNT(keys); i++) {
-        const S2HCustomItemDefinition* definition = sApi->FindCustomItem(keys[i]);
-        if (definition == NULL || strcmp(icon, definition->iconPath) != 0)
-            continue;
-        sEquipFlight.key = keys[i];
-        sEquipFlight.icon = definition->iconPath;
-        sEquipFlight.startFrame = play->state.frames;
-        sEquipFlight.x = SCREEN_WIDTH / 2 + pause->itemVtx[slot * 4].v.ob[0];
-        sEquipFlight.y = SCREEN_HEIGHT / 2 - pause->itemVtx[slot * 4].v.ob[1];
-        sEquipFlight.button = button;
-        break;
-    }
-}
-
-static bool HasSlingshotWheel(void) {
-    if (!sApi->IsCustomItemOwned(SLING) ||
-        gSaveContext.save.saveInfo.inventory.items[SLOT_POWDER_KEG] != ITEM_POWDER_KEG)
-        return false;
-    if (CVarGetInteger(SLING_SHOW_KEG, 0))
-        return true;
-    S2HCustomItemPlacement placement;
-    return KaleidoItemManager_GetPlacement(SLING, &placement) && placement.page == S2H_ITEM_PAGE_VANILLA &&
-           placement.slot == SLOT_POWDER_KEG;
-}
-
-static void CycleSlingshotCell(PlayState* play, Input* input, bool* handled) {
-    PauseContext* pause = &play->pauseCtx;
-    const bool showingKeg = CVarGetInteger(SLING_SHOW_KEG, 0) != 0;
-    const bool hasWheel = HasSlingshotWheel();
-    if (showingKeg && !hasWheel) {
-        CVarSetInteger(SLING_SHOW_KEG, 0);
-        KaleidoItemManager_SetPauseVisible(SLING, true);
-    }
-    const bool focused = hasWheel && pause->pageIndex == PAUSE_ITEM && pause->cursorSpecialPos == 0 &&
-                         !pause->itemDescriptionOn && pause->cursorPoint[PAUSE_ITEM] == SLOT_POWDER_KEG &&
-                         KaleidoItemManager_IsVanillaPageShown();
-    if (focused) {
-        if (!sWheelPrompt)
-            sPreviousAAction = play->interfaceCtx.aButtonDoActionDelayed;
-        sWheelPrompt = true;
-        Interface_SetAButtonDoAction(play, DO_ACTION_DECIDE);
-    } else if (sWheelPrompt) {
-        sWheelPrompt = false;
-        if (play->interfaceCtx.aButtonDoActionDelayed == DO_ACTION_DECIDE) {
-            Interface_SetAButtonDoAction(play, sPreviousAAction);
-        }
-    }
-    if (*handled || !focused || !(input->press.button & BTN_A))
-        return;
-
-    CVarSetInteger(SLING_SHOW_KEG, !showingKeg);
-    KaleidoItemManager_SetPauseVisible(SLING, showingKeg);
-    Audio_PlaySfx(NA_SE_SY_CURSOR);
-    input->press.button &= ~BTN_A;
-    *handled = true;
-}
-
-static void DrawEquipFlight(PlayState* play) {
-    static const s16 targetX[] = { 226, 250, 274 };
-    static const s16 targetY[] = { 10, 28, 10 };
-    if (sEquipFlight.key == NULL)
-        return;
-    u32 elapsed = play->state.frames - sEquipFlight.startFrame;
-    const char* equipped = sApi->GetEquippedCustomItem(sEquipFlight.button);
-    if (elapsed >= 10 || play->pauseCtx.state != PAUSE_STATE_MAIN || equipped == NULL ||
-        strcmp(equipped, sEquipFlight.key) != 0) {
-        sEquipFlight.key = NULL;
+// The host's wheel now holds the Powder Keg and the Slingshot together; drop the old A flip that hid one of them.
+static void ShowSlingshotOverPowderKeg(void) {
+    if (!CVarGetInteger(SLING_SHOW_KEG_LEGACY, 0)) {
         return;
     }
-    u8 index = sEquipFlight.button - S2H_ITEM_BUTTON_C_FIRST;
-    s16 x = sEquipFlight.x + (targetX[index] - sEquipFlight.x) * (s32)elapsed / 10;
-    s16 y = sEquipFlight.y + (targetY[index] - sEquipFlight.y) * (s32)elapsed / 10;
-    GraphicsContext* gfx = play->state.gfxCtx;
-    OPEN_DISPS(gfx);
-    Gfx_SetupDL42_Overlay(gfx);
-    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, 255);
-    gDPLoadTextureBlock(OVERLAY_DISP++, sEquipFlight.icon, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0, G_TX_CLAMP,
-                        G_TX_CLAMP, 0, 0, G_TX_NOLOD, G_TX_NOLOD);
-    gSPTextureRectangle(OVERLAY_DISP++, x * 4, y * 4, (x + 32) * 4, (y + 32) * 4, G_TX_RENDERTILE, 0, 0, 1 << 10,
-                        1 << 10);
-    CLOSE_DISPS(gfx);
+    CVarClear(SLING_SHOW_KEG_LEGACY);
+    KaleidoItemManager_SetPauseVisible(SLING, true);
 }
 
 static void DrawSeedHud(PlayState* play) {
@@ -2516,33 +2421,9 @@ static void DrawSeedHud(PlayState* play) {
                                           8, 8, 1 << 10, 1 << 10);
     }
     CLOSE_DISPS(gfx);
-    DrawEquipFlight(play);
-}
-
-static void DrawSlingshotWheelPreview(PlayState* play, s32 slot, Vtx* cell) {
-    if (slot != SLOT_POWDER_KEG || play->pauseCtx.pageIndex != PAUSE_ITEM || !KaleidoItemManager_IsVanillaPageShown() ||
-        !HasSlingshotWheel())
-        return;
-    const char* icon = CVarGetInteger(SLING_SHOW_KEG, 0) ? sSlingIcon : sKegIcon;
-    GraphicsContext* gfx = play->state.gfxCtx;
-    const s16 left = cell[0].v.ob[0] - 8;
-    const s16 top = cell[0].v.ob[1] - 14;
-    Vtx* quad = GRAPH_ALLOC(gfx, 4 * sizeof(Vtx));
-    const Vtx corners[] = {
-        VTX(left, top, 0, 0, 0, 255, 255, 255, 255),
-        VTX(left + 16, top, 0, 32 << 5, 0, 255, 255, 255, 255),
-        VTX(left, top - 16, 0, 0, 32 << 5, 255, 255, 255, 255),
-        VTX(left + 16, top - 16, 0, 32 << 5, 32 << 5, 255, 255, 255, 255),
-    };
-    memcpy(quad, corners, sizeof(corners));
-    OPEN_DISPS(gfx);
-    gSPVertex(POLY_OPA_DISP++, (uintptr_t)quad, 4, 0);
-    KaleidoScope_DrawTexQuadRGBA32(gfx, (TexturePtr)icon, 32, 32, 0);
-    CLOSE_DISPS(gfx);
 }
 
 static void DrawSeedPause(PlayState* play, s32 slot, s32 item, Vtx* cell) {
-    DrawSlingshotWheelPreview(play, slot, cell);
     if (item != ITEM_CUSTOM)
         return;
     const char* icon = KaleidoItemManager_GetSlotIcon(slot);
@@ -2704,8 +2585,6 @@ static void Scene(s16 scene, s8 spawn) {
     sFarorePromptPending = false;
     sNayrusLove = NULL;
     sCastCamera = CAM_ID_NONE;
-    sEquipFlight.key = NULL;
-    sWheelPrompt = false;
     Z64Aiming_Drop();
     PlayState* play = gPlayState;
     if (play == NULL) {
@@ -3039,8 +2918,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK(sApi, OnPlayerPostLimbDraw, DrawSlingshotString);
     S2H_REGISTER_HOOK(sApi, OnKaleidoItemDraw, DrawSeedPause);
     S2H_REGISTER_HOOK(sApi, OnInterfaceDrawEnd, DrawSeedHud);
-    S2H_REGISTER_HOOK(sApi, OnKaleidoItemEquip, StartEquipFlight);
-    S2H_REGISTER_HOOK(sApi, OnKaleidoInput, CycleSlingshotCell);
+    ShowSlingshotOverPowderKeg();
     S2H_REGISTER_HOOK(sApi, OnResolveCustomGetItem, ResolveSlingshotPickup);
     S2H_REGISTER_HOOK(sApi, OnLoadFile, Load);
     S2H_REGISTER_HOOK(sApi, OnActorDestroy, ActorDestroyed);

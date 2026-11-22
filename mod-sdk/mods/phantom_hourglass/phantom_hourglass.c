@@ -13,10 +13,16 @@
 #include "macros.h"
 #include "variables.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#include "interface/parameter_static/parameter_static.h"
 #include <libultraship/bridge/resourcebridge.h>
 #include "z64rumble.h"
 
 #define HOURGLASS_KEY "nei.phantom_hourglass"
+#define HOURGLASS_METER_CVAR "gMods.PhantomHourglass.ChargeMeter"
+#define METER_LEFT 18
+#define METER_MID_LEFT 26
+#define METER_BELOW_MAGIC 12
+#define METER_TWO_HEART_ROWS_HEALTH 0xA0
 #define HOURGLASS_TIME_OWNER HOURGLASS_KEY
 #define HOURGLASS_TIME_PRIORITY 50
 #define HOURGLASS_MAGIC_ACTIVATION 1
@@ -123,7 +129,7 @@ static ColliderCylinderInit sImpactColliderInit = {
 static const char* const sRequiredHooks[] = { "OnGameFrameUpdate",      "OnPlayerUpdate",
                                               "OnActorDrawEnd",         "OnActorResolveGrayscale",
                                               "OnRoomResolveGrayscale", "OnPlayerResolveLimbDraw",
-                                              "OnSceneInit" };
+                                              "OnSceneInit",            "OnInterfaceDrawEnd" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
@@ -1335,6 +1341,67 @@ static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, HOURGLASS_KEY, HOURGLASS_KEY, "",
 };
 
+// The magic meter's own frame and fill textures, one row under it, filled blue and pulsing once full.
+static void DrawChargeMeter(PlayState* play) {
+    if (FindEquippedButtons() == 0 || !CVarGetInteger(HOURGLASS_METER_CVAR, 1)) {
+        return;
+    }
+    InterfaceContext* interfaceCtx = &play->interfaceCtx;
+    SavePlayerData* playerData = &gSaveContext.save.saveInfo.playerData;
+    s16 width = playerData->magicLevel >= 2 ? MAGIC_DOUBLE_METER : MAGIC_NORMAL_METER;
+    s16 barY = playerData->healthCapacity > METER_TWO_HEART_ROWS_HEALTH ? 42 : 34;
+    s16 rightEnd = METER_MID_LEFT + width;
+    f32 fraction = (f32)sSlots[HOURGLASS_LINK_SLOT].count / HOURGLASS_FRAMES;
+    s16 fillWidth = (s16)(CLAMP(fraction, 0.0f, 1.0f) * width);
+    u8 pulse = (u8)(200 + 55 * Math_SinS(play->gameplayFrames * 3000));
+
+    if (playerData->magicLevel != 0) {
+        barY += METER_BELOW_MAGIC;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL39_Overlay(play->state.gfxCtx);
+    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->magicAlpha);
+    gDPSetEnvColor(OVERLAY_DISP++, 100, 50, 50, 255);
+    OVERLAY_DISP =
+        Gfx_DrawTexRectIA8(OVERLAY_DISP, (TexturePtr)gMagicMeterEndTex, 8, 16, METER_LEFT, barY, 8, 16, 1 << 10, 1 << 10);
+    OVERLAY_DISP = Gfx_DrawTexRectIA8(OVERLAY_DISP, (TexturePtr)gMagicMeterMidTex, 24, 16, METER_MID_LEFT, barY, width, 16,
+                                      1 << 10, 1 << 10);
+    gDPLoadTextureBlock(OVERLAY_DISP++, gMagicMeterEndTex, G_IM_FMT_IA, G_IM_SIZ_8b, 8, 16, 0, G_TX_MIRROR | G_TX_WRAP,
+                        G_TX_NOMIRROR | G_TX_WRAP, 3, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+    gSPWideTextureRectangle(OVERLAY_DISP++, rightEnd << 2, barY << 2, (rightEnd + 8) << 2, (barY + 16) << 2,
+                            G_TX_RENDERTILE, 256, 0, 1 << 10, 1 << 10);
+    gDPPipeSync(OVERLAY_DISP++);
+    gDPSetCombineLERP(OVERLAY_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, 0, 0, 0, PRIMITIVE, PRIMITIVE,
+                      ENVIRONMENT, TEXEL0, ENVIRONMENT, 0, 0, 0, PRIMITIVE);
+    gDPSetEnvColor(OVERLAY_DISP++, 0, 0, 0, 255);
+    if (fraction >= 1.0f) {
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, pulse, pulse, 255, interfaceCtx->magicAlpha);
+    } else {
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 60, 140, 255, interfaceCtx->magicAlpha);
+    }
+    gDPLoadTextureBlock_4b(OVERLAY_DISP++, gMagicMeterFillTex, G_IM_FMT_I, 16, 16, 0, G_TX_NOMIRROR | G_TX_WRAP,
+                           G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+    if (fillWidth > 0) {
+        gSPWideTextureRectangle(OVERLAY_DISP++, METER_MID_LEFT << 2, (barY + 3) << 2, (METER_MID_LEFT + fillWidth) << 2,
+                                (barY + 10) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void RegisterOption(const char* label, const char* cvar, const char* tooltip) {
+    S2HModMenuWidget widget = { 0 };
+
+    widget.structSize = sizeof(widget);
+    widget.section = "Mods";
+    widget.sidebar = "Phantom Hourglass";
+    widget.type = S2H_MOD_MENU_CHECKBOX;
+    widget.label = label;
+    widget.cvar = cvar;
+    widget.defaultInt = 1;
+    widget.tooltip = tooltip;
+    sApi->RegisterMenuWidget(&widget);
+}
+
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
     sApi = api;
 }
@@ -1380,4 +1447,7 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK(sApi, OnPlayerResolveLimbDraw, ResolveAimingHand);
     S2H_REGISTER_HOOK(sApi, OnRoomResolveGrayscale, ResolveRoomGrayscale);
     S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorDrawEnd, ACTOR_PLAYER, DrawHourglass);
+    S2H_REGISTER_HOOK(sApi, OnInterfaceDrawEnd, DrawChargeMeter);
+    RegisterOption("Charge Meter", HOURGLASS_METER_CVAR,
+                   "While the Hourglass is on a button, shows how much of your path it remembers.");
 }

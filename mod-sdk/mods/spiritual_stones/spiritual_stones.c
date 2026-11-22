@@ -63,12 +63,6 @@ static const ALIGN_ASSET(2) char sStoneIcons[STONE_MAX][64] = {
     "__OTR__textures/icon_item_custom/gItemIconZoraSapphireTex",
 };
 
-static const ALIGN_ASSET(2) char sPassiveOffIcons[STONE_MAX][64] = {
-    "__OTR__textures/icon_item_custom/gStonePassiveOff0Tex",
-    "__OTR__textures/icon_item_custom/gStonePassiveOff1Tex",
-    "__OTR__textures/icon_item_custom/gStonePassiveOff2Tex",
-};
-
 static const ALIGN_ASSET(2) char sStoneNames[STONE_MAX][72] = {
     "__OTR__textures/item_name_static/gKokiriEmeraldItemNameENGTex",
     "__OTR__textures/item_name_static/gGoronsRubyItemNameENGTex",
@@ -152,8 +146,6 @@ static bool sIsVoidDamageWaived;
 static Actor* sStatues[STONE_MAX];
 static int8_t sPendingWarpStone = -1;
 static u16 sWarpPromptTextId;
-static const char* sShownIcons[STONE_MAX];
-static const char* sBaseIcons[STONE_MAX];
 
 void Player_Action_50(Player* player, PlayState* play);
 
@@ -210,12 +202,6 @@ static bool IsPassiveEnabled(uint8_t stone) {
     return !(sDisabledSpeedMask & (1 << stone));
 }
 
-static bool IsPassiveKeyEnabled(const char* key) {
-    int8_t stone = FindStone(key);
-
-    return stone < 0 || IsPassiveEnabled((uint8_t)stone);
-}
-
 static void TogglePassive(const char* key) {
     int8_t stone = FindStone(key);
 
@@ -230,17 +216,11 @@ static bool IsPassiveOn(uint8_t stone) {
     return IsStoneOwned(stone) && IsPassiveEnabled(stone);
 }
 
-// The off icons belong to the pause screen alone; the item buttons keep the stone's own art.
-static void ShowPassiveIcons(void) {
-    bool isPaused = gPlayState != NULL && gPlayState->pauseCtx.state != PAUSE_STATE_OFF;
+// The host halves a paused-off stone's alpha on the pause screen.
+static bool IsPassiveKeyEnabled(const char* key) {
+    int8_t stone = FindStone(key);
 
-    for (uint8_t stone = 0; stone < STONE_MAX; stone++) {
-        const char* icon = isPaused && !IsPassiveEnabled(stone) ? sPassiveOffIcons[stone] : sBaseIcons[stone];
-
-        if (icon != sShownIcons[stone] && sApi->SetCustomItemIconPath(sStones[stone].key, icon)) {
-            sShownIcons[stone] = icon;
-        }
-    }
+    return stone < 0 || IsPassiveEnabled((uint8_t)stone);
 }
 
 static bool IsStoneWarpReady(uint8_t stone) {
@@ -542,8 +522,6 @@ static bool RegisterStone(Stone stone) {
     jewel.isPauseActive = IsPassiveKeyEnabled;
     jewel.displayName = sStoneLabels[stone];
     Z64Items_SetLogic(&jewel, &randomizer);
-    sBaseIcons[stone] = jewel.iconPath;
-    sShownIcons[stone] = jewel.iconPath;
     return Z64Items_Register(sApi, &jewel);
 }
 
@@ -574,7 +552,4 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetSceneState);
     S2H_REGISTER_HOOK(sApi, OnLoadFile, ReloadState);
     S2H_REGISTER_HOOK(sApi, OnSceneSpawnActors, PlantStatuesForScene);
-    if (S2H_MOD_API_HAS(sApi, SetCustomItemIconPath)) {
-        S2H_REGISTER_HOOK(sApi, OnGameFrameUpdate, ShowPassiveIcons);
-    }
 }

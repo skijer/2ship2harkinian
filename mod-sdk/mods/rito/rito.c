@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "z64items.h"
-#include "z64formmasks.h"
 #include "z64logic.h"
 
 #include "align_asset_macro.h"
@@ -20,7 +19,7 @@
 #define ROCS_CAPE_KEY "nei.rocs_cape"
 #define RITO_FORM_KEY "nei.rito"
 #define RITO_MODEL_PATH "objects/forms/rito"
-#define RITO_MASK_PAGE 1
+#define RITO_MASK_PAGE S2H_ITEM_PAGE_MASK_VANILLA
 #define RITO_MASK_SLOT 7
 #define RITO_MASK_WHEEL_PRIORITY (-1)
 
@@ -29,8 +28,9 @@
 #define OCARINA_NOTE_NONE OCARINA_PITCH_NONE
 #define CLIP_FRAMES_PER_UPDATE 1.5f
 
-// The rig is MM's human skeleton, rooted at 2376, so an adult clip drives it a third too high; a child one fits.
-#define RITO_ROOT_SCALE_ADULT 0.7036f
+// The rig is MM's human skeleton, rooted at 2376. It ships as the adult rig, but MM only plays child-height clips,
+// so both scales are the child one.
+#define RITO_ROOT_SCALE_ADULT 1.0f
 #define RITO_ROOT_SCALE_CHILD 1.0f
 #define RITO_HEIGHT 40.0f
 
@@ -1807,10 +1807,6 @@ static const S2HCustomItemRandomizer sRandomizerItem = {
     sizeof(S2HCustomItemRandomizer), 0, S2H_CUSTOM_ITEM_TYPE_ITEM, 0, 1, RITO_MASK_KEY, RITO_MASK_KEY, "",
 };
 
-static void AssignMaskFromPause(const char* key) {
-    Z64FormMasks_AssignToPressedButton(sApi, key);
-}
-
 static void DrawMaskPickup(PlayState* play, S2HGetItemEntry* entry) {
     GraphicsContext* gfxCtx = play->state.gfxCtx;
     Mtx* matrices = GRAPH_ALLOC(gfxCtx, MASK_MATRIX_COUNT * sizeof(Mtx));
@@ -1857,9 +1853,7 @@ static void RegisterMask(void) {
     Z64Items_SetCanUse(&mask, CanWearMask);
     Z64Items_SetAction(&mask, WearMask, NULL);
     Z64Items_SetLogic(&mask, &sRandomizerItem);
-    mask.onPauseToggle = AssignMaskFromPause;
     Z64Items_Register(sApi, &mask);
-    Z64FormMasks_PlaceMask(sApi, RITO_MASK_KEY, RITO_MASK_SLOT);
 }
 
 S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {

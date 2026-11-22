@@ -40,6 +40,8 @@ static s16 sStoppedFrames;
 static u32 sToggleFrame;
 static Vec3f sSfxPos;
 static f32 sReleasePitch = ZONAI_RELEASE_PITCH_END;
+static OSTime sHeldTimersOsTime;
+static u32 sHeldTimersFrame;
 
 // The ice samples carry SFX_FLAG, which parks a one-shot in PLAYING until the same position stops it.
 static void PlayOwnSfx(Player* player, u16 sfxId) {
@@ -113,9 +115,26 @@ static bool HasMagic(s16 amount) {
            gSaveContext.save.saveInfo.playerData.magic >= amount;
 }
 
+// MM's timers count osGetTime against timerPausedOsTimes; growing it by each stopped frame keeps them still. Frames
+// MM pauses itself (menus, messages) are skipped, since Interface_DrawTimers adds those on its own.
+static void HoldHudTimers(PlayState* play) {
+    OSTime now = osGetTime();
+    bool isNextFrame = sHeldTimersOsTime != 0 && play->gameplayFrames == sHeldTimersFrame + 1 &&
+                       play->msgCtx.msgMode == MSGMODE_NONE;
+
+    for (s32 timer = 0; isNextFrame && timer < TIMER_ID_MAX; timer++) {
+        if (gSaveContext.timerStates[timer] == TIMER_STATE_COUNTING) {
+            gSaveContext.timerPausedOsTimes[timer] += now - sHeldTimersOsTime;
+        }
+    }
+    sHeldTimersOsTime = now;
+    sHeldTimersFrame = play->gameplayFrames;
+}
+
 static void StartTime(Player* player, PlayState* play) {
     sApi->ReleaseTimeControl(ZONAI_KEY);
     sIsTimeStopped = false;
+    sHeldTimersOsTime = 0;
     SpawnRuneBurst(player, play);
     FlashScreen();
     TintScreen(play, 0);
@@ -163,6 +182,7 @@ static s32 FindEquippedButton(void) {
 }
 
 static void KeepTimeStopped(Player* player, PlayState* play) {
+    HoldHudTimers(play);
     if (sStoppedFrames < 0x7000) {
         sStoppedFrames++;
     }
@@ -214,6 +234,7 @@ static void UpdateZonai(Player* player) {
 
 static void ForgetStopOnSceneChange(s16 sceneId, s8 spawnNum) {
     sIsTimeStopped = false;
+    sHeldTimersOsTime = 0;
 }
 
 static bool CanToggleTime(Player* player, PlayState* play) {

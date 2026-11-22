@@ -433,6 +433,11 @@ static void RumbleNearHiddenGrotto(Actor* actor) {
     Rumble_Request(actor->xyzDistToPlayerSq, 100, 8, 12);
 }
 
+// OoT's quest screen, which oot_items fills with the songs and stones; these take OoT's own points on it.
+#define OOT_QUEST_PAGE (S2H_ITEM_PAGE_QUEST_VANILLA + 1)
+#define OOT_QUEST_STONE_OF_AGONY 21
+#define OOT_QUEST_GERUDO_CARD 22
+
 static void RegisterStoneOfAgony(void) {
     static const S2HCustomItemRandomizer randomizer = {
         .structSize = sizeof(S2HCustomItemRandomizer),
@@ -446,8 +451,8 @@ static void RegisterStoneOfAgony(void) {
     item.displayName = "Stone of Agony";
     item.pauseText = "%rStone of Agony&%wThe controller rumbles near a hidden grotto. No button is needed.";
     item.getItemText = "You got %rStone of Agony%w!&It makes the controller rumble near hidden grottos.";
-    item.preferredPage = S2H_ITEM_PAGE_QUEST_VANILLA + 7;
-    item.preferredSlot = 1;
+    item.preferredPage = OOT_QUEST_PAGE;
+    item.preferredSlot = OOT_QUEST_STONE_OF_AGONY;
     item.randomizer = &randomizer;
     item.getItemEntry.drawFunc = DrawStoneOfAgony;
     Z64Items_Register(sApi, &item);
@@ -486,8 +491,8 @@ static void RegisterGerudoCard(void) {
     item.displayName = "Gerudo Membership Card";
     item.pauseText = "%rGerudo Membership Card&%wCarry it past patrols in Pirates' Fortress.";
     item.getItemText = "You got %rGerudo Membership Card%w!&Patrols in Pirates' Fortress will let you pass.";
-    item.preferredPage = S2H_ITEM_PAGE_QUEST_VANILLA + 7;
-    item.preferredSlot = 2;
+    item.preferredPage = OOT_QUEST_PAGE;
+    item.preferredSlot = OOT_QUEST_GERUDO_CARD;
     item.randomizer = &randomizer;
     item.getItemEntry.drawFunc = DrawGerudoCard;
     Z64Items_Register(sApi, &item);

@@ -1010,7 +1010,10 @@ static void DriveEnragedEnemy(void) {
     }
     sEnragedEnemy->colorFilterTimer = 2;
     sEnragedEnemy->colorFilterParams = 0x4028;
-    if (sEnragedEnemy->speed > 0.1f) {
+    // The extra stride skips collision, so floaters would drift through walls.
+    bool isOnOpenFloor = (sEnragedEnemy->bgCheckFlags & BGCHECKFLAG_GROUND) &&
+                         !(sEnragedEnemy->bgCheckFlags & BGCHECKFLAG_WALL);
+    if (isOnOpenFloor && sEnragedEnemy->speed > 0.1f) {
         sEnragedEnemy->world.pos.x +=
             Math_SinS(sEnragedEnemy->world.rot.y) * sEnragedEnemy->speed * WHIP_RAGE_EXTRA_STRIDE;
         sEnragedEnemy->world.pos.z +=

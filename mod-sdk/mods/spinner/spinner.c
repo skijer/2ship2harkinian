@@ -8,17 +8,24 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "z64sound_source.h"
 #include "overlays/actors/ovl_En_Ishi/z_en_ishi.h"
 
 #define SPINNER_KEY "nei.spinner"
 #define SPINNER_CHARGE_MAX 60
+#define SPINNER_INVERT_CVAR "gMods.Spinner.InvertSteering"
+#define SPINNER_METER_CVAR "gMods.Spinner.ChargeMeter"
+#define SPINNER_BAR_WIDTH 32
+#define SPINNER_BAR_HEIGHT 3
+#define SPINNER_BAR_BELOW_FEET 6
 #define SPINNER_SPEED_MIN 12.0f
 #define SPINNER_SPEED_MAX 25.0f
 #define SPINNER_SPEED_HOMING 30.0f
 #define SPINNER_HOVER_HEIGHT 17.0f
 #define SPINNER_RIDE_FRAMES 120
+#define SPINNER_RIDE_FRAMES_MIN 25
 #define SPINNER_ATTACK_FRAMES 20
 #define SPINNER_RECOIL_FRAMES 15
 #define SPINNER_HOMING_WINDUP_FRAMES 10
@@ -74,7 +81,8 @@ static ColliderCylinderInit sAttackColliderInit = {
 };
 
 static const char* const sRequiredHooks[] = { "OnGameFrameUpdate", "OnPlayerUpdate", "OnActorDrawEnd",
-                                              "OnPassPlayerInputs", "OnSceneInit" };
+                                              "OnPassPlayerInputs", "OnSceneInit",
+                                              "OnInterfaceDrawEnd" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
 
@@ -99,6 +107,7 @@ static bool sIsMountPending;
 static u8 sPhase;
 static s16 sCharge;
 static s16 sTimer;
+static s16 sRideFrames = SPINNER_RIDE_FRAMES;
 static s16 sAngle;
 static f32 sSpeed;
 static Actor* sTarget;
@@ -214,11 +223,13 @@ static void BounceOffWalls(Player* player) {
     }
 }
 
+// Pushing right turns left unless the steering is set back to normal.
 static void SteerWithStick(PlayState* play, f32 deadZone, f32 rate) {
     f32 stickX = play->state.input[0].rel.stick_x;
+    f32 direction = CVarGetInteger(SPINNER_INVERT_CVAR, 1) ? 1.0f : -1.0f;
 
     if (fabsf(stickX) > deadZone) {
-        sAngle += (s16)(stickX * rate);
+        sAngle += (s16)(stickX * rate * direction);
     }
 }
 
@@ -323,7 +334,10 @@ static bool StrikeAround(Player* player, PlayState* play, u8 damage) {
 }
 
 static void Launch(Player* player) {
-    sSpeed = SPINNER_SPEED_MIN + (SPINNER_SPEED_MAX - SPINNER_SPEED_MIN) * ((f32)sCharge / SPINNER_CHARGE_MAX);
+    f32 charge = (f32)sCharge / SPINNER_CHARGE_MAX;
+
+    sRideFrames = (s16)(SPINNER_RIDE_FRAMES_MIN + (SPINNER_RIDE_FRAMES - SPINNER_RIDE_FRAMES_MIN) * charge);
+    sSpeed = SPINNER_SPEED_MIN + (SPINNER_SPEED_MAX - SPINNER_SPEED_MIN) * charge;
     player->actor.velocity.y = 6.0f;
     if (player->focusActor != NULL) {
         sTarget = player->focusActor;
@@ -334,7 +348,7 @@ static void Launch(Player* player) {
         return;
     }
     sAngle = player->actor.shape.rot.y;
-    sTimer = SPINNER_RIDE_FRAMES;
+    sTimer = sRideFrames;
     sPhase = SPINNER_RIDING;
     Audio_PlaySfx_AtPos(&player->actor.world.pos, NA_SE_IT_HAMMER_SWING);
 }
@@ -379,7 +393,7 @@ static void UpdateRiding(Player* player, PlayState* play) {
 static void UpdateAttacking(Player* player, PlayState* play) {
     if (--sTimer <= 0) {
         sAttackCollider.base.atFlags &= ~AT_ON;
-        sTimer = SPINNER_RIDE_FRAMES;
+        sTimer = sRideFrames;
         sPhase = SPINNER_RIDING;
         return;
     }
@@ -709,6 +723,74 @@ static void GrantSpinnerLogic(void) {
     }
 }
 
+// Wound up while the button is held, then the ride's remaining spin, which a spin attack tops back up.
+static f32 GetSpinEnergy(void) {
+    switch (sPhase) {
+        case SPINNER_CHARGING:
+            return (f32)sCharge / SPINNER_CHARGE_MAX;
+        case SPINNER_RIDING:
+            return (f32)sTimer / SPINNER_RIDE_FRAMES;
+        case SPINNER_ATTACKING:
+            return 1.0f;
+        default:
+            return -1.0f;
+    }
+}
+
+static void DrawSpinEnergy(PlayState* play) {
+    Player* player = GET_PLAYER(play);
+    f32 energy = GetSpinEnergy();
+    Vec3f projected;
+    f32 inverseW;
+
+    if (energy < 0.0f || !CVarGetInteger(SPINNER_METER_CVAR, 1)) {
+        return;
+    }
+    Actor_GetProjectedPos(play, &player->actor.world.pos, &projected, &inverseW);
+    if (projected.z <= 0.0f) {
+        return;
+    }
+    s32 centerX = (s32)(SCREEN_WIDTH / 2 + (SCREEN_WIDTH / 2) * projected.x * inverseW);
+    s32 top = (s32)(SCREEN_HEIGHT / 2 - (SCREEN_HEIGHT / 2) * projected.y * inverseW) + SPINNER_BAR_BELOW_FEET;
+    s32 left = centerX - SPINNER_BAR_WIDTH / 2;
+    s32 fillWidth = (s32)(CLAMP(energy, 0.0f, 1.0f) * SPINNER_BAR_WIDTH);
+    u8 pulse = (u8)(200 + 55 * Math_SinS(play->gameplayFrames * 3000));
+    bool isFull = sPhase == SPINNER_CHARGING && sCharge >= SPINNER_CHARGE_MAX;
+
+    if (left < 0 || left + SPINNER_BAR_WIDTH >= SCREEN_WIDTH || top < 0 || top + SPINNER_BAR_HEIGHT >= SCREEN_HEIGHT) {
+        return;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL39_Overlay(play->state.gfxCtx);
+    gDPSetCombineMode(OVERLAY_DISP++, G_CC_PRIMITIVE, G_CC_PRIMITIVE);
+    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 20, 20, 30, 200);
+    gDPFillRectangle(OVERLAY_DISP++, left - 1, top - 1, left + SPINNER_BAR_WIDTH + 1, top + SPINNER_BAR_HEIGHT + 1);
+    gDPPipeSync(OVERLAY_DISP++);
+    if (isFull) {
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, pulse, pulse, 255, 255);
+    } else {
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 60, 140, 255, 255);
+    }
+    if (fillWidth > 0) {
+        gDPFillRectangle(OVERLAY_DISP++, left, top, left + fillWidth, top + SPINNER_BAR_HEIGHT);
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void RegisterOption(const char* label, const char* cvar, const char* tooltip) {
+    S2HModMenuWidget widget = { 0 };
+
+    widget.structSize = sizeof(widget);
+    widget.section = "Mods";
+    widget.sidebar = "Spinner";
+    widget.type = S2H_MOD_MENU_CHECKBOX;
+    widget.label = label;
+    widget.cvar = cvar;
+    widget.defaultInt = 1;
+    widget.tooltip = tooltip;
+    sApi->RegisterMenuWidget(&widget);
+}
+
 S2H_MOD_EXPORT void ModInit(void) {
     GrantSpinnerLogic();
     InitRemoteVisuals();
@@ -742,4 +824,8 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK(sApi, OnPassPlayerInputs, KeepRideButtons);
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetScene);
     S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorDrawEnd, ACTOR_PLAYER, DrawSpinner);
+    S2H_REGISTER_HOOK(sApi, OnInterfaceDrawEnd, DrawSpinEnergy);
+    RegisterOption("Inverted Steering", SPINNER_INVERT_CVAR,
+                   "Pushing the stick right turns the Spinner left. Turn it off to steer the way you push.");
+    RegisterOption("Charge Meter", SPINNER_METER_CVAR, "A bar under Link: it fills while you wind the Spinner up and drains as the ride runs out.");
 }

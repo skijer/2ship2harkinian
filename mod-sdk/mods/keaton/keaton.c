@@ -2,7 +2,6 @@
 #include <string.h>
 
 #include "z64items.h"
-#include "z64formmasks.h"
 
 #include "align_asset_macro.h"
 #include "functions.h"
@@ -16,11 +15,12 @@
 #define KEATON_MASK_KEY "nei.keaton_form_mask"
 #define KEATON_FORM_KEY "nei.keaton"
 #define KEATON_MODEL_PATH "objects/forms/keaton"
-// Root offset in this rig is 1131 where Link's is 2336 (child animations put the root near 2376 instead of 3377).
-#define KEATON_ROOT_SCALE_ADULT 0.335f
+// Root offset in this rig is 1131 where Link's is 2336. It ships as the adult rig, but MM only plays child-height
+// clips (root near 2376, not 3377), so both scales are the child one.
+#define KEATON_ROOT_SCALE_ADULT 0.476f
 #define KEATON_ROOT_SCALE_CHILD 0.476f
 #define KEATON_ROOT_DROP 350.0f
-#define KEATON_MASK_PAGE 1
+#define KEATON_MASK_PAGE S2H_ITEM_PAGE_MASK_VANILLA
 #define KEATON_MASK_SLOT 6
 
 #define TAIL_SEGMENTS 9
@@ -1566,10 +1566,6 @@ static void DrawMaskPickup(PlayState* play, S2HGetItemEntry* entry) {
     GetItem_Draw(play, GID_MASK_KEATON);
 }
 
-static void AssignMaskFromPause(const char* key) {
-    Z64FormMasks_AssignToPressedButton(sApi, key);
-}
-
 static void RegisterMask(void) {
     S2HCustomItemDefinition mask = Z64Items_Define(KEATON_MASK_KEY, sIconTex, sNameTex);
 
@@ -1589,9 +1585,7 @@ static void RegisterMask(void) {
 
     Z64Items_SetLogic(&mask, &sRandomizerItem);
     mask.onAcquire = KeepMaskOutOfSaveDuringSimulation;
-    mask.onPauseToggle = AssignMaskFromPause;
     Z64Items_Register(sApi, &mask);
-    Z64FormMasks_PlaceMask(sApi, KEATON_MASK_KEY, KEATON_MASK_SLOT);
 }
 
 static uint16_t ResolveKeatonEquipment(int32_t equipType, uint16_t value) {
