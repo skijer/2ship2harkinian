@@ -157,7 +157,7 @@ def apply(catalog, plan_result, request, signed, hashes, packs, links, release_b
         builds[game] = {"file": asset, "url": f"{release_base}/{asset}", "hash": file_hash(package),
                          "size": package.stat().st_size, "source_hash": hashes.get(mod_id, "")}
         metadata = {
-            "name": manifest.get("name", mod_id), "author": manifest.get("author", request["author"]),
+            "name": manifest.get("display_name") or manifest.get("name", mod_id), "author": manifest.get("author", request["author"]),
             "description": manifest.get("description", ""), "version": str(manifest.get("version", "")),
             "repository": request["repository"], "commit": request["commit"], "issue": issue,
             "owner": request["author"], "permissions": manifest.get("permissions", []),
