@@ -235,6 +235,11 @@ void ResolveLimbDraw(const Player* player, s32 limbIndex, Gfx** dList, Gfx* limb
     if (HideEmptySheath(player, limbIndex, dList) || *dList == nullptr) {
         return;
     }
+    // A mod already picked one of the form's own meshes for this limb, such as the Gerudo's scimitars.
+    const bool isChosenByMod = *dList != limbDList && IsModelPath(*dList);
+    if (isChosenByMod) {
+        return;
+    }
     if (IsBareLimb(player, limbIndex) && IsModelPath(limbDList)) {
         *dList = limbDList;
         return;

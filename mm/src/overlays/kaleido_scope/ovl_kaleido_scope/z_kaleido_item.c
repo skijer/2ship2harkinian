@@ -1633,6 +1633,16 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
                 return;
             }
 
+            // #region 2S2H [ModApi] A custom item lands on its button itself
+            if (KaleidoItemManager_FinishEquip(play)) {
+                pauseCtx->mainState = PAUSE_MAIN_STATE_IDLE;
+                sEquipAnimTimer = 10;
+                pauseCtx->equipAnimScale = 320;
+                pauseCtx->equipAnimShrinkRate = 40;
+                return;
+            }
+            // #endregion
+
             // Equip item onto c buttons
             if (pauseCtx->equipTargetCBtn == PAUSE_EQUIP_C_LEFT) {
                 // Swap if item is already equipped on CDown or CRight.
@@ -1902,6 +1912,7 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
                 KaleidoScope_UpdateDpadItemEquip(play);
             }
             // #endregion
+            KaleidoItemManager_SettleSwappedKeys(play);
 
             // Reset params
             pauseCtx->mainState = PAUSE_MAIN_STATE_IDLE;

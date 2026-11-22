@@ -5657,6 +5657,42 @@ s32 Player_TryActionHandlerList(PlayState* play, Player* this, s8* actionHandler
     return false;
 }
 
+// Doors, talking, lifting or opening, ledges and walls: what the paused action funcs of a takeover form would start.
+s8 sActionHandlerListTakeover[] = {
+    /* 0 */ PLAYER_ACTION_HANDLER_1,
+    /* 1 */ PLAYER_ACTION_HANDLER_TALK,
+    /* 2 */ PLAYER_ACTION_HANDLER_2,
+    /* 3 */ PLAYER_ACTION_HANDLER_12,
+    /* 4 */ -PLAYER_ACTION_HANDLER_5,
+};
+
+s32 Player_TryTakeoverInteraction(PlayState* play, Player* this) {
+    s8* actionHandler = sActionHandlerListTakeover;
+
+    while (*actionHandler >= 0) {
+        if (Player_RunActionHandler(play, this, *actionHandler)) {
+            return true;
+        }
+        actionHandler++;
+    }
+    return Player_RunActionHandler(play, this, -*actionHandler);
+}
+
+// Door and exit walks and block pushes outlive their one-frame flags, so only the action func identifies them.
+s32 Player_IsDrivenByGame(PlayState* play, Player* this) {
+    if (Player_InBlockingCsMode(play, this)) {
+        return true;
+    }
+    if (this->stateFlags1 & (PLAYER_STATE1_4 | PLAYER_STATE1_TALKING | PLAYER_STATE1_400 |
+                             PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 |
+                             PLAYER_STATE1_100000 | PLAYER_STATE1_200000)) {
+        return true;
+    }
+    return (this->actionFunc == Player_Action_35) || (this->actionFunc == Player_Action_36) ||
+           (this->actionFunc == Player_Action_45) || (this->actionFunc == Player_Action_46) ||
+           (this->actionFunc == Player_Action_47);
+}
+
 typedef enum PlayerActionInterruptResult {
     /* -1 */ PLAYER_INTERRUPT_NONE = -1,
     /*  0 */ PLAYER_INTERRUPT_NEW_ACTION,

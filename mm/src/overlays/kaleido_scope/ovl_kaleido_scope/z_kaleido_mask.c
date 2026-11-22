@@ -190,6 +190,34 @@ u16 sMasksGivenOnMoonBits[] = {
     SET_MOON_MASK_BIT(2, 0X80), // SLOT_MASK_FIERCE_DEITY
 };
 
+// #region 2S2H [ModApi] Custom masks share the vanilla Masks slots
+u8 KaleidoScope_GetOwnedMask(s32 maskSlot) {
+    u8 mask = gSaveContext.save.saveInfo.inventory.items[maskSlot + ITEM_NUM_SLOTS];
+    return CHECK_GIVEN_MASK_ON_MOON(maskSlot) ? ITEM_NONE : mask;
+}
+
+static void DrawCustomMaskIcon(PlayState* play, s32 maskSlot, Vtx* vertices) {
+    PauseContext* pauseCtx = &play->pauseCtx;
+    u8 isRestricted = !KaleidoItemManager_IsMaskSlotFormAllowed(maskSlot);
+
+    OPEN_DISPS(play->state.gfxCtx);
+    if (isRestricted) {
+        gDPSetGrayscaleColor(POLY_OPA_DISP++, 109, 109, 109, 255);
+        gSPGrayscale(POLY_OPA_DISP++, true);
+    }
+    if (!KaleidoItemManager_IsMaskSlotEffectActive(maskSlot)) {
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha / 2);
+    }
+    gSPVertex(POLY_OPA_DISP++, vertices, 4, 0);
+    KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, (TexturePtr)KaleidoItemManager_GetMaskSlotIcon(maskSlot), 32,
+                                   32, 0);
+    if (isRestricted) {
+        gSPGrayscale(POLY_OPA_DISP++, false);
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+// #endregion
+
 s16 sMaskMagicArrowEffectsR[] = { 255, 100, 255 };
 s16 sMaskMagicArrowEffectsG[] = { 0, 100, 255 };
 s16 sMaskMagicArrowEffectsB[] = { 0, 255, 100 };
@@ -245,46 +273,48 @@ void KaleidoScope_DrawMaskSelect(PlayState* play) {
     gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
     for (j = 0, i = 0; i < MASK_NUM_SLOTS; i++, j += 4) {
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
+        u16 cellItem = KaleidoItemManager_ResolveMaskSlotItem(i);
 
-        if (((void)0, gSaveContext.save.saveInfo.inventory.items[i + ITEM_NUM_SLOTS]) != ITEM_NONE) {
-            if (!CHECK_GIVEN_MASK_ON_MOON(i)) {
-                if ((pauseCtx->mainState == PAUSE_MAIN_STATE_IDLE) && (pauseCtx->pageIndex == PAUSE_MASK) &&
-                    (pauseCtx->cursorSpecialPos == 0) && gMaskPlayerFormSlotRestrictions[GET_PLAYER_FORM][i]) {
-                    if ((sMaskEquipState == EQUIP_STATE_MAGIC_ARROW_HOVER_OVER_BOW_SLOT) && (i == SLOT_ARROW_ICE)) {
-                        // Possible bug:
-                        // Supposed to be `SLOT_BOW`, unchanged from OoT, instead increase size of ice arrow icon
-                        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0,
-                                        sMaskMagicArrowEffectsR[pauseCtx->equipTargetItem - 0xB5],
-                                        sMaskMagicArrowEffectsG[pauseCtx->equipTargetItem - 0xB5],
-                                        sMaskMagicArrowEffectsB[pauseCtx->equipTargetItem - 0xB5], pauseCtx->alpha);
+        if (cellItem != ITEM_NONE) {
+            if ((pauseCtx->mainState == PAUSE_MAIN_STATE_IDLE) && (pauseCtx->pageIndex == PAUSE_MASK) &&
+                (pauseCtx->cursorSpecialPos == 0) && gMaskPlayerFormSlotRestrictions[GET_PLAYER_FORM][i]) {
+                if ((sMaskEquipState == EQUIP_STATE_MAGIC_ARROW_HOVER_OVER_BOW_SLOT) && (i == SLOT_ARROW_ICE)) {
+                    // Possible bug:
+                    // Supposed to be `SLOT_BOW`, unchanged from OoT, instead increase size of ice arrow icon
+                    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0,
+                                    sMaskMagicArrowEffectsR[pauseCtx->equipTargetItem - 0xB5],
+                                    sMaskMagicArrowEffectsG[pauseCtx->equipTargetItem - 0xB5],
+                                    sMaskMagicArrowEffectsB[pauseCtx->equipTargetItem - 0xB5], pauseCtx->alpha);
 
-                        pauseCtx->maskVtx[j + 0].v.ob[0] = pauseCtx->maskVtx[j + 2].v.ob[0] =
-                            pauseCtx->maskVtx[j + 0].v.ob[0] - 2;
-                        pauseCtx->maskVtx[j + 1].v.ob[0] = pauseCtx->maskVtx[j + 3].v.ob[0] =
-                            pauseCtx->maskVtx[j + 0].v.ob[0] + 32;
-                        pauseCtx->maskVtx[j + 0].v.ob[1] = pauseCtx->maskVtx[j + 1].v.ob[1] =
-                            pauseCtx->maskVtx[j + 0].v.ob[1] + 2;
-                        pauseCtx->maskVtx[j + 2].v.ob[1] = pauseCtx->maskVtx[j + 3].v.ob[1] =
-                            pauseCtx->maskVtx[j + 0].v.ob[1] - 32;
+                    pauseCtx->maskVtx[j + 0].v.ob[0] = pauseCtx->maskVtx[j + 2].v.ob[0] =
+                        pauseCtx->maskVtx[j + 0].v.ob[0] - 2;
+                    pauseCtx->maskVtx[j + 1].v.ob[0] = pauseCtx->maskVtx[j + 3].v.ob[0] =
+                        pauseCtx->maskVtx[j + 0].v.ob[0] + 32;
+                    pauseCtx->maskVtx[j + 0].v.ob[1] = pauseCtx->maskVtx[j + 1].v.ob[1] =
+                        pauseCtx->maskVtx[j + 0].v.ob[1] + 2;
+                    pauseCtx->maskVtx[j + 2].v.ob[1] = pauseCtx->maskVtx[j + 3].v.ob[1] =
+                        pauseCtx->maskVtx[j + 0].v.ob[1] - 32;
 
-                    } else if (i == pauseCtx->cursorSlot[PAUSE_MASK]) {
-                        // Increase the size of the selected item
-                        pauseCtx->maskVtx[j + 0].v.ob[0] = pauseCtx->maskVtx[j + 2].v.ob[0] =
-                            pauseCtx->maskVtx[j + 0].v.ob[0] - 2;
-                        pauseCtx->maskVtx[j + 1].v.ob[0] = pauseCtx->maskVtx[j + 3].v.ob[0] =
-                            pauseCtx->maskVtx[j + 0].v.ob[0] + 32;
-                        pauseCtx->maskVtx[j + 0].v.ob[1] = pauseCtx->maskVtx[j + 1].v.ob[1] =
-                            pauseCtx->maskVtx[j + 0].v.ob[1] + 2;
-                        pauseCtx->maskVtx[j + 2].v.ob[1] = pauseCtx->maskVtx[j + 3].v.ob[1] =
-                            pauseCtx->maskVtx[j + 0].v.ob[1] - 32;
-                    }
+                } else if (i == pauseCtx->cursorSlot[PAUSE_MASK]) {
+                    // Increase the size of the selected item
+                    pauseCtx->maskVtx[j + 0].v.ob[0] = pauseCtx->maskVtx[j + 2].v.ob[0] =
+                        pauseCtx->maskVtx[j + 0].v.ob[0] - 2;
+                    pauseCtx->maskVtx[j + 1].v.ob[0] = pauseCtx->maskVtx[j + 3].v.ob[0] =
+                        pauseCtx->maskVtx[j + 0].v.ob[0] + 32;
+                    pauseCtx->maskVtx[j + 0].v.ob[1] = pauseCtx->maskVtx[j + 1].v.ob[1] =
+                        pauseCtx->maskVtx[j + 0].v.ob[1] + 2;
+                    pauseCtx->maskVtx[j + 2].v.ob[1] = pauseCtx->maskVtx[j + 3].v.ob[1] =
+                        pauseCtx->maskVtx[j + 0].v.ob[1] - 32;
                 }
+            }
 
-                u8 maskItem = gSaveContext.save.saveInfo.inventory.items[i + ITEM_NUM_SLOTS];
+            if (cellItem == ITEM_CUSTOM) {
+                DrawCustomMaskIcon(play, i, &pauseCtx->maskVtx[j]);
+            } else {
                 gSPVertex(POLY_OPA_DISP++, &pauseCtx->maskVtx[j + 0], 4, 0);
                 KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx,
                                                (TexturePtr)GameInteractor_ExecuteOnKaleidoResolveItemIcon(
-                                                   play, maskItem, (const char*)gItemIcons[maskItem]),
+                                                   play, cellItem, (const char*)gItemIcons[cellItem]),
                                                32, 32, 0);
             }
         }
@@ -292,6 +322,7 @@ void KaleidoScope_DrawMaskSelect(PlayState* play) {
                                                 gSaveContext.save.saveInfo.inventory.items[i + ITEM_NUM_SLOTS],
                                                 &pauseCtx->maskVtx[j]);
     }
+    KaleidoItemManager_DrawMaskWheels(play);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -407,11 +438,7 @@ void KaleidoScope_UpdateMaskCursor(PlayState* play) {
                 }
 
                 if (moveCursorResult == PAUSE_CURSOR_RESULT_SLOT) {
-                    cursorItem =
-                        gSaveContext.save.saveInfo.inventory.items[pauseCtx->cursorPoint[PAUSE_MASK] + ITEM_NUM_SLOTS];
-                    if (CHECK_GIVEN_MASK_ON_MOON(pauseCtx->cursorPoint[PAUSE_MASK])) {
-                        cursorItem = ITEM_NONE;
-                    }
+                    cursorItem = KaleidoItemManager_ResolveMaskSlotItem(pauseCtx->cursorPoint[PAUSE_MASK]);
                 }
             }
         } else if (pauseCtx->cursorSpecialPos == PAUSE_CURSOR_PAGE_LEFT) {
@@ -424,8 +451,7 @@ void KaleidoScope_UpdateMaskCursor(PlayState* play) {
                 // Search for slot to move to
                 while (true) {
                     // Check if current cursor has an item in its slot
-                    if ((gSaveContext.save.saveInfo.inventory.items[cursorPoint + ITEM_NUM_SLOTS] != ITEM_NONE) &&
-                        !CHECK_GIVEN_MASK_ON_MOON(cursorPoint)) {
+                    if (KaleidoItemManager_ResolveMaskSlotItem(cursorPoint) != ITEM_NONE) {
                         pauseCtx->cursorPoint[PAUSE_MASK] = cursorPoint;
                         pauseCtx->cursorXIndex[PAUSE_MASK] = cursorXIndex;
                         pauseCtx->cursorYIndex[PAUSE_MASK] = cursorYIndex;
@@ -465,8 +491,7 @@ void KaleidoScope_UpdateMaskCursor(PlayState* play) {
                 // Search for slot to move to
                 while (true) {
                     // Check if current cursor has an item in its slot
-                    if ((gSaveContext.save.saveInfo.inventory.items[cursorPoint + ITEM_NUM_SLOTS] != ITEM_NONE) &&
-                        !CHECK_GIVEN_MASK_ON_MOON(cursorPoint)) {
+                    if (KaleidoItemManager_ResolveMaskSlotItem(cursorPoint) != ITEM_NONE) {
                         pauseCtx->cursorPoint[PAUSE_MASK] = cursorPoint;
                         pauseCtx->cursorXIndex[PAUSE_MASK] = cursorXIndex;
                         pauseCtx->cursorYIndex[PAUSE_MASK] = cursorYIndex;
@@ -537,17 +562,9 @@ void KaleidoScope_UpdateMaskCursor(PlayState* play) {
             pauseCtx->cursorColorSet = PAUSE_CURSOR_COLOR_SET_YELLOW;
 
             if (moveCursorResult == PAUSE_CURSOR_RESULT_SLOT) {
-                cursorItem =
-                    gSaveContext.save.saveInfo.inventory.items[pauseCtx->cursorPoint[PAUSE_MASK] + ITEM_NUM_SLOTS];
-                if (CHECK_GIVEN_MASK_ON_MOON(pauseCtx->cursorPoint[PAUSE_MASK])) {
-                    cursorItem = ITEM_NONE;
-                }
+                cursorItem = KaleidoItemManager_ResolveMaskSlotItem(pauseCtx->cursorPoint[PAUSE_MASK]);
             } else if (moveCursorResult != PAUSE_CURSOR_RESULT_SPECIAL_POS) {
-                cursorItem =
-                    gSaveContext.save.saveInfo.inventory.items[pauseCtx->cursorPoint[PAUSE_MASK] + ITEM_NUM_SLOTS];
-                if (CHECK_GIVEN_MASK_ON_MOON(pauseCtx->cursorPoint[PAUSE_MASK])) {
-                    cursorItem = ITEM_NONE;
-                }
+                cursorItem = KaleidoItemManager_ResolveMaskSlotItem(pauseCtx->cursorPoint[PAUSE_MASK]);
             }
 
             if (cursorItem == ITEM_NONE) {
@@ -1161,6 +1178,16 @@ void KaleidoScope_UpdateMaskEquip(PlayState* play) {
                 return;
             }
 
+            // #region 2S2H [ModApi] A custom mask lands on its button itself
+            if (KaleidoItemManager_FinishEquip(play)) {
+                pauseCtx->mainState = PAUSE_MAIN_STATE_IDLE;
+                sMaskEquipAnimTimer = 10;
+                pauseCtx->equipAnimScale = 320;
+                pauseCtx->equipAnimShrinkRate = 40;
+                return;
+            }
+            // #endregion
+
             // Equip mask onto c buttons
             if (pauseCtx->equipTargetCBtn == PAUSE_EQUIP_C_LEFT) {
                 // Swap if mask is already equipped on CDown or CRight.
@@ -1256,6 +1283,7 @@ void KaleidoScope_UpdateMaskEquip(PlayState* play) {
                 KaleidoScope_UpdateDpadMaskEquip(play);
             }
             // #endregion
+            KaleidoItemManager_SettleSwappedKeys(play);
 
             // Reset params
             pauseCtx->mainState = PAUSE_MAIN_STATE_IDLE;

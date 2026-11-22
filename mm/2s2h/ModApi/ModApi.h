@@ -248,6 +248,7 @@ typedef struct {
     const char* (*GetShownLayoutPage)(void);
     bool (*DrawPlayerPreview)(struct PlayState* play, const S2HPlayerPreview* preview);
     uint32_t (*ReadModsFolderFiles)(const char* extensions, S2HArchiveFileFunc visit, void* userData);
+    bool (*IsFormSuspended)(void);
 } S2HModApi;
 
 #define S2H_REGISTER_HOOK(api, name, callback) ((api)->RegisterHookByName(#name, (void*)S2H_CheckHook_##name(callback)))

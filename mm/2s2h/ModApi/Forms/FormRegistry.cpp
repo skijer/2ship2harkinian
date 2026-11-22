@@ -30,6 +30,8 @@ extern "C" {
 extern PlayerAnimationHeader* D_8085BE84[PLAYER_ANIMGROUP_MAX][PLAYER_ANIMTYPE_MAX];
 extern PlayerAgeProperties sPlayerAgeProperties[PLAYER_FORM_MAX];
 void Player_ResetMeleeWeaponColliders(PlayState* play, Player* player);
+s32 Player_TryTakeoverInteraction(PlayState* play, Player* player);
+s32 Player_IsDrivenByGame(PlayState* play, Player* player);
 }
 
 namespace {
@@ -73,6 +75,7 @@ StashedLoadout sStash;
 PlayerAgeProperties sHumanBody = {};
 bool sBodyPatched = false;
 std::vector<SavedAnim> sSavedAnims;
+bool sIsTakeoverSuspended = false;
 
 Player* GetPlayer() {
     return gPlayState == nullptr ? nullptr : GET_PLAYER(gPlayState);
@@ -446,8 +449,25 @@ void PrepareFormFrame(Input*) {
     }
     ResolvePendingForm();
     SyncEffects(player);
-    if (IsAppliedKind(S2H_FORM_KIND_TAKEOVER)) {
+    if (!IsAppliedKind(S2H_FORM_KIND_TAKEOVER)) {
+        sIsTakeoverSuspended = false;
+        return;
+    }
+    sIsTakeoverSuspended = Player_IsDrivenByGame(gPlayState, player);
+    if (!sIsTakeoverSuspended) {
         player->stateFlags3 |= PLAYER_STATE3_4;
+    }
+}
+
+// The handler that takes the interaction installs its action func, which has to run this very frame.
+void StartTakeoverInteraction(bool* should, va_list args) {
+    Player* player = va_arg(args, Player*);
+    if (*should || player != GetPlayer() || !IsAppliedKind(S2H_FORM_KIND_TAKEOVER) || sIsTakeoverSuspended) {
+        return;
+    }
+    if (Player_TryTakeoverInteraction(gPlayState, player)) {
+        sIsTakeoverSuspended = true;
+        *should = true;
     }
 }
 
@@ -541,6 +561,7 @@ void FormRegistry_Init() {
     SaveSections_Register(SaveSection, WriteSection, ReadSection);
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPassPlayerInputs>(PrepareFormFrame);
+    REGISTER_VB_SHOULD(VB_EXECUTE_PLAYER_ACTION_FUNC, { StartTakeoverInteraction(should, args); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>(UpdateForms);
     GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnActorDraw>(ACTOR_PLAYER, DrawLinkFormOverlay);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerActionHandler>(FormRegistry_RunActionOverride);
@@ -694,6 +715,10 @@ const char* FormRegistry_GetActiveKey(void) {
 bool FormRegistry_IsActive(const char* key) {
     const char* active = FormRegistry_GetActiveKey();
     return key != nullptr && active != nullptr && std::strcmp(active, key) == 0;
+}
+
+bool FormRegistry_IsSuspended(void) {
+    return IsAppliedKind(S2H_FORM_KIND_TAKEOVER) && sIsTakeoverSuspended;
 }
 
 const char* FormRegistry_GetNativeKey(uint8_t playerForm) {

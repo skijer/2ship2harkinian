@@ -12,6 +12,12 @@ uint16_t KaleidoQuestManager_GetShownPage(void);
 void** KaleidoQuestManager_GetBackground(void** vanilla);
 
 uint16_t KaleidoItemManager_ResolveSlotItem(uint8_t slot, uint16_t vanillaItem);
+uint16_t KaleidoItemManager_ResolveMaskSlotItem(uint8_t slot);
+void* KaleidoItemManager_GetMaskSlotIcon(uint8_t slot);
+bool KaleidoItemManager_IsMaskSlotFormAllowed(uint8_t slot);
+bool KaleidoItemManager_IsMaskSlotEffectActive(uint8_t slot);
+void KaleidoItemManager_DrawMaskWheels(struct PlayState* play);
+bool KaleidoItemManager_IsTurningWheel(struct PlayState* play);
 void** KaleidoItemManager_GetBackground(void** vanilla);
 void KaleidoItemManager_ApplyGeometry(struct PlayState* play);
 void KaleidoItemManager_Update(struct PlayState* play);
@@ -20,6 +26,9 @@ bool KaleidoItemManager_OpenPauseDescription(struct PlayState* play, const S2HCu
                                              int16_t cursorRow);
 bool KaleidoItemManager_IsSlotEffectActive(uint8_t slot);
 uint8_t KaleidoItemManager_ToHeldButton(uint16_t equipTargetCBtn);
+// Run where vanilla's equip animation lands: true when a custom item took the button instead of vanilla.
+bool KaleidoItemManager_FinishEquip(struct PlayState* play);
+void KaleidoItemManager_SettleSwappedKeys(struct PlayState* play);
 bool KaleidoItemManager_IsPauseEffectActive(const S2HCustomItemDefinition* definition);
 void KaleidoItemManager_ToggleEquipment(const S2HCustomItemDefinition* definition);
 bool KaleidoItemManager_SetDefaultPlacement(const char* key, const S2HCustomItemPlacement* placement);

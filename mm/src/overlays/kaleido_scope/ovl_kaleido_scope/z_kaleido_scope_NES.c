@@ -4342,6 +4342,11 @@ void KaleidoScope_Update(PlayState* play) {
                     KaleidoScope_UpdateMaskCursor(play);
                     break;
             }
+            // #region 2S2H [ModApi] A locked the cursor on a wheel of items
+            if (KaleidoItemManager_IsTurningWheel(play)) {
+                pauseCtx->cursorColorSet = PAUSE_CURSOR_COLOR_SET_BLUE;
+            }
+            // #endregion
 
             if ((pauseCtx->state == PAUSE_STATE_MAIN) &&
                 ((pauseCtx->mainState == PAUSE_MAIN_STATE_IDLE) ||

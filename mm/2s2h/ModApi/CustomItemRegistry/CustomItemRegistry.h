@@ -239,6 +239,7 @@ typedef struct {
 
 #define S2H_ITEM_PAGE_VANILLA 0xFF
 #define S2H_ITEM_PAGE_QUEST_VANILLA 0xE0
+#define S2H_ITEM_PAGE_MASK_VANILLA 0xDF
 #define S2H_ITEM_PAGE_EQUIPMENT_FIRST 0x100
 
 static inline bool CustomItemRegistry_IsQuestPage(uint16_t page) {
@@ -287,9 +288,12 @@ void CustomItemRegistry_ReceiveGetItem(const char* key);
 bool CustomItemRegistry_IsOwned(const char* key);
 bool CustomItemRegistry_SetWorn(const char* key, bool worn);
 bool CustomItemRegistry_IsWorn(const char* key);
+bool CustomItemRegistry_CanEquip(uint8_t button, const char* key);
 bool CustomItemRegistry_Equip(uint8_t button, const char* key);
 void CustomItemRegistry_Unequip(uint8_t button);
 void CustomItemRegistry_CopyEquippedKey(uint8_t fromButton, uint8_t toButton);
+uint8_t CustomItemRegistry_GetButtonVanillaItem(uint8_t button);
+void CustomItemRegistry_EquipVanilla(uint8_t button, uint8_t item, uint8_t slot);
 const char* CustomItemRegistry_GetEquippedKey(uint8_t button);
 uint16_t CustomItemRegistry_GetEquippedRuntimeId(uint8_t button);
 bool CustomItemRegistry_PressButtonItem(struct PlayState* play, struct Player* player, uint8_t button);

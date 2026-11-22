@@ -2544,8 +2544,13 @@ static void DrawModInventoryEditor() {
                        "to move it. Layout changes are saved in configuration. Shared cells form a wheel.");
     ImGui::BeginDisabled(gPlayState == nullptr);
     if (ImGui::Button("Give All Mod Items")) {
-        for (uint32_t i = 0; i < CustomItemRegistry_GetCount(); ++i)
-            SetModEditorOwned(CustomItemRegistry_GetAt(i), true);
+        for (uint32_t i = 0; i < CustomItemRegistry_GetCount(); ++i) {
+            const S2HCustomItemDefinition* item = CustomItemRegistry_GetAt(i);
+            SetModEditorOwned(item, true);
+            for (const S2HCustomPickupVariant* variant : CustomItemRegistry_ListPickupVariants(item->key)) {
+                CustomItemRegistry_ReceiveGetItem(variant->key);
+            }
+        }
     }
     ImGui::SameLine();
     if (ImGui::Button("Remove All Mod Items")) {

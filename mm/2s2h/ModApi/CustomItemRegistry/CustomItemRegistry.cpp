@@ -1027,17 +1027,20 @@ bool CustomItemRegistry_IsOwned(const char* key) {
     return sOwnedItems.contains(key);
 }
 
-bool CustomItemRegistry_Equip(uint8_t button, const char* key) {
+bool CustomItemRegistry_CanEquip(uint8_t button, const char* key) {
     const S2HCustomItemDefinition* definition = CustomItemRegistry_Find(key);
     if (!IsValidButton(button) || definition == nullptr || CustomItemRegistry_IsVanillaUpgrade(definition) ||
         !CustomItemRegistry_IsOwned(key) || !CustomItemRegistry_IsUsableNow(key) ||
         (definition->flags & S2H_CUSTOM_ITEM_EQUIPPABLE) == 0) {
         return false;
     }
-    const bool fitsButton = button == S2H_ITEM_BUTTON_B ? (definition->flags & S2H_CUSTOM_ITEM_B_BUTTON) != 0
-                            : IsDpadButton(button)      ? (definition->flags & S2H_CUSTOM_ITEM_DPAD) != 0
-                                                        : (definition->flags & S2H_CUSTOM_ITEM_C_BUTTON) != 0;
-    if (!fitsButton) {
+    return button == S2H_ITEM_BUTTON_B ? (definition->flags & S2H_CUSTOM_ITEM_B_BUTTON) != 0
+           : IsDpadButton(button)      ? (definition->flags & S2H_CUSTOM_ITEM_DPAD) != 0
+                                       : (definition->flags & S2H_CUSTOM_ITEM_C_BUTTON) != 0;
+}
+
+bool CustomItemRegistry_Equip(uint8_t button, const char* key) {
+    if (!CustomItemRegistry_CanEquip(button, key)) {
         return false;
     }
     SwapOutOfOtherButtons(button, key);
@@ -1053,6 +1056,19 @@ void CustomItemRegistry_Unequip(uint8_t button) {
     }
     EquippedKey(button).clear();
     SyncButton(button);
+    ReloadButtonIcon(button);
+}
+
+uint8_t CustomItemRegistry_GetButtonVanillaItem(uint8_t button) {
+    return IsValidButton(button) ? GetVanillaButtonItem(button) : ITEM_NONE;
+}
+
+void CustomItemRegistry_EquipVanilla(uint8_t button, uint8_t item, uint8_t slot) {
+    if (!IsValidButton(button)) {
+        return;
+    }
+    EquippedKey(button).clear();
+    SetVanillaButton(button, item, slot);
     ReloadButtonIcon(button);
 }
 

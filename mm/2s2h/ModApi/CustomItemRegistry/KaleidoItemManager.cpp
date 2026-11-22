@@ -25,8 +25,10 @@ extern "C" {
 #include "variables.h"
 #include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"
 #include "2s2h_assets.h"
+#include "archives/icon_item_static/icon_item_static_yar.h"
 #include "interface/parameter_static/parameter_static.h"
 void func_801514B0(PlayState* play, u16 textId, u8 arg2);
+u8 KaleidoScope_GetOwnedMask(s32 maskSlot);
 void Player_DrawGameplay(PlayState* play, Player* player, s32 lod, Gfx* cullDList,
                          OverrideLimbDrawFlex overrideLimbDraw);
 int gfx_create_framebuffer(uint32_t width, uint32_t height, uint32_t native_width, uint32_t native_height,
@@ -43,7 +45,6 @@ namespace {
 constexpr uint8_t SlotCount = 32;
 constexpr uint8_t GridColumns = 6;
 constexpr int32_t StickThreshold = 30;
-constexpr int32_t WheelIconSize = 16;
 
 struct PoolEntry {
     uint16_t vanillaItem;
@@ -62,20 +63,30 @@ struct ItemPage {
     std::array<WheelItems, SlotCount> slots;
 };
 
+S2HCustomItemDefinition MakeNativeEntry() {
+    S2HCustomItemDefinition entry = {};
+    entry.key = "";
+    return entry;
+}
+
 std::deque<ItemPool> sPools;
 std::vector<ItemPage> sVisiblePages;
 ItemPage sVanillaClaims = { S2H_ITEM_PAGE_VANILLA, {} };
+ItemPage sMaskClaims = { S2H_ITEM_PAGE_MASK_VANILLA, {} };
+// Stands for the slot's own item in a vanilla Items or Masks slot that custom items also claim.
+const S2HCustomItemDefinition sNativeEntry = MakeNativeEntry();
 std::optional<uint32_t> sLayoutFrame;
 std::optional<uint16_t> sShownPage;
 std::optional<uint16_t> sMaskPage;
-int32_t sMaskWheelSlot = -1;
 std::map<std::pair<uint16_t, uint8_t>, std::string> sWheelSelection;
 std::string sSelectedKey;
 std::map<std::string, S2HCustomItemPlacement> sDefaultPlacements;
 bool sWasAPressConsumed = false;
 int32_t sCyclingSlot = -1;
-int32_t sItemAHold = 0;
-int32_t sMaskAHold = 0;
+int16_t sCyclingPause = -1;
+// The custom item flying to its button in vanilla's equip animation; it lands in KaleidoItemManager_FinishEquip.
+std::string sFlyingKey;
+std::array<uint8_t, S2H_ITEM_BUTTON_COUNT> sButtonItemsBeforeEquip;
 
 const ItemPool* FindPool(const char* key) {
     if (key == nullptr) {
@@ -121,6 +132,19 @@ void SortByPriority(std::array<WheelItems, SlotCount>& slots) {
     }
 }
 
+void TakeVanillaPageClaims(std::map<uint16_t, std::array<WheelItems, SlotCount>>& pages, ItemPage& claims) {
+    for (auto& items : claims.slots) {
+        items.clear();
+    }
+    auto claimed = pages.find(claims.page);
+    if (claimed == pages.end()) {
+        return;
+    }
+    claims.slots = std::move(claimed->second);
+    SortByPriority(claims.slots);
+    pages.erase(claimed);
+}
+
 void BuildVisiblePages() {
     std::map<uint16_t, std::array<WheelItems, SlotCount>> pages;
     if (CustomEquipRegistry_GetCount() != 0) {
@@ -145,15 +169,8 @@ void BuildVisiblePages() {
         return ownerForm != nullptr && std::strcmp(ownerForm, currentForm) != 0;
     });
 
-    for (auto& items : sVanillaClaims.slots) {
-        items.clear();
-    }
-    auto claims = pages.find(S2H_ITEM_PAGE_VANILLA);
-    if (claims != pages.end()) {
-        sVanillaClaims.slots = std::move(claims->second);
-        SortByPriority(sVanillaClaims.slots);
-        pages.erase(claims);
-    }
+    TakeVanillaPageClaims(pages, sVanillaClaims);
+    TakeVanillaPageClaims(pages, sMaskClaims);
 
     sVisiblePages.clear();
     for (auto& [page, slots] : pages) {
@@ -184,14 +201,13 @@ const ItemPage* GetShownOrVanillaPage() {
     return page != nullptr ? page : &sVanillaClaims;
 }
 
-const S2HCustomItemDefinition* GetWheelSelection(const ItemPage& page, uint8_t slot) {
-    const WheelItems& items = page.slots[slot];
+const S2HCustomItemDefinition* SelectWheelItem(const WheelItems& items, uint16_t page, uint8_t slot) {
     if (items.empty()) {
         return nullptr;
     }
-    const auto selection = sWheelSelection.find({ page.page, slot });
+    const auto selection = sWheelSelection.find({ page, slot });
     const std::string wheelSetting =
-        CVAR_CUSTOM_ITEM_MANAGER("Wheel.") + std::to_string(page.page) + "." + std::to_string(slot);
+        CVAR_CUSTOM_ITEM_MANAGER("Wheel.") + std::to_string(page) + "." + std::to_string(slot);
     const char* saved = CVarGetString(wheelSetting.c_str(), "");
     if (selection != sWheelSelection.end()) {
         for (const auto* item : items) {
@@ -208,8 +224,60 @@ const S2HCustomItemDefinition* GetWheelSelection(const ItemPage& page, uint8_t s
     return items.front();
 }
 
+void RememberWheelSelection(uint16_t page, uint8_t slot, const char* key) {
+    sWheelSelection[{ page, slot }] = key;
+    const std::string setting = CVAR_CUSTOM_ITEM_MANAGER("Wheel.") + std::to_string(page) + "." + std::to_string(slot);
+    CVarSetString(setting.c_str(), key);
+    Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+}
+
+bool IsNativeEntry(const S2HCustomItemDefinition* entry) {
+    return entry == &sNativeEntry;
+}
+
+// The vanilla Items and Masks pages keep the slot's own item in the wheel, ahead of the custom claims.
+uint8_t GetNativeItem(const ItemPage& page, uint8_t slot) {
+    if (slot >= ITEM_NUM_SLOTS) {
+        return ITEM_NONE;
+    }
+    if (&page == &sVanillaClaims) {
+        return gSaveContext.save.saveInfo.inventory.items[slot];
+    }
+    return &page == &sMaskClaims ? KaleidoScope_GetOwnedMask(slot) : ITEM_NONE;
+}
+
+uint8_t GetNativeInventorySlot(const ItemPage& page, uint8_t slot) {
+    return &page == &sMaskClaims ? slot + ITEM_NUM_SLOTS : slot;
+}
+
+WheelItems GetWheelEntries(const ItemPage& page, uint8_t slot) {
+    WheelItems entries = page.slots[slot];
+    if (GetNativeItem(page, slot) != ITEM_NONE) {
+        entries.insert(entries.begin(), &sNativeEntry);
+    }
+    return entries;
+}
+
+// May be sNativeEntry: callers wanting a custom item go through GetCustomSelection.
+const S2HCustomItemDefinition* GetWheelSelection(const ItemPage& page, uint8_t slot) {
+    return SelectWheelItem(GetWheelEntries(page, slot), page.page, slot);
+}
+
+const S2HCustomItemDefinition* GetCustomSelection(const ItemPage& page, uint8_t slot) {
+    if (slot >= SlotCount) {
+        return nullptr;
+    }
+    const S2HCustomItemDefinition* selection = GetWheelSelection(page, slot);
+    return IsNativeEntry(selection) ? nullptr : selection;
+}
+
+const S2HCustomItemDefinition* GetMaskCustomSelection(uint8_t slot) {
+    RefreshVisiblePages();
+    return GetCustomSelection(sMaskClaims, slot);
+}
+
 const S2HCustomItemDefinition* GetShownSlotItem(uint8_t slot) {
-    return slot < SlotCount ? GetWheelSelection(*GetShownOrVanillaPage(), slot) : nullptr;
+    return GetCustomSelection(*GetShownOrVanillaPage(), slot);
 }
 
 const S2HCustomItemDefinition* GetCursorShownItem(PlayState* play) {
@@ -233,31 +301,93 @@ void MoveCursorToFirstItem(PlayState* play) {
     }
 }
 
-void EquipOnSameButtons(const char* previousKey, const char* nextKey) {
-    for (uint8_t button = 0; button < S2H_ITEM_BUTTON_COUNT; ++button) {
-        const char* equipped = CustomItemRegistry_GetEquippedKey(button);
-        if (equipped == nullptr || std::strcmp(equipped, previousKey) != 0) {
+bool HoldsWheelEntry(uint8_t button, uint8_t nativeItem, const S2HCustomItemDefinition* entry) {
+    if (IsNativeEntry(entry)) {
+        return CustomItemRegistry_GetButtonVanillaItem(button) == nativeItem;
+    }
+    const char* equipped = CustomItemRegistry_GetEquippedKey(button);
+    return equipped != nullptr && std::strcmp(equipped, entry->key) == 0;
+}
+
+// Like vanilla's item cycling, every button holding the old entry takes the new one, native item or not.
+void EquipEntryOnSameButtons(const ItemPage& page, uint8_t slot, const S2HCustomItemDefinition* previous,
+                             const S2HCustomItemDefinition* next) {
+    const uint8_t nativeItem = GetNativeItem(page, slot);
+    for (uint8_t button = S2H_ITEM_BUTTON_C_FIRST; button < S2H_ITEM_BUTTON_COUNT; ++button) {
+        if (!HoldsWheelEntry(button, nativeItem, previous)) {
             continue;
         }
-        if (!CustomItemRegistry_Equip(button, nextKey)) {
+        if (IsNativeEntry(next)) {
+            CustomItemRegistry_EquipVanilla(button, nativeItem, GetNativeInventorySlot(page, slot));
+        } else if (!CustomItemRegistry_Equip(button, next->key) && !IsNativeEntry(previous)) {
             CustomItemRegistry_Unequip(button);
         }
     }
 }
 
-void TurnWheel(PlayState* play, const ItemPage& page, uint8_t slot, int32_t step) {
-    const WheelItems& items = page.slots[slot];
-    const S2HCustomItemDefinition* previous = GetWheelSelection(page, slot);
-    const auto position = std::find(items.begin(), items.end(), previous) - items.begin();
+void WearInPlaceOf(const S2HCustomItemDefinition* previous, const S2HCustomItemDefinition* next) {
+    if (CustomEquipRegistry_IsWorn(previous->key) && CustomEquipRegistry_Find(next->key) != nullptr) {
+        CustomEquipRegistry_Wear(next->key);
+    }
+}
+
+const S2HCustomItemDefinition* StepWheel(const WheelItems& items, const S2HCustomItemDefinition* current,
+                                         int32_t step) {
+    const auto position = std::find(items.begin(), items.end(), current) - items.begin();
     const auto count = static_cast<std::ptrdiff_t>(items.size());
-    const S2HCustomItemDefinition* next = items[(position + step + count) % count];
-    sWheelSelection[{ page.page, slot }] = next->key;
-    EquipOnSameButtons(previous->key, next->key);
+    return items[(position + step + count) % count];
+}
+
+void TurnWheel(PlayState* play, const ItemPage& page, uint8_t slot, int32_t step) {
+    const WheelItems entries = GetWheelEntries(page, slot);
+    const S2HCustomItemDefinition* previous = SelectWheelItem(entries, page.page, slot);
+    const S2HCustomItemDefinition* next = StepWheel(entries, previous, step);
+    RememberWheelSelection(page.page, slot, next->key);
+    EquipEntryOnSameButtons(page, slot, previous, next);
+    WearInPlaceOf(previous, next);
     play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
 }
 
-void SyncSelectedItem(PlayState* play) {
-    const S2HCustomItemDefinition* shown = GetCursorShownItem(play);
+bool IsCyclingSlot(const PauseContext* pause, int32_t slot) {
+    return sCyclingSlot == slot && sCyclingPause == pause->pageIndex;
+}
+
+void StopCycling() {
+    sCyclingSlot = -1;
+    sCyclingPause = -1;
+}
+
+// Shipwright's item cycling: A locks the cursor on the slot and A again releases it.
+void ToggleCycling(PlayState* play, int32_t slot) {
+    PlayPauseSfx(NA_SE_SY_DECIDE);
+    sWasAPressConsumed = true;
+    if (IsCyclingSlot(&play->pauseCtx, slot)) {
+        StopCycling();
+        return;
+    }
+    sCyclingSlot = slot;
+    sCyclingPause = play->pauseCtx.pageIndex;
+}
+
+// Consumes the stick so the cursor stays on the slot while the wheel turns.
+int32_t ReadWheelStep(PlayState* play) {
+    PauseContext* pause = &play->pauseCtx;
+    const u16 pressed = CONTROLLER1(&play->state)->press.button;
+    const bool canTurnWithDpad = !CVarGetInteger("gEnhancements.Dpad.DpadEquips", 0);
+    int32_t step = 0;
+    if (pause->stickAdjX > StickThreshold || pause->stickAdjY > StickThreshold ||
+        (canTurnWithDpad && CHECK_BTN_ANY(pressed, BTN_DRIGHT | BTN_DUP))) {
+        step = 1;
+    } else if (pause->stickAdjX < -StickThreshold || pause->stickAdjY < -StickThreshold ||
+               (canTurnWithDpad && CHECK_BTN_ANY(pressed, BTN_DLEFT | BTN_DDOWN))) {
+        step = -1;
+    }
+    pause->stickAdjX = 0;
+    pause->stickAdjY = 0;
+    return step;
+}
+
+void SyncSelectedItem(PlayState* play, const S2HCustomItemDefinition* shown) {
     const std::string key = shown != nullptr ? shown->key : std::string();
     const auto* selected = CustomItemRegistry_GetPauseItem();
     if (key == sSelectedKey && (selected == nullptr ? key.empty() : key == selected->key)) {
@@ -274,20 +404,51 @@ void EquipCursorItem(bool* should, va_list args) {
     if (cursorItem != ITEM_CUSTOM || gPlayState == nullptr) {
         return;
     }
-    const S2HCustomItemDefinition* definition = GetShownSlotItem(static_cast<uint8_t>(cursorSlot));
+    const S2HCustomItemDefinition* definition =
+        cursorSlot >= ITEM_NUM_SLOTS ? GetMaskCustomSelection(static_cast<uint8_t>(cursorSlot - ITEM_NUM_SLOTS))
+                                     : GetShownSlotItem(static_cast<uint8_t>(cursorSlot));
     const uint8_t button = KaleidoItemManager_ToHeldButton(gPlayState->pauseCtx.equipTargetCBtn);
-    *should = false;
     const char* equippedKey = CustomItemRegistry_GetEquippedKey(button);
     const bool isAlreadyOnButton =
         definition != nullptr && equippedKey != nullptr && std::strcmp(equippedKey, definition->key) == 0;
     if (isAlreadyOnButton && CVarGetInteger("gEnhancements.Equipment.ItemUnequip", 0)) {
+        *should = false;
         CustomItemRegistry_Unequip(button);
         PlayPauseSfx(NA_SE_SY_DECIDE);
         return;
     }
-    const bool isEquipped = definition != nullptr && CustomItemRegistry_Equip(button, definition->key);
-    PlayPauseSfx(isEquipped ? NA_SE_SY_DECIDE : NA_SE_SY_ERROR);
+    if (definition == nullptr || !CustomItemRegistry_CanEquip(button, definition->key)) {
+        *should = false;
+        PlayPauseSfx(NA_SE_SY_ERROR);
+        return;
+    }
+    sFlyingKey = definition->key;
 }
+
+} // namespace
+
+// Outside the anonymous namespace for OPEN_DISPS, like DrawWheel.
+static void DrawFlyingCustomItem(bool* should, va_list args) {
+    const ItemId* item = va_arg(args, ItemId*);
+    if (*item != ITEM_CUSTOM || sFlyingKey.empty() || gPlayState == nullptr) {
+        return;
+    }
+    const char* icon = CustomItemRegistry_ResolveTexture(sFlyingKey.c_str(), S2H_ITEM_ICON_INVENTORY);
+    *should = false;
+    if (icon == nullptr) {
+        return;
+    }
+    PauseContext* pause = &gPlayState->pauseCtx;
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, pause->equipAnimAlpha);
+    gSPVertex(OVERLAY_DISP++, reinterpret_cast<uintptr_t>(&pause->cursorVtx[16]), 4, 0);
+    gDPLoadTextureBlock(OVERLAY_DISP++, icon, G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0, G_TX_NOMIRROR | G_TX_WRAP,
+                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+    gSP1Quadrangle(OVERLAY_DISP++, 0, 2, 3, 1, 0);
+    CLOSE_DISPS(gPlayState->state.gfxCtx);
+}
+
+namespace {
 
 void DisplayCursorItemText(bool* should, va_list args) {
     const u16* cursorItem = va_arg(args, u16*);
@@ -300,7 +461,7 @@ void DisplayCursorItemText(bool* should, va_list args) {
     }
     const PauseContext* pauseCtx = &gPlayState->pauseCtx;
     KaleidoItemManager_OpenPauseDescription(gPlayState, CustomItemRegistry_GetPauseItem(),
-                                            pauseCtx->cursorYIndex[PAUSE_ITEM]);
+                                            pauseCtx->cursorYIndex[pauseCtx->pageIndex]);
 }
 
 void ResetShownPage() {
@@ -339,11 +500,10 @@ void ResetShownPage() {
     }
     sShownPage.reset();
     sMaskPage.reset();
-    sMaskWheelSlot = -1;
     sLayoutFrame.reset();
     sWheelSelection.clear();
     sSelectedKey.clear();
-    sCyclingSlot = -1;
+    StopCycling();
 }
 
 void OpenOnFormPage(PlayState* play) {
@@ -362,15 +522,43 @@ void OpenOnFormPage(PlayState* play) {
 void RegisterHooks() {
     REGISTER_VB_SHOULD(VB_OPEN_PAUSE_MENU, {
         if (*should) {
+            StopCycling();
             OpenOnFormPage(gPlayState);
         }
     });
     REGISTER_VB_SHOULD(VB_KALEIDO_EQUIP_ITEM_TO_BUTTON, { EquipCursorItem(should, args); });
     REGISTER_VB_SHOULD(VB_KALEIDO_DISPLAY_ITEM_TEXT, { DisplayCursorItemText(should, args); });
+    REGISTER_VB_SHOULD(VB_KALEIDO_DRAW_EQUIP_ANIM_ICON, { DrawFlyingCustomItem(should, args); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveLoad>([](s16) { ResetShownPage(); });
 }
 
 } // namespace
+
+bool KaleidoItemManager_FinishEquip(PlayState* play) {
+    const uint8_t target = KaleidoItemManager_ToHeldButton(play->pauseCtx.equipTargetCBtn);
+    if (play->pauseCtx.equipTargetItem == ITEM_CUSTOM && !sFlyingKey.empty()) {
+        CustomItemRegistry_Equip(target, sFlyingKey.c_str());
+        sFlyingKey.clear();
+        return true;
+    }
+    sFlyingKey.clear();
+    for (uint8_t button = 0; button < S2H_ITEM_BUTTON_COUNT; ++button) {
+        sButtonItemsBeforeEquip[button] = CustomItemRegistry_GetButtonVanillaItem(button);
+    }
+    return false;
+}
+
+// Vanilla's swap hands the target's old item to the button that held the new one; a custom item keeps its key.
+void KaleidoItemManager_SettleSwappedKeys(PlayState* play) {
+    const uint8_t target = KaleidoItemManager_ToHeldButton(play->pauseCtx.equipTargetCBtn);
+    for (uint8_t button = 0; button < S2H_ITEM_BUTTON_COUNT; ++button) {
+        const bool receivedCustom = button != target && sButtonItemsBeforeEquip[button] != ITEM_CUSTOM &&
+                                    CustomItemRegistry_GetButtonVanillaItem(button) == ITEM_CUSTOM;
+        if (receivedCustom) {
+            CustomItemRegistry_CopyEquippedKey(target, button);
+        }
+    }
+}
 
 uint8_t KaleidoItemManager_ToHeldButton(uint16_t equipTargetCBtn) {
     return equipTargetCBtn <= PAUSE_EQUIP_C_RIGHT ? equipTargetCBtn + S2H_ITEM_BUTTON_C_FIRST
@@ -379,28 +567,134 @@ uint8_t KaleidoItemManager_ToHeldButton(uint16_t equipTargetCBtn) {
 
 // Outside the anonymous namespace: OPEN_DISPS redeclares the interpolation hooks in its body, and inside one they
 // get C++ linkage and fail to link.
-static void DrawNeighborIcon(PlayState* play, uint8_t slot, bool isRight, const S2HCustomItemDefinition* neighbor,
-                             bool mask = false) {
-    const char* icon = CustomItemRegistry_ResolveTexture(neighbor->key, S2H_ITEM_ICON_INVENTORY);
-    if (icon == nullptr) {
-        return;
+static Vtx sWheelItemVtx[] = {
+    VTX(-48, 16, 0, 0 << 5, 0 << 5, 0xFF, 0xFF, 0xFF, 0xFF),  VTX(-16, 16, 0, 32 << 5, 0 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+    VTX(-48, -16, 0, 0 << 5, 32 << 5, 0xFF, 0xFF, 0xFF, 0xFF), VTX(-16, -16, 0, 32 << 5, 32 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+    VTX(16, 16, 0, 0 << 5, 0 << 5, 0xFF, 0xFF, 0xFF, 0xFF),    VTX(48, 16, 0, 32 << 5, 0 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+    VTX(16, -16, 0, 0 << 5, 32 << 5, 0xFF, 0xFF, 0xFF, 0xFF),  VTX(48, -16, 0, 32 << 5, 32 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+};
+
+static Vtx sWheelCircleVtx[] = {
+    VTX(-56, 24, 0, 0 << 5, 0 << 5, 0xFF, 0xFF, 0xFF, 0xFF),  VTX(-8, 24, 0, 48 << 5, 0 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+    VTX(-56, -24, 0, 0 << 5, 48 << 5, 0xFF, 0xFF, 0xFF, 0xFF), VTX(-8, -24, 0, 48 << 5, 48 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+    VTX(8, 24, 0, 0 << 5, 0 << 5, 0xFF, 0xFF, 0xFF, 0xFF),    VTX(56, 24, 0, 48 << 5, 0 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+    VTX(8, -24, 0, 0 << 5, 48 << 5, 0xFF, 0xFF, 0xFF, 0xFF),  VTX(56, -24, 0, 48 << 5, 48 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+};
+
+static Vtx sWheelAButtonVtx[] = {
+    VTX(-18, 12, 0, 0 << 5, 0 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+    VTX(18, 12, 0, 24 << 5, 0 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+    VTX(-18, -12, 0, 0 << 5, 16 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+    VTX(18, -12, 0, 24 << 5, 16 << 5, 0xFF, 0xFF, 0xFF, 0xFF),
+};
+
+constexpr int32_t WheelOpenFrames = 5;
+static int32_t sWheelOpenTimers[PAUSE_MASK + 1][SlotCount];
+
+struct WheelIcon {
+    const char* texture;
+    bool isUsable;
+};
+
+struct WheelState {
+    bool isTurning;
+    bool isHovered;
+};
+
+static WheelIcon GetWheelIcon(const S2HCustomItemDefinition* entry, uint8_t nativeItem) {
+    if (IsNativeEntry(entry)) {
+        return { static_cast<const char*>(gItemIcons[nativeItem]), true };
     }
-    const Vtx* cell = &(mask ? play->pauseCtx.maskVtx : play->pauseCtx.itemVtx)[slot * 4];
-    const int16_t left = cell[0].v.ob[0] + (isRight ? 32 - WheelIconSize / 2 : -WheelIconSize / 2);
-    const int16_t top = cell[0].v.ob[1] - 32 + WheelIconSize + 2;
-    Vtx* vertices = static_cast<Vtx*>(GRAPH_ALLOC(play->state.gfxCtx, 4 * sizeof(Vtx)));
-    const Vtx corners[4] = {
-        VTX(left, top, 0, 0, 0, 255, 255, 255, 255),
-        VTX(left + WheelIconSize, top, 0, 32 << 5, 0, 255, 255, 255, 255),
-        VTX(left, top - WheelIconSize, 0, 0, 32 << 5, 255, 255, 255, 255),
-        VTX(left + WheelIconSize, top - WheelIconSize, 0, 32 << 5, 32 << 5, 255, 255, 255, 255),
-    };
-    std::copy(corners, corners + 4, vertices);
+    return { CustomItemRegistry_ResolveTexture(entry->key, S2H_ITEM_ICON_INVENTORY),
+             CustomItemRegistry_IsUsableNow(entry->key) };
+}
+
+static void DrawWheelIcon(PlayState* play, const WheelIcon& icon, int32_t firstVertex) {
+    OPEN_DISPS(play->state.gfxCtx);
+    if (!icon.isUsable) {
+        gDPSetGrayscaleColor(POLY_OPA_DISP++, 109, 109, 109, 255);
+        gSPGrayscale(POLY_OPA_DISP++, true);
+    }
+    KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, const_cast<char*>(icon.texture), 32, 32, firstVertex);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// Shipwright's KaleidoScope_DrawCycleIconsAt: the neighbours sit small under the item with an A prompt, and open
+// out beside it over dark circles while the wheel turns.
+static void DrawWheel(PlayState* play, const Vtx* cell, int32_t* openTimer, const WheelIcon& left,
+                      const WheelIcon* right, WheelState state) {
+    PauseContext* pause = &play->pauseCtx;
+    f32 centerX = (cell[0].v.ob[0] + cell[3].v.ob[0]) / 2.0f;
+    f32 centerY = (cell[0].v.ob[1] + cell[3].v.ob[1]) / 2.0f;
+
+    *openTimer = state.isTurning ? MIN(*openTimer + 1, WheelOpenFrames) : MAX(*openTimer - 1, 0);
+    f32 closed = (f32)(WheelOpenFrames - *openTimer) / WheelOpenFrames;
 
     OPEN_DISPS(play->state.gfxCtx);
-    gSPVertex(POLY_OPA_DISP++, reinterpret_cast<uintptr_t>(vertices), 4, 0);
-    KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, const_cast<char*>(icon), 32, 32, 0);
+    gDPPipeSync(POLY_OPA_DISP++);
+    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+    Matrix_Push();
+    Matrix_Translate(centerX, centerY, 0.0f, MTXMODE_APPLY);
+    if (*openTimer < WheelOpenFrames) {
+        f32 scale = 1.0f - 0.675f * closed;
+        Matrix_Translate(0.0f, -15.0f * closed, 0.0f, MTXMODE_APPLY);
+        Matrix_Scale(scale, scale, 1.0f, MTXMODE_APPLY);
+    }
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    if (state.isHovered && !state.isTurning && *openTimer == 0) {
+        gSPVertex(POLY_OPA_DISP++, reinterpret_cast<uintptr_t>(sWheelAButtonVtx), 4, 0);
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 100, 200, 255, pause->alpha);
+        gDPLoadTextureBlock(POLY_OPA_DISP++, gABtnSymbolTex, G_IM_FMT_IA, G_IM_SIZ_8b, 24, 16, 0,
+                            G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMIRROR | G_TX_CLAMP, 4, 4, G_TX_NOLOD, G_TX_NOLOD);
+        gSP1Quadrangle(POLY_OPA_DISP++, 0, 2, 3, 1, 0);
+    }
+    if (state.isTurning) {
+        gSPVertex(POLY_OPA_DISP++, reinterpret_cast<uintptr_t>(sWheelCircleVtx), 8, 0);
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 0, 0, 0, (u8)(pause->alpha * (1.0f - closed)));
+        gDPLoadTextureBlock_4b(POLY_OPA_DISP++, gPausePromptCursorTex, G_IM_FMT_I, 48, 48, 0,
+                               G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
+                               G_TX_NOLOD, G_TX_NOLOD);
+        gSP1Quadrangle(POLY_OPA_DISP++, 0, 2, 3, 1, 0);
+        if (right != nullptr) {
+            gSP1Quadrangle(POLY_OPA_DISP++, 4, 6, 7, 5, 0);
+        }
+    }
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pause->alpha);
+    gSPVertex(POLY_OPA_DISP++, reinterpret_cast<uintptr_t>(sWheelItemVtx), 8, 0);
+    DrawWheelIcon(play, left, 0);
+    if (right != nullptr) {
+        DrawWheelIcon(play, *right, 4);
+    }
+    Matrix_Pop();
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DrawPageWheels(PlayState* play, const ItemPage& page, const Vtx* cells, int16_t pauseIndex) {
+    const PauseContext* pause = &play->pauseCtx;
+    const bool isFocused = pause->pageIndex == pauseIndex && pause->cursorSpecialPos == 0;
+
+    for (uint8_t slot = 0; slot < ITEM_NUM_SLOTS; ++slot) {
+        const WheelItems entries = GetWheelEntries(page, slot);
+        if (entries.size() < 2) {
+            sWheelOpenTimers[pauseIndex][slot] = 0;
+            continue;
+        }
+        const uint8_t nativeItem = GetNativeItem(page, slot);
+        const S2HCustomItemDefinition* current = SelectWheelItem(entries, page.page, slot);
+        const S2HCustomItemDefinition* leftEntry = StepWheel(entries, current, -1);
+        const S2HCustomItemDefinition* rightEntry = StepWheel(entries, current, 1);
+        const WheelIcon left = GetWheelIcon(leftEntry, nativeItem);
+        const WheelIcon right = GetWheelIcon(rightEntry, nativeItem);
+        const WheelState state = { isFocused && IsCyclingSlot(pause, slot),
+                                   isFocused && pause->cursorPoint[pauseIndex] == slot };
+        if (left.texture == nullptr || right.texture == nullptr) {
+            continue;
+        }
+        DrawWheel(play, &cells[slot * 4], &sWheelOpenTimers[pauseIndex][slot], left,
+                  rightEntry != leftEntry ? &right : nullptr, state);
+    }
 }
 
 void KaleidoItemManager_Init() {
@@ -587,6 +881,29 @@ void* KaleidoItemManager_GetSlotIcon(uint8_t slot) {
     return const_cast<char*>(icon != nullptr ? icon : gEmptyTexture);
 }
 
+uint16_t KaleidoItemManager_ResolveMaskSlotItem(uint8_t slot) {
+    if (slot >= ITEM_NUM_SLOTS) {
+        return ITEM_NONE;
+    }
+    return GetMaskCustomSelection(slot) != nullptr ? ITEM_CUSTOM : KaleidoScope_GetOwnedMask(slot);
+}
+
+void* KaleidoItemManager_GetMaskSlotIcon(uint8_t slot) {
+    const S2HCustomItemDefinition* definition = GetMaskCustomSelection(slot);
+    const char* icon =
+        definition != nullptr ? CustomItemRegistry_ResolveTexture(definition->key, S2H_ITEM_ICON_INVENTORY) : nullptr;
+    return const_cast<char*>(icon != nullptr ? icon : gEmptyTexture);
+}
+
+bool KaleidoItemManager_IsMaskSlotFormAllowed(uint8_t slot) {
+    const S2HCustomItemDefinition* definition = GetMaskCustomSelection(slot);
+    return definition != nullptr && CustomItemRegistry_IsUsableNow(definition->key);
+}
+
+bool KaleidoItemManager_IsMaskSlotEffectActive(uint8_t slot) {
+    return KaleidoItemManager_IsPauseEffectActive(GetMaskCustomSelection(slot));
+}
+
 bool KaleidoItemManager_IsSlotFormAllowed(uint8_t slot) {
     const S2HCustomItemDefinition* definition = GetShownSlotItem(slot);
     return definition != nullptr && CustomItemRegistry_IsUsableNow(definition->key);
@@ -651,7 +968,7 @@ void KaleidoItemManager_ToggleEquipment(const S2HCustomItemDefinition* definitio
 
 bool KaleidoItemManager_CycleItemPage(PlayState* play) {
     RefreshVisiblePages();
-    if (play == nullptr || sVisiblePages.empty() || sCyclingSlot != -1) {
+    if (play == nullptr || sVisiblePages.empty() || KaleidoItemManager_IsTurningWheel(play)) {
         return false;
     }
     uint16_t formPage;
@@ -685,43 +1002,68 @@ bool KaleidoItemManager_CycleItemPage(PlayState* play) {
 
 void KaleidoItemManager_HandleWheel(PlayState* play) {
     const ItemPage* page = GetShownOrVanillaPage();
-    int slot = play->pauseCtx.cursorPoint[PAUSE_ITEM];
-    auto* input = CONTROLLER1(&play->state);
-    if (slot < 0 || slot >= ITEM_NUM_SLOTS) {
+    const int32_t slot = play->pauseCtx.cursorPoint[PAUSE_ITEM];
+    if (slot < 0 || slot >= ITEM_NUM_SLOTS || play->pauseCtx.cursorSpecialPos != 0) {
+        StopCycling();
         return;
     }
-    if (page->slots[slot].size() < 2) {
-        if (input->press.button & BTN_A) {
+    const bool isAPressed = CHECK_BTN_ALL(CONTROLLER1(&play->state)->press.button, BTN_A);
+    if (GetWheelEntries(*page, slot).size() < 2) {
+        StopCycling();
+        if (isAPressed) {
             KaleidoItemManager_ToggleEquipment(GetWheelSelection(*page, slot));
         }
-        sCyclingSlot = -1;
-        sItemAHold = 0;
         return;
     }
-    if (input->press.button & BTN_A) {
-        TurnWheel(play, *page, slot, 1);
+    if (isAPressed) {
+        ToggleCycling(play, slot);
+    }
+    if (!IsCyclingSlot(&play->pauseCtx, slot)) {
+        return;
+    }
+    const int32_t step = ReadWheelStep(play);
+    if (step != 0) {
         PlayPauseSfx(NA_SE_SY_CURSOR);
-        sWasAPressConsumed = true;
-        sItemAHold = 0;
+        TurnWheel(play, *page, slot, step);
     }
-    if (input->cur.button & BTN_A) {
-        if (++sItemAHold >= 10) {
-            sCyclingSlot = slot;
-        }
-    } else {
-        if (sItemAHold >= 10) {
-            KaleidoItemManager_ToggleEquipment(GetWheelSelection(*page, slot));
-        }
-        sCyclingSlot = -1;
-        sItemAHold = 0;
+}
+
+// The A that releases an equipment wheel wears its pick when none of the wheel is worn.
+static void PressEquipmentWheel(PlayState* play, const ItemPage& page, uint8_t slot) {
+    const bool wasCycling = IsCyclingSlot(&play->pauseCtx, slot);
+    const WheelItems& items = page.slots[slot];
+    ToggleCycling(play, slot);
+    const bool isAnyWorn = std::any_of(items.begin(), items.end(), [](const S2HCustomItemDefinition* item) {
+        return CustomEquipRegistry_IsWorn(item->key);
+    });
+    if (wasCycling && !isAnyWorn) {
+        KaleidoItemManager_ToggleEquipment(GetWheelSelection(page, slot));
     }
-    if (sCyclingSlot == slot) {
-        int step = play->pauseCtx.stickAdjX > StickThreshold ? 1 : play->pauseCtx.stickAdjX < -StickThreshold ? -1 : 0;
-        if (step) {
-            TurnWheel(play, *page, slot, step);
-        }
-        play->pauseCtx.stickAdjX = play->pauseCtx.stickAdjY = 0;
+}
+
+static void HandleMaskWheel(PlayState* play) {
+    const int32_t slot = play->pauseCtx.cursorPoint[PAUSE_MASK];
+    if (slot < 0 || slot >= ITEM_NUM_SLOTS || play->pauseCtx.cursorSpecialPos != 0 ||
+        GetWheelEntries(sMaskClaims, slot).size() < 2) {
+        StopCycling();
+        return;
     }
+    if (CHECK_BTN_ALL(CONTROLLER1(&play->state)->press.button, BTN_A)) {
+        ToggleCycling(play, slot);
+    }
+    if (!IsCyclingSlot(&play->pauseCtx, slot)) {
+        return;
+    }
+    const int32_t step = ReadWheelStep(play);
+    if (step != 0) {
+        PlayPauseSfx(NA_SE_SY_CURSOR);
+        TurnWheel(play, sMaskClaims, slot, step);
+    }
+}
+
+bool KaleidoItemManager_IsTurningWheel(PlayState* play) {
+    const PauseContext* pause = &play->pauseCtx;
+    return pause->cursorSpecialPos == 0 && IsCyclingSlot(pause, pause->cursorPoint[pause->pageIndex]);
 }
 
 static int SpatialCell(uint16_t page, int slot, int dx, int dy) {
@@ -773,25 +1115,16 @@ void KaleidoItemManager_Update(PlayState* play) {
         }
         pause->stickAdjX = pause->stickAdjY = 0;
     }
-    SyncSelectedItem(play);
+    SyncSelectedItem(play, GetCursorShownItem(play));
 }
 
 void KaleidoItemManager_DrawWheels(PlayState* play) {
-    const ItemPage* page = GetShownOrVanillaPage();
-    for (uint8_t slot = 0; slot < SlotCount; ++slot) {
-        const WheelItems& items = page->slots[slot];
-        if (items.size() < 2) {
-            continue;
-        }
-        const auto count = static_cast<std::ptrdiff_t>(items.size());
-        const auto position = std::find(items.begin(), items.end(), GetWheelSelection(*page, slot)) - items.begin();
-        const S2HCustomItemDefinition* left = items[(position + count - 1) % count];
-        const S2HCustomItemDefinition* right = items[(position + 1) % count];
-        DrawNeighborIcon(play, slot, false, left);
-        if (right != left) {
-            DrawNeighborIcon(play, slot, true, right);
-        }
-    }
+    DrawPageWheels(play, *GetShownOrVanillaPage(), play->pauseCtx.itemVtx, PAUSE_ITEM);
+}
+
+void KaleidoItemManager_DrawMaskWheels(PlayState* play) {
+    RefreshVisiblePages();
+    DrawPageWheels(play, sMaskClaims, play->pauseCtx.maskVtx, PAUSE_MASK);
 }
 
 namespace {
@@ -881,7 +1214,8 @@ bool KaleidoMaskEquipment_Update(PlayState* play) {
         pause->pageIndex != PAUSE_MASK || pause->itemDescriptionOn) {
         return page != nullptr;
     }
-    if (CHECK_BTN_ALL(input->press.button, BTN_L) && !CVarGetInteger("gDeveloperTools.DebugEnabled", 0)) {
+    if (CHECK_BTN_ALL(input->press.button, BTN_L) && !CVarGetInteger("gDeveloperTools.DebugEnabled", 0) &&
+        !KaleidoItemManager_IsTurningWheel(play)) {
         auto next = std::find_if(sVisiblePages.begin(), sVisiblePages.end(), [](const ItemPage& candidate) {
             return candidate.page >= S2H_ITEM_PAGE_EQUIPMENT_FIRST &&
                    (!sMaskPage.has_value() || candidate.page > *sMaskPage);
@@ -891,7 +1225,6 @@ bool KaleidoMaskEquipment_Update(PlayState* play) {
         } else {
             sMaskPage = next->page;
         }
-        sMaskWheelSlot = -1;
         page = MaskEquipmentPage();
         pause->cursorSpecialPos = 0;
         pause->namedItem = PAUSE_ITEM_NONE;
@@ -909,6 +1242,7 @@ bool KaleidoMaskEquipment_Update(PlayState* play) {
         }
     }
     if (page == nullptr) {
+        HandleMaskWheel(play);
         if (pause->cursorSpecialPos == 0 &&
             (std::abs(pause->stickAdjX) > StickThreshold || std::abs(pause->stickAdjY) > StickThreshold)) {
             const int dx = pause->stickAdjX > StickThreshold ? 1 : pause->stickAdjX < -StickThreshold ? -1 : 0;
@@ -925,6 +1259,8 @@ bool KaleidoMaskEquipment_Update(PlayState* play) {
             }
             pause->stickAdjX = pause->stickAdjY = 0;
         }
+        SyncSelectedItem(play, pause->cursorSpecialPos == 0 ? GetMaskCustomSelection(pause->cursorPoint[PAUSE_MASK])
+                                                            : nullptr);
         return false;
     }
     int slot = std::clamp<int>(pause->cursorPoint[PAUSE_MASK], 0, SlotCount - 1);
@@ -937,13 +1273,12 @@ bool KaleidoMaskEquipment_Update(PlayState* play) {
             pause->cursorItem[PAUSE_MASK] = PAUSE_ITEM_NONE;
             return true;
         }
-    } else if (sMaskWheelSlot == slot) {
-        int step = pause->stickAdjX > StickThreshold ? 1 : (pause->stickAdjX < -StickThreshold ? -1 : 0);
-        if (step && page->slots[slot].size() > 1) {
+    } else if (IsCyclingSlot(pause, slot)) {
+        const int32_t step = ReadWheelStep(play);
+        if (step != 0 && page->slots[slot].size() > 1) {
             TurnWheel(play, *page, slot, step);
             PlayPauseSfx(NA_SE_SY_CURSOR);
         }
-        pause->stickAdjX = pause->stickAdjY = 0;
     } else {
         int dx = pause->stickAdjX > StickThreshold ? 1 : pause->stickAdjX < -StickThreshold ? -1 : 0;
         int dy = dx ? 0 : pause->stickAdjY > StickThreshold ? 1 : pause->stickAdjY < -StickThreshold ? -1 : 0;
@@ -1010,23 +1345,11 @@ bool KaleidoMaskEquipment_Update(PlayState* play) {
         return true;
     }
     if (input->press.button & BTN_A) {
-        sMaskAHold = 0;
         if (page->slots[slot].size() > 1) {
-            TurnWheel(play, *page, slot, 1);
+            PressEquipmentWheel(play, *page, slot);
         } else {
             KaleidoItemManager_ToggleEquipment(item);
         }
-    }
-    if (input->cur.button & BTN_A) {
-        if (++sMaskAHold >= 10 && page->slots[slot].size() > 1) {
-            sMaskWheelSlot = slot;
-        }
-    } else {
-        if (sMaskWheelSlot == slot) {
-            KaleidoItemManager_ToggleEquipment(GetWheelSelection(*page, slot));
-        }
-        sMaskWheelSlot = -1;
-        sMaskAHold = 0;
     }
     const uint32_t buttons[] = { BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, BTN_DRIGHT, BTN_DLEFT, BTN_DDOWN, BTN_DUP };
     for (int i = 0; i < 7; ++i) {
@@ -1282,16 +1605,7 @@ bool KaleidoMaskEquipment_Draw(PlayState* play) {
     KaleidoScope_SetCursorVtxPos(pause, std::clamp<int>(pause->cursorSlot[PAUSE_MASK], 0, ITEM_NUM_SLOTS - 1) * 4,
                                  pause->maskVtx);
     CLOSE_DISPS(play->state.gfxCtx);
-    for (uint8_t slot = 0; slot < ITEM_NUM_SLOTS; ++slot) {
-        const auto& items = page->slots[slot];
-        if (items.size() < 2) {
-            continue;
-        }
-        const auto count = static_cast<std::ptrdiff_t>(items.size());
-        const auto position = std::find(items.begin(), items.end(), GetWheelSelection(*page, slot)) - items.begin();
-        DrawNeighborIcon(play, slot, false, items[(position + count - 1) % count], true);
-        DrawNeighborIcon(play, slot, true, items[(position + 1) % count], true);
-    }
+    DrawPageWheels(play, *page, pause->maskVtx, PAUSE_MASK);
     return true;
 }
 
@@ -1304,10 +1618,7 @@ bool KaleidoItemManager_SetWheelSelection(uint16_t page, uint8_t slot, const cha
     if (CustomItemRegistry_Find(key) == nullptr) {
         return false;
     }
-    sWheelSelection[{ page, slot }] = key;
-    const std::string setting = CVAR_CUSTOM_ITEM_MANAGER("Wheel.") + std::to_string(page) + "." + std::to_string(slot);
-    CVarSetString(setting.c_str(), key);
-    Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    RememberWheelSelection(page, slot, key);
     return true;
 }
 void** KaleidoItemManager_GetBackground(void** vanilla) {
