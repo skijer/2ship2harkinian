@@ -2,6 +2,7 @@
 #include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
 #include "2s2h/ModApi/RandoOptions/RandoOptions.h"
 #include "2s2h/ModApi/ModApi.h"
+#include "2s2h/ModApi/ModDialogs/ModDialogs.h"
 #include "2s2h/Enhancements/ModMenu/ModMenu.h"
 #include <ship/Context.h>
 #include <ship/resource/ResourceManager.h>
@@ -609,6 +610,7 @@ void InitRandoHeadless() {
     ModMenu_LoadArchives();
     OTRMessage_Init();
     ShipInit::Init(Rando::Logic::RegionGraphPath);
+    ModDialogs_SetHeadless(true);
     ModApi_Init();
     Rando::StaticData::PopulateCheckNames();
 }

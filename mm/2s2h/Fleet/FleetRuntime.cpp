@@ -117,8 +117,26 @@ RandoItemId FindItemNamed(const std::string& item) {
     return RI_UNKNOWN;
 }
 
+std::string DeliveredItem(const nlohmann::json& delivery) {
+    return delivery.value("trap", false) ? "Knockoff Item" : delivery.at("item").get<std::string>();
+}
+
+// A delivery for an item this game does not know (its mod was removed after the seed was made) waits instead of
+// stopping the game, and arrives once the mod is back.
+bool IsUnknownDelivery(const nlohmann::json& delivery) {
+    static std::set<std::string> sReported;
+    const std::string item = DeliveredItem(delivery);
+    if (FindItemNamed(item) != RI_UNKNOWN) {
+        return false;
+    }
+    if (sReported.insert(item).second) {
+        SPDLOG_WARN("[Fleet] {} is not an item of this game; its delivery waits", item);
+    }
+    return true;
+}
+
 void Grant(const nlohmann::json& delivery) {
-    const std::string item = delivery.value("trap", false) ? "Knockoff Item" : delivery.at("item").get<std::string>();
+    const std::string item = DeliveredItem(delivery);
     RandoItemId itemId = FindItemNamed(item);
     if (itemId == RI_UNKNOWN) {
         throw std::runtime_error("unknown MM delivery: " + item);
@@ -586,7 +604,7 @@ void ReceiveItems() {
         if (flag == 0) {
             throw std::runtime_error("could not register Fleet receipt");
         }
-        if (RandoInfCustom_Get(S2H_RANDO_INF_SAVE, flag)) {
+        if (RandoInfCustom_Get(S2H_RANDO_INF_SAVE, flag) || IsUnknownDelivery(delivery)) {
             continue;
         }
         SPDLOG_INFO("[Fleet] Receiving {} from {}", delivery.at("item").get<std::string>(),
