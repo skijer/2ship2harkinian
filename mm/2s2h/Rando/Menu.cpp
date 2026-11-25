@@ -10,6 +10,7 @@
 #include "2s2h/Rando/Logic/Logic.h"
 #include "2s2h/ShipInit.hpp"
 #include "2s2h/Fleet/FleetRando.h"
+#include "2s2h/Enhancements/Modes/EnemyRandomizer.h"
 
 extern "C" {
 #include "overlays/actors/ovl_En_Sth/z_en_sth.h"
@@ -17,6 +18,10 @@ extern "C" {
 
 #include <fast/Fast3dGui.h>
 #include <spdlog/spdlog.h>
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <map>
 
 // TODO: This block should come from elsewhere, tied to data in Rando::StaticData::Options
 std::unordered_map<int32_t, const char*> logicOptions = {
@@ -2101,6 +2106,138 @@ static void RegisterStartingItemsRows(WidgetPath& path) {
            [](WidgetInfo& info) { DrawAvailableStartingItems(); });
 }
 
+static const std::unordered_map<int32_t, const char*> enemyMinibossOptions = {
+    { RO_ENEMY_MINIBOSSES_VANILLA, "Vanilla" },
+    { RO_ENEMY_MINIBOSSES_AMONG_THEMSELVES, "Among Themselves" },
+    { RO_ENEMY_MINIBOSSES_ANYWHERE, "Anywhere" },
+};
+
+static const std::unordered_map<int32_t, const char*> enemySoulBehaviourOptions = {
+    { RO_ENEMY_SOUL_INVULNERABLE, "Invulnerable" },
+    { RO_ENEMY_SOUL_NO_SPAWN, "No Spawn" },
+};
+
+static void DrawEnemyRandomizerRow() {
+    if (IsDrawnByFleet(RO_ENEMY_RANDOMIZER)) {
+        return;
+    }
+    CVarCheckbox("Enemy Randomizer", OptionCvar(RO_ENEMY_RANDOMIZER),
+                 CheckboxOptions({ { .tooltip = "Each kind of enemy in a scene becomes another enemy from the pool, "
+                                                "decided when the seed is generated. Logic knows the result." } }));
+}
+
+static void DrawEnemyMinibossesRow() {
+    if (IsDrawnByFleet(RO_ENEMY_RANDOMIZER_MINIBOSSES) || !IsOptionOn(RO_ENEMY_RANDOMIZER)) {
+        return;
+    }
+    UIWidgets::CVarCombobox("Minibosses", OptionCvar(RO_ENEMY_RANDOMIZER_MINIBOSSES), &enemyMinibossOptions,
+                            UIWidgets::ComboboxOptions().Tooltip(
+                                "Vanilla - Minibosses stay and never replace other enemies.\n\n"
+                                "Among Themselves - Minibosses only replace and are replaced by minibosses.\n\n"
+                                "Anywhere - Minibosses and regular enemies replace each other freely."));
+}
+
+static void DrawEnemySoulBehaviourRow() {
+    if (IsDrawnByFleet(RO_ENEMY_SOUL_BEHAVIOUR) || !IsOptionOn(RO_SHUFFLE_ENEMY_SOULS)) {
+        return;
+    }
+    UIWidgets::CVarCombobox("Soulless Enemies", OptionCvar(RO_ENEMY_SOUL_BEHAVIOUR), &enemySoulBehaviourOptions,
+                            UIWidgets::ComboboxOptions().Tooltip(
+                                "Invulnerable - Enemies without their soul cannot be hurt.\n\n"
+                                "No Spawn - Enemies without their soul vanish as they appear. Rooms that wait for "
+                                "their enemies still open, but logic still requires the soul to kill them."));
+}
+
+static bool ContainsIgnoringCase(const std::string& text, const char* fragment) {
+    std::string_view needle(fragment);
+    auto found = std::search(text.begin(), text.end(), needle.begin(), needle.end(),
+                             [](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); });
+    return found != text.end();
+}
+
+static void DrawPoolBulkButtons(const char* cvar, const std::vector<const EnemyRandomizer::PoolEntry*>& shown) {
+    if (Button("All", ButtonOptions().Size(UIWidgets::Sizes::Inline).Color(THEME_COLOR))) {
+        for (const EnemyRandomizer::PoolEntry* entry : shown) {
+            EnemyRandomizer::SetKeyExcluded(cvar, entry->key, false);
+        }
+    }
+    ImGui::SameLine();
+    if (Button("None", ButtonOptions().Size(UIWidgets::Sizes::Inline).Color(THEME_COLOR))) {
+        for (const EnemyRandomizer::PoolEntry* entry : shown) {
+            EnemyRandomizer::SetKeyExcluded(cvar, entry->key, true);
+        }
+    }
+}
+
+static void DrawPoolList(const char* title, const char* cvar, const std::vector<EnemyRandomizer::PoolEntry>& entries) {
+    if (FleetRando_IsOptionDrawnByFleet(cvar)) {
+        return;
+    }
+    static std::map<std::string, std::array<char, 64>> filters;
+    std::array<char, 64>& filter = filters[title];
+    ImGui::PushID(title);
+    ImGui::SeparatorText(title);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+    ImGui::InputTextWithHint("##search", "Search", filter.data(), filter.size());
+
+    std::vector<const EnemyRandomizer::PoolEntry*> shown;
+    for (const EnemyRandomizer::PoolEntry& entry : entries) {
+        if (ContainsIgnoringCase(entry.name, filter.data())) {
+            shown.push_back(&entry);
+        }
+    }
+    ImGui::SameLine();
+    DrawPoolBulkButtons(cvar, shown);
+
+    if (ImGui::BeginTable("##pool", 2)) {
+        for (const EnemyRandomizer::PoolEntry* entry : shown) {
+            ImGui::TableNextColumn();
+            bool included = !EnemyRandomizer::IsKeyExcluded(cvar, entry->key);
+            std::string label = entry->name + "##" + entry->key;
+            if (UIWidgets::Checkbox(label.c_str(), &included, CheckboxOptions().Color(THEME_COLOR))) {
+                EnemyRandomizer::SetKeyExcluded(cvar, entry->key, !included);
+            }
+        }
+        ImGui::EndTable();
+    }
+    ImGui::PopID();
+}
+
+static void DrawEnemyPoolRow() {
+    if (!IsOptionOn(RO_ENEMY_RANDOMIZER)) {
+        return;
+    }
+    DrawPoolList("Enemy Pool", ENEMY_POOL_EXCLUDED_CVAR, EnemyRandomizer::ListEnemyPool(false));
+}
+
+static void DrawMinibossPoolRow() {
+    const bool areMinibossesShuffled = CVarGetInteger(OptionCvar(RO_ENEMY_RANDOMIZER_MINIBOSSES),
+                                                      RO_ENEMY_MINIBOSSES_VANILLA) != RO_ENEMY_MINIBOSSES_VANILLA;
+    if (!IsOptionOn(RO_ENEMY_RANDOMIZER) || !areMinibossesShuffled) {
+        return;
+    }
+    DrawPoolList("Miniboss Pool", ENEMY_POOL_EXCLUDED_CVAR, EnemyRandomizer::ListEnemyPool(true));
+}
+
+static void DrawSoulPoolRow() {
+    if (!IsOptionOn(RO_SHUFFLE_ENEMY_SOULS)) {
+        return;
+    }
+    DrawPoolList("Soul Pool", SOUL_POOL_EXCLUDED_CVAR, EnemyRandomizer::ListSoulPool());
+}
+
+static void RegisterEnemyRows(WidgetPath& path) {
+    AddRow(path, "Enemy Randomizer", OptionCvar(RO_ENEMY_RANDOMIZER),
+           [](WidgetInfo& info) { DrawEnemyRandomizerRow(); });
+    AddRow(path, "Minibosses", OptionCvar(RO_ENEMY_RANDOMIZER_MINIBOSSES),
+           [](WidgetInfo& info) { DrawEnemyMinibossesRow(); });
+    AddRow(path, "Soulless Enemies", OptionCvar(RO_ENEMY_SOUL_BEHAVIOUR),
+           [](WidgetInfo& info) { DrawEnemySoulBehaviourRow(); });
+    AddRow(path, "Enemy Pool", ENEMY_POOL_EXCLUDED_CVAR, [](WidgetInfo& info) { DrawEnemyPoolRow(); });
+    AddRow(path, "Miniboss Pool", ENEMY_POOL_EXCLUDED_CVAR, [](WidgetInfo& info) { DrawMinibossPoolRow(); });
+    AddRow(path, "Soul Pool", SOUL_POOL_EXCLUDED_CVAR, [](WidgetInfo& info) { DrawSoulPoolRow(); });
+}
+
 static void RegisterHintRows(WidgetPath& path) {
     AddLayout(path, "Layout: Hints", [](WidgetInfo& info) { BeginHintsColumn(); });
     for (const HintRow& row : HINT_ROWS) {
@@ -2144,6 +2281,10 @@ void Rando::RegisterMenu() {
     mBenMenu->AddSidebarEntry("Rando", "Hints", 1);
     path.sidebarName = "Hints";
     RegisterHintRows(path);
+
+    mBenMenu->AddSidebarEntry("Rando", "Enemies", 1);
+    path.sidebarName = "Enemies";
+    RegisterEnemyRows(path);
 
     mBenMenu->AddSidebarEntry("Rando", "Item Tracker", 1);
     path.sidebarName = "Item Tracker";

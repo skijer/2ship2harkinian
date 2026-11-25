@@ -29,6 +29,7 @@ void RandoItems_SetOwned(int32_t randoItem, S2HRandoInfBank bank, bool state);
 #include "2s2h/Rando/Types.h"
 
 int32_t RandoItems_Register(const char* key);
+void RandoItems_RebuildRow(const char* key);
 void RandoItems_BuildItemTable();
 void RandoItems_AddToPool(std::vector<RandoItemId>& itemPool);
 

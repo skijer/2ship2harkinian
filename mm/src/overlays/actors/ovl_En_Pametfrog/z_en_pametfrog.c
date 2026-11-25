@@ -5,6 +5,7 @@
  */
 
 #include "z_en_pametfrog.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "z64quake.h"
 #include "z64rumble.h"
 #include "overlays/actors/ovl_En_Bigpamet/z_en_bigpamet.h"
@@ -957,15 +958,23 @@ void EnPametfrog_SetupSpawnFrog(EnPametfrog* this, PlayState* play) {
     Vec3f velocity;
     s32 i;
 
-    Actor_Spawn(&play->actorCtx, play, ACTOR_EN_MINIFROG, this->actor.world.pos.x, this->actor.world.pos.y,
-                this->actor.world.pos.z, 0, yaw, 0, this->params);
+    s32 isAtHome = GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor);
+
+    if (isAtHome) {
+        Actor_Spawn(&play->actorCtx, play, ACTOR_EN_MINIFROG, this->actor.world.pos.x, this->actor.world.pos.y,
+                    this->actor.world.pos.z, 0, yaw, 0, this->params);
+    } else {
+        Item_DropCollectibleRandom(play, &this->actor, &this->actor.world.pos, 0xB0);
+    }
     vec1.x = (Math_SinS(yaw) * 20.0f) + this->actor.world.pos.x;
     vec1.y = this->actor.world.pos.y + 25.0f;
     vec1.z = (Math_CosS(yaw) * 20.0f) + this->actor.world.pos.z;
     this->collider.base.ocFlags1 &= ~OC1_ON;
     func_800B0DE0(play, &vec1, &gZeroVec3f, &gZeroVec3f, &sPrimColor, &sEnvColor, 800, 50);
     SoundSource_PlaySfxAtFixedWorldPos(play, &this->actor.world.pos, 40, NA_SE_EN_NPC_APPEAR);
-    Flags_SetClearTemp(play, play->roomCtx.curRoom.num);
+    if (isAtHome) {
+        Flags_SetClearTemp(play, play->roomCtx.curRoom.num);
+    }
 
     for (i = 0; i < 25; i++) {
         velocity.x = Rand_CenteredFloat(5.0f);
@@ -1006,9 +1015,12 @@ void EnPametfrog_SetupCutscene(EnPametfrog* this) {
 
 void EnPametfrog_PlayCutscene(EnPametfrog* this, PlayState* play) {
     if (CutsceneManager_IsNext(this->csId)) {
-        CutsceneManager_Start(this->csId, &this->actor);
-        this->subCamId = CutsceneManager_GetCurrentSubCamId(this->csId);
-        Player_SetCsAction(play, &this->actor, PLAYER_CSACTION_WAIT);
+        this->subCamId = SUB_CAM_ID_DONE;
+        if (GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor)) {
+            CutsceneManager_Start(this->csId, &this->actor);
+            this->subCamId = CutsceneManager_GetCurrentSubCamId(this->csId);
+            Player_SetCsAction(play, &this->actor, PLAYER_CSACTION_WAIT);
+        }
         if (this->actor.colChkInfo.health == 0) {
             if (this->actor.params == GEKKO_PRE_SNAPPER) {
                 EnPametfrog_SetupCallSnapper(this, play);

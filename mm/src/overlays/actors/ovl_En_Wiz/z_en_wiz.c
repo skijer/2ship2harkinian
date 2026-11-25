@@ -5,6 +5,7 @@
  */
 
 #include "z_en_wiz.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/actors/ovl_En_Clear_Tag/z_en_clear_tag.h"
 #include "overlays/actors/ovl_En_Wiz_Brock/z_en_wiz_brock.h"
@@ -673,7 +674,10 @@ void EnWiz_MoveGhosts(EnWiz* this) {
 }
 
 void EnWiz_StartIntroCutscene(EnWiz* this, PlayState* play) {
-    if (CutsceneManager_IsNext(this->actor.csId)) {
+    if (!GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor)) {
+        this->introCutsceneState = EN_WIZ_INTRO_CS_END;
+        EnWiz_SetupAppear(this, play);
+    } else if (CutsceneManager_IsNext(this->actor.csId)) {
         CutsceneManager_StartWithPlayerCsAndSetFlag(this->actor.csId, &this->actor);
         this->subCamId = CutsceneManager_GetCurrentSubCamId(this->actor.csId);
         this->actor.flags |= ACTOR_FLAG_FREEZE_EXCEPTION;
@@ -835,7 +839,17 @@ void EnWiz_Dance(EnWiz* this, PlayState* play) {
 void EnWiz_SetupSecondPhaseCutscene(EnWiz* this, PlayState* play) {
     s16 secondPhaseCsId = CutsceneManager_GetAdditionalCsId(this->actor.csId);
 
-    if (!CutsceneManager_IsNext(secondPhaseCsId)) {
+    if (!GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor)) {
+        s32 i;
+
+        for (i = 0; i < this->platformCount; i++) {
+            Math_Vec3f_Copy(&this->ghostPos[i], &gZeroVec3f);
+        }
+        this->platformCount = 0;
+        this->fightState = EN_WIZ_FIGHT_STATE_SECOND_PHASE_GHOSTS_COPY_WIZROBE;
+        this->timer = 0;
+        EnWiz_SetupDisappear(this);
+    } else if (!CutsceneManager_IsNext(secondPhaseCsId)) {
         CutsceneManager_Queue(secondPhaseCsId);
     } else {
         CutsceneManager_StartWithPlayerCsAndSetFlag(secondPhaseCsId, &this->actor);

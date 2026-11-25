@@ -349,6 +349,28 @@ void func_80C0B31C(PlayState* play, EnBsb* this, Vec3f* pos) {
     }
 }
 
+// Away from Ikana Graveyard there is no Sonata trigger, race path or defeat cutscene: Keeta wakes up fighting.
+static void EnBsb_SetupArenaFight(EnBsb* this) {
+    s32 i;
+
+    for (i = 0; i < ARRAY_COUNT(this->csIdList); i++) {
+        this->csIdList[i] = CS_ID_NONE;
+    }
+
+    this->collider.elements[0].dim.modelSphere.radius = 40;
+    this->collider.elements[0].dim.modelSphere.center.x = 1000;
+    this->collider.elements[0].dim.modelSphere.center.y = 400;
+    this->collider.base.colMaterial = COL_MATERIAL_NONE;
+
+    for (i = 0; i < ARRAY_COUNT(this->colliderElements); i++) {
+        this->collider.elements[i].base.elemMaterial = ELEM_MATERIAL_UNK0;
+    }
+
+    this->actor.flags &= ~ACTOR_FLAG_LOCK_ON_DISABLED;
+    this->actor.shape.shadowScale = 25.0f;
+    func_80C0C86C(this);
+}
+
 void EnBsb_Init(Actor* thisx, PlayState* play) {
     EnBsb* this = (EnBsb*)thisx;
     s32 csId;
@@ -395,7 +417,9 @@ void EnBsb_Init(Actor* thisx, PlayState* play) {
 
     this->actor.attentionRangeType = ATTENTION_RANGE_10;
 
-    if (CHECK_WEEKEVENTREG(WEEKEVENTREG_23_04)) {
+    if (!GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor)) {
+        EnBsb_SetupArenaFight(this);
+    } else if (CHECK_WEEKEVENTREG(WEEKEVENTREG_23_04)) {
         Actor_Kill(&this->actor);
     } else {
         func_80C0BF2C(this);
@@ -1531,7 +1555,12 @@ void func_80C0E618(EnBsb* this, PlayState* play) {
                 this->actor.flags |= ACTOR_FLAG_LOCK_ON_DISABLED;
                 this->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED;
                 Actor_ChangeCategory(play, &play->actorCtx, &this->actor, ACTORCAT_NPC);
-                func_80C0D3C0(this, play);
+                if (GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor)) {
+                    func_80C0D3C0(this, play);
+                } else {
+                    Item_DropCollectibleRandom(play, &this->actor, &this->actor.world.pos, 0xB0);
+                    Actor_Kill(&this->actor);
+                }
             } else {
                 for (i = 0; i < ARRAY_COUNT(this->colliderElements); i++) {
                     if (this->collider.elements[i].base.acElemFlags & ACELEM_HIT) {

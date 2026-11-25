@@ -157,6 +157,13 @@ int32_t RandoItems_Register(const char* key) {
     return randoItem;
 }
 
+void RandoItems_RebuildRow(const char* key) {
+    const auto found = key != nullptr ? sKeysToIndex.find(key) : sKeysToIndex.end();
+    if (found != sKeysToIndex.end()) {
+        BuildRow(sItems[found->second]);
+    }
+}
+
 int32_t RandoItems_GetRandoGet(const char* key) {
     if (key == nullptr) {
         return 0;

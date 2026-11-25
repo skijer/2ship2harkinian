@@ -2,6 +2,7 @@
 #include "2s2h/Fleet/FleetRuntime.h"
 #include "2s2h/Fleet/FleetRando.h"
 #include "2s2h/ModApi/ModDungeons/BossRegistry.h"
+#include "2s2h/Enhancements/Modes/EnemyRandomizer.h"
 #include "Rando/Rando.h"
 #include "Rando/Spoiler/Spoiler.h"
 #include "Rando/Logic/Logic.h"
@@ -61,6 +62,8 @@ void Rando::MiscBehavior::PersistSeedOptions(uint32_t finalSeed) {
     if (RANDO_SAVE_OPTIONS[RO_PLACEMENT_STRAY_FAIRIES] == RO_DUNGEON_ITEM_START_WITH) {
         RANDO_SAVE_OPTIONS[RO_STRAY_FAIRIES_REQUIRED] = STRAY_FAIRY_SCATTERED_TOTAL;
     }
+
+    EnemyRandomizer::AssignForSeed(finalSeed);
 
     // Persist StartingItems to the save
     auto startingItems = Rando::GetStartingItemsFromConfig();

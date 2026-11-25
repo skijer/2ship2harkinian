@@ -3971,6 +3971,12 @@ void Actor_SpawnTransitionActors(PlayState* play, ActorContext* actorCtx) {
 }
 
 Actor* Actor_SpawnEntry(ActorContext* actorCtx, ActorEntry* actorEntry, PlayState* play) {
+    Actor* replacement = NULL;
+
+    if (!GameInteractor_Should(VB_SPAWN_ACTOR_ENTRY, true, actorCtx, actorEntry, play, &replacement)) {
+        return replacement;
+    }
+
     s16 rotX = (actorEntry->rot.x >> 7) & 0x1FF;
     s16 rotY = (actorEntry->rot.y >> 7) & 0x1FF;
     s16 rotZ = (actorEntry->rot.z >> 7) & 0x1FF;

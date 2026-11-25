@@ -5,6 +5,7 @@
  */
 
 #include "z_boss_04.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "z64shrink_window.h"
 #include "overlays/actors/ovl_En_Clear_Tag/z_en_clear_tag.h"
 
@@ -177,6 +178,16 @@ void Boss04_Init(Actor* thisx, PlayState* play2) {
     Collider_InitAndSetJntSph(play, &this->collider2, &this->actor, &sJntSphInit2, this->collider2Elements);
     SkelAnime_InitFlex(play, &this->skelAnime, &gWartSkel, &gWartIdleAnim, this->jointTable, this->morphTable,
                        WART_LIMB_MAX);
+
+    s32 isAtHome = GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor);
+
+    // Rooms without walls within the probe range would otherwise center the arena on the world origin.
+    if (!isAtHome) {
+        this->unk_6D8 = this->actor.world.pos.x + D_809EE1F8[0].x;
+        this->unk_6DC = this->actor.world.pos.x + D_809EE1F8[1].x;
+        this->unk_6E0 = this->actor.world.pos.z + D_809EE1F8[2].z;
+        this->unk_6E4 = this->actor.world.pos.z + D_809EE1F8[3].z;
+    }
     spA8.y = this->actor.world.pos.y + 200.0f;
 
     for (i = 0; i < ARRAY_COUNT(D_809EE1F8); i++) {
@@ -202,7 +213,7 @@ void Boss04_Init(Actor* thisx, PlayState* play2) {
     this->actor.world.pos.z = this->unk_6F0;
     Actor_UpdateBgCheckInfo(play, &this->actor, 35.0f, 60.0f, 60.0f, UPDBGCHECKINFO_FLAG_4);
 
-    if ((KREG(64) != 0) || CHECK_EVENTINF(EVENTINF_INTRO_CS_WATCHED_WART)) {
+    if ((KREG(64) != 0) || CHECK_EVENTINF(EVENTINF_INTRO_CS_WATCHED_WART) || !isAtHome) {
         func_809ECD00(this, play);
         this->actor.world.pos.y = this->actor.floorHeight + 160.0f;
         phi_f24 = this->actor.floorHeight;
@@ -229,7 +240,18 @@ void Boss04_Init(Actor* thisx, PlayState* play2) {
                        this->actor.world.pos.y, this->actor.world.pos.z, 0, 0, 0, 100);
 }
 
+static void Boss04_KillBubblesInCategory(Actor* wart, PlayState* play, s32 category) {
+    for (Actor* actor = play->actorCtx.actorLists[category].first; actor != NULL; actor = actor->next) {
+        if ((actor->id == ACTOR_EN_TANRON2) && (actor->parent == wart)) {
+            Actor_Kill(actor);
+        }
+    }
+}
+
+// The bubbles write into Wart every frame; when something else kills Wart first, they must not outlive it.
 void Boss04_Destroy(Actor* thisx, PlayState* play) {
+    Boss04_KillBubblesInCategory(thisx, play, ACTORCAT_BOSS);
+    Boss04_KillBubblesInCategory(thisx, play, ACTORCAT_ENEMY);
 }
 
 void func_809EC544(Boss04* this) {

@@ -5,6 +5,7 @@
  */
 
 #include "z_en_peehat.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h"
 #include "overlays/actors/ovl_En_Clear_Tag/z_en_clear_tag.h"
 #include "overlays/effects/ovl_Effect_Ss_Hahen/z_eff_ss_hahen.h"
@@ -271,8 +272,13 @@ void func_80897390(EnPeehat* this, PlayState* play) {
     this->colliderCylinder.base.acFlags &= ~AC_HIT;
 
     for (i = 3 - this->unk_2AC; i > 0; i--) {
-        actor = Actor_SpawnAsChild(&play->actorCtx, &this->actor, play, ACTOR_EN_PEEHAT, this->actor.world.pos.x,
-                                   this->actor.world.pos.y + 50.0f, this->actor.world.pos.z, 0, phi_s2, 0, 1);
+        Vec3f larvaPos = { this->actor.world.pos.x, this->actor.world.pos.y + 50.0f, this->actor.world.pos.z };
+
+        actor = NULL;
+        if (GameInteractor_Should(VB_PEAHAT_SPAWN_LARVA, true, &this->actor, ACTOR_EN_PEEHAT, &larvaPos, 1, &actor)) {
+            actor = Actor_SpawnAsChild(&play->actorCtx, &this->actor, play, ACTOR_EN_PEEHAT, larvaPos.x, larvaPos.y,
+                                       larvaPos.z, 0, phi_s2, 0, 1);
+        }
         phi_s2 += 0x5555;
 
         if (actor != NULL) {

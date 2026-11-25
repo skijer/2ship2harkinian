@@ -72,6 +72,11 @@ void AddEnemy(const S2HActorDefinition* definition, int16_t actorId) {
     enemy.params = definition->enemyParams;
     enemy.flags = definition->enemyFlags;
     enemy.spawnHeight = definition->enemySpawnHeight;
+    if (definition->structSize >= S2H_ACTOR_DEFINITION_SOUL_SIZE) {
+        enemy.soulKey = definition->soulKey != nullptr ? StoreName(definition->soulKey) : nullptr;
+        enemy.logicKill = definition->logicKill;
+        enemy.logicKillUserData = definition->logicKillUserData;
+    }
 
     auto position = std::lower_bound(
         sEnemies.begin(), sEnemies.end(), enemy,

@@ -11,6 +11,7 @@
 #include "FleetFieldTest.h"
 #include "FleetForeignItems.h"
 #include "FleetItemDraw.h"
+#include "FleetPortal.h"
 #include "FleetRuntime.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "2s2h/BenGui/BenMenu.h"
@@ -850,6 +851,14 @@ char* FleetRando_Request(const char* op, const char* json) {
     }
     if (request == "CatchUpParked") {
         FleetRuntime_CatchUpParked();
+        return CopyString("{}");
+    }
+    if (request == "EndSession") {
+        FleetPortal_EndSession();
+        return CopyString("{}");
+    }
+    if (request == "ReloadSaveFiles") {
+        // MM's file select reads every save each time it opens.
         return CopyString("{}");
     }
     if (request == "DumpSettingDefinitions") {

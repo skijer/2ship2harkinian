@@ -1,5 +1,6 @@
 #include "Spoiler.h"
 #include "2s2h/ModApi/ModDungeons/BossRegistry.h"
+#include "2s2h/Enhancements/Modes/EnemyRandomizer.h"
 #include "Rando/Rando.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "ShipUtils.h"
@@ -17,6 +18,7 @@ namespace Spoiler {
 void ApplyToSaveContext(nlohmann::json spoiler) {
     BossRegistry_ParseSpoiler(spoiler);
     DungeonRegistry_ReadSpoiler(spoiler);
+    EnemyRandomizer::ReadSpoiler(spoiler);
     gSaveContext.save.shipSaveInfo.rando.finalSeed = spoiler["finalSeed"].get<uint32_t>();
 
     for (auto& [randoOptionId, randoStaticOption] : Rando::StaticData::Options) {

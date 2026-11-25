@@ -222,6 +222,8 @@ static inline bool CustomItemRegistry_IsVanillaUpgrade(const S2HCustomItemDefini
 }
 
 bool CustomItemRegistry_Register(const S2HCustomItemDefinition* definition);
+// For an item a host registers per seed: the next seed rewrites what changes with it, keeping its runtime id.
+bool CustomItemRegistry_UpdateSeedPresentation(const char* key, const char* getItemText, uint32_t randomizerFlags);
 const S2HCustomItemDefinition* CustomItemRegistry_FindReplacement(uint16_t vanillaItem);
 bool CustomItemRegistry_IsAgeMet(uint8_t ageRequirement);
 bool CustomItemRegistry_IsFormInMask(uint8_t formMask);

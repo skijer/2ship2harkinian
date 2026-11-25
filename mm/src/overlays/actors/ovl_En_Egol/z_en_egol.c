@@ -10,6 +10,7 @@
 #include "overlays/actors/ovl_En_Arrow/z_en_arrow.h"
 #include "overlays/actors/ovl_En_Clear_Tag/z_en_clear_tag.h"
 #include "overlays/actors/ovl_En_Estone/z_en_estone.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "overlays/effects/ovl_Effect_Ss_Hitmark/z_eff_ss_hitmark.h"
 
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
@@ -472,7 +473,11 @@ void EnEgol_Init(Actor* thisx, PlayState* play) {
         this->minLaserRange = 200.0f;
     }
 
-    this->path = SubS_GetPathByIndex(play, this->pathIndex, EYEGORE_PATH_INDEX_NONE);
+    if (GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor)) {
+        this->path = SubS_GetPathByIndex(play, this->pathIndex, EYEGORE_PATH_INDEX_NONE);
+    } else {
+        Math_Vec3f_Copy(&this->waypointPos, &this->actor.home.pos);
+    }
 
     EYEGORE_SET_SPH_DIM(this->eyeCollider.elements[0], 500, 0, 0, 26, 1.0f);
 
@@ -1069,11 +1074,16 @@ void EnEgol_Damaged(EnEgol* this, PlayState* play) {
 }
 
 void EnEgol_StartDeathCutscene(EnEgol* this, PlayState* play) {
-    if (!CutsceneManager_IsNext(this->actor.csId)) {
+    s32 isAtHome = GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor);
+
+    if (isAtHome && !CutsceneManager_IsNext(this->actor.csId)) {
         CutsceneManager_Queue(this->actor.csId);
     } else {
-        CutsceneManager_StartWithPlayerCs(this->actor.csId, &this->actor);
-        this->subCamId = CutsceneManager_GetCurrentSubCamId(this->actor.csId);
+        this->subCamId = SUB_CAM_ID_DONE;
+        if (isAtHome) {
+            CutsceneManager_StartWithPlayerCs(this->actor.csId, &this->actor);
+            this->subCamId = CutsceneManager_GetCurrentSubCamId(this->actor.csId);
+        }
         this->subCamFovTarget = 60.0f;
         EnEgol_ChangeAnim(this, EYEGORE_ANIM_DEATH);
         this->action = EYEGORE_ACTION_DYING;
@@ -1095,8 +1105,10 @@ void EnEgol_Death(EnEgol* this, PlayState* play) {
     this->subCamEye.y = this->actor.world.pos.y + 70.0f;
     this->subCamEye.z = this->actor.world.pos.z;
     Math_ApproachF(&this->subCamFov, this->subCamFovTarget, 0.3f, 10.0f);
-    Play_SetCameraAtEye(play, this->subCamId, &this->subCamEye, &this->subCamAt);
-    Play_SetCameraFov(play, this->subCamId, this->subCamFov);
+    if (this->subCamId != SUB_CAM_ID_DONE) {
+        Play_SetCameraAtEye(play, this->subCamId, &this->subCamEye, &this->subCamAt);
+        Play_SetCameraFov(play, this->subCamId, this->subCamFov);
+    }
     if ((this->action == EYEGORE_ACTION_DEAD) && (this->waitTimer == 1)) {
         if (this->switchFlag > SWITCH_FLAG_NONE) {
             Flags_SetSwitch(play, this->switchFlag);

@@ -37,7 +37,11 @@ bool CanDraw() {
 
 RandoItemId FindItem(const std::string& name) {
     static std::unordered_map<std::string, RandoItemId> items;
-    if (items.empty()) {
+    static size_t indexedCount = 0;
+    // Mods register their items after the first lookups, so the index follows the table as it grows.
+    if (indexedCount != Rando::StaticData::Items.size()) {
+        items.clear();
+        indexedCount = Rando::StaticData::Items.size();
         for (const auto& [id, definition] : Rando::StaticData::Items) {
             items.emplace(Rando::StaticData::GetItemDisplayName(id), id);
             if (definition.spoilerName != nullptr) {
@@ -162,6 +166,19 @@ const char* FleetItemDraw_TextboxIconPath(const char* name) {
     return texture != nullptr && FitsTextbox(*texture) ? path : nullptr;
 }
 
+nlohmann::json FleetItemDraw_DescribeIcon(const char* name) {
+    const RandoItemId item = FindItem(name);
+    if (item == RI_UNKNOWN) {
+        return nullptr;
+    }
+    const IconSource source = FindIconSource(item);
+    const char* textboxPath = FleetItemDraw_TextboxIconPath(name);
+    return { { "iconPath", source.path != nullptr ? source.path : "" },
+             { "launcherImage", source.path != nullptr },
+             { "tint", { source.tint.x, source.tint.y, source.tint.z, source.tint.w } },
+             { "textboxIconPath", textboxPath != nullptr ? textboxPath : "" } };
+}
+
 bool FleetItemDraw_Icon(const char* name, FleetItemIcon* icon) {
     if (name == nullptr || icon == nullptr) {
         return false;
@@ -184,6 +201,10 @@ bool FleetItemDraw_Icon(const char* name, FleetItemIcon* icon) {
               { 1.0f, 1.0f },
               { tint.x, tint.y, tint.z, tint.w } };
     return true;
+}
+
+RandoItemId FleetItemDraw_FindItem(const char* item) {
+    return item != nullptr ? FindItem(item) : RI_UNKNOWN;
 }
 
 bool FleetItemDraw_Draw(FleetItemDraw* request) {

@@ -50,15 +50,23 @@ void DrawForeignItem(PlayState* play, S2HGetItemEntry* entry) {
     GetItem_Draw(play, GID_RUPEE_BLUE);
 }
 
-void Register(const std::string& key, const ForeignItem& foreign, const nlohmann::json& reward) {
+std::string FoundText(const ForeignItem& foreign, const nlohmann::json& reward) {
     const bool shared = reward.value("shared", false);
     const bool disguised = !reward.value("fakeItemName", std::string{}).empty();
     const std::string shown = disguised ? foreign.item : reward.value("label", foreign.item);
-    const std::string text = "You found %y" + shown + (shared ? " (Shared)" : " (OoT)") + "%w!&" +
-                             (shared ? "Both games share it." : "It belongs to Ocarina of Time.");
+    return "You found %y" + shown + (shared ? " (Shared)" : " (OoT)") + "%w!&" +
+           (shared ? "Both games share it." : "It belongs to Ocarina of Time.");
+}
+
+uint32_t RandomizerFlags(const nlohmann::json& reward) {
+    return reward.value("advancement", false) ? S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT : 0;
+}
+
+void Register(const std::string& key, const ForeignItem& foreign, const nlohmann::json& reward) {
+    const std::string text = FoundText(foreign, reward);
     S2HCustomItemRandomizer randomizer = {};
     randomizer.structSize = sizeof(randomizer);
-    randomizer.flags = reward.value("advancement", false) ? S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT : 0;
+    randomizer.flags = RandomizerFlags(reward);
     S2HCustomItemDefinition definition = {};
     definition.structSize = sizeof(definition);
     definition.key = key.c_str();
@@ -92,20 +100,40 @@ std::string FleetForeignItems_KeyForCheck(const nlohmann::json& seed, const std:
     return "";
 }
 
+// The registry cannot drop an item, so a key an earlier seed registered is kept and told this seed's text.
 void FleetForeignItems_Register(const nlohmann::json& seed) {
+    std::unordered_set<std::string> seedKeys;
     for (const auto& foreign : seed.at("foreign")) {
         if (foreign.at("checkGame") != kGame) {
             continue;
         }
         const std::string key = FleetForeignItems_Key(foreign);
-        if (sKeys.contains(key)) {
+        if (!seedKeys.insert(key).second) {
             continue;
         }
         const ForeignItem item = { foreign.at("itemGame").get<std::string>(), PresentedName(foreign) };
+        if (sKeys.contains(key)) {
+            CustomItemRegistry_UpdateSeedPresentation(key.c_str(), FoundText(item, foreign).c_str(),
+                                                      RandomizerFlags(foreign));
+            continue;
+        }
         Register(key, item, foreign);
         sItems.push_back(item);
         sKeys.insert(key);
     }
+}
+
+// One foreign item outside any seed, for fleet-test's review: named and drawn as a check holding it would show it.
+std::string FleetForeignItems_RegisterLoose(const std::string& owner, const std::string& item) {
+    const nlohmann::json foreign = { { "itemGame", owner }, { "itemName", item }, { "label", item } };
+    const std::string key = FleetForeignItems_Key(foreign);
+    if (!sKeys.contains(key)) {
+        const ForeignItem loose = { owner, item };
+        Register(key, loose, foreign);
+        sItems.push_back(loose);
+        sKeys.insert(key);
+    }
+    return key;
 }
 
 std::vector<std::string> FleetForeignItems_ListKeys() {

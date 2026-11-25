@@ -10,6 +10,12 @@ namespace Logic {
 std::map<RandoRegionId, RandoRegion> Regions = {};
 
 uint64_t gCurrentRegionTime = 0;
+SceneId gCurrentRegionScene = SCENE_MAX;
+
+void SetCurrentRegionScene(RandoRegionId regionId) {
+    auto region = Regions.find(regionId);
+    gCurrentRegionScene = region != Regions.end() ? region->second.sceneId : SCENE_MAX;
+}
 
 // GROTTOS
 // grottos are a bit weird, 15 of them share entrances with other grottos, so we have to check an extra field to
@@ -188,6 +194,7 @@ void FindReachableRegions(RandoRegionId currentRegion, std::set<RandoRegionId>& 
     for (auto& [connectedRegionId, condition] : sourceRegion.connections) {
         // Set global time for check evaluation
         gCurrentRegionTime = currentTime;
+        gCurrentRegionScene = sourceRegion.sceneId;
 
         if (condition.first()) {
             auto& targetRegion = Regions[connectedRegionId];
@@ -216,6 +223,7 @@ void FindReachableRegions(RandoRegionId currentRegion, std::set<RandoRegionId>& 
     for (auto& [exitId, regionExit] : sourceRegion.exits) {
         // Set global time for check evaluation
         gCurrentRegionTime = currentTime;
+        gCurrentRegionScene = sourceRegion.sceneId;
 
         const std::optional<RandoRegionId> rerouted =
             sExitRedirect ? sExitRedirect(exitId, currentRegion) : std::nullopt;

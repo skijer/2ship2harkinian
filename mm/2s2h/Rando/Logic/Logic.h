@@ -6,6 +6,8 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ModApi/RandoLogic/RandoLogic.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
+#include "2s2h/ModApi/ActorRegistry/ActorRegistry.h"
+#include "2s2h/Enhancements/Modes/EnemyRandomizer.h"
 #include "2s2h/ShipUtils.h"
 
 #include <set>
@@ -109,6 +111,8 @@ struct RegionTimeState {
 };
 
 extern uint64_t gCurrentRegionTime;
+// SCENE_MAX outside a region evaluation; CanKillEnemy then ignores the enemy placement.
+extern SceneId gCurrentRegionScene;
 
 // Helper: Convert runtime game time to TimeSlice enum
 TimeSlice TimeSliceFromGameTime(s32 day, u16 time);
@@ -124,9 +128,13 @@ void EnsureRegionTimeState(std::unordered_map<RandoRegionId, RegionTimeState>& r
                            RandoRegionId regionId);
 
 // Helper to set current region time
+void SetCurrentRegionScene(RandoRegionId regionId);
+
+// Hidden side effect: also sets gCurrentRegionScene, so every evaluator that already sets the time sets the scene.
 inline void SetCurrentRegionTime(const std::unordered_map<RandoRegionId, RegionTimeState>& regionTimeStates,
                                  RandoRegionId regionId) {
     gCurrentRegionTime = regionTimeStates.at(regionId).timeSlices;
+    SetCurrentRegionScene(regionId);
 }
 
 void FindReachableRegions(RandoRegionId currentRegion, std::set<RandoRegionId>& reachableRegions,
@@ -740,7 +748,36 @@ inline bool ClockFilter() {
     (BETWEEN(TIME_NIGHT1_AM_12_00, TIME_DAY2_AM_06_00) || BETWEEN(TIME_NIGHT2_AM_12_00, TIME_DAY3_AM_06_00) || \
      AFTER(TIME_NIGHT3_AM_12_00))
 
+inline bool CanKillNativeEnemy(ActorId EnemyId);
+
+inline bool CanKillCustomEnemy(const S2HCustomEnemy* enemy) {
+    if (RandoLogic_IsEnemyGranted(enemy->actorId)) {
+        return true;
+    }
+    const bool soulRequired = RANDO_SAVE_OPTIONS[RO_SHUFFLE_ENEMY_SOULS] && enemy->soulKey != nullptr &&
+                              EnemyRandomizer::IsSoulInPool(enemy->soulKey);
+    const int32_t soulItem = soulRequired ? GetCustomEnemySoulItem(enemy->soulKey) : 0;
+    if (soulItem != 0 && !RandoLogic_HasLogicItem(soulItem)) {
+        return false;
+    }
+    return enemy->logicKill == nullptr || enemy->logicKill(enemy->logicKillUserData);
+}
+
 inline bool CanKillEnemy(ActorId EnemyId) {
+    if (gCurrentRegionScene == SCENE_MAX) {
+        return CanKillNativeEnemy(EnemyId);
+    }
+    const EnemyRandomizer::LogicReplacement replacement =
+        EnemyRandomizer::FindLogicReplacement(gCurrentRegionScene, EnemyId);
+    const bool killable = replacement.custom != nullptr ? CanKillCustomEnemy(replacement.custom)
+                                                        : CanKillNativeEnemy((ActorId)replacement.actorId);
+    if (!replacement.onlySubmerged) {
+        return killable;
+    }
+    return killable && CAN_BE_ZORA && CAN_USE_ABILITY(SWIM);
+}
+
+inline bool CanKillNativeEnemy(ActorId EnemyId) {
     if (RandoLogic_IsEnemyGranted(EnemyId))
         return true;
     // If enemy souls are shuffled, and the relevant soul is not obtained, we cannot kill that enemy.
@@ -773,7 +810,7 @@ inline bool CanKillEnemy(ActorId EnemyId) {
         case ACTOR_EN_KAIZOKU: // Fighter Pirate
             return (CAN_USE_SWORD || CAN_BE_ZORA);
         case ACTOR_EN_PAMETFROG: // Woodfall Temple Gekko (and Snapper)
-            return (HAS_ITEM(ITEM_BOW) && CanKillEnemy(ACTOR_EN_BIGPAMET));
+            return (HAS_ITEM(ITEM_BOW) && CanKillNativeEnemy(ACTOR_EN_BIGPAMET));
         case ACTOR_EN_BIGSLIME: // Great Bay Temple Gekko
             return (CAN_USE_MAGIC_ARROW(ICE));
         case ACTOR_EN_SW: // Gold Skulltula & Skullwalltula
@@ -889,6 +926,8 @@ inline bool CanKillEnemy(ActorId EnemyId) {
             return (CAN_BE_ZORA && HAS_MAGIC);
         case ACTOR_EN_BIGPO:
             return HAS_ITEM(ITEM_BOW);
+        case ACTOR_EN_POH: // Poe
+            return (CAN_USE_SWORD || CAN_BE_GORON || CAN_BE_ZORA || HAS_ITEM(ITEM_BOW) || HAS_ITEM(ITEM_DEKU_STICK));
         case ACTOR_EN_PO_SISTERS:
             // The first three sisters can be damaged with almost anything, but Meg requires ranged attacks. Not using
             // CAN_USE_EXPLOSIVE here, as the Blast Mask cannot reach, and the Powder Keg can only be used once.

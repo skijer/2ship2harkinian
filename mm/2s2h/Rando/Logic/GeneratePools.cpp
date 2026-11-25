@@ -220,8 +220,10 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
 
     // Enemy Souls
     if (saveInfo.randoSaveOptions[RO_SHUFFLE_ENEMY_SOULS] == RO_GENERIC_YES) {
-        for (int i = RI_SOUL_ENEMY_ALIEN; i <= RI_SOUL_ENEMY_WOLFOS; i++) {
-            itemPool.push_back((RandoItemId)i);
+        for (const NativeEnemySoul& soul : GetNativeEnemySouls()) {
+            if (EnemyRandomizer::IsSoulInPool(soul.key)) {
+                itemPool.push_back(soul.randoItemId);
+            }
         }
     }
 
@@ -403,6 +405,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     }
 
     RandoItems_AddToPool(itemPool);
+    std::erase_if(itemPool, [](RandoItemId item) { return EnemyRandomizer::IsCustomSoulItemExcluded(item); });
     ProgressiveItems_ConfigurePool(itemPool);
     PlaceVanillaDungeonItems(saveInfo, checkPool, itemPool);
 }

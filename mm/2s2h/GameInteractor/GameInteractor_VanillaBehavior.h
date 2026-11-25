@@ -2733,6 +2733,40 @@ typedef enum {
     // #### `args`
     // - `*Actor` (the player)
     VB_PLAYER_NOCLIP,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*ActorContext`
+    // - `*ActorEntry`
+    // - `*PlayState`
+    // - `**Actor` (out: the actor spawned instead when `*should` is set to false)
+    VB_SPAWN_ACTOR_ENTRY,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*Actor` (the spawner)
+    // - `s16` (child actor id, promoted to int)
+    // - `*Vec3f` (spawn position)
+    // - `s32` (child params)
+    // - `**Actor` (out: the child spawned instead when `*should` is set to false)
+    VB_ENCOUNT1_SPAWN_ENEMY,
+    VB_ENCOUNT3_SPAWN_GARO,
+    VB_ENCOUNT4_SPAWN_STALCHILD,
+    VB_PEAHAT_SPAWN_LARVA,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*Actor` (a miniboss that relies on its home scene's cutscenes, paths, lights or story flags)
+    VB_MINIBOSS_USE_HOME_SCENE,
 } GIVanillaBehavior;
 
 #endif

@@ -6,6 +6,7 @@
 
 #include "z_en_death.h"
 #include "z64rumble.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "overlays/actors/ovl_Arrow_Light/z_arrow_light.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
@@ -249,7 +250,10 @@ void EnDeath_Init(Actor* thisx, PlayState* play2) {
 
     Effect_Add(play, &this->effectIndex, EFFECT_BLURE2, 0, 0, &sBlureInit);
 
-    if (!CHECK_EVENTINF(EVENTINF_INTRO_CS_WATCHED_GOMESS)) {
+    s32 skipIntro = CHECK_EVENTINF(EVENTINF_INTRO_CS_WATCHED_GOMESS) ||
+                    !GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor);
+
+    if (!skipIntro) {
         this->actor.world.pos.y += 400.0f;
     }
 
@@ -273,7 +277,7 @@ void EnDeath_Init(Actor* thisx, PlayState* play2) {
     this->bodyMatAnim = Lib_SegmentedToVirtual(&gGomessBodyMatAnim);
     this->coreMatAnim = Lib_SegmentedToVirtual(&gGomessCoreMatAnim);
 
-    if (CHECK_EVENTINF(EVENTINF_INTRO_CS_WATCHED_GOMESS)) {
+    if (skipIntro) {
         // Watched intro cutscene
         this->holdsScythe = true;
         Actor_SetScale(&this->actor, 0.01f);
@@ -1065,7 +1069,9 @@ void EnDeath_DeathCutscenePart4(EnDeath* this, PlayState* play) {
 void EnDeath_SetupDead(EnDeath* this, PlayState* play) {
     CutsceneManager_Stop(this->actor.csId);
     Player_SetCsAction(play, &this->actor, PLAYER_CSACTION_END);
-    Flags_SetClearTemp(play, play->roomCtx.curRoom.num);
+    if (GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor)) {
+        Flags_SetClearTemp(play, play->roomCtx.curRoom.num);
+    }
     this->actionTimer = 255;
     play->envCtx.lightSettingOverride = 255;
     this->actionFunc = EnDeath_Dead;
@@ -1158,7 +1164,9 @@ void EnDeath_SetupBeginWithoutCutscene(EnDeath* this) {
 
 void EnDeath_BeginWithoutCutscene(EnDeath* this, PlayState* play) {
     if (!Play_InCsMode(play)) {
-        EnDeath_DimLights(play);
+        if (GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor)) {
+            EnDeath_DimLights(play);
+        }
         this->coreCollider.base.acFlags |= AC_ON;
         Audio_PlayBgm_StorePrevBgm(NA_BGM_MINI_BOSS);
         EnDeath_SetupApproachPlayer(this);

@@ -18,6 +18,13 @@ typedef void (*S2HActorResetFunc)(void);
 #define S2H_ACTOR_ENEMY (1 << 0)
 #define S2H_ACTOR_ENEMY_NOT_IN_CLEAR_ROOMS (1 << 1)
 #define S2H_ACTOR_ENEMY_NOT_IN_TIMED_ROOMS (1 << 2)
+#define S2H_ACTOR_ENEMY_MINIBOSS (1 << 3)
+#define S2H_ACTOR_ENEMY_NEEDS_WATER (1 << 4)
+#define S2H_ACTOR_ENEMY_NOT_IN_WATER (1 << 5)
+#define S2H_ACTOR_ENEMY_NEEDS_CEILING (1 << 6)
+#define S2H_ACTOR_ENEMY_UNDERWATER (1 << 7)
+
+typedef bool (*S2HLogicKillFunc)(void* userData);
 
 // Ship's fields after reset, which 2Ship shipped first: same names, appended so older mods keep their layout.
 typedef struct {
@@ -37,6 +44,9 @@ typedef struct {
     int16_t enemyParams;
     int16_t enemySpawnHeight;
     const char* naviHint;
+    const char* soulKey;
+    S2HLogicKillFunc logicKill;
+    void* logicKillUserData;
 } S2HActorDefinition;
 
 #define S2H_ACTOR_DEFINITION_MIN_SIZE (offsetof(S2HActorDefinition, draw) + sizeof(((S2HActorDefinition*)0)->draw))
@@ -45,6 +55,8 @@ typedef struct {
     (offsetof(S2HActorDefinition, enemySpawnHeight) + sizeof(((S2HActorDefinition*)0)->enemySpawnHeight))
 #define S2H_ACTOR_DEFINITION_HINT_SIZE \
     (offsetof(S2HActorDefinition, naviHint) + sizeof(((S2HActorDefinition*)0)->naviHint))
+#define S2H_ACTOR_DEFINITION_SOUL_SIZE \
+    (offsetof(S2HActorDefinition, logicKillUserData) + sizeof(((S2HActorDefinition*)0)->logicKillUserData))
 
 typedef struct {
     const char* key;
@@ -53,6 +65,9 @@ typedef struct {
     int16_t params;
     uint32_t flags;
     int16_t spawnHeight;
+    const char* soulKey;
+    S2HLogicKillFunc logicKill;
+    void* logicKillUserData;
 } S2HCustomEnemy;
 
 int16_t ActorRegistry_Register(const S2HActorDefinition* definition);

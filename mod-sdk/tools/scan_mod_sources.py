@@ -43,7 +43,8 @@ SERVICE_PERMISSIONS = {
     "ModNetwork_RequestTeleport": "network", "ModNetwork_SummonPeer": "network",
     "ModNetwork_StartRoomCountdown": "network",
 }
-INCLUDE = re.compile(r'^\s*#\s*include\s*([<"])([^>"]+)[>"]', re.MULTILINE)
+PACKS_FILE = "packs.json"
+INCLUDE =re.compile(r'^\s*#\s*include\s*([<"])([^>"]+)[>"]', re.MULTILINE)
 PRAGMA = re.compile(r"^\s*#\s*pragma\s+(.*)$", re.MULTILINE)
 LINE_MARKER = re.compile(r'^#\s*\d+\s+"((?:\\.|[^"\\])*)"')
 LITERAL = re.compile(r'"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\'')
@@ -66,7 +67,8 @@ def check_layout(mods_directory):
         name = path.name.lower()
         suffix = path.suffix.lower()
         in_assets = len(relative.parts) > 2 and relative.parts[1] == "assets"
-        is_known_file = name == "manifest.json" or suffix in SOURCE_SUFFIXES | DOCUMENT_SUFFIXES
+        is_packs = relative.as_posix() == PACKS_FILE
+        is_known_file = name == "manifest.json" or is_packs or suffix in SOURCE_SUFFIXES | DOCUMENT_SUFFIXES
         if name in BUILD_SCRIPT_NAMES or suffix == ".cmake":
             problems.append(f"{relative}: build scripts are not allowed; the signing build uses its own")
         elif suffix in EXECUTABLE_SUFFIXES or starts_like_executable(path):

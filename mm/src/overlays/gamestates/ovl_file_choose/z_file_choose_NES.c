@@ -266,9 +266,6 @@ void FileSelect_UpdateMainMenu(GameState* thisx) {
     }
     if (CHECK_BTN_ALL(input->press.button, BTN_START) || CHECK_BTN_ALL(input->press.button, BTN_A)) {
         if (this->buttonIndex <= FS_BTN_MAIN_FILE_3) {
-            if (FleetGame_SelectFile(this->buttonIndex)) {
-                return;
-            }
             if (!gSaveContext.flashSaveAvailable) {
                 if (!NO_FLASH_SLOT_OCCUPIED(sramCtx, this->buttonIndex)) {
                     Audio_PlaySfx(NA_SE_SY_FSEL_DECIDE_L);
@@ -2133,6 +2130,10 @@ void FileSelect_ConfirmFile(GameState* thisx) {
         if (this->confirmButtonIndex == FS_BTN_CONFIRM_YES) {
             Rumble_Request(300.0f, 180, 20, 100);
             Audio_PlaySfx(NA_SE_SY_FSEL_DECIDE_L);
+            // Fleet opens its own session for this slot instead of loading the native save.
+            if (FleetGame_SelectFile(this->buttonIndex)) {
+                return;
+            }
             this->selectMode = SM_FADE_OUT;
             Audio_MuteAllSeqExceptSystemAndOcarina(15);
         } else { // FS_BTN_CONFIRM_QUIT

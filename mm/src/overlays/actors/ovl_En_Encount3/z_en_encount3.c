@@ -6,6 +6,7 @@
 
 #include "z_en_encount3.h"
 #include "objects/object_big_fwall/object_big_fwall.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_LOCK_ON_DISABLED)
 
@@ -77,9 +78,13 @@ void func_809AD084(EnEncount3* this, PlayState* play) {
         if (this->timer > 0) {
             this->timer--;
         } else {
-            this->child =
-                Actor_SpawnAsChild(&play->actorCtx, &this->actor, play, this->childActorId, this->actor.world.pos.x,
-                                   this->actor.world.pos.y, this->actor.world.pos.z, 0, 0, 0, this->childParams);
+            this->child = NULL;
+            if (GameInteractor_Should(VB_ENCOUNT3_SPAWN_GARO, true, &this->actor, this->childActorId,
+                                      &this->actor.world.pos, this->childParams, &this->child)) {
+                this->child =
+                    Actor_SpawnAsChild(&play->actorCtx, &this->actor, play, this->childActorId, this->actor.world.pos.x,
+                                       this->actor.world.pos.y, this->actor.world.pos.z, 0, 0, 0, this->childParams);
+            }
             if (this->child != NULL) {
                 this->unk14E++;
                 D_809AD810 = true;

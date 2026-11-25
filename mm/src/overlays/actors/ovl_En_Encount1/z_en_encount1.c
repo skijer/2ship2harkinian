@@ -8,6 +8,7 @@
 #include "overlays/actors/ovl_En_Grasshopper/z_en_grasshopper.h"
 #include "overlays/actors/ovl_En_Wallmas/z_en_wallmas.h"
 #include "overlays/actors/ovl_En_Pr2/z_en_pr2.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_FREEZE_EXCEPTION | ACTOR_FLAG_LOCK_ON_DISABLED)
 
@@ -147,8 +148,12 @@ void EnEncount1_SpawnActor(EnEncount1* this, PlayState* play) {
 
     actorId = sActorIds[this->type];
     actorParams = sActorParams[this->type];
-    if (Actor_SpawnAsChild(&play->actorCtx, &this->actor, play, actorId, spawnPos.x, spawnPos.y, spawnPos.z, 0, 0, 0,
-                           actorParams) != NULL) {
+    Actor* child = NULL;
+    if (GameInteractor_Should(VB_ENCOUNT1_SPAWN_ENEMY, true, &this->actor, actorId, &spawnPos, actorParams, &child)) {
+        child = Actor_SpawnAsChild(&play->actorCtx, &this->actor, play, actorId, spawnPos.x, spawnPos.y, spawnPos.z, 0,
+                                   0, 0, actorParams);
+    }
+    if (child != NULL) {
         this->spawnActiveCount++;
         if (this->spawnTotalMax > 0) {
             this->spawnTotalCount++;

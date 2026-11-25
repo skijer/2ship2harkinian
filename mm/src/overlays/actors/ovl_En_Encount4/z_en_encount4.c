@@ -5,6 +5,7 @@
  */
 
 #include "z_en_encount4.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_LOCK_ON_DISABLED)
 
@@ -173,8 +174,13 @@ void func_809C42A8(EnEncount4* this, PlayState* play) {
     }
     pos.x += Math_SinS(yRot) * (40.0f + Rand_CenteredFloat(40.0f));
     pos.z += Math_CosS(yRot) * (40.0f + Rand_CenteredFloat(40.0f));
-    if (Actor_SpawnAsChild(&play->actorCtx, &this->actor, play, ACTOR_EN_SKB, pos.x, pos.y, pos.z, 0, 0, 0,
-                           ENSKB_PARAM_0) != NULL) {
+    Actor* stalchild = NULL;
+    if (GameInteractor_Should(VB_ENCOUNT4_SPAWN_STALCHILD, true, &this->actor, ACTOR_EN_SKB, &pos, ENSKB_PARAM_0,
+                              &stalchild)) {
+        stalchild = Actor_SpawnAsChild(&play->actorCtx, &this->actor, play, ACTOR_EN_SKB, pos.x, pos.y, pos.z, 0, 0,
+                                       0, ENSKB_PARAM_0);
+    }
+    if (stalchild != NULL) {
         this->unk_14C++;
         if (this->unk_14C >= 2) {
             this->actionFunc = func_809C4598;

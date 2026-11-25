@@ -5,6 +5,9 @@
 #include "Rando/Logic/Logic.h"
 #include "2s2h/BenGui/Notification.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
+#include "2s2h/Enhancements/Modes/EnemyRandomizer.h"
+#include "2s2h/ModApi/ActorRegistry/ActorRegistry.h"
+#include "2s2h/ModApi/RandoItems/RandoItems.h"
 
 extern "C" {
 #include "variables.h"
@@ -105,23 +108,100 @@ std::unordered_map<int16_t, RandoItemId> enemySoulMap = {
 };
 // clang-format on
 
+// clang-format off
+static const std::vector<NativeEnemySoul> sNativeEnemySouls = {
+    { RI_SOUL_ENEMY_ALIEN,          "mm.alien" },
+    { RI_SOUL_ENEMY_ARMOS,          "mm.armos" },
+    { RI_SOUL_ENEMY_BAD_BAT,        "mm.bad_bat" },
+    { RI_SOUL_ENEMY_BEAMOS,         "mm.beamos" },
+    { RI_SOUL_ENEMY_BOE,            "mm.boe" },
+    { RI_SOUL_ENEMY_BUBBLE,         "mm.bubble" },
+    { RI_SOUL_ENEMY_CAPTAIN_KEETA,  "mm.captain_keeta" },
+    { RI_SOUL_ENEMY_CHUCHU,         "mm.chuchu" },
+    { RI_SOUL_ENEMY_DEATH_ARMOS,    "mm.death_armos" },
+    { RI_SOUL_ENEMY_DEEP_PYTHON,    "mm.deep_python" },
+    { RI_SOUL_ENEMY_DEKU_BABA,      "mm.deku_baba" },
+    { RI_SOUL_ENEMY_DEXIHAND,       "mm.dexihand" },
+    { RI_SOUL_ENEMY_DINOLFOS,       "mm.dinolfos" },
+    { RI_SOUL_ENEMY_DODONGO,        "mm.dodongo" },
+    { RI_SOUL_ENEMY_DRAGONFLY,      "mm.dragonfly" },
+    { RI_SOUL_ENEMY_EENO,           "mm.eeno" },
+    { RI_SOUL_ENEMY_EYEGORE,        "mm.eyegore" },
+    { RI_SOUL_ENEMY_FREEZARD,       "mm.freezard" },
+    { RI_SOUL_ENEMY_GARO,           "mm.garo" },
+    { RI_SOUL_ENEMY_GEKKO,          "mm.gekko" },
+    { RI_SOUL_ENEMY_GIANT_BEE,      "mm.giant_bee" },
+    { RI_SOUL_ENEMY_GOMESS,         "mm.gomess" },
+    { RI_SOUL_ENEMY_GUAY,           "mm.guay" },
+    { RI_SOUL_ENEMY_HIPLOOP,        "mm.hiploop" },
+    { RI_SOUL_ENEMY_IGOS_DU_IKANA,  "mm.igos_du_ikana" },
+    { RI_SOUL_ENEMY_IRON_KNUCKLE,   "mm.iron_knuckle" },
+    { RI_SOUL_ENEMY_KEESE,          "mm.keese" },
+    { RI_SOUL_ENEMY_LEEVER,         "mm.leever" },
+    { RI_SOUL_ENEMY_LIKE_LIKE,      "mm.like_like" },
+    { RI_SOUL_ENEMY_MAD_SCRUB,      "mm.mad_scrub" },
+    { RI_SOUL_ENEMY_NEJIRON,        "mm.nejiron" },
+    { RI_SOUL_ENEMY_OCTOROK,        "mm.octorok" },
+    { RI_SOUL_ENEMY_PEAHAT,         "mm.peahat" },
+    { RI_SOUL_ENEMY_PIRATE,         "mm.pirate" },
+    { RI_SOUL_ENEMY_POE,            "mm.poe" },
+    { RI_SOUL_ENEMY_REDEAD,         "mm.redead" },
+    { RI_SOUL_ENEMY_SHELLBLADE,     "mm.shellblade" },
+    { RI_SOUL_ENEMY_SKULLFISH,      "mm.skullfish" },
+    { RI_SOUL_ENEMY_SKULLTULA,      "mm.skulltula" },
+    { RI_SOUL_ENEMY_SNAPPER,        "mm.snapper" },
+    { RI_SOUL_ENEMY_STALCHILD,      "mm.stalchild" },
+    { RI_SOUL_ENEMY_TAKKURI,        "mm.takkuri" },
+    { RI_SOUL_ENEMY_TEKTITE,        "mm.tektite" },
+    { RI_SOUL_ENEMY_WALLMASTER,     "mm.wallmaster" },
+    { RI_SOUL_ENEMY_WART,           "mm.wart" },
+    { RI_SOUL_ENEMY_WIZROBE,        "mm.wizrobe" },
+    { RI_SOUL_ENEMY_WOLFOS,         "mm.wolfos" },
+};
+// clang-format on
+
+const std::vector<NativeEnemySoul>& GetNativeEnemySouls() {
+    return sNativeEnemySouls;
+}
+
+const char* GetNativeEnemySoulKey(RandoItemId randoItemId) {
+    for (const NativeEnemySoul& soul : sNativeEnemySouls) {
+        if (soul.randoItemId == randoItemId) {
+            return soul.key;
+        }
+    }
+    return nullptr;
+}
+
+int32_t GetCustomEnemySoulItem(const char* soulKey) {
+    return soulKey != nullptr ? RandoItems_GetRandoGet((std::string("soul.") + soulKey).c_str()) : 0;
+}
+
+static bool HaveCustomEnemySoul(const char* soulKey) {
+    if (soulKey == nullptr || !EnemyRandomizer::IsSoulInPool(soulKey)) {
+        return true;
+    }
+    const int32_t soulItem = GetCustomEnemySoulItem(soulKey);
+    return soulItem == 0 || RandoItems_IsOwned(soulItem, S2H_RANDO_INF_SAVE);
+}
+
 bool HaveEnemySoul(ActorId enemyId) {
     auto findSoulFlag = enemySoulMap.find(enemyId);
     if (findSoulFlag != enemySoulMap.end()) {
         RandoItemId randoItemId = findSoulFlag->second;
-        if (randoItemId != RI_UNKNOWN) {
-            return Flags_GetRandoInf(SOUL_RI_TO_RANDO_INF(randoItemId));
-        }
+        const char* soulKey = GetNativeEnemySoulKey(randoItemId);
+        return (soulKey != nullptr && !EnemyRandomizer::IsSoulInPool(soulKey)) ||
+               Flags_GetRandoInf(SOUL_RI_TO_RANDO_INF(randoItemId));
     }
-    // Enemy soul does not exist, so act as if it is obtained
-    return true;
+    const S2HCustomEnemy* customEnemy = ActorRegistry_FindEnemyById(enemyId);
+    return customEnemy == nullptr || HaveCustomEnemySoul(customEnemy->soulKey);
 }
 
 void ShouldActorUpdate(Actor* actor, bool* should, RandoInf randoInf) {
     if (!Flags_GetRandoInf(randoInf)) {
         *should = false;
         actor->flags &= ~ACTOR_FLAG_ATTENTION_ENABLED;
-    } else if (!actor->flags & ACTOR_FLAG_ATTENTION_ENABLED) {
+    } else if (!(actor->flags & ACTOR_FLAG_ATTENTION_ENABLED)) {
         actor->flags |= ACTOR_FLAG_ATTENTION_ENABLED;
     }
 }
@@ -145,12 +225,21 @@ void SetEnemyInjureGrayscale(bool enable) {
 
 void Rando::ActorBehavior::InitSoulsBehavior() {
     bool shouldBossRegister = IS_RANDO && RANDO_SAVE_OPTIONS[RO_SHUFFLE_BOSS_SOULS] == RO_GENERIC_YES;
-    bool shouldEnemyInjure = IS_RANDO && RANDO_SAVE_OPTIONS[RO_SHUFFLE_ENEMY_SOULS] == RO_GENERIC_YES;
+    const bool enemySoulsShuffled = IS_RANDO && RANDO_SAVE_OPTIONS[RO_SHUFFLE_ENEMY_SOULS] == RO_GENERIC_YES;
+    const bool soullessEnemiesDespawn = RANDO_SAVE_OPTIONS[RO_ENEMY_SOUL_BEHAVIOUR] == RO_ENEMY_SOUL_NO_SPAWN;
+    bool shouldEnemyInjure = enemySoulsShuffled && !soullessEnemiesDespawn;
     const bool shouldWithholdMajora = ShouldWithholdMajora();
     const bool isMajoraSoulTriggered =
         IS_RANDO && Rando::Logic::IsMajoraSoulTriggered(gSaveContext.save.shipSaveInfo.rando);
 
     COND_ID_HOOK(OnActorUpdate, ACTOR_PLAYER, isMajoraSoulTriggered, [](Actor* actor) { GrantMajoraSoulOnTrigger(); });
+
+    // Actor_Kill still lets the room-clear flag fire, but skips the enemy's death events.
+    COND_HOOK(OnActorInit, enemySoulsShuffled && soullessEnemiesDespawn, [](Actor* actor) {
+        if (actor->id != ACTOR_EN_INVADEPOH && !HaveEnemySoul((ActorId)actor->id)) {
+            Actor_Kill(actor);
+        }
+    });
 
     COND_VB_SHOULD(VB_PERFORM_AC_COLLISION, shouldEnemyInjure, {
         Collider* at = va_arg(args, Collider*);

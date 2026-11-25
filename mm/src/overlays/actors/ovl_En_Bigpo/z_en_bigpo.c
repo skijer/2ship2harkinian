@@ -5,6 +5,7 @@
  */
 
 #include "z_en_bigpo.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include "overlays/actors/ovl_En_Clear_Tag/z_en_clear_tag.h"
 #include "objects/object_bigpo/object_bigpo.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
@@ -307,9 +308,12 @@ void EnBigpo_SetupSpawnCutscene(EnBigpo* this) {
 
 void EnBigpo_WaitCutsceneQueue(EnBigpo* this, PlayState* play) {
     if (CutsceneManager_IsNext(this->actor.csId)) {
-        CutsceneManager_Start(this->actor.csId, &this->actor);
-        Player_SetCsAction(play, &this->actor, PLAYER_CSACTION_WAIT);
-        this->subCamId = CutsceneManager_GetCurrentSubCamId(this->actor.csId);
+        this->subCamId = SUB_CAM_ID_DONE;
+        if (GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor)) {
+            CutsceneManager_Start(this->actor.csId, &this->actor);
+            Player_SetCsAction(play, &this->actor, PLAYER_CSACTION_WAIT);
+            this->subCamId = CutsceneManager_GetCurrentSubCamId(this->actor.csId);
+        }
         if (this->actor.params == BIG_POE_TYPE_REGULAR) { // and SUMMONED, got switched earlier
             EnBigpo_SpawnCutsceneStage1(this, play);
         } else { // BIG_POE_TYPE_REVEALED_FIRE
@@ -478,7 +482,9 @@ void EnBigpo_SpawnCutsceneStage8(EnBigpo* this, PlayState* play) {
         } else { // BIG_POE_TYPE_REGULAR
             CutsceneManager_Stop(this->actor.csId);
         }
-        Player_SetCsAction(play, &this->actor, PLAYER_CSACTION_END);
+        if (GameInteractor_Should(VB_MINIBOSS_USE_HOME_SCENE, true, &this->actor)) {
+            Player_SetCsAction(play, &this->actor, PLAYER_CSACTION_END);
+        }
         EnBigpo_SetupIdleFlying(this); // setup idle flying
     }
 }

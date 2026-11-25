@@ -408,8 +408,11 @@ void CustomItemRegistry_DrawAcquisition(const char* key, PlayState* play) {
     const auto* pickup = CustomItemRegistry_GetPickupVariant(key);
     if (pickup != nullptr && pickup->drawSoulFlame) {
         // The acquisition caller already applies its 30x scale; match the soul flame's 0.06 world scale.
+        // The flame billboards and shrinks the matrix in place, which the model drawn after it must not inherit.
+        Matrix_Push();
         DrawEnLight({ pickup->flameRed, pickup->flameGreen, pickup->flameBlue },
                     { 0.13333333f, 0.13333333f, 0.13333333f });
+        Matrix_Pop();
         if (definition->getItemEntry.drawFunc == nullptr) {
             return;
         }
@@ -825,6 +828,18 @@ bool CustomItemRegistry_Register(const S2HCustomItemDefinition* definition) {
     }
     SPDLOG_INFO("[CustomItemRegistry] Mod '{}' registered custom item '{}' as {}", registered->owner, registered->key,
                 registered->runtimeId);
+    return true;
+}
+
+bool CustomItemRegistry_UpdateSeedPresentation(const char* key, const char* getItemText, uint32_t randomizerFlags) {
+    const auto found = key != nullptr ? sCustomItems.find(key) : sCustomItems.end();
+    if (found == sCustomItems.end() || found->second->definition.randomizer == nullptr) {
+        return false;
+    }
+    RegisteredCustomItem& item = *found->second;
+    SetString(item.definition.getItemText, item.getItemText, getItemText);
+    item.randomizer.flags = randomizerFlags;
+    RandoItems_RebuildRow(item.key.c_str());
     return true;
 }
 
