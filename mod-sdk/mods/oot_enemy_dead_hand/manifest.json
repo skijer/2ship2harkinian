@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_dead_hand",
+  "display_name": "Dead Hand",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Dead Hand as a Majora's Mask miniboss, with its ring of grasping hands. Custom enemy oot.dead_hand and its soul soul.oot.dead_hand. Uses OoT Asset Loader resources."
+}

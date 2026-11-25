@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_stinger",
+  "display_name": "Stinger",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Stinger in Majora's Mask: it lurks under the floor with only its eyes showing, leaps out when you step on it and dives at you from the air; its water kin swims in deep water and rams you. Custom enemies oot.stinger and oot.stinger_water, sharing the soul soul.oot.stinger. Uses OoT Asset Loader resources."
+}

@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_stalfos",
+  "display_name": "Stalfos",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Stalfos in Majora's Mask: a sword-and-shield skeleton that blocks, sidesteps and jumpslashes. Also the Stalfos pair miniboss, which keeps rising until both fall together. Custom enemies oot.stalfos and oot.stalfos_pair and their soul soul.oot.stalfos. Uses OoT Asset Loader resources."
+}

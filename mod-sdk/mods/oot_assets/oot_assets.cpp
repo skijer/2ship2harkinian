@@ -62,8 +62,8 @@ static uint32_t ReadBE(const uint8_t* data) {
     return uint32_t(data[0]) << 24 | uint32_t(data[1]) << 16 | uint32_t(data[2]) << 8 | data[3];
 }
 
-static void ExtractAssets() {
-    if (!sApi->AskPlayer("OoT Asset Loader", "Extract Ocarina of Time item assets from your own ROM?"))
+static void ExtractAssets(const char* question) {
+    if (!sApi->AskPlayer("OoT Asset Loader", question))
         return;
     S2HUserFile file = {};
     file.structSize = sizeof(file);
@@ -187,7 +187,32 @@ static void DrawLoaderMenu() {
     bool extract = false;
     ModUI_Text("OoT Asset Loader: use your own NTSC 1.0, 1.1 or 1.2 ROM.");
     if (ModUI_Checkbox("Extract OoT assets now", &extract) && extract)
-        ExtractAssets();
+        ExtractAssets("Extract Ocarina of Time item assets from your own ROM?");
+}
+
+// Asked at most once per session, however many mods find a resource missing.
+static void OfferExtraction(const char* question) {
+    static bool isOffered = false;
+    if (isOffered) {
+        return;
+    }
+    isOffered = true;
+    ExtractAssets(question);
+}
+
+// Published as "oot_assets.require": a mod whose resource is missing gets the extraction offer instead of
+// staying silently off, and registers only when this returns true.
+static bool RequireAsset(const char* path) {
+    if (path == nullptr) {
+        return false;
+    }
+    if (sApi->HasResource(path)) {
+        return true;
+    }
+    sApi->Log((std::string("A mod needs the missing OoT resource ") + path).c_str());
+    OfferExtraction("Some installed mods need Ocarina of Time assets that are not extracted yet. Extract them "
+                    "again from your own ROM?");
+    return false;
 }
 
 extern "C" S2H_MOD_EXPORT void ModSetApi(const S2HModApi* api) {
@@ -199,6 +224,7 @@ extern "C" S2H_MOD_EXPORT const S2HModRequirements* ModGetRequirements() {
 extern "C" S2H_MOD_EXPORT void ModInit() {
     if (!S2H_MOD_API_HAS(sApi, RequestRestart))
         return;
+    sApi->PublishService("oot_assets.require", reinterpret_cast<void*>(RequireAsset));
     S2HModMenuWidget button = {};
     button.structSize = sizeof(button);
     button.section = "Enhancements";
@@ -209,7 +235,7 @@ extern "C" S2H_MOD_EXPORT void ModInit() {
     sApi->RegisterMenuSidebar("Enhancements", "OoT Asset Loader", "gMods.OotAssets.Menu", 1);
     sApi->RegisterMenuWidget(&button);
     if (!HasExtractedAssets()) {
-        ExtractAssets();
+        OfferExtraction("Extract Ocarina of Time item assets from your own ROM?");
         return;
     }
     S2H_REGISTER_HOOK(sApi, OnSceneInit, CreateSharedAssetsOnce);

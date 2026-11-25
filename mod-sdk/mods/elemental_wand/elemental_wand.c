@@ -1375,6 +1375,9 @@ static void DrawRodGetItem(PlayState* play, u8 mode) {
     Matrix_RotateYF((s16)(play->gameplayFrames * 2) * 0.01f, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)sRods[mode].opaModel);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)sRods[mode].xluModel);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 

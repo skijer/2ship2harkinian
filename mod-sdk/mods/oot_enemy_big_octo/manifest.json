@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_big_octo",
+  "display_name": "Big Octo",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Big Octo as a Majora's Mask miniboss. It circles its spawn point in water, or burrows through the ground where there is none. Custom enemy oot.big_octo and its soul soul.oot.big_octo. Uses OoT Asset Loader resources."
+}

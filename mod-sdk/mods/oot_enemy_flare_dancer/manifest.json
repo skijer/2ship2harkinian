@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_flare_dancer",
+  "display_name": "Flare Dancer",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Flare Dancer miniboss in Majora's Mask: a whirling dancer of flame that hurls fire. Explosives, the hookshot or a Goron pound knock out its core; catch the core three times to win. Custom enemy oot.flare_dancer and its soul soul.oot.flare_dancer. Uses OoT Asset Loader resources."
+}

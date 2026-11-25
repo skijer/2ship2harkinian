@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_lizalfos",
+  "display_name": "Lizalfos",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Lizalfos in Majora's Mask: a lizard swordsman that drops from above, circles, dodges arrows and leaps over your sword. Custom enemy oot.lizalfos and its soul soul.oot.lizalfos. Uses OoT Asset Loader resources."
+}

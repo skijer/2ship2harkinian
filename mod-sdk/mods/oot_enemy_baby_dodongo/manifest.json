@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_baby_dodongo",
+  "display_name": "Baby Dodongo",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Baby Dodongo in Majora's Mask: it burrows up near you, lunges at you, swallows loose bombs and explodes when it dies. Custom enemy oot.baby_dodongo with the Dodongo family soul soul.oot.dodongo. Uses OoT Asset Loader resources."
+}

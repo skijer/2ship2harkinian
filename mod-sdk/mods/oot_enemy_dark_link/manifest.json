@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_dark_link",
+  "display_name": "Dark Link",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Dark Link as a Majora's Mask miniboss: your shadow mirrors you, keeps its distance, blocks, sidesteps, backflips, answers your jump attack with its own and leaps onto your blade when you thrust. It fades in, sinks into the floor when struck and rises behind you; fire still burns it through the shield. Custom enemy oot.dark_link and its soul soul.oot.dark_link. Uses OoT Asset Loader resources."
+}

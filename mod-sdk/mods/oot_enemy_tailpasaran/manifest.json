@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_tailpasaran",
+  "display_name": "Tailpasaran",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Tailpasaran in Majora's Mask: an electric worm that rises from the floor and chases you. Its head is armoured, so hit the tail; a sword gets shocked, a stick or a boomerang does not. Custom enemy oot.tailpasaran (no soul, as in Ship). Uses OoT Asset Loader resources."
+}

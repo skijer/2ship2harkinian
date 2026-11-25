@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_parasitic_tentacle",
+  "display_name": "Parasitic Tentacle",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Parasitic Tentacle from inside Jabu-Jabu in Majora's Mask: it hangs from above and lashes at you when you come close. Only Zora's boomerang can hurt it. Custom enemy oot.parasitic_tentacle and its soul soul.oot.parasitic_tentacle. Uses OoT Asset Loader resources."
+}

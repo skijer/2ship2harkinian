@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_gohma_larva",
+  "display_name": "Gohma Larva",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Gohma Larva in Majora's Mask: it waits as an egg, hatches when you come close and leaps at you. Deku Nuts stun it and a shield push knocks it back. Custom enemy oot.gohma_larva and its soul soul.oot.gohma_larva. Uses OoT Asset Loader resources."
+}

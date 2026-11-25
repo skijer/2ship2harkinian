@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_bari",
+  "display_name": "Bari and Biri",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's electric jellyfish in Majora's Mask: the Bari drops from above and splits into three Biri when beaten, and the small Biri drift after you. Both shock a sword that touches them. Custom enemies oot.bari and oot.biri and their shared soul soul.oot.bari. Uses OoT Asset Loader resources."
+}

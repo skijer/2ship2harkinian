@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_floor_tile",
+  "display_name": "Flying Floor Tile",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's flying floor tile in Majora's Mask: it rises, spins and hurls itself at Link. Custom enemy oot.floor_tile. Uses OoT Asset Loader resources."
+}

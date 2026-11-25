@@ -12,6 +12,7 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
+#include "2s2h/BenPort.h"
 #include "2s2h/Rando/Types.h"
 #include "overlays/actors/ovl_En_Sob1/z_en_sob1.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -28,6 +29,8 @@
 #define RESCUE_CVAR "gCheats.OoTSkills.Rescue"
 
 #define ICON(name) "__OTR__textures/icon_item_custom/" name
+#define SKILL_MODEL(name) "__OTR__objects/object_nei_skills/" name
+#define OOT_KEEP_TEXTURE(name) "__OTR__objects/oot_gameplay_keep/" name
 
 static const char* const sRequiredHooks[] = { "OnActorUpdate" };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
@@ -57,28 +60,28 @@ typedef struct {
     const char* nativeFormMask;
     s32 nativeForm;
     const char* nativeCustomForm;
-    const char* icon;
+    Color_RGB8 nutColor;
 } LanguageInfo;
 
 #define JABBER_NUT_ICON "__OTR__icon_item_static_yar/gItemIconDekuNutTex"
 
 static const LanguageInfo sLanguages[SPEECH_MAX] = {
     [SPEECH_TERMINAN] = { "nei.skill.speak_terminan", "Terminan Jabber Nut", "the people of Termina", false, RI_UNKNOWN,
-                          "nei.mask_kafei", -1, "nei.kafei", JABBER_NUT_ICON },
+                          "nei.mask_kafei", -1, "nei.kafei", { 255, 255, 0 } },
     [SPEECH_DEKU] = { "nei.skill.speak_deku", "Deku Jabber Nut", "the Deku", false, RI_MASK_DEKU, NULL,
-                      PLAYER_FORM_DEKU, NULL, JABBER_NUT_ICON },
+                      PLAYER_FORM_DEKU, NULL, { 255, 160, 32 } },
     [SPEECH_GORON] = { "nei.skill.speak_goron", "Goron Jabber Nut", "the Gorons", false, RI_MASK_GORON, NULL,
-                       PLAYER_FORM_GORON, NULL, JABBER_NUT_ICON },
+                       PLAYER_FORM_GORON, NULL, { 255, 32, 0 } },
     [SPEECH_ZORA] = { "nei.skill.speak_zora", "Zora Jabber Nut", "the Zoras", false, RI_MASK_ZORA, NULL,
-                      PLAYER_FORM_ZORA, NULL, JABBER_NUT_ICON },
+                      PLAYER_FORM_ZORA, NULL, { 96, 240, 255 } },
     [SPEECH_GERUDO] = { "nei.skill.speak_gerudo", "Gerudo Jabber Nut", "the Gerudo", false, RI_UNKNOWN,
-                        "nei.gerudo_form_mask", -1, "nei.gerudo", JABBER_NUT_ICON },
+                        "nei.gerudo_form_mask", -1, "nei.gerudo", { 128, 64, 0 } },
     [SPEECH_KEATON] = { "nei.skill.speak_animal", "Animalese Jabber Nut", "animals", true, RI_UNKNOWN,
-                        "nei.keaton_form_mask", -1, "nei.keaton", JABBER_NUT_ICON },
+                        "nei.keaton_form_mask", -1, "nei.keaton", { 128, 216, 48 } },
     [SPEECH_ANIMAL] = { "nei.skill.speak_animal", "Animalese Jabber Nut", "animals", true, RI_UNKNOWN, NULL, -1, NULL,
-                        JABBER_NUT_ICON },
+                        { 128, 216, 48 } },
     [SPEECH_GOSSIP] = { "nei.skill.speak_gossip", "Gossip Jabber Nut", "the Gossip Stones", true, RI_UNKNOWN,
-                        "nei.garo_form_mask", -1, "nei.garo", JABBER_NUT_ICON },
+                        "nei.garo_form_mask", -1, "nei.garo", { 255, 0, 216 } },
 };
 
 static bool IsRandoSave(void) {
@@ -523,26 +526,50 @@ static const S2HModRandoOption sOptions[] = {
 };
 
 typedef struct {
+    const char* model;
+    const char* requiredTexture;
+    Color_RGB8 color;
+    s16 fallbackDrawId;
+} SkillPickup;
+
+typedef struct {
     const char* key;
     const char* name;
     const char* icon;
-    s16 pickupDrawId;
+    SkillPickup pickup;
     const char* text;
     const char* poolOption;
 } SkillItem;
 
-// MM's own draw fills the segments its models branch into; the nut's bare display list jumps through segment 8.
+static SkillPickup sPickups[SPEECH_MAX + 2];
+
+// Ship's skill models; the ladder and chest borrow OoT textures, so without oot.o2r MM's own draw stands in.
 static void DrawSkillPickup(PlayState* play, S2HGetItemEntry* entry) {
-    GetItem_Draw(play, entry->gid);
+    if (entry->drawItemId >= ARRAY_COUNT(sPickups)) {
+        return;
+    }
+    const SkillPickup* pickup = &sPickups[entry->drawItemId];
+    if (pickup->requiredTexture != NULL && !ResourceMgr_FileExists(pickup->requiredTexture)) {
+        GetItem_Draw(play, pickup->fallbackDrawId);
+        return;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL26_Opa(play->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gDPSetEnvColor(POLY_OPA_DISP++, pickup->color.r, pickup->color.g, pickup->color.b, 255);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)pickup->model);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static bool RegisterSkillItem(const SkillItem* skill) {
-    static S2HCustomItemRandomizer pools[SPEECH_MAX + 2];
+    static S2HCustomItemRandomizer pools[ARRAY_COUNT(sPickups)];
     static uint32_t poolCount;
     if (poolCount >= ARRAY_COUNT(pools)) {
         return false;
     }
-    S2HCustomItemRandomizer* pool = &pools[poolCount++];
+    const uint32_t index = poolCount++;
+    sPickups[index] = skill->pickup;
+    S2HCustomItemRandomizer* pool = &pools[index];
     *pool = (S2HCustomItemRandomizer){ .structSize = sizeof(S2HCustomItemRandomizer),
                                        .flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT,
                                        .type = S2H_CUSTOM_ITEM_TYPE_ITEM,
@@ -556,7 +583,8 @@ static bool RegisterSkillItem(const SkillItem* skill) {
     definition.presentationFlags = S2H_ITEM_HIDE_FROM_KALEIDO;
     definition.displayName = skill->name;
     Z64Items_SetTextbox(&definition, skill->text);
-    definition.getItemEntry.gid = skill->pickupDrawId;
+    definition.getItemEntry.gid = skill->pickup.fallbackDrawId;
+    definition.getItemEntry.drawItemId = index;
     definition.getItemEntry.drawFunc = DrawSkillPickup;
     Z64Items_SetLogic(&definition, pool);
     return Z64Items_Register(sApi, &definition);
@@ -580,8 +608,9 @@ static void RegisterJabberNuts(void) {
         const char* article = strchr("AEIOU", info->nutName[0]) != NULL ? "an" : "a";
         snprintf(texts[language], sizeof(texts[language]), "You got %s %%r%s%%w!&Now you can speak with %s.", article,
                  info->nutName, info->listener);
-        const SkillItem nut = { info->nutKey,  info->nutName,   info->icon,
-                                GID_DEKU_NUTS, texts[language], info->isExtra ? EXTRA_SPEAK_OPTION : SPEAK_OPTION };
+        const SkillPickup model = { SKILL_MODEL("gGiJabbernutDL"), NULL, info->nutColor, GID_DEKU_NUTS };
+        const SkillItem nut = { info->nutKey, info->nutName,   JABBER_NUT_ICON,
+                                model,        texts[language], info->isExtra ? EXTRA_SPEAK_OPTION : SPEAK_OPTION };
         RegisterSkillItem(&nut);
     }
 }
@@ -618,13 +647,15 @@ S2H_MOD_EXPORT void ModInit(void) {
     const SkillItem openChest = { OPEN_CHEST_KEY,
                                   "Open Chests",
                                   ICON("gItemIconOpenChestsTex"),
-                                  GID_KEY_SMALL,
+                                  { SKILL_MODEL("gGiOpenChestsDL"), OOT_KEEP_TEXTURE("gEffUnknown10Tex"),
+                                    { 255, 255, 255 }, GID_KEY_SMALL },
                                   "You got %rOpen Chests%w!&Now you can open treasure chests.",
                                   OPEN_CHEST_OPTION };
     const SkillItem climb = { CLIMB_KEY,
                               "Climb",
                               ICON("gItemIconClimbTex"),
-                              GID_MAGIC_BEANS,
+                              { SKILL_MODEL("gGiClimbDL"), OOT_KEEP_TEXTURE("gEffUnknown11Tex"), { 255, 255, 255 },
+                                GID_MAGIC_BEANS },
                               "You got %rClimb%w!&Now you can climb ladders and walls.",
                               CLIMB_OPTION };
     RegisterSkillItem(&openChest);

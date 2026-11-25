@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_spike",
+  "display_name": "Spike",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Spike in Majora's Mask: a spiked ball that rolls or swims at you and then hardens into stone, the only moment it can be hurt. Custom enemy oot.spike and its soul soul.oot.spike. Uses OoT Asset Loader resources."
+}

@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_anubis",
+  "display_name": "Anubis",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Anubis in Majora's Mask: it rises from the floor, mirrors your moves around its spawn and hurls fire when you swing your sword. Only fire burns it, and the Mirror Shield sends its fireballs back. Custom enemy oot.anubis and its soul soul.oot.anubis. Uses OoT Asset Loader resources."
+}

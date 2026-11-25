@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_moblin",
+  "display_name": "Moblins",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Moblins in Majora's Mask: the spear guard that patrols around its post and charges on sight, and the giant club Moblin whose smash sends a shockwave along the ground. Custom enemies oot.moblin_spear and oot.moblin_club. Uses OoT Asset Loader resources."
+}

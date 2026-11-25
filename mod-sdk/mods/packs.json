@@ -1,0 +1,32 @@
+{
+    "packs": [
+        {
+            "id": "crossworld-enemies",
+            "name": "Crossworld Enemies",
+            "icon": "ITEM_MASK_CAPTAIN",
+            "mods": [
+                "oot_enemy_dead_hand",
+                "oot_enemy_big_octo",
+                "oot_enemy_floor_tile",
+                "oot_enemy_shabom",
+                "oot_enemy_stalfos",
+                "oot_enemy_lizalfos",
+                "oot_enemy_flare_dancer",
+                "oot_enemy_gerudo_fighter",
+                "oot_enemy_anubis",
+                "oot_enemy_moblin",
+                "oot_enemy_bari",
+                "oot_enemy_baby_dodongo",
+                "oot_enemy_gohma_larva",
+                "oot_enemy_torch_slug",
+                "oot_enemy_spike",
+                "oot_enemy_stinger",
+                "oot_enemy_tailpasaran",
+                "oot_enemy_parasitic_tentacle",
+                "oot_enemy_skull_kid",
+                "oot_enemy_dark_link"
+            ],
+            "description": "Ocarina of Time's enemies and minibosses in Majora's Mask, for the enemy randomizer and enemy souls. Needs the OoT Asset Loader."
+        }
+    ]
+}

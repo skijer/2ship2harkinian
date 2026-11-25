@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_shabom",
+  "display_name": "Shabom",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Shabom, the bouncing bubble of Jabu-Jabu's Belly, in Majora's Mask. Custom enemy oot.shabom and its soul soul.oot.shabom. Uses OoT Asset Loader resources."
+}

@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_skull_kid",
+  "display_name": "Skull Kid",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's hostile Skull Kid in Majora's Mask: he plays his flute until he notices you, then circles you, shoots needles and backflips away. Only a sword hurts him; any other hit makes him vanish. Custom enemy oot.skull_kid (no soul, as in Ship). Uses OoT Asset Loader resources."
+}

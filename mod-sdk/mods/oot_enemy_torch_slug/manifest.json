@@ -1,0 +1,11 @@
+{
+  "name": "oot_enemy_torch_slug",
+  "display_name": "Torch Slug",
+  "author": "Skijer",
+  "version": "0.1.0",
+  "game": "mm",
+  "dependencies": [
+    "oot_assets"
+  ],
+  "description": "Ocarina of Time's Torch Slug in Majora's Mask: it crawls along walls, lunges at you and burns you with its flame. A first blow puts the fire out, a Goron pound flips it over and ice freezes it. Custom enemy oot.torch_slug and its soul soul.oot.torch_slug. Uses OoT Asset Loader resources."
+}
