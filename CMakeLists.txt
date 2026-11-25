@@ -13,7 +13,7 @@ set(SPDLOG_LEVEL_OFF 6)
 set(SPDLOG_MIN_CUTOFF SPDLOG_LEVEL_TRACE CACHE STRING "cutoff at trace")
 set(PROJECT_BUILD_NAME "Battler Bravo" CACHE STRING "" FORCE)
 # 2S2H [Unbound] Bump when cutting a release: the tag is "${PROJECT_VERSION}-${PROJECT_FORK_VERSION}"
-set(PROJECT_FORK_VERSION "unbound0.3.3" CACHE STRING "" FORCE)
+set(PROJECT_FORK_VERSION "unbound0.3.4" CACHE STRING "" FORCE)
 set(PROJECT_TEAM "github.com/harbourmasters" CACHE STRING "" FORCE)
 
 execute_process(
