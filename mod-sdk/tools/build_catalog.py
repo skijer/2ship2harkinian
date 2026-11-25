@@ -107,8 +107,10 @@ def file_hash(path):
     return hashlib.blake2b(path.read_bytes(), digest_size=64).hexdigest()
 
 
-def plan(catalog, packages, hashes, issue, trusted, approved, held_permissions, game="mm", author=None):
-    """Which built mods to sign and publish, which are already published, and which wait or are refused."""
+def plan(catalog, packages, hashes, issue, trusted, approved, held_permissions, game="mm", author=None, rebuild=False):
+    """Which built mods to sign and publish, which are already published, and which wait or are refused.
+
+    A rebuild for another Unbound publishes unchanged sources too: their binaries follow the game's layout."""
     source = catalog["sources"].get(f"{game}:{issue}", catalog["sources"].get(str(issue)) if game == "oot" else None)
     published = any(mod.get("variants", {}).get(game, mod if game == "oot" and "variants" not in mod else {}).get("issue") == issue
                     for mod in catalog["mods"].values())
@@ -129,7 +131,8 @@ def plan(catalog, packages, hashes, issue, trusted, approved, held_permissions, 
             result["rejected"][mod_id] = f"the name '{mod_id}' already belongs to #{existing['issue']}"
         elif existing and not variant and existing.get("owner") and existing["owner"] != author:
             result["rejected"][mod_id] = "the other game variant belongs to another publisher"
-        elif existing and hashes.get(mod_id) and build.get("source_hash") == hashes[mod_id] and existing.get("listed", True):
+        elif (not rebuild and existing and hashes.get(mod_id) and build.get("source_hash") == hashes[mod_id]
+              and existing.get("listed", True)):
             result["unchanged"].append(mod_id)
         elif new_permissions and not trusted and not (approved and set(new_permissions) <= held_permissions):
             result["held"][mod_id] = new_permissions
@@ -248,6 +251,7 @@ def main():
     plan_parser.add_argument("--author")
     plan_parser.add_argument("--trusted", action="store_true")
     plan_parser.add_argument("--approved", action="store_true")
+    plan_parser.add_argument("--rebuild", action="store_true")
     plan_parser.add_argument("--held-permissions", default="")
     plan_parser.add_argument("--output", type=Path, required=True)
 
@@ -286,7 +290,7 @@ def main():
         held = {permission for permission in args.held_permissions.split(",") if permission}
         result = plan(read_catalog(args.catalog), list(args.packages.glob("*.o2r")),
                       read_json(args.source_hashes, {}), args.issue, args.trusted, args.approved, held,
-                      args.game, args.author)
+                      args.game, args.author, args.rebuild)
         write_json(args.output, result)
         print(json.dumps(result, indent=2))
     elif args.command == "apply":
