@@ -20,6 +20,20 @@ typedef enum {
     S2H_CUSTOM_ITEM_RANDO_PROGRESSIVE = 1 << 1,
 } S2HCustomItemRandomizerFlags;
 
+// Container Style Matches Contents classes. Mods read them through the "rando.container_style" service.
+typedef enum {
+    S2H_CONTAINER_STYLE_NONE,
+    S2H_CONTAINER_STYLE_JUNK,
+    S2H_CONTAINER_STYLE_LESSER,
+    S2H_CONTAINER_STYLE_MAJOR,
+    S2H_CONTAINER_STYLE_HEALTH,
+    S2H_CONTAINER_STYLE_SMALL_KEY,
+    S2H_CONTAINER_STYLE_BOSS_KEY,
+    S2H_CONTAINER_STYLE_TOKEN,
+    S2H_CONTAINER_STYLE_MASK,
+    S2H_CONTAINER_STYLE_STRAY_FAIRY,
+} S2HContainerStyle;
+
 typedef enum {
     S2H_CUSTOM_ITEM_EQUIPPABLE = 1 << 0,
     S2H_CUSTOM_ITEM_INSTANT = 1 << 1,
@@ -126,6 +140,8 @@ typedef struct {
     const int32_t* poolSources;
     uint16_t poolSourceCount;
     const S2HKeyRing* keyRing;
+    // S2HContainerStyle; NONE derives it from the advancement flag.
+    uint8_t containerStyle;
 } S2HCustomItemRandomizer;
 
 typedef void (*S2HPickupVariantReceiveFunc)(const char* itemKey, const char* variantKey);
@@ -223,7 +239,8 @@ static inline bool CustomItemRegistry_IsVanillaUpgrade(const S2HCustomItemDefini
 
 bool CustomItemRegistry_Register(const S2HCustomItemDefinition* definition);
 // For an item a host registers per seed: the next seed rewrites what changes with it, keeping its runtime id.
-bool CustomItemRegistry_UpdateSeedPresentation(const char* key, const char* getItemText, uint32_t randomizerFlags);
+bool CustomItemRegistry_UpdateSeedPresentation(const char* key, const char* getItemText, uint32_t randomizerFlags,
+                                               uint8_t containerStyle);
 const S2HCustomItemDefinition* CustomItemRegistry_FindReplacement(uint16_t vanillaItem);
 bool CustomItemRegistry_IsAgeMet(uint8_t ageRequirement);
 bool CustomItemRegistry_IsFormInMask(uint8_t formMask);

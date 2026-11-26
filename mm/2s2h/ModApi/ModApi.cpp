@@ -26,6 +26,7 @@
 
 extern "C" {
 #include "build.h"
+bool Anchor_GetPlayerColor(const Actor* actor, Color_RGB8* color);
 }
 
 namespace {
@@ -357,6 +358,7 @@ S2HModApi BuildTable() {
     api.GetActiveForm = FormRegistry_GetActiveKey;
     api.IsFormActive = FormRegistry_IsActive;
     api.IsFormSuspended = FormRegistry_IsSuspended;
+    api.GetNetPlayerColor = Anchor_GetPlayerColor;
     api.BlockPlayerInput = PlayerInput_Block;
     api.ReleasePlayerInput = PlayerInput_Release;
     api.ShowTextbox = CustomItemRegistry_ShowTextbox;

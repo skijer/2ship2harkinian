@@ -11,6 +11,7 @@ void Init();
 void OnFileLoad();
 
 bool ShouldMatchContainerStyle();
+RandoItemType GetContainerItemType(RandoCheckId randoCheckId);
 RandoCheckId GetObjectRandoCheckId(void* actor);
 void SetObjectRandoCheckId(const void* object, RandoCheckId rc);
 

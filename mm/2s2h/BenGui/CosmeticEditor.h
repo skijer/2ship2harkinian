@@ -38,6 +38,8 @@ Gfx* Gfx_DrawTexRectIA8_DropShadowOffsetOverride(Gfx* pkt, TexturePtr texture, s
                                                  const char* cosmeticId);
 Color_RGBA8 CosmeticEditor_GetChangedColorEx(u8 r, u8 g, u8 b, u8 a, const char* cosmeticId, u8 mode, f32 modifier);
 Color_RGBA8 CosmeticEditor_GetChangedColor(u8 r, u8 g, u8 b, u8 a, const char* cosmeticId);
+void PlayerTunic_SetPerPlayerTint(bool enabled);
+void PlayerTunic_BindDrawColor(struct PlayState* play, struct Actor* actor);
 
 typedef enum {
     COSMETIC_COLOR_MODE_DEFAULT,

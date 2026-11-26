@@ -7,6 +7,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "2s2h/NameTag/NameTag.h"
+#include "2s2h/BenGui/CosmeticEditor.h"
 #include "2s2h/ShipUtils.h"
 #include "2s2h/Rando/Spoiler/Spoiler.h"
 #include "2s2h/Rando/MiscBehavior/MiscBehavior.h"
@@ -186,6 +187,12 @@ void Anchor::RegisterHooks() {
         }
     });
 
+    COND_VB_SHOULD(VB_APPLY_TUNIC_COLOR, isConnected, {
+        Actor* actor = va_arg(args, Actor*);
+        Color_RGB8* color = va_arg(args, Color_RGB8*);
+        Anchor::Instance->GetPlayerColor(actor, color);
+    });
+
     COND_HOOK(OnPlayerSfx, isConnected, [&](u16 sfxId) { SendPacket_PlayerSfx(sfxId); });
 
     COND_HOOK(OnSaveLoad, isConnected, [&](s16 fileNum) { SendPacket_RequestTeamState(); });
@@ -342,6 +349,8 @@ void Anchor::Init() {
                 ModNetwork_OnPeerOnlineChange(id, false);
         online = std::move(current);
     });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawBegin>(
+        [this] { PlayerTunic_SetPerPlayerTint(isConnected); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>([this] {
         if (connectionChanged.exchange(false)) {
             RegisterHooks();
@@ -355,4 +364,24 @@ uint32_t Anchor::GetDummyPlayerClientId(const Actor* actor) {
     if (actor == nullptr || actor->update != DummyPlayer_Update)
         return 0;
     return static_cast<const Player*>(static_cast<const void*>(actor))->zTargetActiveTimer;
+}
+
+bool Anchor::GetPlayerColor(const Actor* actor, Color_RGB8* color) {
+    if (!isConnected || actor == nullptr || color == nullptr || gPlayState == nullptr) {
+        return false;
+    }
+    if (actor == &GET_PLAYER(gPlayState)->actor) {
+        *color = CVarGetColor24("gNetwork.Anchor.Color", { 100, 255, 100 });
+        return true;
+    }
+    const auto client = clients.find(GetDummyPlayerClientId(actor));
+    if (client == clients.end()) {
+        return false;
+    }
+    *color = client->second.color;
+    return true;
+}
+
+extern "C" bool Anchor_GetPlayerColor(const Actor* actor, Color_RGB8* color) {
+    return Anchor::Instance != nullptr && Anchor::Instance->GetPlayerColor(actor, color);
 }

@@ -151,6 +151,7 @@ class Anchor : public Network {
     void Init();
     void Enable();
     uint32_t GetDummyPlayerClientId(const Actor* actor);
+    bool GetPlayerColor(const Actor* actor, Color_RGB8* color);
     void SendPacket_Summon(uint32_t clientId);
     void ApplyFlag(s16 scene, FlagType type, uint32_t flag, bool state);
     void SendPacket_CustomProgress(const std::string& kind, const char* key, bool state);

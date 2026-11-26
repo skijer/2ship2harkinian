@@ -6,6 +6,7 @@
 #include "global.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
+#include "2s2h/BenGui/CosmeticEditor.h"
 
 #include "objects/gameplay_keep/gameplay_keep.h"
 
@@ -2129,6 +2130,7 @@ void Player_DrawImpl(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dL
         lod = 0;
     }
     sPlayerLod = lod;
+    PlayerTunic_BindDrawColor(play, actor);
     SkelAnime_DrawFlexLod(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, actor, lod);
 
     CLOSE_DISPS(play->state.gfxCtx);

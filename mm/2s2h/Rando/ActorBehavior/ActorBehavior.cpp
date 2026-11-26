@@ -1,9 +1,12 @@
 #include "ActorBehavior.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#include <spdlog/spdlog.h>
+#include "2s2h/ModApi/ModApi.h"
 #include "2s2h/ObjectExtension/ObjectExtension.h"
 
 extern "C" {
 #include "variables.h"
+#include "overlays/actors/ovl_En_Sw/z_en_sw.h"
 }
 
 struct ActorRandoCheckId {
@@ -13,6 +16,60 @@ static ObjectExtension::Register<ActorRandoCheckId> ActorRandoCheckIdRegister;
 
 bool Rando::ActorBehavior::ShouldMatchContainerStyle() {
     return GameInteractor_Should(VB_RANDO_MATCH_CONTAINER_STYLE, CVarGetInteger("gRando.CSMC", 0) != 0);
+}
+
+RandoItemType Rando::ActorBehavior::GetContainerItemType(RandoCheckId randoCheckId) {
+    return RandoItems_GetContainerType(Rando::ConvertItem(RANDO_SAVE_CHECKS[randoCheckId].randoItemId, randoCheckId));
+}
+
+static S2HContainerStyle GetContainerStyle(RandoItemType randoItemType) {
+    switch (randoItemType) {
+        case RITYPE_JUNK:
+            return S2H_CONTAINER_STYLE_JUNK;
+        case RITYPE_LESSER:
+            return S2H_CONTAINER_STYLE_LESSER;
+        case RITYPE_MAJOR:
+            return S2H_CONTAINER_STYLE_MAJOR;
+        case RITYPE_HEALTH:
+            return S2H_CONTAINER_STYLE_HEALTH;
+        case RITYPE_SMALL_KEY:
+            return S2H_CONTAINER_STYLE_SMALL_KEY;
+        case RITYPE_BOSS_KEY:
+            return S2H_CONTAINER_STYLE_BOSS_KEY;
+        case RITYPE_SKULLTULA_TOKEN:
+            return S2H_CONTAINER_STYLE_TOKEN;
+        case RITYPE_MASK:
+            return S2H_CONTAINER_STYLE_MASK;
+        case RITYPE_STRAY_FAIRY:
+            return S2H_CONTAINER_STYLE_STRAY_FAIRY;
+        default:
+            SPDLOG_WARN("[Rando] Item type {} has no container style", static_cast<int>(randoItemType));
+            return S2H_CONTAINER_STYLE_JUNK;
+    }
+}
+
+// A gold Skulltula carries its token's chest flag, which names the check before the token spawns.
+static RandoCheckId GetActorRandoCheckId(Actor* actor) {
+    if (actor->id == ACTOR_EN_SW && ENSW_GET_3(actor)) {
+        return Rando::StaticData::GetCheckFromFlag(FLAG_CYCL_SCENE_CHEST, ENSW_GET_FC(actor), gPlayState->sceneId)
+            .randoCheckId;
+    }
+    return Rando::ActorBehavior::GetObjectRandoCheckId(actor);
+}
+
+static uint8_t GetActorContainerStyle(Actor* actor) {
+    if (!IS_RANDO || actor == nullptr || !Rando::ActorBehavior::ShouldMatchContainerStyle()) {
+        return S2H_CONTAINER_STYLE_NONE;
+    }
+    const RandoCheckId randoCheckId = GetActorRandoCheckId(actor);
+    if (randoCheckId == RC_UNKNOWN) {
+        return S2H_CONTAINER_STYLE_NONE;
+    }
+    const RandoSaveCheck& saveCheck = RANDO_SAVE_CHECKS[randoCheckId];
+    if (!saveCheck.shuffled || saveCheck.cycleObtained) {
+        return S2H_CONTAINER_STYLE_NONE;
+    }
+    return GetContainerStyle(Rando::ActorBehavior::GetContainerItemType(randoCheckId));
 }
 
 // This is kind of a catch-all for things that are simple enough to not need their own file.
@@ -45,6 +102,7 @@ void Rando::ActorBehavior::SetObjectRandoCheckId(const void* object, RandoCheckI
 
 // Entry point for the module, run once on game boot
 void Rando::ActorBehavior::Init() {
+    ModApi_PublishHostService("rando.container_style", reinterpret_cast<void*>(GetActorContainerStyle));
 }
 
 void Rando::ActorBehavior::OnFileLoad() {

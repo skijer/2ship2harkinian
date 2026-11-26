@@ -37,6 +37,8 @@ void RandoItems_Give(RandoItemId randoItemId);
 void RandoItems_Remove(RandoItemId randoItemId);
 void RandoItems_SeedLogicBank();
 const S2HKeyRing* RandoItems_GetKeyRing(RandoItemId randoItemId);
+// Only Container Style Matches Contents reads this; logic and pools keep randoItemType.
+RandoItemType RandoItems_GetContainerType(RandoItemId randoItemId);
 const char* RandoItems_GetIconPath(RandoItemId randoItemId);
 void RandoItems_Draw(RandoItemId randoItemId);
 #endif

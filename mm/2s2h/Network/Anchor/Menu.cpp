@@ -53,7 +53,9 @@ void AnchorFormMenu(WidgetInfo& info) {
     }
     UIWidgets::PopStyleInput();
 
-    ImGui::Text("Name");
+    ImGui::Text("Name & Color");
+    UIWidgets::CVarColorPicker("##Color", "gNetwork.Anchor.Color", { 100, 255, 100, 255 });
+    ImGui::SameLine();
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
     if (UIWidgets::InputString("##Name", &anchorName, UIWidgets::InputOptions().Color(THEME_COLOR))) {
         CVarSetString("gNetwork.Anchor.Name", anchorName.c_str());

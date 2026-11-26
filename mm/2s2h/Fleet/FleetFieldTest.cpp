@@ -547,6 +547,7 @@ enum class ShowPhase { Idle, Queued, Started, Showing, Done, Unknown };
 struct GetItemShow {
     std::string item;
     std::string owner;
+    std::string label;
     ShowPhase phase = ShowPhase::Idle;
     int quietFrames = 0;
 };
@@ -582,8 +583,8 @@ void StartGetItemShow(PlayState* play) {
     const RandoItemId item =
         sShow.owner == kShowGame
             ? FleetItemDraw_FindItem(sShow.item.c_str())
-            : static_cast<RandoItemId>(
-                  RandoItems_GetRandoGet(FleetForeignItems_RegisterLoose(sShow.owner, sShow.item).c_str()));
+            : static_cast<RandoItemId>(RandoItems_GetRandoGet(
+                  FleetForeignItems_RegisterLoose(sShow.owner, sShow.item, sShow.label).c_str()));
     if (item <= RI_UNKNOWN) {
         sShow.phase = ShowPhase::Unknown;
         return;
@@ -721,7 +722,8 @@ std::optional<std::string> FleetFieldTest_Request(const std::string& request, co
         return nlohmann::json{ { "queued", sPhoto.item } }.dump();
     }
     if (request == "TestGetItem") {
-        sShow = { input.value("item", std::string{}), input.value("owner", std::string(kShowGame)), ShowPhase::Queued, 0 };
+        const std::string item = input.value("item", std::string{});
+        sShow = { item, input.value("owner", std::string(kShowGame)), input.value("label", item), ShowPhase::Queued, 0 };
         return Status().dump();
     }
     if (request == "TestItemAssets") {

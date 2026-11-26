@@ -469,11 +469,33 @@ void ApplySharedEquips(const nlohmann::json& equips) {
     ReloadSharedButtonIcons();
 }
 
+bool IsMagicMeterFilling() {
+    return gSaveContext.save.saveInfo.playerData.isMagicAcquired &&
+           (gSaveContext.magicState == MAGIC_STATE_STEP_CAPACITY || gSaveContext.magicState == MAGIC_STATE_FILL);
+}
+
+// A loaded save keeps its magic until the interface moves it to magicFillTarget and refills the meter from 0.
+int GetSharedMagic() {
+    return IsMagicMeterFilling() ? gSaveContext.magicFillTarget : gSaveContext.save.saveInfo.playerData.magic;
+}
+
+void SetSharedMagic(int magic) {
+    auto& player = gSaveContext.save.saveInfo.playerData;
+    const int fullMeter = (player.isDoubleMagicAcquired + 1) * MAGIC_NORMAL_METER;
+    if (player.magicLevel == 0) {
+        player.magic = static_cast<s8>(std::clamp(magic, 0, fullMeter));
+    } else if (IsMagicMeterFilling()) {
+        gSaveContext.magicFillTarget = static_cast<s16>(std::clamp(magic, 0, fullMeter));
+    } else {
+        player.magic = static_cast<s8>(std::clamp(magic, 0, static_cast<int>(gSaveContext.magicCapacity)));
+    }
+}
+
 nlohmann::json ReadLiveState() {
     const auto& player = gSaveContext.save.saveInfo.playerData;
     return { { "rupees", player.rupees },
              { "health", player.health },
-             { "magic", player.magic },
+             { "magic", GetSharedMagic() },
              { "chateau", CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI) != 0 },
              { "equips", ReadSharedEquips() } };
 }
@@ -489,8 +511,7 @@ void ApplyLiveState(const nlohmann::json& state) {
             static_cast<s16>(std::min(state.at("health").get<int>(), static_cast<int>(player.healthCapacity)));
     }
     if (state.contains("magic") && player.isMagicAcquired) {
-        player.magic =
-            static_cast<s8>(std::clamp(state.at("magic").get<int>(), 0, static_cast<int>(gSaveContext.magicCapacity)));
+        SetSharedMagic(state.at("magic").get<int>());
     }
     if (state.contains("chateau")) {
         if (state.at("chateau").get<bool>()) {

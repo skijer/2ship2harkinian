@@ -103,7 +103,9 @@ void DummyPlayer_Init(Actor* actor, PlayState* play) {
     player->actor.colChkInfo.damageTable = &DummyPlayerDamageTable;
 
     if (!Anchor::IsGlobalRoom()) {
-        NameTag_RegisterForActorWithOptions(actor, client.name.c_str(), { .yOffset = 30 });
+        NameTag_RegisterForActorWithOptions(
+            actor, client.name.c_str(),
+            { .yOffset = 30, .textColor = { client.color.r, client.color.g, client.color.b, 255 } });
     }
 }
 

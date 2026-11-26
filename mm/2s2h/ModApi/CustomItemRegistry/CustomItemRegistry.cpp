@@ -831,7 +831,8 @@ bool CustomItemRegistry_Register(const S2HCustomItemDefinition* definition) {
     return true;
 }
 
-bool CustomItemRegistry_UpdateSeedPresentation(const char* key, const char* getItemText, uint32_t randomizerFlags) {
+bool CustomItemRegistry_UpdateSeedPresentation(const char* key, const char* getItemText, uint32_t randomizerFlags,
+                                               uint8_t containerStyle) {
     const auto found = key != nullptr ? sCustomItems.find(key) : sCustomItems.end();
     if (found == sCustomItems.end() || found->second->definition.randomizer == nullptr) {
         return false;
@@ -839,6 +840,7 @@ bool CustomItemRegistry_UpdateSeedPresentation(const char* key, const char* getI
     RegisteredCustomItem& item = *found->second;
     SetString(item.definition.getItemText, item.getItemText, getItemText);
     item.randomizer.flags = randomizerFlags;
+    item.randomizer.containerStyle = containerStyle;
     RandoItems_RebuildRow(item.key.c_str());
     return true;
 }

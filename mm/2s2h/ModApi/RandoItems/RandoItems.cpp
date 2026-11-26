@@ -126,6 +126,34 @@ void AddKeyRingToPool(const ModItem& item, const S2HKeyRing& keyRing, std::vecto
     itemPool.push_back(static_cast<RandoItemId>(item.randoItem));
 }
 
+RandoItemType GetStyleType(S2HContainerStyle style, RandoItemType derived) {
+    switch (style) {
+        case S2H_CONTAINER_STYLE_NONE:
+            return derived;
+        case S2H_CONTAINER_STYLE_JUNK:
+            return RITYPE_JUNK;
+        case S2H_CONTAINER_STYLE_LESSER:
+            return RITYPE_LESSER;
+        case S2H_CONTAINER_STYLE_MAJOR:
+            return RITYPE_MAJOR;
+        case S2H_CONTAINER_STYLE_HEALTH:
+            return RITYPE_HEALTH;
+        case S2H_CONTAINER_STYLE_SMALL_KEY:
+            return RITYPE_SMALL_KEY;
+        case S2H_CONTAINER_STYLE_BOSS_KEY:
+            return RITYPE_BOSS_KEY;
+        case S2H_CONTAINER_STYLE_TOKEN:
+            return RITYPE_SKULLTULA_TOKEN;
+        case S2H_CONTAINER_STYLE_MASK:
+            return RITYPE_MASK;
+        case S2H_CONTAINER_STYLE_STRAY_FAIRY:
+            return RITYPE_STRAY_FAIRY;
+        default:
+            SPDLOG_WARN("[RandoItems] Unknown container style {}", static_cast<int>(style));
+            return derived;
+    }
+}
+
 S2HRandoInfBank GetActiveBank() {
     return RandoInfCustom_GetActiveBank();
 }
@@ -285,6 +313,13 @@ const S2HKeyRing* RandoItems_GetKeyRing(RandoItemId randoItemId) {
     const ModItem* item = Find(randoItemId);
     const S2HCustomItemRandomizer* block = item != nullptr ? GetRandomizerBlock(*item) : nullptr;
     return block != nullptr ? block->keyRing : nullptr;
+}
+
+RandoItemType RandoItems_GetContainerType(RandoItemId randoItemId) {
+    const RandoItemType derived = Rando::StaticData::Items[randoItemId].randoItemType;
+    const ModItem* item = Find(randoItemId);
+    const S2HCustomItemRandomizer* block = item != nullptr ? GetRandomizerBlock(*item) : nullptr;
+    return block != nullptr ? GetStyleType(static_cast<S2HContainerStyle>(block->containerStyle), derived) : derived;
 }
 
 const char* RandoItems_GetIconPath(RandoItemId randoItemId) {

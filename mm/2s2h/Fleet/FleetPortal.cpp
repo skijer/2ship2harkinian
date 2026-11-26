@@ -127,6 +127,8 @@ void OpenSave() {
 
 void BootIntoPlay(const Arrival& arrival) {
     FleetRuntime_Initialize();
+    // A title demo cutscene (0xFFF0+) left queued would block pausing; the load below queues its own.
+    gSaveContext.nextCutsceneIndex = 0xFFEF;
     gSaveContext.fileNum = arrival.slot;
     if (SaveManager_SlotExists(arrival.slot)) {
         OpenSave();
