@@ -862,7 +862,8 @@ void RegisterEnemyRandomizer() {
         }
     });
 
-    COND_HOOK(OnActorDestroy, isActive, ReleaseReplacedChild);
+    // Children replaced before the mode is turned off still die after it, and must leave sReplacedChildren then.
+    COND_HOOK(OnActorDestroy, true, ReleaseReplacedChild);
 }
 
 // Always on: mods (e.g. the spawn tester) place minibosses away from home without the randomizer running.

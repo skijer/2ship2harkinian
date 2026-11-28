@@ -781,3 +781,15 @@ RandoSeedGenerationScope::~RandoSeedGenerationScope() {
     RandoInfCustom_EndLogicSimulation();
     ProgressiveItems_ResetLogic();
 }
+
+void RandoLogic_EditWorld(void (*edit)()) {
+    const bool isWorldWrapped = !sWrappedConditions.empty();
+    if (isWorldWrapped) {
+        UnwrapWorld();
+    }
+    edit();
+    if (isWorldWrapped) {
+        IndexWorld();
+        WrapWorld();
+    }
+}

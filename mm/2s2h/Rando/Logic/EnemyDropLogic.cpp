@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "Logic.h"
+#include "2s2h/ModApi/RandoLogic/RandoLogic.h"
 #include "2s2h/Rando/ActorBehavior/ActorBehavior.h"
 
 namespace Rando {
@@ -96,9 +97,7 @@ void CollectEarnableDrops() {
     }
 }
 
-} // namespace
-
-void RefreshEnemyDropLogic() {
+void RelocateDropsForPlacement() {
     RemoveRelocatedDrops();
     sEarnableDrops.clear();
     if (!EnemyRandomizer::IsPlacementActive()) {
@@ -108,6 +107,12 @@ void RefreshEnemyDropLogic() {
         RelocateDropsInRegion(regionId, region);
     }
     CollectEarnableDrops();
+}
+
+} // namespace
+
+void RefreshEnemyDropLogic() {
+    RandoLogic_EditWorld(RelocateDropsForPlacement);
 }
 
 // Drops without an actor profile (cutscene deaths: Captain Keeta, Gomess, Igos) keep their own logic.

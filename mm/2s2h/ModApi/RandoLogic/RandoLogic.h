@@ -135,6 +135,10 @@ class RandoSeedGenerationScope {
     RandoSeedGenerationScope(const RandoSeedGenerationScope&) = delete;
     RandoSeedGenerationScope& operator=(const RandoSeedGenerationScope&) = delete;
 };
+
+// Inside a RandoSeedGenerationScope the world's conditions are wrapped in place, so any change to Regions goes
+// through here: the world is unwrapped around the edit and wrapped again after it.
+void RandoLogic_EditWorld(void (*edit)());
 #endif
 
 #define LOGIC_MOD_GRANTS(name)                                                          \
