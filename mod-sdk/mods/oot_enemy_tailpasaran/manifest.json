@@ -2,7 +2,7 @@
   "name": "oot_enemy_tailpasaran",
   "display_name": "Tailpasaran",
   "author": "Skijer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "game": "mm",
   "dependencies": [
     "oot_assets"

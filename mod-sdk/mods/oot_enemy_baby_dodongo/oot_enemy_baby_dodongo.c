@@ -8,12 +8,10 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
-#include "objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h"
 
 #define BABY_DODONGO_KEY "oot.baby_dodongo"
 #define DODONGO_FAMILY_KEY "oot.dodongo"
-#define DODONGO_SOUL_ITEM_KEY "soul.oot.dodongo"
 #define DODOJR_OBJECT "objects/oot_object_dodojr/"
 #define DODOJR_ASSET(name) "__OTR__" DODOJR_OBJECT name
 
@@ -644,65 +642,6 @@ static void EnDodojr_Draw(Actor* thisx, PlayState* play) {
                       &this->actor);
 }
 
-static Gfx sSoulEmptyDL[] = {
-    gsSPEndDisplayList(),
-};
-
-// The soul shows its enemy in an idle loop, as Majora's Mask souls do.
-static void DrawSoulModel(PlayState* play) {
-    static SkelAnime sSoulSkelAnime;
-    static Vec3s sSoulJointTable[DODOJR_LIMB_MAX];
-    static Vec3s sSoulMorphTable[DODOJR_LIMB_MAX];
-    static bool sIsSoulPosed = false;
-    static u32 sSoulFrame = 0;
-
-    if (!sIsSoulPosed) {
-        SkelAnime_Init(play, &sSoulSkelAnime, (SkeletonHeader*)sSkel, ANIM(sCrawlAnim), sSoulJointTable,
-                       sSoulMorphTable, DODOJR_LIMB_MAX);
-        sIsSoulPosed = true;
-    }
-    if (sSoulFrame != play->state.frames) {
-        sSoulFrame = play->state.frames;
-        SkelAnime_Update(&sSoulSkelAnime);
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Matrix_Push();
-    Gfx_SetupDL25_Opa(play->state.gfxCtx);
-    Matrix_Scale(0.03f, 0.03f, 0.03f, MTXMODE_APPLY);
-    // Side on: from the front the long body hides behind its head.
-    Matrix_RotateYS(0x4000, MTXMODE_APPLY);
-    // Animations place the root far from the origin; the soul floats on its root instead.
-    Matrix_Translate(-sSoulJointTable[0].x, -sSoulJointTable[0].y, -sSoulJointTable[0].z, MTXMODE_APPLY);
-    // Eyes and effects read segments the actor fills; with no actor they point at harmless lists.
-    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x09, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0A, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0B, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)sSoulEmptyDL);
-    SkelAnime_DrawOpa(play, sSoulSkelAnime.skeleton, sSoulSkelAnime.jointTable, NULL, NULL, NULL);
-    Matrix_Pop();
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
-static void DrawSoul(PlayState* play, S2HGetItemEntry* entry) {
-    u32 frames = play->state.frames;
-
-    DrawSoulModel(play);
-
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    Matrix_ReplaceRotation(&play->billboardMtxF);
-    gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, 0, 0, 0x10, 0x20, 1, (frames * 2) & 0x3F,
-                                           (frames * -6) & 0x7F, 0x10, 0x20));
-    gDPSetPrimColor(POLY_XLU_DISP++, 0xC0, 0xC0, 230, 130, 60, 0);
-    gDPSetEnvColor(POLY_XLU_DISP++, 230, 130, 60, 0);
-    Matrix_Scale(0.13333333f, 0.13333333f, 0.13333333f, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gameplay_keep_DL_01ACF0);
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
 // Ship (RE_DODONGO): a sword, the hammer (Goron here), sticks, explosives, the slingshot or the bow.
 static bool CanKillBabyDodongo(void* userData) {
     return sApi->LogicHasCapability("CanUseSword") || sApi->LogicHasCapability("CanBeGoron") ||
@@ -710,30 +649,7 @@ static bool CanKillBabyDodongo(void* userData) {
            sApi->LogicCanUseItem(RI_BOW);
 }
 
-// The Dodongo family soul, as in Ship: a Dodongo mod defines it alike, so whichever loads first registers it.
-static void RegisterSoul(void) {
-    if (S2H_MOD_API_HAS(sApi, FindCustomItem) && sApi->FindCustomItem(DODONGO_SOUL_ITEM_KEY) != NULL) {
-        return;
-    }
-    static S2HCustomItemRandomizer sSoulLogic = { 0 };
-    S2HCustomItemDefinition soul = { 0 };
-
-    sSoulLogic.structSize = sizeof(sSoulLogic);
-    sSoulLogic.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
-    sSoulLogic.type = S2H_CUSTOM_ITEM_TYPE_ITEM;
-    sSoulLogic.logicKey = DODONGO_SOUL_ITEM_KEY;
-    sSoulLogic.hintKey = DODONGO_SOUL_ITEM_KEY;
-    soul.structSize = sizeof(soul);
-    soul.key = DODONGO_SOUL_ITEM_KEY;
-    soul.presentationFlags = S2H_ITEM_HIDE_FROM_KALEIDO;
-    soul.getItemText = "You got the %rSoul of Dodongos%w!&Dodongos can be defeated now.";
-    soul.getItemEntry.drawFunc = DrawSoul;
-    soul.randomizer = &sSoulLogic;
-    if (!sApi->RegisterCustomItem(&soul)) {
-        sApi->Log("Could not register " DODONGO_SOUL_ITEM_KEY);
-    }
-}
-
+// The Dodongo family soul, as in Ship: a Dodongo mod shares the key, and whichever loads first names it.
 static s16 RegisterBabyDodongo(void) {
     S2HActorDefinition definition = { 0 };
 
@@ -752,6 +668,14 @@ static s16 RegisterBabyDodongo(void) {
     definition.naviHint = "Baby Dodongo&It burrows up and lunges at you, and it&explodes when it dies. Keep away!";
     definition.soulKey = DODONGO_FAMILY_KEY;
     definition.logicKill = CanKillBabyDodongo;
+    definition.enemyCategory = S2H_ENEMY_CATEGORY_REGULAR;
+    definition.soulModel.skeleton = sSkel;
+    definition.soulModel.idleAnimation = sCrawlAnim;
+    definition.soulModel.limbCount = DODOJR_LIMB_MAX;
+    definition.soulModel.scale = 0.03f;
+    definition.soulModel.flameRed = 230;
+    definition.soulModel.flameGreen = 130;
+    definition.soulModel.flameBlue = 60;
     return sApi->RegisterActor(&definition);
 }
 
@@ -783,7 +707,5 @@ S2H_MOD_EXPORT void ModInit(void) {
     }
     if (RegisterBabyDodongo() < 0) {
         sApi->Log("Could not register " BABY_DODONGO_KEY);
-        return;
     }
-    RegisterSoul();
 }

@@ -16,7 +16,6 @@
 #define FLARE_DANCER_KEY "oot.flare_dancer"
 #define FLARE_DANCER_CORE_KEY "oot.flare_dancer.core"
 #define FLARE_DANCER_FIRE_KEY "oot.flare_dancer.fire"
-#define FLARE_DANCER_SOUL_KEY "soul.oot.flare_dancer"
 #define FW_OBJECT "objects/oot_object_fw/"
 #define FW_ASSET(name) "__OTR__" FW_OBJECT name
 
@@ -1518,64 +1517,6 @@ static void EnFdFire_Draw(Actor* thisx, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-static Gfx sSoulEmptyDL[] = {
-    gsSPEndDisplayList(),
-};
-
-// The soul shows its enemy in an idle loop, as Majora's Mask souls do.
-static void DrawSoulModel(PlayState* play) {
-    static SkelAnime sSoulSkelAnime;
-    static Vec3s sSoulJointTable[FD_LIMB_COUNT];
-    static Vec3s sSoulMorphTable[FD_LIMB_COUNT];
-    static bool sIsSoulPosed = false;
-    static u32 sSoulFrame = 0;
-
-    if (!sIsSoulPosed) {
-        SkelAnime_InitFlex(play, &sSoulSkelAnime, (FlexSkeletonHeader*)sSkel, (AnimationHeader*)sTwirlAnim,
-                           sSoulJointTable, sSoulMorphTable, FD_LIMB_COUNT);
-        sIsSoulPosed = true;
-    }
-    if (sSoulFrame != play->state.frames) {
-        sSoulFrame = play->state.frames;
-        SkelAnime_Update(&sSoulSkelAnime);
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Matrix_Push();
-    Gfx_SetupDL25_Opa(play->state.gfxCtx);
-    Matrix_Scale(0.01f, 0.01f, 0.01f, MTXMODE_APPLY);
-    // Animations place the root far from the origin; the soul floats on its root instead.
-    Matrix_Translate(-sSoulJointTable[0].x, -sSoulJointTable[0].y, -sSoulJointTable[0].z, MTXMODE_APPLY);
-    // Eyes and effects read segments the actor fills; with no actor they point at harmless lists.
-    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x09, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0A, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0B, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)sSoulEmptyDL);
-    SkelAnime_DrawFlexOpa(play, sSoulSkelAnime.skeleton, sSoulSkelAnime.jointTable, sSoulSkelAnime.dListCount, NULL,
-                          NULL, NULL);
-    Matrix_Pop();
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
-static void DrawSoul(PlayState* play, S2HGetItemEntry* entry) {
-    u32 frames = play->state.frames;
-
-    DrawSoulModel(play);
-
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    Matrix_ReplaceRotation(&play->billboardMtxF);
-    gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, 0, 0, 0x10, 0x20, 1, (frames * 2) & 0x3F,
-                                           (frames * -6) & 0x7F, 0x10, 0x20));
-    gDPSetPrimColor(POLY_XLU_DISP++, 0xC0, 0xC0, 255, 150, 60, 0);
-    gDPSetEnvColor(POLY_XLU_DISP++, 255, 150, 60, 0);
-    Matrix_Scale(0.13333333f, 0.13333333f, 0.13333333f, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gameplay_keep_DL_01ACF0);
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
 // Ship: the hammer (a Goron pound here) or the hookshot, or explosives plus a weapon for the core.
 static bool CanKillFlareDancer(void* userData) {
     bool canHitCore = sApi->LogicHasCapability("CanUseSword") || sApi->LogicCanUseItem(RI_DEKU_STICK) ||
@@ -1583,27 +1524,6 @@ static bool CanKillFlareDancer(void* userData) {
 
     return sApi->LogicHasCapability("CanBeGoron") || sApi->LogicCanUseItem(RI_HOOKSHOT) ||
            (sApi->LogicHasCapability("HasExplosives") && canHitCore);
-}
-
-static void RegisterSoul(void) {
-    static S2HCustomItemRandomizer sSoulLogic = { 0 };
-    S2HCustomItemDefinition soul = { 0 };
-
-    // Pool membership follows the host's soul shuffle and soul pool; the mod only declares the item.
-    sSoulLogic.structSize = sizeof(sSoulLogic);
-    sSoulLogic.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
-    sSoulLogic.type = S2H_CUSTOM_ITEM_TYPE_ITEM;
-    sSoulLogic.logicKey = FLARE_DANCER_SOUL_KEY;
-    sSoulLogic.hintKey = FLARE_DANCER_SOUL_KEY;
-    soul.structSize = sizeof(soul);
-    soul.key = FLARE_DANCER_SOUL_KEY;
-    soul.presentationFlags = S2H_ITEM_HIDE_FROM_KALEIDO;
-    soul.getItemText = "You got the %rSoul of Flare Dancers%w!&They can be defeated now.";
-    soul.getItemEntry.drawFunc = DrawSoul;
-    soul.randomizer = &sSoulLogic;
-    if (!sApi->RegisterCustomItem(&soul)) {
-        sApi->Log("Could not register " FLARE_DANCER_SOUL_KEY);
-    }
 }
 
 static S2HActorDefinition DefineEnemyActor(const char* key, const char* description, u32 flags, u32 size) {
@@ -1655,6 +1575,15 @@ static s16 RegisterFlareDancer(void) {
     // The host finds the soul item as "soul." + soulKey, so this is the family key.
     body.soulKey = FLARE_DANCER_KEY;
     body.logicKill = CanKillFlareDancer;
+    body.enemyCategory = S2H_ENEMY_CATEGORY_MINIBOSS;
+    body.soulModel.skeleton = sSkel;
+    body.soulModel.idleAnimation = sTwirlAnim;
+    body.soulModel.isFlex = true;
+    body.soulModel.limbCount = FD_LIMB_COUNT;
+    body.soulModel.scale = 0.01f;
+    body.soulModel.flameRed = 255;
+    body.soulModel.flameGreen = 150;
+    body.soulModel.flameBlue = 60;
     return sApi->RegisterActor(&body);
 }
 
@@ -1684,16 +1613,15 @@ S2H_MOD_EXPORT void ModInit(void) {
         sApi->Log(FLARE_DANCER_KEY ": OoT Asset Loader resources are missing; extract them to enable this enemy.");
         return;
     }
-    sCoreId = RegisterCore();
-    sFireId = RegisterFire();
-    if ((sCoreId < 0) || (sFireId < 0)) {
-        sApi->Log("Could not register " FLARE_DANCER_CORE_KEY " or " FLARE_DANCER_FIRE_KEY);
-        return;
-    }
+    // The first definition sharing a soul names it and sets its category, so the dancer comes before its core.
     sFlareDancerId = RegisterFlareDancer();
     if (sFlareDancerId < 0) {
         sApi->Log("Could not register " FLARE_DANCER_KEY);
         return;
     }
-    RegisterSoul();
+    sCoreId = RegisterCore();
+    sFireId = RegisterFire();
+    if ((sCoreId < 0) || (sFireId < 0)) {
+        sApi->Log("Could not register " FLARE_DANCER_CORE_KEY " or " FLARE_DANCER_FIRE_KEY);
+    }
 }

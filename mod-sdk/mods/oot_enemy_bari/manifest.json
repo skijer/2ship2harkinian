@@ -2,7 +2,7 @@
   "name": "oot_enemy_bari",
   "display_name": "Bari and Biri",
   "author": "Skijer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "game": "mm",
   "dependencies": [
     "oot_assets"

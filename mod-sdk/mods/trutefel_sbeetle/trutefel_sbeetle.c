@@ -1153,6 +1153,15 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.enemyFlags = S2H_ACTOR_ENEMY;
     definition.naviHint = "Scissors Beetle&It attacks by throwing its %rpincers%w&like boomerangs! Keep moving,&"
                           "then strike when they return!";
+    definition.soulKey = "nei.sbeetle";
+    definition.enemyCategory = S2H_ENEMY_CATEGORY_REGULAR;
+    definition.enemyOrigin = S2H_ENEMY_ORIGIN_CUSTOM;
+    definition.soulModel.skeleton = (const char*)&gScissorsBeetleSkel;
+    definition.soulModel.idleAnimation = (const char*)&gScissorsBeetleSkelIdle1Anim;
+    definition.soulModel.isFlex = true;
+    definition.soulModel.limbCount = GSCISSORSBEETLESKEL_NUM_LIMBS;
+    definition.soulModel.scale = 0.1f;
+    definition.isSoulModelInMemory = true;
 
     if (sApi->RegisterActor(&definition) < 0) {
         sApi->Log("Could not register " SBEETLE_KEY);

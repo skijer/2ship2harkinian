@@ -625,6 +625,15 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.draw = EnMiniblin_Draw;
     definition.enemyFlags = S2H_ACTOR_ENEMY;
     definition.naviHint = "Miniblin&It steals %rRupees%w with its tail!&Beat it quickly to get them back!";
+    definition.soulKey = "nei.miniblin";
+    definition.enemyCategory = S2H_ENEMY_CATEGORY_REGULAR;
+    definition.enemyOrigin = S2H_ENEMY_ORIGIN_CUSTOM;
+    definition.soulModel.skeleton = (const char*)&gMiniblinSkel;
+    definition.soulModel.idleAnimation = (const char*)&gMiniblinSkelIdleAnim;
+    definition.soulModel.isFlex = true;
+    definition.soulModel.limbCount = GMINIBLINSKEL_NUM_LIMBS;
+    definition.soulModel.scale = 0.0035f;
+    definition.isSoulModelInMemory = true;
 
     if (sApi->RegisterActor(&definition) < 0) {
         sApi->Log("Could not register " MINIBLIN_KEY);

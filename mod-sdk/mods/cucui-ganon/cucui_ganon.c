@@ -45,6 +45,8 @@
 #define PHANTOM_KEY "skijer.cucui_ganon.phantom"
 #define BOSS_HINT_KEY "skijer.cucui_ganon.boss"
 #define BOSS_KEY "skijer.cucui_ganon"
+#define BOSS_SOUL_KEY "nei.cucui_ganon"
+#define GANONDORF_LIMB_COUNT 26
 #define BOSS_MAX_HEALTH 80
 #define BOSS_PHASE2_HEALTH 40
 #define BACK_DAMAGE 1
@@ -100,12 +102,13 @@ static const SOHBossDefinition sCucuiBoss = {
 typedef struct CucuiBoss {
     Actor actor;
     SkelAnime skelAnime;
-    Vec3s joints[26];
-    Vec3s morphs[26];
+    Vec3s joints[GANONDORF_LIMB_COUNT];
+    Vec3s morphs[GANONDORF_LIMB_COUNT];
     s16 subCamId;
     Vec3f subCamEye;
     Vec3f subCamAt;
     Vec3f triforcePos;
+    bool hasStartedIntro;
 } CucuiBoss;
 
 static s16 sBossActorId = -1;
@@ -2144,6 +2147,14 @@ static void OnBossDamage(Actor* victim, ColliderInfo* attack, float* damage) {
     *damage = 0.0f;
 }
 
+static void BindBoss(CucuiBoss* boss) {
+    sBoss = boss;
+    sPlaying = false;
+    sFrame = 0;
+    sMusicStarted = false;
+    sMusicFrame = 0;
+}
+
 static void OnGanondorfUpdate(void* actorPtr) {
     CucuiBoss* boss = (CucuiBoss*)actorPtr;
     int i;
@@ -2152,11 +2163,7 @@ static void OnGanondorfUpdate(void* actorPtr) {
         return;
     }
     if (boss != sBoss) {
-        sBoss = boss;
-        sPlaying = false;
-        sFrame = 0;
-        sMusicStarted = false;
-        sMusicFrame = 0;
+        BindBoss(boss);
     }
     if (sPlaying) {
         UpdateBossHurtbox(boss, gPlayState);
@@ -2280,24 +2287,37 @@ static void CucuiInit(Actor* actor, PlayState* play) {
     actor->colChkInfo.health = BOSS_MAX_HEALTH;
     actor->hintId = sBossNaviHintId;
     SkelAnime_InitFlex(play, &boss->skelAnime, (FlexSkeletonHeader*)gGanondorfSkel, NULL, boss->joints, boss->morphs,
-                       26);
+                       GANONDORF_LIMB_COUNT);
     memcpy(boss->joints, sNeutralJoints, sizeof(boss->joints));
     actor->world.pos.y = FindArenaFloorY(boss, play) + 400.0f;
+    boss->subCamId = 0;
+    boss->hasStartedIntro = false;
+    // Bound here so a later Majora spawn in the same scene reuses this boss instead of spawning another.
+    BindBoss(boss);
+}
+
+// Runs on the first update, not in init: a missing Boss Soul holds updates, so Link is never frozen without it.
+static void StartIntro(CucuiBoss* boss, PlayState* play) {
+    boss->hasStartedIntro = true;
     Cutscene_StartManual(play, &play->csCtx);
-    Player_SetCsActionWithHaltedActors(play, actor, PLAYER_CSACTION_WAIT);
+    Player_SetCsActionWithHaltedActors(play, &boss->actor, PLAYER_CSACTION_WAIT);
     boss->subCamId = Play_CreateSubCamera(play);
-    if (boss->subCamId > CAM_ID_MAIN) {
-        Play_ChangeCameraStatus(play, CAM_ID_MAIN, CAM_STATUS_WAIT);
-        Play_ChangeCameraStatus(play, boss->subCamId, CAM_STATUS_ACTIVE);
-    } else
+    if (boss->subCamId <= CAM_ID_MAIN) {
         boss->subCamId = 0;
-    OnGanondorfUpdate(actor);
+        return;
+    }
+    Play_ChangeCameraStatus(play, CAM_ID_MAIN, CAM_STATUS_WAIT);
+    Play_ChangeCameraStatus(play, boss->subCamId, CAM_STATUS_ACTIVE);
 }
 
 static void CucuiUpdate(Actor* actor, PlayState* play) {
     CucuiBoss* boss = (CucuiBoss*)actor;
-    if (sPlaying)
+    if (!boss->hasStartedIntro) {
+        StartIntro(boss, play);
+    }
+    if (sPlaying) {
         DanceAction(boss, play);
+    }
     OnGanondorfUpdate(actor);
 }
 
@@ -2407,6 +2427,16 @@ SOH_MOD_EXPORT void ModInit(void) {
     boss.destroy = CucuiDestroy;
     boss.update = CucuiUpdate;
     boss.draw = CucuiDraw;
+    // The host links the boss slot to this actor through the shared BOSS_KEY, which gates the fight on its soul.
+    boss.enemyFlags = SOH_ACTOR_ENEMY;
+    boss.soulKey = BOSS_SOUL_KEY;
+    boss.enemyCategory = S2H_ENEMY_CATEGORY_BOSS;
+    boss.enemyOrigin = S2H_ENEMY_ORIGIN_CUSTOM;
+    boss.soulModel.skeleton = gGanondorfSkel;
+    boss.soulModel.idleAnimation = gGanondorfStandIdleAnim;
+    boss.soulModel.isFlex = true;
+    boss.soulModel.limbCount = GANONDORF_LIMB_COUNT;
+    boss.soulModel.scale = 0.01f;
     sBossActorId = sApi->RegisterActor(&boss);
     SOH_REGISTER_HOOK_FOR_ID(sApi, ShouldActorInit, ACTOR_BOSS_07, ReplaceMajora);
     if (SOH_MOD_API_HAS(sApi, RegisterActor)) {

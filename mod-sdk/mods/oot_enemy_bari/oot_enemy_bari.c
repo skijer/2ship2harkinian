@@ -8,11 +8,9 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
-#include "objects/gameplay_keep/gameplay_keep.h"
 
 #define BARI_KEY "oot.bari"
 #define BIRI_KEY "oot.biri"
-#define BARI_SOUL_KEY "soul.oot.bari"
 #define VALI_OBJECT "objects/oot_object_vali/"
 #define VALI_ASSET(name) "__OTR__" VALI_OBJECT name
 #define BL_OBJECT "objects/oot_object_bl/"
@@ -1319,89 +1317,11 @@ static void EnBili_Draw(Actor* thisx, PlayState* play) {
                             ACTOR_DRAW_DMGEFF_FROZEN_NO_SFX);
 }
 
-static Gfx sSoulEmptyDL[] = {
-    gsSPEndDisplayList(),
-};
-
-// The soul shows its enemy in an idle loop, as Majora's Mask souls do.
-static void DrawSoulModel(PlayState* play) {
-    static SkelAnime sSoulSkelAnime;
-    static Vec3s sSoulJointTable[VALI_LIMB_MAX];
-    static Vec3s sSoulMorphTable[VALI_LIMB_MAX];
-    static bool sIsSoulPosed = false;
-    static u32 sSoulFrame = 0;
-
-    if (!sIsSoulPosed) {
-        SkelAnime_Init(play, &sSoulSkelAnime, (SkeletonHeader*)sBariSkel, ANIM(sBariLurkingAnim), sSoulJointTable,
-                       sSoulMorphTable, VALI_LIMB_MAX);
-        sIsSoulPosed = true;
-    }
-    if (sSoulFrame != play->state.frames) {
-        sSoulFrame = play->state.frames;
-        SkelAnime_Update(&sSoulSkelAnime);
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Matrix_Push();
-    Gfx_SetupDL25_Opa(play->state.gfxCtx);
-    Matrix_Scale(0.01f, 0.01f, 0.01f, MTXMODE_APPLY);
-    // Animations place the root far from the origin; the soul floats on its root instead.
-    Matrix_Translate(-sSoulJointTable[0].x, -sSoulJointTable[0].y, -sSoulJointTable[0].z, MTXMODE_APPLY);
-    // Eyes and effects read segments the actor fills; with no actor they point at harmless lists.
-    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x09, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0A, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0B, (uintptr_t)sSoulEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)sSoulEmptyDL);
-    SkelAnime_DrawOpa(play, sSoulSkelAnime.skeleton, sSoulSkelAnime.jointTable, NULL, NULL, NULL);
-    Matrix_Pop();
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
-static void DrawSoul(PlayState* play, S2HGetItemEntry* entry) {
-    u32 frames = play->state.frames;
-
-    DrawSoulModel(play);
-
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    Matrix_ReplaceRotation(&play->billboardMtxF);
-    gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, 0, 0, 0x10, 0x20, 1, (frames * 2) & 0x3F,
-                                           (frames * -6) & 0x7F, 0x10, 0x20));
-    gDPSetPrimColor(POLY_XLU_DISP++, 0xC0, 0xC0, 120, 220, 255, 0);
-    gDPSetEnvColor(POLY_XLU_DISP++, 120, 220, 255, 0);
-    Matrix_Scale(0.13333333f, 0.13333333f, 0.13333333f, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gameplay_keep_DL_01ACF0);
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
 // Ship (RE_BARI, both jellyfish): hookshot or boomerang, bow, explosives, hammer, sticks or a shocked sword.
 static bool CanKillJellyfish(void* userData) {
     return sApi->LogicHasCapability("HookshotOrBoomerang") || sApi->LogicCanUseItem(RI_BOW) ||
            sApi->LogicHasCapability("HasExplosives") || sApi->LogicHasCapability("CanBeGoron") ||
            sApi->LogicCanUseItem(RI_DEKU_STICK) || sApi->LogicHasCapability("CanUseSword");
-}
-
-static void RegisterSoul(void) {
-    static S2HCustomItemRandomizer sSoulLogic = { 0 };
-    S2HCustomItemDefinition soul = { 0 };
-
-    // Pool membership follows the host's soul shuffle and soul pool; the mod only declares the item.
-    sSoulLogic.structSize = sizeof(sSoulLogic);
-    sSoulLogic.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
-    sSoulLogic.type = S2H_CUSTOM_ITEM_TYPE_ITEM;
-    sSoulLogic.logicKey = BARI_SOUL_KEY;
-    sSoulLogic.hintKey = BARI_SOUL_KEY;
-    soul.structSize = sizeof(soul);
-    soul.key = BARI_SOUL_KEY;
-    soul.presentationFlags = S2H_ITEM_HIDE_FROM_KALEIDO;
-    soul.getItemText = "You got the %rSoul of Bari%w!&Bari and Biri can be defeated now.";
-    soul.getItemEntry.drawFunc = DrawSoul;
-    soul.randomizer = &sSoulLogic;
-    if (!sApi->RegisterCustomItem(&soul)) {
-        sApi->Log("Could not register " BARI_SOUL_KEY);
-    }
 }
 
 static S2HActorDefinition DefineJellyfish(const char* key, const char* description, u32 flags, u32 size) {
@@ -1443,6 +1363,14 @@ static s16 RegisterBari(void) {
     definition.draw = EnVali_Draw;
     // Vanilla Bari hang from the ceiling and drop in; the spawn is raised so it lurks above the floor.
     definition.enemySpawnHeight = BARI_LURK_HEIGHT;
+    definition.enemyCategory = S2H_ENEMY_CATEGORY_REGULAR;
+    definition.soulModel.skeleton = sBariSkel;
+    definition.soulModel.idleAnimation = sBariLurkingAnim;
+    definition.soulModel.limbCount = VALI_LIMB_MAX;
+    definition.soulModel.scale = 0.01f;
+    definition.soulModel.flameRed = 120;
+    definition.soulModel.flameGreen = 220;
+    definition.soulModel.flameBlue = 255;
     definition.naviHint = "Bari&A big electric jellyfish that splits when beaten.&Attack from afar when it sparks!";
     return sApi->RegisterActor(&definition);
 }
@@ -1473,13 +1401,13 @@ S2H_MOD_EXPORT void ModInit(void) {
         sApi->Log(BARI_KEY ": OoT Asset Loader resources are missing; extract them to enable this enemy.");
         return;
     }
+    // The first definition sharing a soul names it, so the Bari comes before the Biri.
+    if (RegisterBari() < 0) {
+        sApi->Log("Could not register " BARI_KEY);
+        return;
+    }
     sBiriId = RegisterBiri();
     if (sBiriId < 0) {
         sApi->Log("Could not register " BIRI_KEY);
-        return;
     }
-    if (RegisterBari() < 0) {
-        sApi->Log("Could not register " BARI_KEY);
-    }
-    RegisterSoul();
 }

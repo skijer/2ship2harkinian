@@ -11,7 +11,6 @@
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 #define TORCH_SLUG_KEY "oot.torch_slug"
-#define TORCH_SLUG_SOUL_KEY "soul.oot.torch_slug"
 #define BW_OBJECT "objects/oot_object_bw/"
 #define BW_ASSET(name) "__OTR__" BW_OBJECT name
 
@@ -967,83 +966,10 @@ static void EnBw_Draw(Actor* thisx, PlayState* play) {
                             ACTOR_DRAW_DMGEFF_FROZEN_NO_SFX);
 }
 
-// The soul shows its enemy in an idle loop, as Majora's Mask souls do.
-static void DrawSoulModel(PlayState* play) {
-    static SkelAnime sSoulSkelAnime;
-    static Vec3s sSoulJointTable[BW_LIMB_MAX];
-    static Vec3s sSoulMorphTable[BW_LIMB_MAX];
-    static bool sIsSoulPosed = false;
-    static u32 sSoulFrame = 0;
-
-    if (!sIsSoulPosed) {
-        SkelAnime_Init(play, &sSoulSkelAnime, (SkeletonHeader*)sSkel, ANIM(sEyestalkWaveAnim), sSoulJointTable,
-                       sSoulMorphTable, BW_LIMB_MAX);
-        sIsSoulPosed = true;
-    }
-    if (sSoulFrame != play->state.frames) {
-        sSoulFrame = play->state.frames;
-        SkelAnime_Update(&sSoulSkelAnime);
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Matrix_Push();
-    Gfx_SetupDL25_Opa(play->state.gfxCtx);
-    Matrix_Scale(0.013f, 0.013f, 0.013f, MTXMODE_APPLY);
-    // Animations place the root far from the origin; the soul floats on its root instead.
-    Matrix_Translate(-sSoulJointTable[0].x, -sSoulJointTable[0].y, -sSoulJointTable[0].z, MTXMODE_APPLY);
-    // Eyes and effects read segments the actor fills; with no actor they point at harmless lists.
-    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x09, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0A, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0B, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)sEmptyDL);
-    SkelAnime_DrawOpa(play, sSoulSkelAnime.skeleton, sSoulSkelAnime.jointTable, NULL, NULL, NULL);
-    Matrix_Pop();
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
-static void DrawSoul(PlayState* play, S2HGetItemEntry* entry) {
-    u32 frames = play->state.frames;
-
-    DrawSoulModel(play);
-
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    Matrix_ReplaceRotation(&play->billboardMtxF);
-    gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, 0, 0, 0x10, 0x20, 1, (frames * 2) & 0x3F,
-                                           (frames * -6) & 0x7F, 0x10, 0x20));
-    gDPSetPrimColor(POLY_XLU_DISP++, 0xC0, 0xC0, 255, 120, 40, 0);
-    gDPSetEnvColor(POLY_XLU_DISP++, 255, 120, 40, 0);
-    Matrix_Scale(0.13333333f, 0.13333333f, 0.13333333f, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gameplay_keep_DL_01ACF0);
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
 // Ship (RE_TORCH_SLUG): a jumpslash (sword or Goron here), explosives or the bow.
 static bool CanKillTorchSlug(void* userData) {
     return sApi->LogicHasCapability("CanUseSword") || sApi->LogicHasCapability("CanBeGoron") ||
            sApi->LogicHasCapability("HasExplosives") || sApi->LogicCanUseItem(RI_BOW);
-}
-
-static void RegisterSoul(void) {
-    static S2HCustomItemRandomizer sSoulLogic = { 0 };
-    S2HCustomItemDefinition soul = { 0 };
-
-    sSoulLogic.structSize = sizeof(sSoulLogic);
-    sSoulLogic.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
-    sSoulLogic.type = S2H_CUSTOM_ITEM_TYPE_ITEM;
-    sSoulLogic.logicKey = TORCH_SLUG_SOUL_KEY;
-    sSoulLogic.hintKey = TORCH_SLUG_SOUL_KEY;
-    soul.structSize = sizeof(soul);
-    soul.key = TORCH_SLUG_SOUL_KEY;
-    soul.presentationFlags = S2H_ITEM_HIDE_FROM_KALEIDO;
-    soul.getItemText = "You got the %rSoul of Torch Slug%w!&They can be defeated now.";
-    soul.getItemEntry.drawFunc = DrawSoul;
-    soul.randomizer = &sSoulLogic;
-    if (!sApi->RegisterCustomItem(&soul)) {
-        sApi->Log("Could not register " TORCH_SLUG_SOUL_KEY);
-    }
 }
 
 static s16 RegisterTorchSlug(void) {
@@ -1064,6 +990,14 @@ static s16 RegisterTorchSlug(void) {
     definition.naviHint = "Torch Slug&Its flame burns you. Put the fire out&with a blow, then strike again!";
     definition.soulKey = TORCH_SLUG_KEY;
     definition.logicKill = CanKillTorchSlug;
+    definition.enemyCategory = S2H_ENEMY_CATEGORY_REGULAR;
+    definition.soulModel.skeleton = sSkel;
+    definition.soulModel.idleAnimation = sEyestalkWaveAnim;
+    definition.soulModel.limbCount = BW_LIMB_MAX;
+    definition.soulModel.scale = 0.013f;
+    definition.soulModel.flameRed = 255;
+    definition.soulModel.flameGreen = 120;
+    definition.soulModel.flameBlue = 40;
     return sApi->RegisterActor(&definition);
 }
 
@@ -1095,7 +1029,5 @@ S2H_MOD_EXPORT void ModInit(void) {
     }
     if (RegisterTorchSlug() < 0) {
         sApi->Log("Could not register " TORCH_SLUG_KEY);
-        return;
     }
-    RegisterSoul();
 }

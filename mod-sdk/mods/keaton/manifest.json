@@ -2,7 +2,8 @@
     "name": "keaton",
     "dependencies": ["oot_assets"],
     "author": "Skijer",
-    "version": "1.0.1",
+    "version": "1.0.2",
+    "game": "mm",
     "description": "The Keaton Mask takes the place of OoT's: wearing it turns Link into Keaton, three tails and all.",
     "requires": [
         "misc/link_animetion/gPlayerAnim_pg_punchA_Data",

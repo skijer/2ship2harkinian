@@ -171,8 +171,10 @@ static void EnTp_PlayFlySfx(EnTp* this) {
 }
 
 static void EnTp_Tail_FollowHead(EnTp* this, PlayState* play) {
-    // The head is gone without dying, e.g. culled by the host; the tail falls apart with it.
-    if ((this->head == NULL) && (this->actor.params != TP_TYPE_TAIL_DYING)) {
+    // The head or the segment ahead is gone without dying (culled, or killed by a soulless spawn): the rest of the
+    // tail falls apart, since it follows that segment.
+    const bool isDetached = (this->head == NULL) || (this->actor.parent == NULL);
+    if (isDetached && (this->actor.params != TP_TYPE_TAIL_DYING)) {
         this->actor.params = TP_TYPE_TAIL_DYING;
         this->actor.colChkInfo.health = 0;
     }

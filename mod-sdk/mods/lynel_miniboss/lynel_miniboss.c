@@ -14,6 +14,7 @@
 #include "z64oot_names.h"
 
 #define LYNEL_KEY "lynel.miniboss.red"
+#define LYNEL_SOUL_KEY "nei.lynel"
 
 // Unbound leaves the update flags of Actor_UpdateBgCheckInfo unnamed.
 #define BGCHECK_UPDATE_ALL ((1 << 0) | (1 << 2) | (1 << 3) | (1 << 4))
@@ -1848,6 +1849,15 @@ SOH_MOD_EXPORT void ModInit(void) {
     definition.enemyFlags = SOH_ACTOR_ENEMY | SOH_ACTOR_ENEMY_NOT_IN_TIMED_ROOMS;
     definition.naviHint = "Lynel&A legendary beast! Shoot its %rhead%w to stun it, then press %b\xB0%w by its back "
                           "to ride it!%w";
+    definition.soulKey = LYNEL_SOUL_KEY;
+    definition.enemyCategory = S2H_ENEMY_CATEGORY_MINIBOSS;
+    definition.enemyOrigin = S2H_ENEMY_ORIGIN_CUSTOM;
+    definition.soulModel.skeleton = (const char*)&gLynelSkel;
+    definition.soulModel.idleAnimation = (const char*)&gLynelIdleAnim;
+    definition.soulModel.isFlex = true;
+    definition.soulModel.limbCount = LYNEL_NUM_LIMBS;
+    definition.soulModel.scale = 0.01f;
+    definition.isSoulModelInMemory = true;
 
     if (sApi->RegisterActor(&definition) < 0) {
         sApi->Log("Could not register " LYNEL_KEY);

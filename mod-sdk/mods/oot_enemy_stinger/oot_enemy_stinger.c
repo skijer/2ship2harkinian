@@ -4,9 +4,7 @@
  * the water one (En_Weiyer) lives in stinger_water.c. Both share one soul.
  */
 #include "oot_enemy_stinger.h"
-#include "objects/gameplay_keep/gameplay_keep.h"
 
-#define STINGER_SOUL_KEY "soul.oot.stinger"
 
 static const ALIGN_ASSET(2) char sBackflipAnim[] = EI_ASSET("gStingerBackflipAnim");
 static const ALIGN_ASSET(2) char sDiveAnim[] = EI_ASSET("gStingerDiveAnim");
@@ -519,59 +517,6 @@ static void EnEiyer_Draw(Actor* thisx, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// The soul shows its enemy in an idle loop, as Majora's Mask souls do.
-static void DrawSoulModel(PlayState* play) {
-    static SkelAnime sSoulSkelAnime;
-    static Vec3s sSoulJointTable[EI_LIMB_MAX];
-    static Vec3s sSoulMorphTable[EI_LIMB_MAX];
-    static bool sIsSoulPosed = false;
-    static u32 sSoulFrame = 0;
-
-    if (!sIsSoulPosed) {
-        SkelAnime_Init(play, &sSoulSkelAnime, (SkeletonHeader*)sSkel, ANIM(sIdleAnim), sSoulJointTable,
-                       sSoulMorphTable, EI_LIMB_MAX);
-        sIsSoulPosed = true;
-    }
-    if (sSoulFrame != play->state.frames) {
-        sSoulFrame = play->state.frames;
-        SkelAnime_Update(&sSoulSkelAnime);
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Matrix_Push();
-    Gfx_SetupDL25_Opa(play->state.gfxCtx);
-    Matrix_Scale(0.01f, 0.01f, 0.01f, MTXMODE_APPLY);
-    // Animations place the root far from the origin; the soul floats on its root instead.
-    Matrix_Translate(-sSoulJointTable[0].x, -sSoulJointTable[0].y, -sSoulJointTable[0].z, MTXMODE_APPLY);
-    // Eyes and effects read segments the actor fills; with no actor they point at harmless lists.
-    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x09, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0A, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0B, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)sEmptyDL);
-    SkelAnime_DrawOpa(play, sSoulSkelAnime.skeleton, sSoulSkelAnime.jointTable, NULL, NULL, NULL);
-    Matrix_Pop();
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
-static void DrawSoul(PlayState* play, S2HGetItemEntry* entry) {
-    u32 frames = play->state.frames;
-
-    DrawSoulModel(play);
-
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    Matrix_ReplaceRotation(&play->billboardMtxF);
-    gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, 0, 0, 0x10, 0x20, 1, (frames * 2) & 0x3F,
-                                           (frames * -6) & 0x7F, 0x10, 0x20));
-    gDPSetPrimColor(POLY_XLU_DISP++, 0xC0, 0xC0, 230, 200, 120, 0);
-    gDPSetEnvColor(POLY_XLU_DISP++, 230, 200, 120, 0);
-    Matrix_Scale(0.13333333f, 0.13333333f, 0.13333333f, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gameplay_keep_DL_01ACF0);
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
 // Ship (RE_STINGER, close range): a sword or the hammer (Goron here), sticks, explosives, hookshot or bow.
 static bool CanKillStinger(void* userData) {
     return sApi->LogicHasCapability("CanUseSword") || sApi->LogicHasCapability("CanBeGoron") ||
@@ -582,26 +527,6 @@ static bool CanKillStinger(void* userData) {
 // As MM's own underwater enemies: Zora's barrier, which this table lets hurt it.
 static bool CanKillWaterStinger(void* userData) {
     return sApi->LogicHasCapability("CanOpenUnderwaterChest") && sApi->LogicHasCapability("HasMagic");
-}
-
-static void RegisterSoul(void) {
-    static S2HCustomItemRandomizer sSoulLogic = { 0 };
-    S2HCustomItemDefinition soul = { 0 };
-
-    sSoulLogic.structSize = sizeof(sSoulLogic);
-    sSoulLogic.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
-    sSoulLogic.type = S2H_CUSTOM_ITEM_TYPE_ITEM;
-    sSoulLogic.logicKey = STINGER_SOUL_KEY;
-    sSoulLogic.hintKey = STINGER_SOUL_KEY;
-    soul.structSize = sizeof(soul);
-    soul.key = STINGER_SOUL_KEY;
-    soul.presentationFlags = S2H_ITEM_HIDE_FROM_KALEIDO;
-    soul.getItemText = "You got the %rSoul of Stinger%w!&They can be defeated now.";
-    soul.getItemEntry.drawFunc = DrawSoul;
-    soul.randomizer = &sSoulLogic;
-    if (!sApi->RegisterCustomItem(&soul)) {
-        sApi->Log("Could not register " STINGER_SOUL_KEY);
-    }
 }
 
 static S2HActorDefinition DefineStingerKind(const char* key, const char* description, u32 placementFlags) {
@@ -627,6 +552,14 @@ static s16 RegisterStinger(void) {
     definition.destroy = EnEiyer_Destroy;
     definition.update = EnEiyer_Update;
     definition.draw = EnEiyer_Draw;
+    definition.enemyCategory = S2H_ENEMY_CATEGORY_REGULAR;
+    definition.soulModel.skeleton = sSkel;
+    definition.soulModel.idleAnimation = sIdleAnim;
+    definition.soulModel.limbCount = EI_LIMB_MAX;
+    definition.soulModel.scale = 0.01f;
+    definition.soulModel.flameRed = 230;
+    definition.soulModel.flameGreen = 200;
+    definition.soulModel.flameBlue = 120;
     definition.naviHint = "Stinger&It hides under the floor and dives at you&from above. Strike as it swoops down!";
     return sApi->RegisterActor(&definition);
 }
@@ -684,5 +617,4 @@ S2H_MOD_EXPORT void ModInit(void) {
     if (RegisterWaterStinger() < 0) {
         sApi->Log("Could not register " STINGER_WATER_KEY);
     }
-    RegisterSoul();
 }

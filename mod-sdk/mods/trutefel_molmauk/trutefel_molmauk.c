@@ -1167,6 +1167,15 @@ S2H_MOD_EXPORT void ModInit(void) {
     definition.draw = EnHammergeist_Draw;
     definition.enemyFlags = S2H_ACTOR_ENEMY | S2H_ACTOR_ENEMY_NOT_IN_TIMED_ROOMS;
     definition.naviHint = "Molmauk&Watch out for its %rhammers%w!&Strike when it drops its guard!";
+    definition.soulKey = "nei.molmauk";
+    definition.enemyCategory = S2H_ENEMY_CATEGORY_REGULAR;
+    definition.enemyOrigin = S2H_ENEMY_ORIGIN_CUSTOM;
+    definition.soulModel.skeleton = (const char*)&gHammergeistSkel;
+    definition.soulModel.idleAnimation = (const char*)&gHammergeistSkelIdleAnim;
+    definition.soulModel.isFlex = true;
+    definition.soulModel.limbCount = GHAMMERGEISTSKEL_NUM_LIMBS;
+    definition.soulModel.scale = 0.015f;
+    definition.isSoulModelInMemory = true;
 
     if (sApi->RegisterActor(&definition) < 0) {
         sApi->Log("Could not register " MOLMAUK_KEY);

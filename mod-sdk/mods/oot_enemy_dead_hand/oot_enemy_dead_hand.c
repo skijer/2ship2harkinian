@@ -8,11 +8,9 @@
 #include "functions.h"
 #include "macros.h"
 #include "variables.h"
-#include "objects/gameplay_keep/gameplay_keep.h"
 
 #define DEAD_HAND_KEY "oot.dead_hand"
 #define DEAD_HAND_HAND_KEY "oot.dead_hand.hand"
-#define DEAD_HAND_SOUL_KEY "soul.oot.dead_hand"
 #define DH_OBJECT "objects/oot_object_dh/"
 #define DH_ASSET(name) "__OTR__" DH_OBJECT name
 
@@ -1119,83 +1117,8 @@ static void EnDha_Draw(Actor* thisx, PlayState* play) {
                           EnDha_OverrideLimbDraw, EnDha_PostLimbDraw, &this->actor);
 }
 
-// The soul shows its enemy in an idle loop, as Majora's Mask souls do.
-static void DrawSoulModel(PlayState* play) {
-    static SkelAnime sSoulSkelAnime;
-    static Vec3s sSoulJointTable[DH_LIMB_COUNT];
-    static Vec3s sSoulMorphTable[DH_LIMB_COUNT];
-    static bool sIsSoulPosed = false;
-    static u32 sSoulFrame = 0;
-
-    if (!sIsSoulPosed) {
-        SkelAnime_InitFlex(play, &sSoulSkelAnime, (FlexSkeletonHeader*)sBodySkel, ANIM(sRetreatAnim), sSoulJointTable,
-                           sSoulMorphTable, DH_LIMB_COUNT);
-        sIsSoulPosed = true;
-    }
-    if (sSoulFrame != play->state.frames) {
-        sSoulFrame = play->state.frames;
-        SkelAnime_Update(&sSoulSkelAnime);
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Matrix_Push();
-    Gfx_SetupDL25_Opa(play->state.gfxCtx);
-    Matrix_Scale(0.007f, 0.007f, 0.007f, MTXMODE_APPLY);
-    // Animations place the root far from the origin; the soul floats on its root instead.
-    Matrix_Translate(-sSoulJointTable[0].x, -sSoulJointTable[0].y, -sSoulJointTable[0].z, MTXMODE_APPLY);
-    // Eyes and effects read segments the actor fills; with no actor they point at harmless lists.
-    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x09, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0A, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0B, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)sEmptyDL);
-    SkelAnime_DrawFlexOpa(play, sSoulSkelAnime.skeleton, sSoulSkelAnime.jointTable, sSoulSkelAnime.dListCount, NULL,
-                          NULL, NULL);
-    Matrix_Pop();
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
-static void DrawSoul(PlayState* play, S2HGetItemEntry* entry) {
-    u32 frames = play->state.frames;
-
-    DrawSoulModel(play);
-
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    Matrix_ReplaceRotation(&play->billboardMtxF);
-    gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, 0, 0, 0x10, 0x20, 1, (frames * 2) & 0x3F,
-                                           (frames * -6) & 0x7F, 0x10, 0x20));
-    gDPSetPrimColor(POLY_XLU_DISP++, 0xC0, 0xC0, 120, 40, 160, 0);
-    gDPSetEnvColor(POLY_XLU_DISP++, 120, 40, 160, 0);
-    Matrix_Scale(0.13333333f, 0.13333333f, 0.13333333f, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gameplay_keep_DL_01ACF0);
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
 static bool CanKillDeadHand(void* userData) {
     return sApi->LogicHasCapability("CanUseSword");
-}
-
-static void RegisterSoul(void) {
-    static S2HCustomItemRandomizer sSoulLogic = { 0 };
-    S2HCustomItemDefinition soul = { 0 };
-
-    // Pool membership follows the host's soul shuffle and soul pool; the mod only declares the item.
-    sSoulLogic.structSize = sizeof(sSoulLogic);
-    sSoulLogic.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
-    sSoulLogic.type = S2H_CUSTOM_ITEM_TYPE_ITEM;
-    sSoulLogic.logicKey = DEAD_HAND_SOUL_KEY;
-    sSoulLogic.hintKey = DEAD_HAND_SOUL_KEY;
-    soul.structSize = sizeof(soul);
-    soul.key = DEAD_HAND_SOUL_KEY;
-    soul.presentationFlags = S2H_ITEM_HIDE_FROM_KALEIDO;
-    soul.getItemText = "You got the %rSoul of Dead Hand%w!&It can be defeated now.";
-    soul.getItemEntry.drawFunc = DrawSoul;
-    soul.randomizer = &sSoulLogic;
-    if (!sApi->RegisterCustomItem(&soul)) {
-        sApi->Log("Could not register " DEAD_HAND_SOUL_KEY);
-    }
 }
 
 static S2HActorDefinition DefineEnemyActor(const char* key, const char* description, u32 flags, u32 size) {
@@ -1234,6 +1157,15 @@ static s16 RegisterBody(void) {
     // The host finds the soul item as "soul." + soulKey, so this is the family key.
     body.soulKey = DEAD_HAND_KEY;
     body.logicKill = CanKillDeadHand;
+    body.enemyCategory = S2H_ENEMY_CATEGORY_MINIBOSS;
+    body.soulModel.skeleton = sBodySkel;
+    body.soulModel.idleAnimation = sRetreatAnim;
+    body.soulModel.isFlex = true;
+    body.soulModel.limbCount = DH_LIMB_COUNT;
+    body.soulModel.scale = 0.007f;
+    body.soulModel.flameRed = 120;
+    body.soulModel.flameGreen = 40;
+    body.soulModel.flameBlue = 160;
     return sApi->RegisterActor(&body);
 }
 
@@ -1271,7 +1203,5 @@ S2H_MOD_EXPORT void ModInit(void) {
     sBodyActorId = RegisterBody();
     if (sBodyActorId < 0) {
         sApi->Log("Could not register " DEAD_HAND_KEY);
-        return;
     }
-    RegisterSoul();
 }

@@ -135,7 +135,8 @@ static const ALIGN_ASSET(2) char sPunchEffectDL[] = "__OTR__objects/object_link_
 
 static const char* const sRequiredHooks[] = {
     "OnPlayerPostLimbDraw", "OnPlayerActionHandler",     "OnActorUpdate",           "OnSceneInit",   "OnActorPlaySfx",
-    "OnPlayerFilterInput",  "OnBgCheckResolveWallFlags", "OnPlayerResolveLimbDraw", "ShouldItemGive"
+    "OnPlayerFilterInput",  "OnBgCheckResolveWallFlags", "OnPlayerResolveLimbDraw", "ShouldItemGive",
+    "ShouldActorInit",      "OnActorInit",               "ShouldActorUpdate"
 };
 static const S2HModRequirements sRequirements = { sizeof(S2HModRequirements), sRequiredHooks,
                                                   ARRAY_COUNT(sRequiredHooks) };
@@ -195,6 +196,8 @@ static bool sShotCylinderReady;
 
 static s32 sFistTrail[2] = { -1, -1 };
 static bool sClimbLent;
+static bool sIsKeatonMaskLent;
+static u8 sMaskBeforeLend;
 static bool sReadingNaturalWall;
 static s16 sClimbDrain;
 
@@ -1506,7 +1509,32 @@ static void ExitKeaton(PlayState* play, Player* player) {
     ClearState();
 }
 
+// En_Kitan reads Player_GetMask, and the form never wears the vanilla mask: lend it only while the fox runs,
+// so Link's head never draws it.
+static void LendKeatonMaskToFox(Actor* fox, bool* should) {
+    if (!*should || sIsKeatonMaskLent || gPlayState == NULL || !sApi->IsFormActive(KEATON_FORM_KEY)) {
+        return;
+    }
+    Player* player = GET_PLAYER(gPlayState);
+    sMaskBeforeLend = player->currentMask;
+    player->currentMask = PLAYER_MASK_KEATON;
+    sIsKeatonMaskLent = true;
+}
+
+static void ReturnKeatonMask(void) {
+    if (!sIsKeatonMaskLent || gPlayState == NULL) {
+        return;
+    }
+    GET_PLAYER(gPlayState)->currentMask = sMaskBeforeLend;
+    sIsKeatonMaskLent = false;
+}
+
+static void ReturnKeatonMaskFromFox(Actor* fox) {
+    ReturnKeatonMask();
+}
+
 static void ForgetScene(s16 sceneId, s8 spawnNum) {
+    sIsKeatonMaskLent = false;
     LendClimbEverything(false);
     sClimbDrain = 0;
     ClearPunchEffect();
@@ -1523,6 +1551,8 @@ static void ForgetScene(s16 sceneId, s8 spawnNum) {
 }
 
 static void UpdateKeaton(PlayState* play, Player* player) {
+    // Closes a lend left open when another mod vetoed the fox's update; Player updates before NPCs.
+    ReturnKeatonMask();
     if (sState != KEATON_IDLE && sState != KEATON_LONG_JUMP && !IsKeatonBusy(player)) {
         StopFistTrails(play);
         ClearState();
@@ -1663,6 +1693,10 @@ S2H_MOD_EXPORT void ModInit(void) {
     S2H_REGISTER_HOOK(sApi, OnSceneInit, ForgetScene);
     S2H_REGISTER_HOOK(sApi, OnPlayerFilterInput, CaptureFistBlock);
     S2H_REGISTER_HOOK(sApi, OnBgCheckResolveWallFlags, AllowKeatonWall);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldActorInit, ACTOR_EN_KITAN, LendKeatonMaskToFox);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorInit, ACTOR_EN_KITAN, ReturnKeatonMaskFromFox);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, ShouldActorUpdate, ACTOR_EN_KITAN, LendKeatonMaskToFox);
+    S2H_REGISTER_HOOK_FOR_ID(sApi, OnActorUpdate, ACTOR_EN_KITAN, ReturnKeatonMaskFromFox);
     sApi->RegisterVB(VB_USE_STRENGTH_UPGRADE, ResolveKeatonStrength);
     sApi->RegisterVBByName("VB_PLAYER_LIFT_ACTOR", ResolveKeatonGrab);
 }
