@@ -978,7 +978,7 @@ bool IsPlacementActive() {
 
 static bool IsRowReplaced(const EnemySpawnRow& row, const ScenePlacement& placement) {
     for (const NativeEnemy* original : GetOriginalsOfRow(row)) {
-        if (placement.contains(original->key)) {
+        if (original != nullptr && placement.contains(original->key)) {
             return true;
         }
     }
