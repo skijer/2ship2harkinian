@@ -44,6 +44,8 @@
 #include <spdlog/spdlog.h>
 
 #include <array>
+#include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <filesystem>
 #include <unordered_map>
@@ -189,6 +191,14 @@ void Extractor::FilterRoms(std::vector<std::string>& roms, RomSearchMode searchM
     }
 }
 
+// Dumps come as .z64, .n64 or .v64, in either letter case.
+static bool IsRomFileName(const std::filesystem::path& file) {
+    std::string extension = file.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(),
+                   [](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+    return extension == ".z64" || extension == ".n64" || extension == ".v64";
+}
+
 void Extractor::GetRoms(std::vector<std::string>& roms) {
 #ifdef _WIN32
     WIN32_FIND_DATAA ffd;
@@ -196,11 +206,9 @@ void Extractor::GetRoms(std::vector<std::string>& roms) {
 
     do {
         if (!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-            char* ext = PathFindExtensionA(ffd.cFileName);
-
-            // Check for any standard N64 rom file extensions.
-            if ((strcmp(ext, ".z64") == 0) || (strcmp(ext, ".n64") == 0) || (strcmp(ext, ".v64") == 0))
+            if (IsRomFileName(ffd.cFileName)) {
                 roms.push_back(ffd.cFileName);
+            }
         }
     } while (FindNextFileA(h, &ffd) != 0);
     // if (h != nullptr) {
@@ -223,10 +231,7 @@ void Extractor::GetRoms(std::vector<std::string>& roms) {
             // Check if current entry is not folder
             stat(fullPathCStr, &path);
             if (S_ISREG(path.st_mode)) {
-
-                // Get the position of the extension character.
-                char* ext = strrchr(dir->d_name, '.');
-                if (ext != NULL && (strcmp(ext, ".z64") == 0 || strcmp(ext, ".n64") == 0 || strcmp(ext, ".v64") == 0)) {
+                if (IsRomFileName(dir->d_name)) {
                     roms.push_back(fullPathCStr);
                 }
             }
@@ -235,10 +240,10 @@ void Extractor::GetRoms(std::vector<std::string>& roms) {
     closedir(d);
 #else
     for (const auto& file : std::filesystem::directory_iterator(mSearchPath)) {
-        if (file.is_directory())
+        if (file.is_directory()) {
             continue;
-        if ((file.path().extension() == ".n64") || (file.path().extension() == ".z64") ||
-            (file.path().extension() == ".v64")) {
+        }
+        if (IsRomFileName(file.path())) {
             roms.push_back((file.path()));
         }
     }
@@ -419,7 +424,7 @@ bool Extractor::RunFileStandalone(std::string rom) {
         return false;
     }
     auto file = std::filesystem::path(rom);
-    if ((file.extension() != ".n64") && (file.extension() != ".z64") && (file.extension() != ".v64")) {
+    if (!IsRomFileName(file)) {
         return false;
     }
     SetRomInfo(rom);

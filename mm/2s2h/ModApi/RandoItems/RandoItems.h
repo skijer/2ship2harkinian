@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+struct Actor;
+
 // A mod item's randoItem is a RandoItemId above RI_MAX, derived from its key so saves survive a changed mod order.
 int32_t RandoItems_GetRandoGet(const char* key);
 const char* RandoItems_GetKey(int32_t randoItem);
@@ -19,6 +21,8 @@ int32_t RandoItems_GetAt(uint32_t index);
 
 bool RandoItems_IsOwned(int32_t randoItem, S2HRandoInfBank bank);
 void RandoItems_SetOwned(int32_t randoItem, S2HRandoInfBank bank, bool state);
+// Draws any item, built-in or a mod's, as a check holding it shows it, at the current matrix.
+void RandoItems_DrawAny(int32_t randoItem, struct Actor* actor);
 
 #ifdef __cplusplus
 }

@@ -85,7 +85,8 @@ void Load(Table& table, const char* binary, const char* jsonPath, bool credits) 
             messages[row.id] = std::move(row);
         }
     }
-    for (const auto& path : *resources->GetArchiveManager()->ListFiles(std::string("override/") + binary + "*")) {
+    const auto overridePaths = resources->GetArchiveManager()->ListFiles(std::string("override/") + binary + "*");
+    for (const auto& path : *overridePaths) {
         auto override = std::dynamic_pointer_cast<SOH::TextMM>(resources->LoadResource(path));
         if (override) {
             for (const auto& row : override->messages) {

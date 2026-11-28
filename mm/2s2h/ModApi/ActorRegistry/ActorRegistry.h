@@ -78,6 +78,8 @@ typedef struct {
     uint8_t enemyOrigin;
     uint8_t dropOnKill;
     S2HSoulModel soulModel;
+    // Non-zero when soulModel's skeleton and idleAnimation point at headers built into the mod, not resource paths.
+    uint8_t isSoulModelInMemory;
 } S2HActorDefinition;
 
 #define S2H_ACTOR_DEFINITION_MIN_SIZE (offsetof(S2HActorDefinition, draw) + sizeof(((S2HActorDefinition*)0)->draw))
@@ -90,6 +92,8 @@ typedef struct {
     (offsetof(S2HActorDefinition, logicKillUserData) + sizeof(((S2HActorDefinition*)0)->logicKillUserData))
 #define S2H_ACTOR_DEFINITION_GENERIC_SOUL_SIZE \
     (offsetof(S2HActorDefinition, soulModel) + sizeof(((S2HActorDefinition*)0)->soulModel))
+#define S2H_ACTOR_DEFINITION_SOUL_MEMORY_SIZE \
+    (offsetof(S2HActorDefinition, isSoulModelInMemory) + sizeof(((S2HActorDefinition*)0)->isSoulModelInMemory))
 
 typedef struct {
     const char* key;

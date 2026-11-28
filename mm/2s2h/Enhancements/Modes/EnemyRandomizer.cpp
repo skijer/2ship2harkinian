@@ -301,8 +301,12 @@ std::vector<EnemyChoice> ListInstalledChoices() {
             choices.push_back(ToChoice(enemy));
         }
     }
+    // A custom boss registers as an enemy only to carry its soul; it belongs to its arena, not to enemy slots.
     for (uint32_t i = 0; i < ActorRegistry_GetEnemyCount(); i++) {
-        choices.push_back(ToChoice(*ActorRegistry_GetEnemyAt(i)));
+        const S2HCustomEnemy* enemy = ActorRegistry_GetEnemyAt(i);
+        if (enemy->soulCategory != S2H_ENEMY_CATEGORY_BOSS) {
+            choices.push_back(ToChoice(*enemy));
+        }
     }
     return choices;
 }

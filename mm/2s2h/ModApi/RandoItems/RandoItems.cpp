@@ -369,3 +369,10 @@ void RandoItems_Draw(RandoItemId randoItemId) {
 
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
+
+void RandoItems_DrawAny(int32_t randoItem, Actor* actor) {
+    if (gPlayState == nullptr || randoItem <= RI_UNKNOWN) {
+        return;
+    }
+    Rando::DrawItem(static_cast<RandoItemId>(randoItem), RC_UNKNOWN, actor);
+}

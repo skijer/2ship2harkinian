@@ -368,6 +368,7 @@ S2HModApi BuildTable() {
     api.IsRandoCheckObtained = RandoChecks_IsObtained;
     api.AwardRandoCheck = RandoChecks_Award;
     api.GetRandoCheckItemCategory = RandoChecks_GetItemCategory;
+    api.DrawRandoItem = RandoItems_DrawAny;
     api.BlockPlayerInput = PlayerInput_Block;
     api.ReleasePlayerInput = PlayerInput_Release;
     api.ShowTextbox = CustomItemRegistry_ShowTextbox;

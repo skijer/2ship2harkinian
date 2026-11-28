@@ -259,6 +259,7 @@ typedef struct {
     bool (*IsRandoCheckObtained)(int32_t check);
     bool (*AwardRandoCheck)(int32_t check);
     uint8_t (*GetRandoCheckItemCategory)(int32_t check);
+    void (*DrawRandoItem)(int32_t randoItem, Actor* actor);
 } S2HModApi;
 
 #define S2H_REGISTER_HOOK(api, name, callback) ((api)->RegisterHookByName(#name, (void*)S2H_CheckHook_##name(callback)))

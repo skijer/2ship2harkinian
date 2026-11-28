@@ -10,6 +10,7 @@
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/ModApi/ActorRegistry/ActorRegistry.h"
 #include "2s2h/ModApi/RandoLogic/RandoLogic.h"
 #include "2s2h/ModApi/RandoOptions/RandoOptions.h"
 #include "2s2h/Rando/Logic/Logic.h"
@@ -107,10 +108,22 @@ Boss* Owner(s32 slot) {
     }
     return &found->second;
 }
+// A boss whose key also names its registered enemy actor needs that enemy's soul, under Boss Souls.
+bool CanKillBossActor(const std::string& key) {
+    const int16_t actorId = ActorRegistry_FindCustomId(key.c_str());
+    const S2HCustomEnemy* enemy = actorId >= 0 ? ActorRegistry_FindEnemyById(actorId) : nullptr;
+    return enemy == nullptr || Rando::Logic::CanKillCustomEnemy(enemy);
+}
 bool Evaluate(void* data) {
     const s32 slot = static_cast<s32>(reinterpret_cast<uintptr_t>(data));
     Boss* boss = Owner(slot);
-    if (boss == nullptr || boss->logicText.empty()) {
+    if (boss == nullptr) {
+        return Rando::Logic::CanKillEnemy(static_cast<ActorId>(slots[slot].actor));
+    }
+    if (!CanKillBossActor(Current()[slot])) {
+        return false;
+    }
+    if (boss->logicText.empty()) {
         return Rando::Logic::CanKillEnemy(static_cast<ActorId>(slots[slot].actor));
     }
     if (!boss->compiled) {

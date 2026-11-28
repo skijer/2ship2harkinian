@@ -24,6 +24,8 @@ extern "C" {
 #include "macros.h"
 #include "variables.h"
 uint8_t ResourceMgr_FileExists(const char* path);
+int ResourceMgr_OTRSigCheck(char* imgData);
+SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path, SkelAnime* skelAnime);
 // OPEN_DISPS redeclares these inside its body, which would give them C++ linkage here.
 void FrameInterpolation_RecordOpenChild(const void* a, int b);
 void FrameInterpolation_RecordCloseChild(void);
@@ -108,33 +110,60 @@ Color_RGB8 ReadFlameColor(const S2HSoulModel& model) {
     return { model.flameRed, model.flameGreen, model.flameBlue };
 }
 
-void StoreModel(Soul& soul, const S2HSoulModel& model) {
-    soul.model = model;
+bool IsSoulModelInMemory(const S2HActorDefinition* definition) {
+    return definition->structSize >= S2H_ACTOR_DEFINITION_SOUL_MEMORY_SIZE && definition->isSoulModelInMemory != 0;
+}
+
+// Assumes headers built into a mod outlive its souls: mods stay loaded for the whole session.
+bool StoreModelSource(Soul& soul, const S2HSoulModel& model, bool isInMemory) {
+    if (isInMemory) {
+        return model.idleAnimation != nullptr;
+    }
     soul.skeletonResource = ToResourceName(model.skeleton);
     soul.animationResource = ToResourceName(model.idleAnimation);
     soul.model.skeleton = soul.skeletonResource.c_str();
     soul.model.idleAnimation = soul.animationResource.c_str();
+    return model.idleAnimation != nullptr && HasResource(soul.skeletonResource) && HasResource(soul.animationResource);
+}
+
+void StoreModel(Soul& soul, const S2HSoulModel& model, bool isInMemory) {
+    soul.model = model;
     soul.flameColor = ReadFlameColor(model);
-    soul.hasModel = model.limbCount > 0 && model.idleAnimation != nullptr && HasResource(soul.skeletonResource) &&
-                    HasResource(soul.animationResource);
+    soul.hasModel = model.limbCount > 0 && StoreModelSource(soul, model, isInMemory);
     if (!soul.hasModel) {
-        SPDLOG_WARN("[EnemySouls] '{}' draws only its flame: soul model resources are missing", soul.itemKey);
+        SPDLOG_WARN("[EnemySouls] '{}' draws only its flame: its soul model is missing", soul.itemKey);
     }
 }
 
-void PoseSoul(Soul& soul, PlayState* play) {
-    void* skeleton = (void*)soul.skeletonResource.c_str();
-    AnimationHeader* animation = (AnimationHeader*)soul.animationResource.c_str();
-    soul.jointTable.assign(soul.model.limbCount, {});
-    soul.morphTable.assign(soul.model.limbCount, {});
+const SkeletonHeader* LoadSoulSkeleton(const Soul& soul) {
+    char* skeleton = (char*)soul.model.skeleton;
+    if (!ResourceMgr_OTRSigCheck(skeleton)) {
+        return (const SkeletonHeader*)skeleton;
+    }
+    return ResourceMgr_LoadSkeletonByName(skeleton, NULL);
+}
+
+// SkelAnime writes skeleton limbCount + 1 frames into the tables, so they are sized from the skeleton, not the mod.
+bool PoseSoul(Soul& soul, PlayState* play) {
+    const SkeletonHeader* header = LoadSoulSkeleton(soul);
+    if (header == nullptr) {
+        SPDLOG_WARN("[EnemySouls] '{}' draws only its flame: its soul skeleton did not load", soul.itemKey);
+        return false;
+    }
+    const s32 limbCount = header->limbCount + 1;
+    void* skeleton = (void*)soul.model.skeleton;
+    AnimationHeader* animation = (AnimationHeader*)soul.model.idleAnimation;
+    soul.jointTable.assign(limbCount, {});
+    soul.morphTable.assign(limbCount, {});
     if (soul.model.isFlex) {
         SkelAnime_InitFlex(play, &soul.skelAnime, (FlexSkeletonHeader*)skeleton, animation, soul.jointTable.data(),
-                           soul.morphTable.data(), soul.model.limbCount);
+                           soul.morphTable.data(), limbCount);
     } else {
         SkelAnime_Init(play, &soul.skelAnime, (SkeletonHeader*)skeleton, animation, soul.jointTable.data(),
-                       soul.morphTable.data(), soul.model.limbCount);
+                       soul.morphTable.data(), limbCount);
     }
     soul.isPosed = true;
+    return true;
 }
 
 } // namespace
@@ -142,8 +171,9 @@ void PoseSoul(Soul& soul, PlayState* play) {
 // Outside the anonymous namespace: OPEN_DISPS redeclares the interpolation hooks in its body, and inside one they
 // get C++ linkage and fail to link.
 static void DrawSoulModel(Soul& soul, PlayState* play) {
-    if (!soul.isPosed) {
-        PoseSoul(soul, play);
+    if (!soul.isPosed && !PoseSoul(soul, play)) {
+        soul.hasModel = false;
+        return;
     }
     if (soul.lastUpdatedFrame != play->state.frames) {
         soul.lastUpdatedFrame = play->state.frames;
@@ -223,10 +253,10 @@ size_t AddSoul(const S2HActorDefinition* definition, const S2HCustomEnemy& enemy
 void AttachSoulModel(const S2HActorDefinition* definition, size_t index) {
     Soul& soul = sSouls[index];
     const bool declaresModel = HasGenericFields(definition) && definition->soulModel.skeleton != nullptr;
-    if (!declaresModel || !soul.skeletonResource.empty() || CustomItemRegistry_Find(soul.itemKey.c_str()) != nullptr) {
+    if (!declaresModel || soul.model.skeleton != nullptr || CustomItemRegistry_Find(soul.itemKey.c_str()) != nullptr) {
         return;
     }
-    StoreModel(soul, definition->soulModel);
+    StoreModel(soul, definition->soulModel, IsSoulModelInMemory(definition));
     RegisterSoulItem(index);
 }
 
