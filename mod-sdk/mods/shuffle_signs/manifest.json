@@ -1,0 +1,8 @@
+{
+  "name": "shuffle_signs",
+  "author": "Skijer",
+  "version": "1.0",
+  "display_name": "Shuffle Signs",
+  "description": "Randomizer option: the first time Link reads a signpost it gives the item placed there. Unread signs sparkle in the color of their item's category.",
+  "game": "mm"
+}

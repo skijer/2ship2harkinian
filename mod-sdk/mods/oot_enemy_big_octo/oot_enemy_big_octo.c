@@ -12,7 +12,6 @@
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 #define BIG_OCTO_KEY "oot.big_octo"
-#define BIG_OCTO_SOUL_KEY "soul.oot.big_octo"
 #define BO_OBJECT "objects/oot_object_bigokuta/"
 #define BO_ASSET(name) "__OTR__" BO_OBJECT name
 
@@ -838,83 +837,8 @@ static void EnBigokuta_Draw(Actor* thisx, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// The soul shows its enemy in an idle loop, as Majora's Mask souls do.
-static void DrawSoulModel(PlayState* play) {
-    static SkelAnime sSoulSkelAnime;
-    static Vec3s sSoulJointTable[BO_LIMB_COUNT];
-    static Vec3s sSoulMorphTable[BO_LIMB_COUNT];
-    static bool sIsSoulPosed = false;
-    static u32 sSoulFrame = 0;
-
-    if (!sIsSoulPosed) {
-        SkelAnime_InitFlex(play, &sSoulSkelAnime, (FlexSkeletonHeader*)sSkel, ANIM(sIdleAnim), sSoulJointTable,
-                           sSoulMorphTable, BO_LIMB_COUNT);
-        sIsSoulPosed = true;
-    }
-    if (sSoulFrame != play->state.frames) {
-        sSoulFrame = play->state.frames;
-        SkelAnime_Update(&sSoulSkelAnime);
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Matrix_Push();
-    Gfx_SetupDL25_Opa(play->state.gfxCtx);
-    Matrix_Scale(0.01f, 0.01f, 0.01f, MTXMODE_APPLY);
-    // Animations place the root far from the origin; the soul floats on its root instead.
-    Matrix_Translate(-sSoulJointTable[0].x, -sSoulJointTable[0].y, -sSoulJointTable[0].z, MTXMODE_APPLY);
-    // Eyes and effects read segments the actor fills; with no actor they point at harmless lists.
-    gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x09, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0A, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0B, (uintptr_t)sEmptyDL);
-    gSPSegment(POLY_OPA_DISP++, 0x0C, (uintptr_t)sEmptyDL);
-    SkelAnime_DrawFlexOpa(play, sSoulSkelAnime.skeleton, sSoulSkelAnime.jointTable, sSoulSkelAnime.dListCount, NULL,
-                          NULL, NULL);
-    Matrix_Pop();
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
-static void DrawSoul(PlayState* play, S2HGetItemEntry* entry) {
-    u32 frames = play->state.frames;
-
-    DrawSoulModel(play);
-
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    Matrix_ReplaceRotation(&play->billboardMtxF);
-    gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScroll(play->state.gfxCtx, 0, 0, 0, 0x10, 0x20, 1, (frames * 2) & 0x3F,
-                                           (frames * -6) & 0x7F, 0x10, 0x20));
-    gDPSetPrimColor(POLY_XLU_DISP++, 0xC0, 0xC0, 60, 160, 255, 0);
-    gDPSetEnvColor(POLY_XLU_DISP++, 60, 160, 255, 0);
-    Matrix_Scale(0.13333333f, 0.13333333f, 0.13333333f, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gameplay_keep_DL_01ACF0);
-    CLOSE_DISPS(play->state.gfxCtx);
-}
-
 static bool CanKillBigOcto(void* userData) {
     return sApi->LogicHasCapability("CanUseSword") || sApi->LogicCanUseItem(RI_DEKU_STICK);
-}
-
-static void RegisterSoul(void) {
-    static S2HCustomItemRandomizer sSoulLogic = { 0 };
-    S2HCustomItemDefinition soul = { 0 };
-
-    // Pool membership follows the host's soul shuffle and soul pool; the mod only declares the item.
-    sSoulLogic.structSize = sizeof(sSoulLogic);
-    sSoulLogic.flags = S2H_CUSTOM_ITEM_RANDO_ADVANCEMENT;
-    sSoulLogic.type = S2H_CUSTOM_ITEM_TYPE_ITEM;
-    sSoulLogic.logicKey = BIG_OCTO_SOUL_KEY;
-    sSoulLogic.hintKey = BIG_OCTO_SOUL_KEY;
-    soul.structSize = sizeof(soul);
-    soul.key = BIG_OCTO_SOUL_KEY;
-    soul.presentationFlags = S2H_ITEM_HIDE_FROM_KALEIDO;
-    soul.getItemText = "You got the %rSoul of Big Octo%w!&It can be defeated now.";
-    soul.getItemEntry.drawFunc = DrawSoul;
-    soul.randomizer = &sSoulLogic;
-    if (!sApi->RegisterCustomItem(&soul)) {
-        sApi->Log("Could not register " BIG_OCTO_SOUL_KEY);
-    }
 }
 
 static s16 RegisterBigOcto(void) {
@@ -936,6 +860,15 @@ static s16 RegisterBigOcto(void) {
     // The host finds the soul item as "soul." + soulKey, so this is the family key.
     definition.soulKey = BIG_OCTO_KEY;
     definition.logicKill = CanKillBigOcto;
+    definition.enemyCategory = S2H_ENEMY_CATEGORY_MINIBOSS;
+    definition.soulModel.skeleton = sSkel;
+    definition.soulModel.idleAnimation = sIdleAnim;
+    definition.soulModel.isFlex = true;
+    definition.soulModel.limbCount = BO_LIMB_COUNT;
+    definition.soulModel.scale = 0.01f;
+    definition.soulModel.flameRed = 60;
+    definition.soulModel.flameGreen = 160;
+    definition.soulModel.flameBlue = 255;
     return sApi->RegisterActor(&definition);
 }
 
@@ -967,7 +900,5 @@ S2H_MOD_EXPORT void ModInit(void) {
     }
     if (RegisterBigOcto() < 0) {
         sApi->Log("Could not register " BIG_OCTO_KEY);
-        return;
     }
-    RegisterSoul();
 }
