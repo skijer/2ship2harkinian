@@ -20,7 +20,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_BENEATH_THE_GRAVEYARD_DAMPE_POT_08, true),
             CHECK(RC_BENEATH_THE_GRAVEYARD_DAMPE_POT_09, true),
             CHECK(RC_BENEATH_THE_GRAVEYARD_DAMPE_POT_10, true),
-            CHECK(RC_ENEMY_DROP_WALLMASTER, CanKillEnemy(ACTOR_EN_WALLMAS)),
+            CHECK(RC_ENEMY_DROP_WALLMASTER, CanKillDropEnemy(ACTOR_EN_WALLMAS)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_GRAVEYARD, 4),                       ONE_WAY_EXIT, true),
@@ -32,7 +32,7 @@ static RegisterShipInitFunc initFunc([]() {
     Regions[RR_BENEATH_THE_GRAVEYARD_NIGHT_1_BOSS] = RandoRegion{ .name = "Night 1 Boss", .sceneId = SCENE_HAKASHITA,
         .checks = {
             CHECK(RC_BENEATH_THE_GRAVEYARD_SONG_OF_STORMS, CanKillEnemy(ACTOR_EN_IK)),
-            CHECK(RC_ENEMY_DROP_IRON_KNUCKLE, CanKillEnemy(ACTOR_EN_IK)),
+            CHECK(RC_ENEMY_DROP_IRON_KNUCKLE, CanKillDropEnemy(ACTOR_EN_IK)),
         },
         .connections = {
             CONNECTION(RR_BENEATH_THE_GRAVEYARD_NIGHT_1_GRAVE, CanKillEnemy(ACTOR_EN_IK)),
@@ -46,7 +46,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_BENEATH_THE_GRAVEYARD_NIGHT_1_BATS_POT_01, true),
             CHECK(RC_BENEATH_THE_GRAVEYARD_NIGHT_1_BATS_POT_02, true),
             CHECK(RC_BENEATH_THE_GRAVEYARD_NIGHT_1_BATS_POT_03, true),
-            CHECK(RC_ENEMY_DROP_BAD_BAT, CanKillEnemy(ACTOR_EN_BAT)),
+            CHECK(RC_ENEMY_DROP_BAD_BAT, CanKillDropEnemy(ACTOR_EN_BAT)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_GRAVEYARD, 3),              ENTRANCE(BENEATH_THE_GRAVERYARD, 1), true),
@@ -58,7 +58,7 @@ static RegisterShipInitFunc initFunc([]() {
     Regions[RR_BENEATH_THE_GRAVEYARD_NIGHT_2_BOSS] = RandoRegion{ .name = "Night 2 Boss", .sceneId = SCENE_HAKASHITA,
         .checks = {
             CHECK(RC_BENEATH_THE_GRAVEYARD_PIECE_OF_HEART, CanKillEnemy(ACTOR_EN_IK)),
-            CHECK(RC_ENEMY_DROP_IRON_KNUCKLE, CanKillEnemy(ACTOR_EN_IK)),
+            CHECK(RC_ENEMY_DROP_IRON_KNUCKLE, CanKillDropEnemy(ACTOR_EN_IK)),
         },
         .connections = {
             CONNECTION(RR_BENEATH_THE_GRAVEYARD_NIGHT_2_GRAVE_AFTER_PIT, true),
@@ -70,7 +70,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_BENEATH_THE_GRAVEYARD_NIGHT_2_AFTER_PIT_POT_02, true),
             CHECK(RC_BENEATH_THE_GRAVEYARD_NIGHT_2_AFTER_PIT_POT_03, true),
             CHECK(RC_BENEATH_THE_GRAVEYARD_NIGHT_2_AFTER_PIT_POT_04, true),
-            CHECK(RC_ENEMY_DROP_SKULLTULA, CanKillEnemy(ACTOR_EN_ST)),
+            CHECK(RC_ENEMY_DROP_SKULLTULA, CanKillDropEnemy(ACTOR_EN_ST)),
         },
         .connections = {
             CONNECTION(RR_BENEATH_THE_GRAVEYARD_NIGHT_2_BOSS, CAN_USE_EXPLOSIVE),
@@ -89,7 +89,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_BENEATH_THE_GRAVEYARD_NIGHT_2_EARLY_POT, true),
             CHECK(RC_BENEATH_THE_GRAVEYARD_NIGHT_2_BEFORE_PIT_POT_01, true),
             CHECK(RC_BENEATH_THE_GRAVEYARD_NIGHT_2_BEFORE_PIT_POT_02, true),
-            CHECK(RC_ENEMY_DROP_KEESE, CanKillEnemy(ACTOR_EN_FIREFLY)),
+            CHECK(RC_ENEMY_DROP_KEESE, CanKillDropEnemy(ACTOR_EN_FIREFLY)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_GRAVEYARD, 2),              ENTRANCE(BENEATH_THE_GRAVERYARD, 0), true),
@@ -101,7 +101,7 @@ static RegisterShipInitFunc initFunc([]() {
     Regions[RR_GHOST_HUT] = RandoRegion{ .sceneId = SCENE_TOUGITES,
         .checks = {
             CHECK(RC_IKANA_CANYON_GHOST_HUT_PIECE_OF_HEART, CHECK_MAX_HP(4) && CanKillEnemy(ACTOR_EN_PO_SISTERS)),
-            CHECK(RC_ENEMY_DROP_POE_SISTER, CHECK_MAX_HP(4) && CanKillEnemy(ACTOR_EN_PO_SISTERS)),
+            CHECK(RC_ENEMY_DROP_POE_SISTER, CHECK_MAX_HP(4) && CanKillDropEnemy(ACTOR_EN_PO_SISTERS)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_CANYON, 1),                 ENTRANCE(GHOST_HUT, 0), true),
@@ -132,7 +132,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_IKANA_CANYON_GROTTO_GRASS_12, true),
             CHECK(RC_IKANA_CANYON_GROTTO_GRASS_13, true),
             CHECK(RC_IKANA_CANYON_GROTTO_GRASS_14, true),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_CANYON, 0),                 ENTRANCE(GROTTOS, 29), true),
@@ -143,8 +143,8 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_IKANA_CANYON_SCRUB_PIECE_OF_HEART, Flags_GetRandoInf(RANDO_INF_OBTAINED_DEED_OCEAN) && CAN_BE_ZORA && CAN_BE_DEKU),
             CHECK(RC_IKANA_CANYON_SCRUB_HUGE_RUPEE, Flags_GetRandoInf(RANDO_INF_OBTAINED_DEED_OCEAN) && CAN_BE_ZORA),
             CHECK(RC_IKANA_CANYON_SCRUB_POTION_REFILL, CUR_UPG_VALUE(UPG_WALLET) >= 1),
-            CHECK(RC_ENEMY_DROP_OCTOROK, CanKillEnemy(ACTOR_EN_OKUTA) && CAN_USE_ABILITY(SWIM)),
-            CHECK(RC_ENEMY_DROP_GARO, CanKillEnemy(ACTOR_EN_JSO)),
+            CHECK(RC_ENEMY_DROP_OCTOROK, CanKillDropEnemy(ACTOR_EN_OKUTA) && CAN_USE_ABILITY(SWIM)),
+            CHECK(RC_ENEMY_DROP_GARO, CanKillDropEnemy(ACTOR_EN_JSO)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(GROTTOS, 29),                     ENTRANCE(IKANA_CANYON, 0), CAN_USE_ABILITY(SWIM)),
@@ -175,7 +175,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_IKANA_CANYON_OWL_STATUE, CAN_USE_SWORD),
             CHECK(RC_IKANA_CANYON_TINGLE_MAP_01, CAN_USE_PROJECTILE && CAN_AFFORD(RC_IKANA_CANYON_TINGLE_MAP_01)),
             CHECK(RC_IKANA_CANYON_TINGLE_MAP_02, CAN_USE_PROJECTILE && CAN_AFFORD(RC_IKANA_CANYON_TINGLE_MAP_02)),
-            CHECK(RC_ENEMY_DROP_GUAY, CanKillEnemy(ACTOR_EN_CROW) && IS_DAY()), // Day only
+            CHECK(RC_ENEMY_DROP_GUAY, CanKillDropEnemy(ACTOR_EN_CROW) && IS_DAY()), // Day only
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(GHOST_HUT, 0),                    ENTRANCE(IKANA_CANYON, 1), true),
@@ -215,7 +215,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_IKANA_GRAVEYARD_GROTTO_GRASS_12, true),
             CHECK(RC_IKANA_GRAVEYARD_GROTTO_GRASS_13, true),
             CHECK(RC_IKANA_GRAVEYARD_GROTTO_GRASS_14, true),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_GRAVEYARD, 0),              ENTRANCE(GROTTOS, 30), true),
@@ -247,8 +247,8 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_IKANA_GRAVEYARD_WONDER_ITEM_07, true),
             CHECK(RC_IKANA_GRAVEYARD_WONDER_ITEM_08, true),
             CHECK(RC_IKANA_GRAVEYARD_WONDER_ITEM_09, true),
-            CHECK(RC_ENEMY_DROP_STALCHILD, CanKillEnemy(ACTOR_EN_SKB) && IS_NIGHT()), // Night only
-            CHECK(RC_ENEMY_DROP_BAD_BAT, CanKillEnemy(ACTOR_EN_BAT) && IS_DAY()), // Day only
+            CHECK(RC_ENEMY_DROP_STALCHILD, CanKillDropEnemy(ACTOR_EN_SKB) && IS_NIGHT()), // Night only
+            CHECK(RC_ENEMY_DROP_BAD_BAT, CanKillDropEnemy(ACTOR_EN_BAT) && IS_DAY()), // Day only
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(GROTTOS, 30),                     ENTRANCE(IKANA_GRAVEYARD, 0), CAN_USE_EXPLOSIVE),
@@ -271,8 +271,8 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_IKANA_GRAVEYARD_WONDER_ITEM_10, true),
             CHECK(RC_IKANA_GRAVEYARD_WONDER_ITEM_11, true),
             CHECK(RC_IKANA_GRAVEYARD_WONDER_ITEM_12, true),
-            CHECK(RC_ENEMY_DROP_STALCHILD, CanKillEnemy(ACTOR_EN_SKB)),
-            CHECK(RC_ENEMY_DROP_BAD_BAT, CanKillEnemy(ACTOR_EN_BAT) && IS_DAY()), // Day only
+            CHECK(RC_ENEMY_DROP_STALCHILD, CanKillDropEnemy(ACTOR_EN_SKB)),
+            CHECK(RC_ENEMY_DROP_BAD_BAT, CanKillDropEnemy(ACTOR_EN_BAT) && IS_DAY()), // Day only
             CHECK(RC_ENEMY_DROP_CAPTAIN_KEETA, CanKillEnemy(ACTOR_EN_SKB) && CanKillEnemy(ACTOR_EN_BSB)),
         },
         .connections = {
@@ -297,7 +297,7 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_ROAD_TO_IKANA_ABOVE_LEDGE] = RandoRegion{ .name = "Above Ledge", .sceneId = SCENE_IKANAMAE,
         .checks = {
-            CHECK(RC_ENEMY_DROP_NEJIRON, CanKillEnemy(ACTOR_EN_BAGUO) && IS_DAY()), // Day only
+            CHECK(RC_ENEMY_DROP_NEJIRON, CanKillDropEnemy(ACTOR_EN_BAGUO) && IS_DAY()), // Day only
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_CANYON, 0),                 ENTRANCE(ROAD_TO_IKANA, 1), true),
@@ -310,8 +310,8 @@ static RegisterShipInitFunc initFunc([]() {
         .checks = {
             CHECK(RC_ROAD_TO_IKANA_POT, CAN_HOOK_SCARECROW),
             CHECK(RC_ROAD_TO_IKANA_STONE_MASK, HAS_ITEM(ITEM_LENS_OF_TRUTH) && HAS_MAGIC && HAS_BOTTLE && (CAN_ACCESS(RED_POTION_REFILL) || CAN_ACCESS(BLUE_POTION_REFILL))),
-            CHECK(RC_ENEMY_DROP_BLUE_BUBBLE, CanKillEnemy(ACTOR_EN_BB) && IS_NIGHT()), // Night only
-            CHECK(RC_ENEMY_DROP_REAL_BOMBCHU, CanKillEnemy(ACTOR_EN_RAT) && IS_DAY()), // Day only
+            CHECK(RC_ENEMY_DROP_BLUE_BUBBLE, CanKillDropEnemy(ACTOR_EN_BB) && IS_NIGHT()), // Night only
+            CHECK(RC_ENEMY_DROP_REAL_BOMBCHU, CanKillDropEnemy(ACTOR_EN_RAT) && IS_DAY()), // Day only
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_GRAVEYARD, 0),              ENTRANCE(ROAD_TO_IKANA, 2), true)
@@ -324,8 +324,8 @@ static RegisterShipInitFunc initFunc([]() {
     Regions[RR_ROAD_TO_IKANA_FIELD_SIDE] = RandoRegion{ .name = "Field Side", .sceneId = SCENE_IKANAMAE,
         .checks = {
             CHECK(RC_ROAD_TO_IKANA_CHEST, HAS_ITEM(ITEM_HOOKSHOT)),
-            CHECK(RC_ENEMY_DROP_BLUE_BUBBLE, CanKillEnemy(ACTOR_EN_BB) && IS_NIGHT()), // Night only
-            CHECK(RC_ENEMY_DROP_REAL_BOMBCHU, CanKillEnemy(ACTOR_EN_RAT) && IS_DAY()), // Day only
+            CHECK(RC_ENEMY_DROP_BLUE_BUBBLE, CanKillDropEnemy(ACTOR_EN_BB) && IS_NIGHT()), // Night only
+            CHECK(RC_ENEMY_DROP_REAL_BOMBCHU, CanKillDropEnemy(ACTOR_EN_RAT) && IS_DAY()), // Day only
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(TERMINA_FIELD, 4),                ENTRANCE(ROAD_TO_IKANA, 0), true),
@@ -352,7 +352,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_ROAD_TO_IKANA_GROTTO_GRASS_12, true),
             CHECK(RC_ROAD_TO_IKANA_GROTTO_GRASS_13, true),
             CHECK(RC_ROAD_TO_IKANA_GROTTO_GRASS_14, true),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(ROAD_TO_IKANA, 0),                ENTRANCE(GROTTOS, 31), true),
@@ -365,8 +365,8 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_SAKON_HIDEOUT_SECOND_ROOM_POT_01,   true),
             CHECK(RC_SAKON_HIDEOUT_SECOND_ROOM_POT_02,   true),
             CHECK(RC_SAKON_HIDEOUT_THIRD_ROOM_POT,       true),
-            CHECK(RC_ENEMY_DROP_DEKU_BABA,               CanKillEnemy(ACTOR_EN_DEKUBABA)),
-            CHECK(RC_ENEMY_DROP_WOLFOS,                  CanKillEnemy(ACTOR_EN_WF)),
+            CHECK(RC_ENEMY_DROP_DEKU_BABA,               CanKillDropEnemy(ACTOR_EN_DEKUBABA)),
+            CHECK(RC_ENEMY_DROP_WOLFOS,                  CanKillDropEnemy(ACTOR_EN_WF)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_CANYON, 6),                 ENTRANCE(SAKONS_HIDEOUT, 0), true),
@@ -447,10 +447,10 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_SECRET_SHRINE_POT_07, (CAN_USE_PROJECTILE && CAN_USE_ABILITY(SWIM)) || CAN_BE_ZORA),
             CHECK(RC_SECRET_SHRINE_POT_08, (CAN_USE_PROJECTILE && CAN_USE_ABILITY(SWIM)) || CAN_BE_ZORA),
             CHECK(RC_SECRET_SHRINE_POT_09, (CAN_USE_PROJECTILE && CAN_USE_ABILITY(SWIM)) || CAN_BE_ZORA),
-            CHECK(RC_ENEMY_DROP_GARO_MASTER, CanKillEnemy(ACTOR_EN_JSO2)),
-            CHECK(RC_ENEMY_DROP_WIZROBE, CanKillEnemy(ACTOR_EN_WIZ)),
-            CHECK(RC_ENEMY_DROP_WART, CanKillEnemy(ACTOR_BOSS_04)),
-            CHECK(RC_ENEMY_DROP_DINOLFOS, CanKillEnemy(ACTOR_EN_DINOFOS)),
+            CHECK(RC_ENEMY_DROP_GARO_MASTER, CanKillDropEnemy(ACTOR_EN_JSO2)),
+            CHECK(RC_ENEMY_DROP_WIZROBE, CanKillDropEnemy(ACTOR_EN_WIZ)),
+            CHECK(RC_ENEMY_DROP_WART, CanKillDropEnemy(ACTOR_BOSS_04)),
+            CHECK(RC_ENEMY_DROP_DINOLFOS, CanKillDropEnemy(ACTOR_EN_DINOFOS)),
         },
         .connections = {
             CONNECTION(RR_SECRET_SHRINE_ENTRANCE, true),
@@ -467,7 +467,7 @@ static RegisterShipInitFunc initFunc([]() {
         .checks = {
             CHECK(RC_STONE_TOWER_CLIMB_POT_01, HAS_ITEM(ITEM_HOOKSHOT)),
             CHECK(RC_STONE_TOWER_CLIMB_POT_02, HAS_ITEM(ITEM_HOOKSHOT)),
-            CHECK(RC_ENEMY_DROP_BEAMOS, CanKillEnemy(ACTOR_EN_VM)),
+            CHECK(RC_ENEMY_DROP_BEAMOS, CanKillDropEnemy(ACTOR_EN_VM)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_CANYON, 3),                 ENTRANCE(STONE_TOWER, 0), true)
@@ -523,8 +523,8 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_STONE_TOWER_LOWER_SCARECROW_POT_10, CAN_HOOK_SCARECROW),
             CHECK(RC_STONE_TOWER_LOWER_SCARECROW_POT_11, CAN_HOOK_SCARECROW),
             CHECK(RC_STONE_TOWER_LOWER_SCARECROW_POT_12, CAN_HOOK_SCARECROW),
-            CHECK(RC_ENEMY_DROP_BEAMOS, CanKillEnemy(ACTOR_EN_VM)),
-            CHECK(RC_ENEMY_DROP_KEESE, CanKillEnemy(ACTOR_EN_FIREFLY)),
+            CHECK(RC_ENEMY_DROP_BEAMOS, CanKillDropEnemy(ACTOR_EN_VM)),
+            CHECK(RC_ENEMY_DROP_KEESE, CanKillDropEnemy(ACTOR_EN_FIREFLY)),
         },
         .connections = {
             CONNECTION(RR_STONE_TOWER_BOTTOM, HAS_ITEM(ITEM_HOOKSHOT) && CAN_PLAY_SONG(ELEGY) && CAN_BE_GORON && CAN_BE_ZORA),
@@ -539,7 +539,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_STONE_TOWER_OWL_STATUE_POT_02, true),
             CHECK(RC_STONE_TOWER_OWL_STATUE_POT_03, true),
             CHECK(RC_STONE_TOWER_OWL_STATUE_POT_04, true),
-            CHECK(RC_ENEMY_DROP_KEESE, CanKillEnemy(ACTOR_EN_FIREFLY)),
+            CHECK(RC_ENEMY_DROP_KEESE, CanKillDropEnemy(ACTOR_EN_FIREFLY)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(STONE_TOWER_INVERTED, 0),         ENTRANCE(STONE_TOWER, 1), CAN_PLAY_SONG(ELEGY) && HAS_ITEM(ITEM_BOW) && HAS_ITEM(ITEM_ARROW_LIGHT) && HAS_MAGIC),
@@ -563,8 +563,8 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_STONE_TOWER_HIGHER_SCARECROW_POT_07, CAN_HOOK_SCARECROW),
             CHECK(RC_STONE_TOWER_HIGHER_SCARECROW_POT_08, CAN_HOOK_SCARECROW),
             CHECK(RC_STONE_TOWER_HIGHER_SCARECROW_POT_09, CAN_HOOK_SCARECROW),
-            CHECK(RC_ENEMY_DROP_KEESE, CanKillEnemy(ACTOR_EN_FIREFLY)),
-            CHECK(RC_ENEMY_DROP_REDEAD, CanKillEnemy(ACTOR_EN_RD)),
+            CHECK(RC_ENEMY_DROP_KEESE, CanKillDropEnemy(ACTOR_EN_FIREFLY)),
+            CHECK(RC_ENEMY_DROP_REDEAD, CanKillDropEnemy(ACTOR_EN_RD)),
         },
         .connections = {
             CONNECTION(RR_STONE_TOWER_MIDDLE, HAS_ITEM(ITEM_HOOKSHOT)),

@@ -60,6 +60,7 @@ extern "C" {
 typedef void (*S2HVbCallback)(bool* should, va_list args);
 
 #include "2s2h/ModApi/ModDungeons/BossRegistry.h"
+#include "2s2h/ModApi/ModDungeons/RandoChecks.h"
 
 typedef struct {
     uint32_t structSize;
@@ -250,6 +251,14 @@ typedef struct {
     uint32_t (*ReadModsFolderFiles)(const char* extensions, S2HArchiveFileFunc visit, void* userData);
     bool (*IsFormSuspended)(void);
     bool (*GetNetPlayerColor)(const Actor* actor, Color_RGB8* color);
+    bool (*RegisterModCounter)(const char* key, int32_t max);
+    int32_t (*GetModCounter)(const char* key);
+    void (*SetModCounter)(const char* key, int32_t value);
+    int32_t (*RegisterRandoCheck)(const S2HRandoCheckDefinition* definition);
+    int32_t (*GetRandoCheckId)(const char* key);
+    bool (*IsRandoCheckObtained)(int32_t check);
+    bool (*AwardRandoCheck)(int32_t check);
+    uint8_t (*GetRandoCheckItemCategory)(int32_t check);
 } S2HModApi;
 
 #define S2H_REGISTER_HOOK(api, name, callback) ((api)->RegisterHookByName(#name, (void*)S2H_CheckHook_##name(callback)))

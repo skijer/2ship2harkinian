@@ -30,7 +30,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_TERMINA_FIELD_BIO_BABA_GROTTO_GRASS_02, true),
             CHECK(RC_TERMINA_FIELD_BIO_BABA_GROTTO_BEEHIVE_01, CAN_USE_PROJECTILE && CAN_BE_ZORA && CAN_USE_ABILITY(SWIM)),
             CHECK(RC_TERMINA_FIELD_BIO_BABA_GROTTO_BEEHIVE_02, CAN_USE_PROJECTILE && CAN_BE_ZORA && CAN_USE_ABILITY(SWIM)),
-            CHECK(RC_ENEMY_DROP_BIO_DEKU_BABA, CanKillEnemy(ACTOR_BOSS_05)),
+            CHECK(RC_ENEMY_DROP_BIO_DEKU_BABA, CanKillDropEnemy(ACTOR_BOSS_05)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(TERMINA_FIELD, 0),                ENTRANCE(GROTTOS, 11), true),
@@ -115,7 +115,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_TERMINA_FIELD_COW_GROTTO_BUTTERFLY_01, HAS_ITEM(ITEM_DEKU_STICK)),
             CHECK(RC_TERMINA_FIELD_COW_GROTTO_BUTTERFLY_02, HAS_ITEM(ITEM_DEKU_STICK)),
             CHECK(RC_TERMINA_FIELD_COW_GROTTO_BUTTERFLY_03, HAS_ITEM(ITEM_DEKU_STICK)),
-            CHECK(RC_ENEMY_DROP_GIANT_BEE, CAN_USE_PROJECTILE && CanKillEnemy(ACTOR_EN_BEE)), // In a beehive
+            CHECK(RC_ENEMY_DROP_GIANT_BEE, CAN_USE_PROJECTILE && CanKillDropEnemy(ACTOR_EN_BEE)), // In a beehive
             CHECK(RC_TERMINA_FIELD_COW_GROTTO_BEEHIVE, CAN_USE_PROJECTILE),
         },
         .exits = { //     TO                                         FROM
@@ -125,7 +125,7 @@ static RegisterShipInitFunc initFunc([]() {
     Regions[RR_TERMINA_FIELD_DODONGO_GROTTO] = RandoRegion{ .name = "Termina Field Dodongo", .sceneId = SCENE_KAKUSIANA,
         .checks = {
             CHECK(RC_TERMINA_FIELD_DODONGO_GROTTO_CHEST, CanKillEnemy(ACTOR_EN_DODONGO)),
-            CHECK(RC_ENEMY_DROP_DODONGO, CanKillEnemy(ACTOR_EN_DODONGO)),
+            CHECK(RC_ENEMY_DROP_DODONGO, CanKillDropEnemy(ACTOR_EN_DODONGO)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(TERMINA_FIELD, 0),                ENTRANCE(GROTTOS, 7), true),
@@ -133,8 +133,8 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_TERMINA_FIELD_GOSSIP_STONE_GROTTO_1] = RandoRegion{ .name = "Termina Field Gossip Stone #1", .sceneId = SCENE_KAKUSIANA,
         .checks = {
-            CHECK(RC_ENEMY_DROP_SKULLTULA, CanKillEnemy(ACTOR_EN_ST)),
-            CHECK(RC_ENEMY_DROP_SKULLWALLTULA, CanKillEnemy(ACTOR_EN_SW)),
+            CHECK(RC_ENEMY_DROP_SKULLTULA, CanKillDropEnemy(ACTOR_EN_ST)),
+            CHECK(RC_ENEMY_DROP_SKULLWALLTULA, CanKillDropEnemy(ACTOR_EN_SW)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(TERMINA_FIELD, 0),                ENTRANCE(GROTTOS, 1), true),
@@ -161,7 +161,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_TERMINA_FIELD_GOSSIP_STONE_GROTTO_3_GRASS_05, true),
             CHECK(RC_TERMINA_FIELD_GOSSIP_STONE_GROTTO_3_BUTTERFLY_01, HAS_ITEM(ITEM_DEKU_STICK)),
             CHECK(RC_TERMINA_FIELD_GOSSIP_STONE_GROTTO_3_BUTTERFLY_02, HAS_ITEM(ITEM_DEKU_STICK)),
-            CHECK(RC_ENEMY_DROP_GIANT_BEE, CAN_USE_PROJECTILE && CanKillEnemy(ACTOR_EN_BEE)), // In a beehive
+            CHECK(RC_ENEMY_DROP_GIANT_BEE, CAN_USE_PROJECTILE && CanKillDropEnemy(ACTOR_EN_BEE)), // In a beehive
             CHECK(RC_TERMINA_FIELD_GOSSIP_STONE_GROTTO_3_BEEHIVE, CAN_USE_PROJECTILE),
         },
         .exits = { //     TO                                         FROM
@@ -201,7 +201,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_TERMINA_FIELD_PEAHAT_GROTTO_GRASS_10, true),
             CHECK(RC_TERMINA_FIELD_PEAHAT_GROTTO_GRASS_11, true),
             CHECK(RC_TERMINA_FIELD_PEAHAT_GROTTO_GRASS_12, true),
-            CHECK(RC_ENEMY_DROP_PEAHAT, CanKillEnemy(ACTOR_EN_PEEHAT)),
+            CHECK(RC_ENEMY_DROP_PEAHAT, CanKillDropEnemy(ACTOR_EN_PEEHAT)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(TERMINA_FIELD, 0),                ENTRANCE(GROTTOS, 13), true),
@@ -224,7 +224,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_TERMINA_FIELD_PILLAR_GROTTO_GRASS_12, true),
             CHECK(RC_TERMINA_FIELD_PILLAR_GROTTO_GRASS_13, true),
             CHECK(RC_TERMINA_FIELD_PILLAR_GROTTO_GRASS_14, true),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(TERMINA_FIELD, 0),                ENTRANCE(GROTTOS, 18), true),
@@ -257,7 +257,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_TERMINA_FIELD_TALL_GRASS_GROTTO_GRASS_12, true),
             CHECK(RC_TERMINA_FIELD_TALL_GRASS_GROTTO_GRASS_13, true),
             CHECK(RC_TERMINA_FIELD_TALL_GRASS_GROTTO_GRASS_14, true),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(TERMINA_FIELD, 0),                ENTRANCE(GROTTOS, 19), true),
@@ -547,15 +547,15 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_TERMINA_FIELD_WALL_WONDER_ITEM_13, canPlaySong(OCARINA_SONG_TERMINA_WALL)),
             CHECK(RC_TERMINA_FIELD_WALL_WONDER_ITEM_14, canPlaySong(OCARINA_SONG_TERMINA_WALL)),
             CHECK(RC_TERMINA_FIELD_WALL_WONDER_ITEM_15, canPlaySong(OCARINA_SONG_TERMINA_WALL)),
-            CHECK(RC_ENEMY_DROP_BLUE_BUBBLE, CanKillEnemy(ACTOR_EN_BB) && IS_NIGHT()), // Night only
-            CHECK(RC_ENEMY_DROP_DEKU_BABA, CanKillEnemy(ACTOR_EN_DEKUBABA)),
-            CHECK(RC_ENEMY_DROP_CHUCHU, CanKillEnemy(ACTOR_EN_SLIME) && IS_DAY()), // Day only
-            CHECK(RC_ENEMY_DROP_REAL_BOMBCHU, CanKillEnemy(ACTOR_EN_RAT) && IS_DAY()), // Day only
-            CHECK(RC_ENEMY_DROP_LEEVER, CanKillEnemy(ACTOR_EN_NEO_REEBA)),
-            CHECK(RC_ENEMY_DROP_DODONGO, CanKillEnemy(ACTOR_EN_DODONGO) && IS_DAY()), // Day only
-            CHECK(RC_ENEMY_DROP_EENO, CanKillEnemy(ACTOR_EN_SNOWMAN) && IS_NIGHT()), // Night only
-            CHECK(RC_ENEMY_DROP_BAD_BAT, CanKillEnemy(ACTOR_EN_BAT)),
-            CHECK(RC_ENEMY_DROP_TAKKURI, CanKillEnemy(ACTOR_EN_THIEFBIRD)),
+            CHECK(RC_ENEMY_DROP_BLUE_BUBBLE, CanKillDropEnemy(ACTOR_EN_BB) && IS_NIGHT()), // Night only
+            CHECK(RC_ENEMY_DROP_DEKU_BABA, CanKillDropEnemy(ACTOR_EN_DEKUBABA)),
+            CHECK(RC_ENEMY_DROP_CHUCHU, CanKillDropEnemy(ACTOR_EN_SLIME) && IS_DAY()), // Day only
+            CHECK(RC_ENEMY_DROP_REAL_BOMBCHU, CanKillDropEnemy(ACTOR_EN_RAT) && IS_DAY()), // Day only
+            CHECK(RC_ENEMY_DROP_LEEVER, CanKillDropEnemy(ACTOR_EN_NEO_REEBA)),
+            CHECK(RC_ENEMY_DROP_DODONGO, CanKillDropEnemy(ACTOR_EN_DODONGO) && IS_DAY()), // Day only
+            CHECK(RC_ENEMY_DROP_EENO, CanKillDropEnemy(ACTOR_EN_SNOWMAN) && IS_NIGHT()), // Night only
+            CHECK(RC_ENEMY_DROP_BAD_BAT, CanKillDropEnemy(ACTOR_EN_BAT)),
+            CHECK(RC_ENEMY_DROP_TAKKURI, CanKillDropEnemy(ACTOR_EN_THIEFBIRD)),
             CHECK(RC_TERMINA_FIELD_BUTTERFLY_01, HAS_ITEM(ITEM_DEKU_STICK)),
             CHECK(RC_TERMINA_FIELD_BUTTERFLY_02, HAS_ITEM(ITEM_DEKU_STICK)),
         },

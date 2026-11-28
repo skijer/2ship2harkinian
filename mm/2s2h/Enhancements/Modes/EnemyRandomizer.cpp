@@ -21,9 +21,11 @@
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ModApi/ActorRegistry/ActorRegistry.h"
+#include "2s2h/ModApi/ActorRegistry/EnemySouls.h"
 #include "2s2h/ModApi/ModApi.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "2s2h/Rando/ActorBehavior/Souls.h"
+#include "2s2h/Rando/Logic/EnemyDropLogic.h"
 #include "2s2h/Rando/Rando.h"
 #include "2s2h/SaveManager/SaveSections.h"
 #include "2s2h/ShipInit.hpp"
@@ -569,6 +571,7 @@ void ReadSeedData(const nlohmann::json& source) {
     ReadPlacement(isObject ? source.value("enemyPlacement", nlohmann::json()) : nlohmann::json());
     sSeedEnemyPoolExcluded = isObject ? source.value("enemyPoolExcluded", std::string()) : std::string();
     sSeedSoulPoolExcluded = isObject ? source.value("soulPoolExcluded", std::string()) : std::string();
+    Rando::Logic::RefreshEnemyDropLogic();
 }
 
 std::optional<EnemyChoice> FindChoice(const std::string& key) {
@@ -913,17 +916,18 @@ void AssignForSeed(uint32_t seed) {
     sSeedEnemyPoolExcluded = CVarGetString(ENEMY_POOL_EXCLUDED_CVAR, "");
     sSeedSoulPoolExcluded = CVarGetString(SOUL_POOL_EXCLUDED_CVAR, "");
     sPlacement.clear();
-    if (RANDO_SAVE_OPTIONS[RO_ENEMY_RANDOMIZER] == RO_GENERIC_OFF) {
-        return;
-    }
-    const s32 minibossMode = RANDO_SAVE_OPTIONS[RO_ENEMY_RANDOMIZER_MINIBOSSES];
-    const std::vector<EnemyChoice> pool = GetRandoPool();
-    std::mt19937 random(seed);
-    for (const auto& [sceneId, sceneKeys] : CollectSceneKeys()) {
-        for (const auto& [originalKey, constraints] : sceneKeys) {
-            sPlacement[sceneId][originalKey] = PickReplacement(originalKey, constraints, pool, minibossMode, random);
+    if (RANDO_SAVE_OPTIONS[RO_ENEMY_RANDOMIZER] != RO_GENERIC_OFF) {
+        const s32 minibossMode = RANDO_SAVE_OPTIONS[RO_ENEMY_RANDOMIZER_MINIBOSSES];
+        const std::vector<EnemyChoice> pool = GetRandoPool();
+        std::mt19937 random(seed);
+        for (const auto& [sceneId, sceneKeys] : CollectSceneKeys()) {
+            for (const auto& [originalKey, constraints] : sceneKeys) {
+                sPlacement[sceneId][originalKey] =
+                    PickReplacement(originalKey, constraints, pool, minibossMode, random);
+            }
         }
     }
+    Rando::Logic::RefreshEnemyDropLogic();
 }
 
 void WriteSpoiler(nlohmann::json& spoiler) {
@@ -934,6 +938,18 @@ void WriteSpoiler(nlohmann::json& spoiler) {
 
 void ReadSpoiler(const nlohmann::json& spoiler) {
     ReadSeedData(spoiler);
+}
+
+static std::optional<LogicReplacement> ResolveReplacement(int16_t sceneId, const std::string& originalKey,
+                                                          const std::string& replacementKey) {
+    const bool onlySubmerged = IsGroupOnlySubmerged(sceneId, originalKey);
+    if (const NativeEnemy* native = FindNativeEnemyByKey(replacementKey)) {
+        return LogicReplacement{ native->actorId, nullptr, onlySubmerged };
+    }
+    if (const S2HCustomEnemy* custom = FindCustomEnemy(replacementKey)) {
+        return LogicReplacement{ custom->actorId, custom, onlySubmerged };
+    }
+    return std::nullopt;
 }
 
 LogicReplacement FindLogicReplacement(int16_t sceneId, int16_t originalActorId) {
@@ -947,14 +963,58 @@ LogicReplacement FindLogicReplacement(int16_t sceneId, int16_t originalActorId) 
         if (original == nullptr || original->actorId != originalActorId) {
             continue;
         }
-        const bool onlySubmerged = IsGroupOnlySubmerged(sceneId, originalKey);
-        if (const NativeEnemy* native = FindNativeEnemyByKey(replacementKey)) {
-            return { native->actorId, nullptr, onlySubmerged };
-        }
-        const S2HCustomEnemy* custom = FindCustomEnemy(replacementKey);
-        return custom != nullptr ? LogicReplacement{ custom->actorId, custom, onlySubmerged } : unchanged;
+        return ResolveReplacement(sceneId, originalKey, replacementKey).value_or(unchanged);
     }
     return unchanged;
+}
+
+bool IsPlacementActive() {
+    return !sPlacement.empty();
+}
+
+static bool IsRowReplaced(const EnemySpawnRow& row, const ScenePlacement& placement) {
+    for (const NativeEnemy* original : GetOriginalsOfRow(row)) {
+        if (placement.contains(original->key)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<LogicReplacement> FindSpawnsOfActor(int16_t sceneId, int16_t actorId) {
+    static const ScenePlacement sNoPlacement;
+    const auto scene = sPlacement.find(sceneId);
+    const ScenePlacement& placement = scene != sPlacement.end() ? scene->second : sNoPlacement;
+    std::vector<LogicReplacement> spawns;
+    for (const auto& [originalKey, replacementKey] : placement) {
+        const std::optional<LogicReplacement> spawn = ResolveReplacement(sceneId, originalKey, replacementKey);
+        if (spawn.has_value() && spawn->actorId == actorId) {
+            spawns.push_back(*spawn);
+        }
+    }
+    for (const EnemySpawnRow& row : sEnemySpawns) {
+        if (row.sceneId == sceneId && row.actorId == actorId && !IsRowReplaced(row, placement)) {
+            spawns.push_back({ actorId, nullptr, false });
+            break;
+        }
+    }
+    return spawns;
+}
+
+std::vector<SceneReplacement> ListSceneReplacements(int16_t sceneId) {
+    std::vector<SceneReplacement> replacements;
+    const auto scene = sPlacement.find(sceneId);
+    if (scene == sPlacement.end()) {
+        return replacements;
+    }
+    for (const auto& [originalKey, replacementKey] : scene->second) {
+        const NativeEnemy* original = FindNativeEnemyByKey(originalKey);
+        const std::optional<LogicReplacement> replacement = ResolveReplacement(sceneId, originalKey, replacementKey);
+        if (original != nullptr && replacement.has_value()) {
+            replacements.push_back({ original->actorId, *replacement });
+        }
+    }
+    return replacements;
 }
 
 bool IsSoulInPool(const char* soulKey) {
@@ -985,13 +1045,15 @@ std::vector<PoolEntry> ListEnemyPool(bool minibosses) {
 std::vector<PoolEntry> ListSoulPool() {
     std::vector<PoolEntry> entries;
     for (const NativeEnemySoul& soul : GetNativeEnemySouls()) {
-        entries.push_back({ soul.key, Rando::StaticData::Items[soul.randoItemId].name });
+        const std::string name = Rando::StaticData::Items[soul.randoItemId].name;
+        entries.push_back({ soul.key, EnemySouls_DescribeNativeSoul(soul.key, name) });
     }
     std::set<std::string> customSouls;
     for (uint32_t i = 0; i < ActorRegistry_GetEnemyCount(); i++) {
         const S2HCustomEnemy* enemy = ActorRegistry_GetEnemyAt(i);
         if (enemy->soulKey != nullptr && !IsNativeSoulKey(enemy->soulKey) && customSouls.insert(enemy->soulKey).second) {
-            entries.push_back({ enemy->soulKey, std::string("Soul of ") + enemy->name });
+            const std::string fallbackName = std::string("Soul of ") + enemy->name;
+            entries.push_back({ enemy->soulKey, EnemySouls_DescribeCustomSoul(enemy->soulKey, fallbackName) });
         }
     }
     return entries;

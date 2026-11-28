@@ -227,3 +227,23 @@ void Rando::ActorBehavior::InitEnemyDropBehavior() {
         }
     });
 }
+
+RandoCheckId Rando::ActorBehavior::GetEnemyDropCheck(int16_t actorId) {
+    auto profile = enemyDropProfiles.find(actorId);
+    return profile != enemyDropProfiles.end() ? std::get<0>(profile->second) : RC_UNKNOWN;
+}
+
+void Rando::ActorBehavior::RegisterEnemyDrop(int16_t actorId, RandoCheckId check) {
+    enemyDropProfiles.insert_or_assign(
+        actorId, std::tuple<RandoCheckId, ActorType, EnemyDropType>{ check, ACTORCAT_ENEMY, DROP_TYPE_KILL });
+}
+
+std::vector<int16_t> Rando::ActorBehavior::GetEnemyDropActors(RandoCheckId check) {
+    std::vector<int16_t> actors;
+    for (const auto& [actorId, profile] : enemyDropProfiles) {
+        if (std::get<0>(profile) == check) {
+            actors.push_back(actorId);
+        }
+    }
+    return actors;
+}

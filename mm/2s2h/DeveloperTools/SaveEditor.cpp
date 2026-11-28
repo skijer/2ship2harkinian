@@ -3,6 +3,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/ModApi/CustomItemRegistry/KaleidoItemManager.h"
 #include "2s2h/ModApi/CustomEquipRegistry/CustomEquipRegistry.h"
+#include "2s2h/ModApi/ModInfEditor/ModInfEditor.h"
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -1846,7 +1847,8 @@ void DrawRegEditorTab() {
 
 const char* flagEditorSections[] = { "currentSceneFlags", "weekEventReg",  "eventInf",
                                      "scenesVisible",     "owlActivation", "permanentSceneFlags",
-                                     "cycleSceneFlags",   "randoInf",      "collectedHearts" };
+                                     "cycleSceneFlags",   "randoInf",      "collectedHearts",
+                                     "modInf" };
 
 void DrawFlagsTab() {
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 3.0f);
@@ -2379,6 +2381,9 @@ void DrawFlagsTab() {
                 ImGui::EndDisabled();
                 ImGui::PopID();
             }
+            break;
+        case MOD_INF:
+            ModInfEditor_Draw();
             break;
     }
     ImGui::PopStyleVar();

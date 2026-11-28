@@ -45,6 +45,7 @@
 #include <SDL2/SDL_scancode.h>
 #endif
 #include "Extractor/Extract.h"
+#include "2s2h/ModApi/AssetSetup/AssetSetup.h"
 // OTRTODO
 // #include <functions.h>
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
@@ -312,8 +313,36 @@ namespace BenGui {
 extern std::shared_ptr<BenGui::BenMenu> mBenMenu;
 }
 
+static void ExtractForAssetSetup() {
+    if (!shipArchiveVersionMatch) {
+        AssetSetup_Exit(AssetSetupExit::Failed, "2ship.o2r does not match this build of 2 Ship 2 Harkinian");
+    }
+    if (VerifyArchiveVersion(DetectArchiveVersion("mm.o2r", true)) && !RemoveArchiveAcrossAppDirs("mm.o2r")) {
+        AssetSetup_Exit(AssetSetupExit::Failed, "an outdated mm.o2r could not be removed");
+    }
+    if (std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("mm.o2r", appShortName))) {
+        return;
+    }
+    const std::string& rom = AssetSetup_GetOwnGameRom();
+    Extractor extract;
+    if (rom.empty() || !extract.RunFileStandalone(rom)) {
+        AssetSetup_Exit(AssetSetupExit::Failed, "'" + rom + "' is not a supported Majora's Mask ROM");
+    }
+    std::atomic<size_t> extractCount = 0;
+    std::atomic<size_t> totalExtract = 0;
+    const std::string installPath = std::filesystem::absolute(Ship::Context::GetAppBundlePath()).string();
+    if (!extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName), &extractCount,
+                          &totalExtract)) {
+        AssetSetup_Exit(AssetSetupExit::Failed, "the Majora's Mask ROM could not be extracted");
+    }
+}
+
 void OTRGlobals::RunExtract(int argc, char* argv[]) {
     if (FleetGame_IsHosted()) {
+        return;
+    }
+    if (AssetSetup_IsRunning()) {
+        ExtractForAssetSetup();
         return;
     }
     bool extractDone = false;
@@ -1037,6 +1066,7 @@ std::string S2H_InstallProblem(const std::string& directory) {
 }
 
 extern "C" void InitOTR(int argc, char* argv[]) {
+    AssetSetup_TakeArguments(argc, argv);
     ModStore_ApplyStagedUpdate();
     OTRGlobals::Instance = new OTRGlobals();
     OTRGlobals::Instance->RunExtract(argc, argv);
@@ -1049,6 +1079,7 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     Ship::Context::GetRawInstance()->GetConsoleVariables()->Save();
 
     GameInteractor::Instance = new GameInteractor();
+    AssetSetup_ExitAfterFirstScene();
     AudioCollection::Instance = new AudioCollection();
     SDLNet_Init();
     Anchor::Instance = new Anchor();

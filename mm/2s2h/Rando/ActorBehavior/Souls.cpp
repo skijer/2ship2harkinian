@@ -7,6 +7,7 @@
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/Enhancements/Modes/EnemyRandomizer.h"
 #include "2s2h/ModApi/ActorRegistry/ActorRegistry.h"
+#include "2s2h/ModApi/ActorRegistry/EnemySouls.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
 
 extern "C" {
@@ -177,7 +178,7 @@ int32_t GetCustomEnemySoulItem(const char* soulKey) {
     return soulKey != nullptr ? RandoItems_GetRandoGet((std::string("soul.") + soulKey).c_str()) : 0;
 }
 
-static bool HaveCustomEnemySoul(const char* soulKey) {
+bool HaveCustomEnemySoul(const char* soulKey) {
     if (soulKey == nullptr || !EnemyRandomizer::IsSoulInPool(soulKey)) {
         return true;
     }
@@ -193,8 +194,10 @@ bool HaveEnemySoul(ActorId enemyId) {
         return (soulKey != nullptr && !EnemyRandomizer::IsSoulInPool(soulKey)) ||
                Flags_GetRandoInf(SOUL_RI_TO_RANDO_INF(randoItemId));
     }
+    // Boss souls hold their bosses through the boss hooks instead.
     const S2HCustomEnemy* customEnemy = ActorRegistry_FindEnemyById(enemyId);
-    return customEnemy == nullptr || HaveCustomEnemySoul(customEnemy->soulKey);
+    return customEnemy == nullptr || customEnemy->soulCategory == S2H_ENEMY_CATEGORY_BOSS ||
+           HaveCustomEnemySoul(customEnemy->soulKey);
 }
 
 void ShouldActorUpdate(Actor* actor, bool* should, RandoInf randoInf) {
@@ -229,6 +232,7 @@ void Rando::ActorBehavior::InitSoulsBehavior() {
     const bool soullessEnemiesDespawn = RANDO_SAVE_OPTIONS[RO_ENEMY_SOUL_BEHAVIOUR] == RO_ENEMY_SOUL_NO_SPAWN;
     bool shouldEnemyInjure = enemySoulsShuffled && !soullessEnemiesDespawn;
     const bool shouldWithholdMajora = ShouldWithholdMajora();
+    const bool shouldHoldCustomBosses = shouldBossRegister && EnemySouls_HasBosses();
     const bool isMajoraSoulTriggered =
         IS_RANDO && Rando::Logic::IsMajoraSoulTriggered(gSaveContext.save.shipSaveInfo.rando);
 
@@ -248,6 +252,18 @@ void Rando::ActorBehavior::InitSoulsBehavior() {
     });
 
     // ShouldActorDraw & ShouldActorUpdate for Boss Souls
+    COND_HOOK(ShouldActorUpdate, shouldHoldCustomBosses, [](Actor* actor, bool* should) {
+        if (EnemySouls_HoldBossWithoutSoul(actor)) {
+            *should = false;
+        }
+    });
+
+    COND_HOOK(ShouldActorDraw, shouldHoldCustomBosses, [](Actor* actor, bool* should) {
+        if (EnemySouls_IsBossWithoutSoul(actor->id)) {
+            *should = false;
+        }
+    });
+
     COND_ID_HOOK(ShouldActorDraw, ACTOR_BOSS_HAKUGIN, shouldBossRegister, [](Actor* actor, bool* should) {
         if (!Flags_GetRandoInf(RANDO_INF_OBTAINED_SOUL_OF_BOSS_GOHT)) {
             BossHakugin_DrawIce((BossHakugin*)actor, gPlayState);

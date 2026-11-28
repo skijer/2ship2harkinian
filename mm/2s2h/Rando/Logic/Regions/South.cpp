@@ -129,7 +129,7 @@ static RegisterShipInitFunc initFunc([]() {
     // TODO: There is a trick you can do to get up to the dekunut with a backflip onto the doorway and then an angled roll jump to grab the upper ledge
     Regions[RR_DEKU_PALACE_INSIDE_UPPER_CELL_SIDE] = RandoRegion{ .name = "Inside, Upper", .sceneId = SCENE_22DEKUCITY,
         .checks = {
-            CHECK(RC_ENEMY_DROP_MAD_SCRUB, CanKillEnemy(ACTOR_EN_DEKUNUTS) && CAN_BE_DEKU),
+            CHECK(RC_ENEMY_DROP_MAD_SCRUB, CanKillDropEnemy(ACTOR_EN_DEKUNUTS) && CAN_BE_DEKU),
         },
         .connections = {
             CONNECTION(RR_DEKU_PALACE_INSIDE_UPPER_CELL_SIDE_LEDGE, CanKillEnemy(ACTOR_EN_DEKUNUTS) && CAN_BE_DEKU),
@@ -150,7 +150,7 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_DEKU_PALACE_INSIDE_UPPER_BEAN_SIDE] = RandoRegion { .name = "Inside, Upper", .sceneId = SCENE_22DEKUCITY,
         .checks = {
-            CHECK(RC_ENEMY_DROP_MAD_SCRUB, CanKillEnemy(ACTOR_EN_DEKUNUTS) && CAN_BE_DEKU),
+            CHECK(RC_ENEMY_DROP_MAD_SCRUB, CanKillDropEnemy(ACTOR_EN_DEKUNUTS) && CAN_BE_DEKU),
         },
         .connections = {
             CONNECTION(RR_DEKU_PALACE_OUTSIDE, CanKillEnemy(ACTOR_EN_DEKUNUTS) && CAN_BE_DEKU),
@@ -160,7 +160,7 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_DEKU_PALACE_OUTSIDE] = RandoRegion{ .name = "Outside", .sceneId = SCENE_22DEKUCITY,
         .checks = {
-            CHECK(RC_ENEMY_DROP_MINI_BABA, (CAN_BE_DEKU || (RANDO_EVENTS[RE_CLEARED_WOODFALL_TEMPLE] && CAN_TRAVERSE_WAIST_DEEP_WATER)) && CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, (CAN_BE_DEKU || (RANDO_EVENTS[RE_CLEARED_WOODFALL_TEMPLE] && CAN_TRAVERSE_WAIST_DEEP_WATER)) && CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(SOUTHERN_SWAMP_POISONED, 3),      ENTRANCE(DEKU_PALACE, 0), true),
@@ -253,7 +253,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_ROAD_TO_SOUTHERN_SWAMP_GROTTO_GRASS_12, true),
             CHECK(RC_ROAD_TO_SOUTHERN_SWAMP_GROTTO_GRASS_13, true),
             CHECK(RC_ROAD_TO_SOUTHERN_SWAMP_GROTTO_GRASS_14, true),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(ROAD_TO_SOUTHERN_SWAMP, 0),       ENTRANCE(GROTTOS, 20), true),
@@ -290,10 +290,10 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_ROAD_TO_SOUTHERN_SWAMP_TREE_04, true),
             CHECK(RC_ROAD_TO_SOUTHERN_SWAMP_TREE_05, true),
             CHECK(RC_ROAD_TO_SOUTHERN_SWAMP_TREE_06, true),
-            CHECK(RC_ENEMY_DROP_DEKU_BABA, CanKillEnemy(ACTOR_EN_DEKUBABA)),
-            CHECK(RC_ENEMY_DROP_CHUCHU, CanKillEnemy(ACTOR_EN_SLIME) && IS_DAY()), // Day only
-            CHECK(RC_ENEMY_DROP_WOLFOS, CanKillEnemy(ACTOR_EN_WF) && IS_NIGHT()), // Night only
-            CHECK(RC_ENEMY_DROP_BAD_BAT, CanKillEnemy(ACTOR_EN_BAT)),
+            CHECK(RC_ENEMY_DROP_DEKU_BABA, CanKillDropEnemy(ACTOR_EN_DEKUBABA)),
+            CHECK(RC_ENEMY_DROP_CHUCHU, CanKillDropEnemy(ACTOR_EN_SLIME) && IS_DAY()), // Day only
+            CHECK(RC_ENEMY_DROP_WOLFOS, CanKillDropEnemy(ACTOR_EN_WF) && IS_NIGHT()), // Night only
+            CHECK(RC_ENEMY_DROP_BAD_BAT, CanKillDropEnemy(ACTOR_EN_BAT)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(TERMINA_FIELD, 1),                ENTRANCE(ROAD_TO_SOUTHERN_SWAMP, 0), true),
@@ -323,7 +323,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_SOUTHERN_SWAMP_GROTTO_GRASS_12, true),
             CHECK(RC_SOUTHERN_SWAMP_GROTTO_GRASS_13, true),
             CHECK(RC_SOUTHERN_SWAMP_GROTTO_GRASS_14, true),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(SOUTHERN_SWAMP_POISONED, 3),      ENTRANCE(GROTTOS, 21), true),
@@ -364,7 +364,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_SOUTHERN_SWAMP_POISON_GRASS_11, true),
             CHECK(RC_SOUTHERN_SWAMP_POISON_GRASS_12, true),
             CHECK(RC_SOUTHERN_SWAMP_POISON_BEEHIVE, CAN_USE_PROJECTILE && CAN_TRAVERSE_WAIST_DEEP_WATER),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(ROAD_TO_SOUTHERN_SWAMP, 1),       ENTRANCE(SOUTHERN_SWAMP_POISONED, 0), true),
@@ -390,7 +390,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_SOUTHERN_SWAMP_FROG, HAS_ITEM(ITEM_MASK_DON_GERO)),
             CHECK(RC_SOUTHERN_SWAMP_FREESTANDING_RUPEE_01, CAN_BE_DEKU || CAN_BE_ZORA),
             CHECK(RC_SOUTHERN_SWAMP_FREESTANDING_RUPEE_02, CAN_BE_DEKU || CAN_BE_ZORA),
-            CHECK(RC_ENEMY_DROP_OCTOROK, CanKillEnemy(ACTOR_EN_OKUTA) && (CAN_USE_ABILITY(SWIM) || CAN_BE_ZORA || CAN_BE_GORON)),
+            CHECK(RC_ENEMY_DROP_OCTOROK, CanKillDropEnemy(ACTOR_EN_OKUTA) && (CAN_USE_ABILITY(SWIM) || CAN_BE_ZORA || CAN_BE_GORON)),
         },
         .connections = {
             CONNECTION(RR_SOUTHERN_SWAMP_SOUTH, CanGetPastBigOctoWithoutBoat()),
@@ -453,8 +453,8 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_SOUTHERN_SWAMP_POISON_GRASS_28, true),
             CHECK(RC_SOUTHERN_SWAMP_POISON_GRASS_29, true),
             CHECK(RC_SOUTHERN_SWAMP_POISON_GRASS_30, true),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
-            CHECK(RC_ENEMY_DROP_DEKU_BABA, CanKillEnemy(ACTOR_EN_DEKUBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_DEKU_BABA, CanKillDropEnemy(ACTOR_EN_DEKUBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(MAGIC_HAGS_POTION_SHOP, 0),       ENTRANCE(SOUTHERN_SWAMP_POISONED, 5), true),
@@ -490,7 +490,7 @@ static RegisterShipInitFunc initFunc([]() {
     Regions[RR_SOUTHERN_SWAMP_SOUTH_UPPER] = RandoRegion{ .name = "Upper South Section", .sceneId = SCENE_20SICHITAI,
         .checks = {
             CHECK(RC_SOUTHERN_SWAMP_SONG_OF_SOARING, CAN_BE_DEKU),
-            CHECK(RC_ENEMY_DROP_DRAGONFLY, CanKillEnemy(ACTOR_EN_GRASSHOPPER)),
+            CHECK(RC_ENEMY_DROP_DRAGONFLY, CanKillDropEnemy(ACTOR_EN_GRASSHOPPER)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(WOODFALL, 0),                     ENTRANCE(SOUTHERN_SWAMP_POISONED, 2), CAN_BE_DEKU),
@@ -550,9 +550,9 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_WOODFALL_GRASS_04, true),
             CHECK(RC_WOODFALL_GRASS_05, true),
             CHECK(RC_WOODFALL_GRASS_06, true),
-            CHECK(RC_ENEMY_DROP_DRAGONFLY, CanKillEnemy(ACTOR_EN_GRASSHOPPER)),
-            CHECK(RC_ENEMY_DROP_HIPLOOP, CanKillEnemy(ACTOR_EN_PP)),
-            CHECK(RC_ENEMY_DROP_MAD_SCRUB, CanKillEnemy(ACTOR_EN_DEKUNUTS)),
+            CHECK(RC_ENEMY_DROP_DRAGONFLY, CanKillDropEnemy(ACTOR_EN_GRASSHOPPER)),
+            CHECK(RC_ENEMY_DROP_HIPLOOP, CanKillDropEnemy(ACTOR_EN_PP)),
+            CHECK(RC_ENEMY_DROP_MAD_SCRUB, CanKillDropEnemy(ACTOR_EN_DEKUNUTS)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(SOUTHERN_SWAMP_POISONED, 2),      ENTRANCE(WOODFALL, 0), true),
@@ -595,7 +595,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_WOODS_OF_MYSTERY_GROTTO_GRASS_12, true),
             CHECK(RC_WOODS_OF_MYSTERY_GROTTO_GRASS_13, true),
             CHECK(RC_WOODS_OF_MYSTERY_GROTTO_GRASS_14, true),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(WOODS_OF_MYSTERY, 0),             ENTRANCE(GROTTOS, 22), true),
@@ -626,7 +626,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_WOODS_OF_MYSTERY_GRASS_21, SECOND_DAY()),
             CHECK(RC_WOODS_OF_MYSTERY_GRASS_22, FINAL_DAY()),
             CHECK(RC_WOODS_OF_MYSTERY_GRASS_23, FINAL_DAY()),
-            CHECK(RC_ENEMY_DROP_SNAPPER, CAN_BE_DEKU && CanKillEnemy(ACTOR_EN_KAME)),
+            CHECK(RC_ENEMY_DROP_SNAPPER, CAN_BE_DEKU && CanKillDropEnemy(ACTOR_EN_KAME)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(GROTTOS, 22),                     ENTRANCE(WOODS_OF_MYSTERY, 0), SECOND_DAY()),

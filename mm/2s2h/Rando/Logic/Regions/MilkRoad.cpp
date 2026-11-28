@@ -270,7 +270,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_ROMANI_RANCH_WONDER_ITEM_05, true),
             CHECK(RC_ROMANI_RANCH_WONDER_ITEM_06, true),
             // TODO: Time logic is wrong for entrance rando
-            CHECK(RC_ENEMY_DROP_ALIEN, CanKillEnemy(ACTOR_EN_INVADEPOH) && IS_NIGHT1() && CAN_BE_GORON && HAS_ITEM(ITEM_POWDER_KEG)), // Night 1 only
+            CHECK(RC_ENEMY_DROP_ALIEN, CanKillDropEnemy(ACTOR_EN_INVADEPOH) && IS_NIGHT1() && CAN_BE_GORON && HAS_ITEM(ITEM_POWDER_KEG)), // Night 1 only
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(MILK_ROAD, 1),                    ENTRANCE(ROMANI_RANCH, 0), true),

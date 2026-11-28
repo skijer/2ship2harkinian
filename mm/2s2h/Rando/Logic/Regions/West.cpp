@@ -95,7 +95,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_GREAT_BAY_COAST_COW_GROTTO_BUTTERFLY_01, HAS_ITEM(ITEM_DEKU_STICK)),
             CHECK(RC_GREAT_BAY_COAST_COW_GROTTO_BUTTERFLY_02, HAS_ITEM(ITEM_DEKU_STICK)),
             CHECK(RC_GREAT_BAY_COAST_COW_GROTTO_BUTTERFLY_03, HAS_ITEM(ITEM_DEKU_STICK)),
-            CHECK(RC_ENEMY_DROP_GIANT_BEE, CAN_USE_PROJECTILE && CanKillEnemy(ACTOR_EN_BEE)), // In a beehive
+            CHECK(RC_ENEMY_DROP_GIANT_BEE, CAN_USE_PROJECTILE && CanKillDropEnemy(ACTOR_EN_BEE)), // In a beehive
             CHECK(RC_GREAT_BAY_COAST_COW_GROTTO_BEEHIVE, CAN_USE_PROJECTILE),
         },
         .exits = { //     TO                                         FROM
@@ -119,7 +119,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_GREAT_BAY_COAST_FISHERMAN_GROTTO_GRASS_12, true),
             CHECK(RC_GREAT_BAY_COAST_FISHERMAN_GROTTO_GRASS_13, true),
             CHECK(RC_GREAT_BAY_COAST_FISHERMAN_GROTTO_GRASS_14, true),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(GREAT_BAY_COAST, 0),              ENTRANCE(GROTTOS, 26), true),
@@ -140,8 +140,8 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_GREAT_BAY_COAST_TREE_02, true),
             CHECK(RC_GREAT_BAY_COAST_TREE_03, true),
             CHECK(RC_GREAT_BAY_COAST_TREE_04, true),
-            CHECK(RC_ENEMY_DROP_LEEVER, CanKillEnemy(ACTOR_EN_NEO_REEBA)),
-            CHECK(RC_ENEMY_DROP_LIKE_LIKE, CanKillEnemy(ACTOR_EN_RR)),
+            CHECK(RC_ENEMY_DROP_LEEVER, CanKillDropEnemy(ACTOR_EN_NEO_REEBA)),
+            CHECK(RC_ENEMY_DROP_LIKE_LIKE, CanKillDropEnemy(ACTOR_EN_RR)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(TERMINA_FIELD, 2),                ENTRANCE(GREAT_BAY_COAST, 0), true),
@@ -263,7 +263,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_PINNACLE_ROCK_POT_10,            CAN_BE_ZORA),
             CHECK(RC_PINNACLE_ROCK_POT_11,            CAN_BE_ZORA),
             CHECK(RC_PINNACLE_ROCK_REUNITE_SEAHORSE,  CanKillEnemy(ACTOR_EN_DRAGON) && RANDO_EVENTS[RE_ACCESS_SEAHORSE]),
-            CHECK(RC_ENEMY_DROP_DEEP_PYTHON,          CanKillEnemy(ACTOR_EN_DRAGON)),
+            CHECK(RC_ENEMY_DROP_DEEP_PYTHON,          CanKillDropEnemy(ACTOR_EN_DRAGON)),
         },
         .connections = {
             CONNECTION(RR_PINNACLE_ROCK_ENTRANCE, CAN_USE_ABILITY(SWIM))
@@ -320,7 +320,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_ZORA_CAPE_GROTTO_GRASS_12, true),
             CHECK(RC_ZORA_CAPE_GROTTO_GRASS_13, true),
             CHECK(RC_ZORA_CAPE_GROTTO_GRASS_14, true),
-            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillEnemy(ACTOR_EN_KAREBABA)),
+            CHECK(RC_ENEMY_DROP_MINI_BABA, CanKillDropEnemy(ACTOR_EN_KAREBABA)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(ZORA_CAPE, 0),                    ENTRANCE(GROTTOS, 28), true),
@@ -328,7 +328,7 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_ZORA_CAPE_OUTSIDE_FAIRY_FOUNTAIN] = RandoRegion{ .sceneId = SCENE_31MISAKI,
         .checks = {
-            CHECK(RC_ENEMY_DROP_GUAY, CanKillEnemy(ACTOR_EN_CROW)),
+            CHECK(RC_ENEMY_DROP_GUAY, CanKillDropEnemy(ACTOR_EN_CROW)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(FAIRY_FOUNTAIN, 3),               ENTRANCE(ZORA_CAPE, 5), CAN_USE_EXPLOSIVE),
@@ -350,8 +350,8 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_ZORA_CAPE_TREE_03,                    HAS_ITEM(ITEM_HOOKSHOT)),
             CHECK(RC_ZORA_CAPE_TREE_04,                    HAS_ITEM(ITEM_HOOKSHOT)),
             CHECK(RC_ZORA_CAPE_TREE_05,                    HAS_ITEM(ITEM_HOOKSHOT)),
-            CHECK(RC_ENEMY_DROP_LEEVER,                    CanKillEnemy(ACTOR_EN_NEO_REEBA)),
-            CHECK(RC_ENEMY_DROP_LIKE_LIKE,                 CanKillEnemy(ACTOR_EN_RR)),
+            CHECK(RC_ENEMY_DROP_LEEVER,                    CanKillDropEnemy(ACTOR_EN_NEO_REEBA)),
+            CHECK(RC_ENEMY_DROP_LIKE_LIKE,                 CanKillDropEnemy(ACTOR_EN_RR)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(GREAT_BAY_COAST, 1),              ENTRANCE(ZORA_CAPE, 0), true),

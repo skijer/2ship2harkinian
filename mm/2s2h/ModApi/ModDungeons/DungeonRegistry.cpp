@@ -1,11 +1,14 @@
 #include "DungeonRegistry.h"
 #include "LogicExpr.h"
+#include "RandoChecks.h"
 #include <algorithm>
 #include <deque>
 #include <set>
 #include <random>
 #include <stdexcept>
 #include <spdlog/spdlog.h>
+#include "2s2h/Rando/ActorBehavior/ActorBehavior.h"
+#include "2s2h/Rando/Logic/EnemyDropLogic.h"
 #include "2s2h/Rando/Logic/Logic.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "2s2h/ModApi/RandoOptions/RandoOptions.h"
@@ -49,6 +52,14 @@ struct EntrancePair {
     uint32_t entry, exit;
 };
 std::vector<EntrancePair> entrancePairs;
+struct ModCheck {
+    std::string key;
+    std::string optionKey;
+    uint32_t optionValues;
+    bool isEnemyDrop = false;
+};
+std::map<int32_t, ModCheck> modChecks;
+std::map<std::string, int32_t> modCheckIds;
 std::map<uint32_t, uint32_t> entranceOverrides;
 std::map<std::string, std::string> entranceAssignment;
 int8_t backupKeys = -1;
@@ -121,7 +132,7 @@ int32_t ParseItem(int32_t dungeon, const std::string& item) {
     static const char* local[] = { "@smallkey", "@bosskey", "@map", "@compass" };
     for (int i = 0; i < 4; i++) {
         if (item == local[i]) {
-            if (!dungeons[dungeon].items[i]) {
+            if (dungeon < 0 || !dungeons[dungeon].items[i]) {
                 throw std::runtime_error("undeclared dungeon item '" + item + "'");
             }
             return dungeons[dungeon].items[i];
@@ -314,6 +325,18 @@ void LoadDungeon(const std::string& key, const Json& definition) {
     }
     entrancePairs.push_back({ key, *entrance, *exit });
 }
+Json DescribeSavedCheck(int32_t check) {
+    const auto& saved = checkSaves[check];
+    const auto& item = Rando::StaticData::Items[saved.randoItemId];
+    const char* key = RandoItems_GetKey(saved.randoItemId);
+    return { { "item", key ? key : (item.spoilerName ? item.spoilerName : "") },
+             { "shuffled", saved.shuffled },
+             { "obtained", saved.obtained },
+             { "cycleObtained", saved.cycleObtained },
+             { "skipped", saved.skipped },
+             { "price", saved.price } };
+}
+// Mod checks live outside any dungeon, so they are saved under "$checks" by their stable key.
 Json WriteState() {
     CaptureKeys();
     Json state = Json::object();
@@ -324,20 +347,32 @@ Json WriteState() {
         row["receivedKeys"] = dungeon.receivedKeys;
         row["items"] = dungeon.equipment;
         for (int32_t check : dungeon.checks) {
-            const auto& saved = checkSaves[check];
-            const auto& item = Rando::StaticData::Items[saved.randoItemId];
-            const char* key = RandoItems_GetKey(saved.randoItemId);
-            row["checks"][Rando::StaticData::Checks[(RandoCheckId)check].name] = {
-                { "item", key ? key : (item.spoilerName ? item.spoilerName : "") },
-                { "shuffled", saved.shuffled },
-                { "obtained", saved.obtained },
-                { "cycleObtained", saved.cycleObtained },
-                { "skipped", saved.skipped },
-                { "price", saved.price }
-            };
+            row["checks"][Rando::StaticData::Checks[(RandoCheckId)check].name] = DescribeSavedCheck(check);
         }
     }
+    for (const auto& [check, modCheck] : modChecks) {
+        state["$checks"][modCheck.key] = DescribeSavedCheck(check);
+    }
     return state;
+}
+void ReadSavedCheck(int32_t dungeon, int32_t id, const Json& checks, const std::string& label) {
+    auto& saved = checkSaves[id];
+    saved.randoItemId = Rando::StaticData::Checks[(RandoCheckId)id].randoItemId;
+    if (!checks.is_object()) {
+        return;
+    }
+    const auto check = checks.find(label);
+    if (check == checks.end() || !check->is_object()) {
+        return;
+    }
+    try {
+        saved.randoItemId = (RandoItemId)ParseItem(dungeon, StringField(*check, "item"));
+    } catch (const std::exception& error) { SPDLOG_WARN("[DungeonRegistry] {}", error.what()); }
+    saved.shuffled = Field(*check, "shuffled");
+    saved.obtained = Field(*check, "obtained");
+    saved.cycleObtained = Field(*check, "cycleObtained");
+    saved.skipped = Field(*check, "skipped");
+    saved.price = std::clamp((int)Field(*check, "price"), 0, 65535);
 }
 void ReadState(const Json& state) {
     RestoreKeys();
@@ -382,26 +417,14 @@ void ReadState(const Json& state) {
         dungeon.keys = std::clamp((int)Field(row, "keys"), 0, 127);
         dungeon.receivedKeys = std::clamp((int)Field(row, "receivedKeys", dungeon.keys), 0, 127);
         dungeon.equipment = Field(row, "items") & 7;
-        const auto checks = row.find("checks");
+        const Json checks = row.value("checks", Json());
         for (int32_t id : dungeon.checks) {
-            auto& saved = checkSaves[id];
-            saved.randoItemId = Rando::StaticData::Checks[(RandoCheckId)id].randoItemId;
-            if (checks == row.end() || !checks->is_object()) {
-                continue;
-            }
-            const auto check = checks->find(Rando::StaticData::Checks[(RandoCheckId)id].name);
-            if (check == checks->end() || !check->is_object()) {
-                continue;
-            }
-            try {
-                saved.randoItemId = (RandoItemId)ParseItem(index, StringField(*check, "item"));
-            } catch (const std::exception& error) { SPDLOG_WARN("[DungeonRegistry] {}", error.what()); }
-            saved.shuffled = Field(*check, "shuffled");
-            saved.obtained = Field(*check, "obtained");
-            saved.cycleObtained = Field(*check, "cycleObtained");
-            saved.skipped = Field(*check, "skipped");
-            saved.price = std::clamp((int)Field(*check, "price"), 0, 65535);
+            ReadSavedCheck(index, id, checks, Rando::StaticData::Checks[(RandoCheckId)id].name);
         }
+    }
+    const Json modCheckRows = state.is_object() ? state.value("$checks", Json()) : Json();
+    for (const auto& [id, modCheck] : modChecks) {
+        ReadSavedCheck(-1, id, modCheckRows, modCheck.key);
     }
 }
 } // namespace
@@ -465,6 +488,21 @@ int32_t ToRegistryPlacement(uint32_t nativePlacement) {
     }
 }
 
+// Dungeon checks always join the seed; a mod check joins only when its option's value is in its selection, and a
+// custom enemy's drop under the same rule as native drops.
+bool IsModCheckSelected(const RandoSaveInfo& save, int32_t check) {
+    const auto modCheck = modChecks.find(check);
+    if (modCheck == modChecks.end()) {
+        return true;
+    }
+    if (modCheck->second.isEnemyDrop) {
+        return save.randoSaveOptions[RO_SHUFFLE_ENEMY_DROPS] != RO_GENERIC_NO &&
+               Rando::Logic::IsEnemyDropEarnable((RandoCheckId)check);
+    }
+    const uint8_t value = RandoOptions_GetForSeed(modCheck->second.optionKey.c_str());
+    return value < 32 && (modCheck->second.optionValues & (1u << value)) != 0;
+}
+
 int32_t Placement(int32_t index, int32_t kind) {
     if (dungeons[index].placement[kind] != -1) {
         return dungeons[index].placement[kind];
@@ -523,6 +561,9 @@ bool DungeonRegistry_AddCheckToPool(RandoSaveInfo& save, RandoCheckId check, std
     auto& saved = DungeonRegistry_SaveCheck(save, check);
     const RandoItemId item = Rando::StaticData::Checks[check].randoItemId;
     saved.randoItemId = item;
+    if (!IsModCheckSelected(save, check)) {
+        return true;
+    }
     const auto owner = itemOwners.find(item);
     if (owner != itemOwners.end()) {
         const auto [index, kind] = owner->second;
@@ -746,4 +787,93 @@ int32_t DungeonRegistry_FindSymbol(const std::string& name) {
 int32_t DungeonRegistry_FindRegion(const std::string& name) {
     const auto custom = namedRegions.find(name);
     return custom == namedRegions.end() ? DungeonRegistry_FindSymbol(name) : custom->second;
+}
+
+namespace {
+bool IsValidCheckDefinition(const S2HRandoCheckDefinition* definition) {
+    return definition != nullptr && definition->structSize >= sizeof(S2HRandoCheckDefinition) &&
+           definition->key != nullptr && definition->name != nullptr && definition->region != nullptr &&
+           definition->optionKey != nullptr && definition->scene >= 0;
+}
+
+RandoSaveCheck* FindLoadedModCheck(int32_t check) {
+    if (!IS_RANDO || !modChecks.contains(check)) {
+        return nullptr;
+    }
+    return &DungeonRegistry_SaveCheck(gSaveContext.save.shipSaveInfo.rando, check);
+}
+} // namespace
+
+extern "C" int32_t RandoChecks_Register(const S2HRandoCheckDefinition* definition) {
+    if (!IsValidCheckDefinition(definition) || modCheckIds.contains(definition->key) || nextCheck > INT16_MAX) {
+        return -1;
+    }
+    const auto region = (RandoRegionId)DungeonRegistry_FindRegion(definition->region);
+    if (region < 0 || !Rando::Logic::Regions.contains(region)) {
+        SPDLOG_ERROR("[RandoChecks] '{}': unknown region '{}'", definition->key, definition->region);
+        return -1;
+    }
+    const std::string logic = definition->logic != nullptr && definition->logic[0] != '\0' ? definition->logic : "true";
+    std::function<bool()> predicate;
+    try {
+        predicate = Condition(logic, -1);
+    } catch (const std::exception& error) {
+        SPDLOG_ERROR("[RandoChecks] '{}': {}", definition->key, error.what());
+        return -1;
+    }
+    const int32_t id = nextCheck++;
+    const char* label = KeepName(definition->name);
+    Rando::StaticData::Checks[(RandoCheckId)id] = {
+        (RandoCheckId)id, label, RCTYPE_FREESTANDING, (SceneId)definition->scene, FLAG_NONE, -1, RI_JUNK
+    };
+    Rando::StaticData::CheckNames[(RandoCheckId)id] = label;
+    Rando::Logic::Regions[region].checks[(RandoCheckId)id] = { predicate, logic };
+    if (registeredRegions.contains(region)) {
+        registeredRegions[region].checks[(RandoCheckId)id] = { predicate, logic };
+    }
+    modChecks[id] = { definition->key, definition->optionKey, definition->optionValues };
+    modCheckIds[definition->key] = id;
+    return id;
+}
+
+int32_t DungeonRegistry_RegisterEnemyDropCheck(const char* key, const char* name) {
+    if (key == nullptr || name == nullptr || modCheckIds.contains(key) || nextCheck > INT16_MAX) {
+        return -1;
+    }
+    const int32_t id = nextCheck++;
+    const char* label = KeepName(name);
+    Rando::StaticData::Checks[(RandoCheckId)id] = {
+        (RandoCheckId)id, label, RCTYPE_ENEMY_DROP, SCENE_MAX, FLAG_NONE, 0, RI_NONE
+    };
+    Rando::StaticData::CheckNames[(RandoCheckId)id] = label;
+    modChecks[id] = { key, "", 0, true };
+    modCheckIds[key] = id;
+    return id;
+}
+
+extern "C" int32_t RandoChecks_GetId(const char* key) {
+    const auto found = key != nullptr ? modCheckIds.find(key) : modCheckIds.end();
+    return found == modCheckIds.end() ? -1 : found->second;
+}
+
+extern "C" bool RandoChecks_IsObtained(int32_t check) {
+    const RandoSaveCheck* saved = FindLoadedModCheck(check);
+    return saved != nullptr && saved->obtained;
+}
+
+extern "C" bool RandoChecks_Award(int32_t check) {
+    RandoSaveCheck* saved = FindLoadedModCheck(check);
+    if (saved == nullptr || !saved->shuffled || saved->obtained || saved->eligible) {
+        return false;
+    }
+    saved->eligible = true;
+    return true;
+}
+
+extern "C" uint8_t RandoChecks_GetItemCategory(int32_t check) {
+    const RandoSaveCheck* saved = FindLoadedModCheck(check);
+    if (saved == nullptr || !saved->shuffled) {
+        return RITYPE_MAX;
+    }
+    return Rando::ActorBehavior::GetContainerItemType((RandoCheckId)check);
 }

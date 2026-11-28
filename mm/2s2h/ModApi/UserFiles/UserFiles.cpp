@@ -18,6 +18,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/ModApi/ModApi.h"
 #include "2s2h/ModApi/ModPermissions/ModPermissions.h"
+#include "2s2h/ModApi/AssetSetup/AssetSetup.h"
 #include "2s2h/ModApi/O2rExtractor/O2rExtractor.h"
 #include "2s2h/ModApi/O2rExtractor/ModArchive.h"
 
@@ -140,10 +141,23 @@ bool MountFor(const ModIdentity* mod, const char* title) {
 #endif
 }
 
+// The asset loaders ask for the other game's ROM; Fleet's setup already holds the one the player chose.
+bool IsRomGivenByAssetSetup(const char* filterPatterns) {
+    return AssetSetup_IsRunning() && !AssetSetup_GetOtherGameRom().empty() && filterPatterns != nullptr &&
+           std::strstr(filterPatterns, ".z64") != nullptr;
+}
+
 bool PickFor(const ModIdentity* mod, const char* title, const char* filterName, const char* filterPatterns,
              S2HUserFile* file) {
     if (file == nullptr || file->structSize < S2H_USER_FILE_MIN_SIZE || !CanUseFiles(mod)) {
         return false;
+    }
+    if (IsRomGivenByAssetSetup(filterPatterns)) {
+        if (!ReadPickedFile(AssetSetup_GetOtherGameRom(), file)) {
+            return false;
+        }
+        SPDLOG_INFO("[UserFiles] Fleet's asset setup gave '{}' the ROM '{}'", mod->name, file->name);
+        return true;
     }
 #ifdef USER_FILES_HAS_DIALOGS
     const std::string dialogTitle = mod->name + ": " + (title != nullptr ? title : "Choose a file to give it");
@@ -182,6 +196,30 @@ bool IsValidExtractRequest(const S2HRomExtractRequest* request) {
            IsRelativeInside(request->filelistDir) && IsPlainFileName(request->outputFileName);
 }
 
+bool ExtractInWorkspace(const ModIdentity& mod, const S2HRomExtractRequest& request,
+                        const std::filesystem::path& workspace) {
+    if (O2rExtractor_ExportMatching(request.zapdAssetMask, workspace) == 0) {
+        SPDLOG_ERROR("[UserFiles] '{}' has no '{}' files to read the ROM with", mod.name, request.zapdAssetMask);
+        return false;
+    }
+    const std::filesystem::path romPath = workspace / kExtractRomName;
+    if (!WriteBytes(romPath, request.rom, request.romSize)) {
+        SPDLOG_ERROR("[UserFiles] Could not write the ROM for '{}' to '{}'", mod.name, romPath.string());
+        return false;
+    }
+    const std::filesystem::path outputPath = workspace / request.outputFileName;
+    if (!O2rExtractor_RunZapd({ romPath, workspace / request.zapdAssetRoot, request.xmlDir, request.configPath,
+                                request.filelistDir, outputPath })) {
+        return false;
+    }
+    std::string archiveError;
+    if (!ModArchive_Prepare(outputPath, archiveError)) {
+        SPDLOG_ERROR("[UserFiles] {}", archiveError);
+        return false;
+    }
+    return PlaceInModsFolder(outputPath, request.outputFileName);
+}
+
 bool ExtractFor(const ModIdentity* mod, const S2HRomExtractRequest* request) {
     if (!CanUseFiles(mod)) {
         return false;
@@ -202,19 +240,7 @@ bool ExtractFor(const ModIdentity* mod, const S2HRomExtractRequest* request) {
     std::error_code error;
     std::filesystem::remove_all(workspace, error);
     std::filesystem::create_directories(workspace, error);
-    const std::filesystem::path romPath = workspace / kExtractRomName;
-    const std::filesystem::path outputPath = workspace / request->outputFileName;
-    const bool prepared = O2rExtractor_ExportMatching(request->zapdAssetMask, workspace) > 0 &&
-                          WriteBytes(romPath, request->rom, request->romSize);
-    std::string archiveError;
-    const bool extracted = prepared &&
-                           O2rExtractor_RunZapd({ romPath, workspace / request->zapdAssetRoot, request->xmlDir,
-                                                  request->configPath, request->filelistDir, outputPath }) &&
-                           ModArchive_Prepare(outputPath, archiveError) &&
-                           PlaceInModsFolder(outputPath, request->outputFileName);
-    if (!archiveError.empty()) {
-        SPDLOG_ERROR("[UserFiles] {}", archiveError);
-    }
+    const bool extracted = ExtractInWorkspace(*mod, *request, workspace);
     std::filesystem::remove_all(workspace, error);
     return extracted;
 }

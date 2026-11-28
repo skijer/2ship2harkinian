@@ -19,6 +19,7 @@ typedef enum {
     CYCLE_SCENE_FLAGS,
     RANDO_INF,
     HEART_FLAGS,
+    MOD_INF,
 } FlagTableType;
 
 typedef enum {

@@ -41,6 +41,7 @@
 #include <stdlib.h>
 
 #include <SDL2/SDL_messagebox.h>
+#include <spdlog/spdlog.h>
 
 #include <array>
 #include <fstream>
@@ -567,6 +568,54 @@ std::string Extractor::Mkdtemp() {
 }
 
 extern "C" int zapd_report(int argc, char** argv, std::atomic<size_t>* extractCount, std::atomic<size_t>* totalExtract);
+
+// A symlink is cheaper, but the drives Linux players keep games on (exFAT, NTFS) often refuse one.
+static bool PlaceZapdAssets(const std::string& source, const std::string& target) {
+    std::error_code error;
+#ifndef _WIN32
+    std::filesystem::create_symlink(source, target, error);
+    if (!error) {
+        return true;
+    }
+#endif
+    std::filesystem::copy(source, target,
+                          std::filesystem::copy_options::recursive | std::filesystem::copy_options::update_existing,
+                          error);
+    if (error) {
+        SPDLOG_ERROR("Could not prepare the extractor's assets from '{}': {}", source, error.message());
+        return false;
+    }
+    return true;
+}
+
+static bool RunZapdWithoutThrowing(int argc, const char** argv, std::atomic<size_t>* extractCount,
+                                   std::atomic<size_t>* totalExtract) {
+    try {
+        const int result = zapd_report(argc, const_cast<char**>(argv), extractCount, totalExtract);
+        if (result != 0) {
+            SPDLOG_ERROR("ZAPD returned {} while extracting the ROM", result);
+        }
+        return result == 0;
+    } catch (const std::exception& exception) {
+        SPDLOG_ERROR("ZAPD stopped while extracting the ROM: {}", exception.what());
+    } catch (...) { SPDLOG_ERROR("ZAPD stopped while extracting the ROM"); }
+    return false;
+}
+
+static bool CopyArchiveTo(const std::string& archive, const std::string& target) {
+    std::error_code error;
+    if (!std::filesystem::exists(archive, error)) {
+        SPDLOG_ERROR("ZAPD finished but wrote no {}", archive);
+        return false;
+    }
+    std::filesystem::copy(archive, target, std::filesystem::copy_options::overwrite_existing, error);
+    if (error) {
+        SPDLOG_ERROR("Could not copy {} to '{}': {}", archive, target, error.message());
+        return false;
+    }
+    return true;
+}
+
 static void MessageboxWorker();
 
 bool Extractor::CallZapd(std::string installPath, std::string exportdir, std::atomic<size_t>* extractCount,
@@ -585,13 +634,11 @@ bool Extractor::CallZapd(std::string installPath, std::string exportdir, std::at
     // Work this out in the temporary folder
     std::string tempdir = Mkdtemp();
     std::string curdir = std::filesystem::current_path().string();
-#ifdef _WIN32
-    std::filesystem::copy(installPath + "/assets", tempdir + "/assets",
-                          std::filesystem::copy_options::recursive | std::filesystem::copy_options::update_existing);
-#else
-    std::filesystem::create_symlink(installPath + "/assets", tempdir + "/assets");
-#endif
-
+    if (!PlaceZapdAssets(installPath + "/assets", tempdir + "/assets")) {
+        std::error_code error;
+        std::filesystem::remove_all(tempdir, error);
+        return false;
+    }
     std::filesystem::current_path(tempdir);
 
     snprintf(xmlPath, 1024, "assets/xml/%s", version);
@@ -621,15 +668,13 @@ bool Extractor::CallZapd(std::string installPath, std::string exportdir, std::at
     argv[20] = "-osf";
     argv[21] = "placeholder";
 
-    zapd_report(argc, (char**)argv.data(), extractCount, totalExtract);
+    const bool extracted = RunZapdWithoutThrowing(argc, argv.data(), extractCount, totalExtract) &&
+                           CopyArchiveTo(otrFile, exportdir + "/" + otrFile);
 
-    std::filesystem::copy(otrFile, exportdir + "/" + otrFile, std::filesystem::copy_options::overwrite_existing);
-
-    // Go back to where this game was executed from
-    std::filesystem::current_path(curdir);
-    std::filesystem::remove_all(tempdir);
-
-    return false;
+    std::error_code error;
+    std::filesystem::current_path(curdir, error);
+    std::filesystem::remove_all(tempdir, error);
+    return extracted;
 }
 
 static void MessageboxWorker() {

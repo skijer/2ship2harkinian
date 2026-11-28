@@ -754,7 +754,9 @@ inline bool CanKillCustomEnemy(const S2HCustomEnemy* enemy) {
     if (RandoLogic_IsEnemyGranted(enemy->actorId)) {
         return true;
     }
-    const bool soulRequired = RANDO_SAVE_OPTIONS[RO_SHUFFLE_ENEMY_SOULS] && enemy->soulKey != nullptr &&
+    const RandoOptionId soulOption =
+        enemy->soulCategory == S2H_ENEMY_CATEGORY_BOSS ? RO_SHUFFLE_BOSS_SOULS : RO_SHUFFLE_ENEMY_SOULS;
+    const bool soulRequired = RANDO_SAVE_OPTIONS[soulOption] && enemy->soulKey != nullptr &&
                               EnemyRandomizer::IsSoulInPool(enemy->soulKey);
     const int32_t soulItem = soulRequired ? GetCustomEnemySoulItem(enemy->soulKey) : 0;
     if (soulItem != 0 && !RandoLogic_HasLogicItem(soulItem)) {
@@ -775,6 +777,34 @@ inline bool CanKillEnemy(ActorId EnemyId) {
         return killable;
     }
     return killable && CAN_BE_ZORA && CAN_USE_ABILITY(SWIM);
+}
+
+struct DropStandIn {
+    int16_t originalActorId;
+    int16_t spawnedActorId;
+};
+
+// Set while a relocated drop check runs the condition of the drop it was copied from, so that condition's kill of
+// the original actor is read as a kill of the actor now spawning there.
+extern DropStandIn gDropStandIn;
+
+// Drops are awarded by actor id, so a drop check is earned from whatever spawns as its actor in this scene this
+// seed, never from the enemy that replaced its actor here.
+inline bool CanKillDropEnemy(ActorId dropActorId) {
+    const int16_t actorId =
+        dropActorId == gDropStandIn.originalActorId ? gDropStandIn.spawnedActorId : (int16_t)dropActorId;
+    if (gCurrentRegionScene == SCENE_MAX || !EnemyRandomizer::IsPlacementActive()) {
+        return CanKillNativeEnemy((ActorId)actorId);
+    }
+    for (const EnemyRandomizer::LogicReplacement& spawn :
+         EnemyRandomizer::FindSpawnsOfActor(gCurrentRegionScene, actorId)) {
+        const bool killable =
+            spawn.custom != nullptr ? CanKillCustomEnemy(spawn.custom) : CanKillNativeEnemy((ActorId)spawn.actorId);
+        if (killable && (!spawn.onlySubmerged || (CAN_BE_ZORA && CAN_USE_ABILITY(SWIM)))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 inline bool CanKillNativeEnemy(ActorId EnemyId) {

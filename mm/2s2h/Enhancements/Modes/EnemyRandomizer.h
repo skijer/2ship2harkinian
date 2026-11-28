@@ -28,7 +28,16 @@ void AssignForSeed(uint32_t seed);
 void WriteSpoiler(nlohmann::json& spoiler);
 void ReadSpoiler(const nlohmann::json& spoiler);
 
+struct SceneReplacement {
+    int16_t originalActorId;
+    LogicReplacement replacement;
+};
+
 LogicReplacement FindLogicReplacement(int16_t sceneId, int16_t originalActorId);
+bool IsPlacementActive();
+// What spawns as this actor in the scene this seed: kept originals and replacements. Enemy drops follow these.
+std::vector<LogicReplacement> FindSpawnsOfActor(int16_t sceneId, int16_t actorId);
+std::vector<SceneReplacement> ListSceneReplacements(int16_t sceneId);
 bool IsSoulInPool(const char* soulKey);
 bool IsCustomSoulItemExcluded(int32_t randoItem);
 

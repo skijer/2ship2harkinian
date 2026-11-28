@@ -16,5 +16,7 @@ extern bool HaveEnemySoul(ActorId enemyId);
 const std::vector<NativeEnemySoul>& GetNativeEnemySouls();
 const char* GetNativeEnemySoulKey(RandoItemId randoItemId);
 int32_t GetCustomEnemySoulItem(const char* soulKey);
+// True when the soul is owned, left out of the soul pool, or has no item.
+bool HaveCustomEnemySoul(const char* soulKey);
 
 #endif // SOULS_H

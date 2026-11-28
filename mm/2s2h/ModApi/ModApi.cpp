@@ -1,5 +1,6 @@
 #include "2s2h/Unbound/UnboundAudio.h"
 #include "2s2h/ModApi/ModDungeons/DungeonRegistry.h"
+#include "2s2h/ModApi/ModCounters/ModCounters.h"
 #include "ModApi.h"
 #include "ModStore/ModStore.h"
 
@@ -359,6 +360,14 @@ S2HModApi BuildTable() {
     api.IsFormActive = FormRegistry_IsActive;
     api.IsFormSuspended = FormRegistry_IsSuspended;
     api.GetNetPlayerColor = Anchor_GetPlayerColor;
+    api.RegisterModCounter = ModCounters_Register;
+    api.GetModCounter = ModCounters_Get;
+    api.SetModCounter = ModCounters_Set;
+    api.RegisterRandoCheck = RandoChecks_Register;
+    api.GetRandoCheckId = RandoChecks_GetId;
+    api.IsRandoCheckObtained = RandoChecks_IsObtained;
+    api.AwardRandoCheck = RandoChecks_Award;
+    api.GetRandoCheckItemCategory = RandoChecks_GetItemCategory;
     api.BlockPlayerInput = PlayerInput_Block;
     api.ReleasePlayerInput = PlayerInput_Release;
     api.ShowTextbox = CustomItemRegistry_ShowTextbox;
@@ -503,6 +512,7 @@ void ModApi_Init() {
     PlayerInput_Init();
     FormRegistry_Init();
     RandoInfCustom_Init();
+    ModCounters_Init();
     RandoOptions_Init();
     TimeControl_Init();
     if (Ship::Context::GetRawInstance()->GetWindow() != nullptr) {

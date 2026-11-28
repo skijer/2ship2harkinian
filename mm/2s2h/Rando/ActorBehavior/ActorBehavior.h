@@ -42,6 +42,11 @@ void InitEnElfgrpBehavior();
 void InitEnElforgBehavior();
 void InitEnFish2Behavior();
 void InitEnemyDropBehavior();
+// The drop check an actor awards when killed, or RC_UNKNOWN; and the actors that award a given drop check.
+RandoCheckId GetEnemyDropCheck(int16_t actorId);
+std::vector<int16_t> GetEnemyDropActors(RandoCheckId check);
+// A custom enemy's drop, awarded when it is killed like the native KILL drops.
+void RegisterEnemyDrop(int16_t actorId, RandoCheckId check);
 void InitEnFsnBehavior();
 void InitEnFuBehavior();
 void InitEnGamelupyBehavior();

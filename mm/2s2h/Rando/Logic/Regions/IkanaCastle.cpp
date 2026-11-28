@@ -19,7 +19,7 @@ static RegisterShipInitFunc initFunc([]() {
         .checks = {
             CHECK(RC_ANCIENT_CASTLE_OF_IKANA_LEFT_THIRD_ROOM_POT_01, true),
             CHECK(RC_ANCIENT_CASTLE_OF_IKANA_LEFT_THIRD_ROOM_POT_02, true),
-            CHECK(RC_ENEMY_DROP_BLUE_BUBBLE, CanKillEnemy(ACTOR_EN_BB)),
+            CHECK(RC_ENEMY_DROP_BLUE_BUBBLE, CanKillDropEnemy(ACTOR_EN_BB)),
         },
         .connections = {
             CONNECTION(RR_IKANA_CASTLE_SKULLTULA_ROOM, CAN_USE_SWORD),
@@ -51,8 +51,8 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_ANCIENT_CASTLE_OF_IKANA_COURTYARD_GRASS_11, true),
             CHECK(RC_ANCIENT_CASTLE_OF_IKANA_COURTYARD_GRASS_12, true),
             CHECK(RC_ANCIENT_CASTLE_OF_IKANA_EXTERIOR_POT, true),
-            CHECK(RC_ENEMY_DROP_GUAY, CanKillEnemy(ACTOR_EN_CROW)),
-            CHECK(RC_ENEMY_DROP_GARO, CanKillEnemy(ACTOR_EN_JSO)),
+            CHECK(RC_ENEMY_DROP_GUAY, CanKillDropEnemy(ACTOR_EN_CROW)),
+            CHECK(RC_ENEMY_DROP_GARO, CanKillDropEnemy(ACTOR_EN_JSO)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(BENEATH_THE_WELL, 1),             ENTRANCE(IKANA_CASTLE, 0), true),
@@ -64,7 +64,7 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_IKANA_CASTLE_FLOORMASTER_ROOM] = RandoRegion{ .name = "Floormaster Room", .sceneId = SCENE_CASTLE,
         .checks = {
-            CHECK(RC_ENEMY_DROP_FLOORMASTER, CanKillEnemy(ACTOR_EN_FLOORMAS)),
+            CHECK(RC_ENEMY_DROP_FLOORMASTER, CanKillDropEnemy(ACTOR_EN_FLOORMAS)),
         },
         .connections = {
             CONNECTION(RR_IKANA_CASTLE_MAIN_ROOM, true),
@@ -76,7 +76,7 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_IKANA_CASTLE_FLOORMASTER_ROOM_REDEAD_AREA] = RandoRegion{ .name = "Floormaster Room, Redead Area", .sceneId = SCENE_CASTLE,
         .checks = {
-            CHECK(RC_ENEMY_DROP_REDEAD, CanKillEnemy(ACTOR_EN_RD)),
+            CHECK(RC_ENEMY_DROP_REDEAD, CanKillDropEnemy(ACTOR_EN_RD)),
         },
         .connections = {
             CONNECTION(RR_IKANA_CASTLE_FLOORMASTER_ROOM, CAN_USE_MAGIC_ARROW(LIGHT)),
@@ -85,7 +85,7 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_IKANA_CASTLE_FRONT_ENTRANCE] = RandoRegion{ .name = "Front Entrance", .sceneId = SCENE_CASTLE,
         .checks = {
-            CHECK(RC_ENEMY_DROP_REDEAD, CanKillEnemy(ACTOR_EN_RD)),
+            CHECK(RC_ENEMY_DROP_REDEAD, CanKillDropEnemy(ACTOR_EN_RD)),
         },
         .exits = { //     TO                                         FROM
             EXIT(ENTRANCE(IKANA_CANYON, 8),                 ENTRANCE(IKANA_CASTLE, 1), true),
@@ -139,7 +139,7 @@ static RegisterShipInitFunc initFunc([]() {
         .checks = {
             CHECK(RC_ANCIENT_CASTLE_OF_IKANA_RIGHT_POT_01, true),
             CHECK(RC_ANCIENT_CASTLE_OF_IKANA_RIGHT_POT_02, true),
-            CHECK(RC_ENEMY_DROP_REDEAD, CanKillEnemy(ACTOR_EN_RD)),
+            CHECK(RC_ENEMY_DROP_REDEAD, CanKillDropEnemy(ACTOR_EN_RD)),
         },
         .connections = {
             CONNECTION(RR_IKANA_CASTLE_WIZZROBE_ROOM, true),
@@ -152,7 +152,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_ANCIENT_CASTLE_OF_IKANA_LEFT_SECOND_ROOM_POT_02, CAN_BE_DEKU || HAS_ITEM(ITEM_BOW)),
             CHECK(RC_ANCIENT_CASTLE_OF_IKANA_LEFT_SECOND_ROOM_POT_03, CAN_BE_DEKU || HAS_ITEM(ITEM_BOW)),
             CHECK(RC_ANCIENT_CASTLE_OF_IKANA_LEFT_SECOND_ROOM_POT_04, CAN_BE_DEKU || HAS_ITEM(ITEM_BOW)),
-            CHECK(RC_ENEMY_DROP_SKULLTULA, CanKillEnemy(ACTOR_EN_ST)),
+            CHECK(RC_ENEMY_DROP_SKULLTULA, CanKillDropEnemy(ACTOR_EN_ST)),
         },
         .connections = {
             CONNECTION(RR_IKANA_CASTLE_CEILING_ROOM, CAN_USE_SWORD || CAN_USE_PROJECTILE),
@@ -178,7 +178,7 @@ static RegisterShipInitFunc initFunc([]() {
     };
     Regions[RR_IKANA_CASTLE_WIZZROBE_ROOM] = RandoRegion{ .name = "Wizrobe Room", .sceneId = SCENE_CASTLE,
         .checks = {
-            CHECK(RC_ENEMY_DROP_WIZROBE, CanKillEnemy(ACTOR_EN_WIZ)),
+            CHECK(RC_ENEMY_DROP_WIZROBE, CanKillDropEnemy(ACTOR_EN_WIZ)),
         },
         .connections = {
             CONNECTION(RR_IKANA_CASTLE_FLOORMASTER_ROOM_REDEAD_AREA, CanKillEnemy(ACTOR_EN_WIZ)),

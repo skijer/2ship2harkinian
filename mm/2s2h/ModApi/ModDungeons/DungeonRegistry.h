@@ -26,6 +26,8 @@ bool DungeonRegistry_HasKeys(int32_t dungeon, int32_t count);
 bool DungeonRegistry_HasBossKey(int32_t dungeon);
 bool DungeonRegistry_GetEvent(int32_t dungeon, const std::string& name);
 int32_t DungeonRegistry_FindRegion(const std::string& name);
+// A drop check with no region of its own: the enemy drop logic places it where its enemy spawns.
+int32_t DungeonRegistry_RegisterEnemyDropCheck(const char* key, const char* name);
 int32_t DungeonRegistry_FindSymbol(const std::string& name);
 void DungeonRegistry_WriteSpoiler(nlohmann::json& spoiler);
 void DungeonRegistry_ReadSpoiler(const nlohmann::json& spoiler);

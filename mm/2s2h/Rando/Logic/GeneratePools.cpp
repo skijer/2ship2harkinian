@@ -1,6 +1,8 @@
 #include "2s2h/ModApi/ProgressiveItems/ProgressiveItems.h"
 #include "Logic.h"
+#include "EnemyDropLogic.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
+#include "2s2h/ModApi/ActorRegistry/EnemySouls.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -142,7 +144,8 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             }
 
             if (randoStaticCheck.randoCheckType == RCTYPE_ENEMY_DROP &&
-                saveInfo.randoSaveOptions[RO_SHUFFLE_ENEMY_DROPS] == RO_GENERIC_NO) {
+                (saveInfo.randoSaveOptions[RO_SHUFFLE_ENEMY_DROPS] == RO_GENERIC_NO ||
+                 !Rando::Logic::IsEnemyDropEarnable(randoCheckId))) {
                 continue;
             }
 
@@ -405,6 +408,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     }
 
     RandoItems_AddToPool(itemPool);
+    EnemySouls_AddToPool(saveInfo, itemPool);
     std::erase_if(itemPool, [](RandoItemId item) { return EnemyRandomizer::IsCustomSoulItemExcluded(item); });
     ProgressiveItems_ConfigurePool(itemPool);
     PlaceVanillaDungeonItems(saveInfo, checkPool, itemPool);

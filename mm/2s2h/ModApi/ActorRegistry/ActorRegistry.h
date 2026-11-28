@@ -24,6 +24,33 @@ typedef void (*S2HActorResetFunc)(void);
 #define S2H_ACTOR_ENEMY_NEEDS_CEILING (1 << 6)
 #define S2H_ACTOR_ENEMY_UNDERWATER (1 << 7)
 
+typedef enum {
+    S2H_ENEMY_CATEGORY_REGULAR,
+    S2H_ENEMY_CATEGORY_MINIBOSS,
+    S2H_ENEMY_CATEGORY_BOSS,
+} S2HEnemyCategory;
+
+// The game whose vanilla roster has the family; AUTO reads the soul key's "oot." or "mm." prefix. Labels only.
+typedef enum {
+    S2H_ENEMY_ORIGIN_AUTO,
+    S2H_ENEMY_ORIGIN_CUSTOM,
+    S2H_ENEMY_ORIGIN_OOT,
+    S2H_ENEMY_ORIGIN_MM,
+} S2HEnemyOrigin;
+
+// The enemy idling inside its soul flame. A null skeleton leaves the soul item to the mod.
+typedef struct {
+    const char* skeleton;
+    const char* idleAnimation;
+    uint8_t isFlex;
+    uint8_t limbCount;
+    float scale;
+    float yOffset;
+    uint8_t flameRed;
+    uint8_t flameGreen;
+    uint8_t flameBlue;
+} S2HSoulModel;
+
 typedef bool (*S2HLogicKillFunc)(void* userData);
 
 // Ship's fields after reset, which 2Ship shipped first: same names, appended so older mods keep their layout.
@@ -47,6 +74,10 @@ typedef struct {
     const char* soulKey;
     S2HLogicKillFunc logicKill;
     void* logicKillUserData;
+    uint8_t enemyCategory;
+    uint8_t enemyOrigin;
+    uint8_t dropOnKill;
+    S2HSoulModel soulModel;
 } S2HActorDefinition;
 
 #define S2H_ACTOR_DEFINITION_MIN_SIZE (offsetof(S2HActorDefinition, draw) + sizeof(((S2HActorDefinition*)0)->draw))
@@ -57,6 +88,8 @@ typedef struct {
     (offsetof(S2HActorDefinition, naviHint) + sizeof(((S2HActorDefinition*)0)->naviHint))
 #define S2H_ACTOR_DEFINITION_SOUL_SIZE \
     (offsetof(S2HActorDefinition, logicKillUserData) + sizeof(((S2HActorDefinition*)0)->logicKillUserData))
+#define S2H_ACTOR_DEFINITION_GENERIC_SOUL_SIZE \
+    (offsetof(S2HActorDefinition, soulModel) + sizeof(((S2HActorDefinition*)0)->soulModel))
 
 typedef struct {
     const char* key;
@@ -68,6 +101,10 @@ typedef struct {
     const char* soulKey;
     S2HLogicKillFunc logicKill;
     void* logicKillUserData;
+    // The soul's category, set by the first definition naming the soul; it picks the soul shuffle option.
+    uint8_t soulCategory;
+    // The drop check registered for dropOnKill, or -1.
+    int32_t dropCheck;
 } S2HCustomEnemy;
 
 int16_t ActorRegistry_Register(const S2HActorDefinition* definition);

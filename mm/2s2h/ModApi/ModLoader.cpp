@@ -99,19 +99,20 @@ class ModLibrary {
         Unload();
     }
 
-    bool Load(const std::vector<char>& libraryImage) {
-        const std::string path = WriteToTemporaryFile(libraryImage);
+    bool Load(const std::vector<char>& libraryImage, [[maybe_unused]] const std::string& hash) {
+#if defined(_WIN32)
+        const std::string path = WriteCachedImage(libraryImage, hash);
         if (path.empty()) {
             return false;
         }
-#if defined(_WIN32)
         mHandle = LoadLibraryA(path.c_str());
-        mFileToDelete = path;
 #elif defined(__APPLE__) || defined(__linux__)
+        const std::string path = WriteTemporaryImage(libraryImage);
+        if (path.empty()) {
+            return false;
+        }
         mHandle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
         unlink(path.c_str());
-#else
-        std::filesystem::remove(path);
 #endif
         return mHandle != nullptr;
     }
@@ -142,37 +143,53 @@ class ModLibrary {
     }
 
   private:
-    static std::string WriteToTemporaryFile(const std::vector<char>& libraryImage) {
-        std::string path;
+    static bool WriteImage(const std::filesystem::path& path, const std::vector<char>& libraryImage) {
+        std::ofstream output(path, std::ios::binary | std::ios::trunc);
+        output.write(libraryImage.data(), static_cast<std::streamsize>(libraryImage.size()));
+        output.close();
+        return static_cast<bool>(output);
+    }
+
 #if defined(_WIN32)
-        char temporaryDirectory[MAX_PATH];
-        char temporaryFile[MAX_PATH];
-        if (GetTempPathA(MAX_PATH, temporaryDirectory) == 0 ||
-            GetTempFileNameA(temporaryDirectory, "s2h", 0, temporaryFile) == 0) {
+    // Named by content and kept between runs: a killed process never deletes its copy, and the fresh
+    // GetTempFileName names leaked that way fill its 65535 slots, slowing and then failing every load.
+    static std::string WriteCachedImage(const std::vector<char>& libraryImage, const std::string& hash) {
+        std::error_code error;
+        const std::filesystem::path temporary = std::filesystem::temp_directory_path(error);
+        if (error) {
             return {};
         }
-        path = temporaryFile;
+        const std::filesystem::path folder = temporary / "unbound-mods" / "2ship";
+        const std::filesystem::path path = folder / (hash + ".dll");
+        if (std::filesystem::file_size(path, error) == libraryImage.size()) {
+            return path.string();
+        }
+        std::filesystem::create_directories(folder, error);
+        // Both games and the pool worker may place the same binary at once, so each writes aside and renames.
+        const std::filesystem::path staging = folder / (hash + "." + std::to_string(GetCurrentProcessId()) + ".part");
+        const bool isPlaced = WriteImage(staging, libraryImage) &&
+                              MoveFileExA(staging.string().c_str(), path.string().c_str(), MOVEFILE_REPLACE_EXISTING);
+        if (!isPlaced) {
+            std::filesystem::remove(staging, error);
+        }
+        return std::filesystem::exists(path, error) ? path.string() : std::string{};
+    }
 #elif defined(__APPLE__) || defined(__linux__)
+    static std::string WriteTemporaryImage(const std::vector<char>& libraryImage) {
         char pathTemplate[] = "/tmp/2ship_mod_XXXXXX";
-        int descriptor = mkstemp(pathTemplate);
+        const int descriptor = mkstemp(pathTemplate);
         if (descriptor == -1) {
             return {};
         }
         fchmod(descriptor, 0755);
         close(descriptor);
-        path = pathTemplate;
-#else
-        return {};
-#endif
-        std::ofstream output(path, std::ios::binary | std::ios::trunc);
-        output.write(libraryImage.data(), static_cast<std::streamsize>(libraryImage.size()));
-        output.close();
-        if (!output) {
-            std::filesystem::remove(path);
+        if (!WriteImage(pathTemplate, libraryImage)) {
+            unlink(pathTemplate);
             return {};
         }
-        return path;
+        return pathTemplate;
     }
+#endif
 
     void Unload() {
         if (mHandle == nullptr) {
@@ -180,9 +197,6 @@ class ModLibrary {
         }
 #if defined(_WIN32)
         FreeLibrary(static_cast<HMODULE>(mHandle));
-        if (!mFileToDelete.empty()) {
-            DeleteFileA(mFileToDelete.c_str());
-        }
 #elif defined(__APPLE__) || defined(__linux__)
         dlclose(mHandle);
 #endif
@@ -194,7 +208,6 @@ class ModLibrary {
 #else
     void* mHandle = nullptr;
 #endif
-    std::string mFileToDelete;
 };
 
 struct LoadedMod {
@@ -421,7 +434,7 @@ std::unique_ptr<LoadedMod> LoadNativeMod(const NativeModPackage& package) {
     mod->archivePath = package.archivePath;
     mod->requiredResources = package.requiredResources;
     mod->binaryHash = Hex(HashBytes(*package.binary));
-    if (!mod->library.Load(*package.binary)) {
+    if (!mod->library.Load(*package.binary, mod->binaryHash)) {
         SPDLOG_ERROR("[ModApi] Native library for mod '{}' could not be loaded", package.name);
         return nullptr;
     }

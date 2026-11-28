@@ -1,6 +1,7 @@
 #include "Spoiler.h"
 #include "2s2h/ModApi/ModDungeons/BossRegistry.h"
 #include "2s2h/Enhancements/Modes/EnemyRandomizer.h"
+#include "2s2h/ModApi/ActorRegistry/EnemySouls.h"
 #include "Rando/Rando.h"
 #include "2s2h/ModApi/RandoItems/RandoItems.h"
 #include "2s2h/ModApi/CustomItemRegistry/CustomItemRegistry.h"
@@ -59,6 +60,7 @@ nlohmann::json GenerateFromSaveContext() {
     BossRegistry_WriteSpoiler(spoiler);
     DungeonRegistry_WriteSpoiler(spoiler);
     EnemyRandomizer::WriteSpoiler(spoiler);
+    EnemySouls_WriteSpoiler(spoiler);
     return spoiler;
 }
 
